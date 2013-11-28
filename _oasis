@@ -1,0 +1,13 @@
+OASISFormat: 0.3
+Name:        bistro
+Version:     0.1
+Synopsis:    A tiny library to build and execute (typed) workflows of shell
+  calls
+Authors:     Philippe Veber
+License:     GPL-3.0
+Plugins:     META (0.3), DevFiles (0.3)
+BuildTools: ocamlbuild
+
+Library bistro
+  Path:       src/lib
+  Modules:    Bistro
