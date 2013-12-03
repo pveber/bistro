@@ -9,5 +9,7 @@ Plugins:     META (0.3), DevFiles (0.3)
 BuildTools: ocamlbuild
 
 Library bistro
-  Path:       src/lib
-  Modules:    Bistro
+  Path:         src/lib
+  Pack:         true
+  Modules:      Workflow
+  BuildDepends: core, threads
