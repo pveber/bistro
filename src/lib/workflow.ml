@@ -52,6 +52,25 @@ let exec_cmd dest path x =
   in
   aux x
 
+let deps = function
+  | Input _ -> []
+  | Rule r -> r.deps
+  | Select (dir,_) -> [ dir ]
+
+let depth_first_traversal w ~init ~f =
+  let rec aux marked accu w =
+    let id = digest w in
+    if String.Set.mem marked id then (marked, accu)
+    else (
+      let marked, accu = List.fold_left (deps w) ~init:(marked, accu) ~f:(fun (marked, accu) -> aux marked accu) in
+      String.Set.add marked id,
+      f w accu
+    )
+  in
+  snd (aux String.Set.empty init w)
+
+let input x = Input x
+
 let deps_of_cmd x =
   let rec aux = function
     | A _ | D | N -> []
@@ -64,7 +83,6 @@ let deps_of_cmd x =
   in
   List.dedup (aux x)
 
-let input x = Input x
 let make cmds = Rule {
   cmds = cmds ;
   deps = (

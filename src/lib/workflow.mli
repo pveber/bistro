@@ -30,6 +30,7 @@ val path :
   u -> path
 val exec_cmd : string -> (u -> path) -> cmd -> string list
 
+val depth_first_traversal : _ t -> init:'a -> f:(u -> 'a -> 'a) -> 'a
 
 (** {5 Constructors} *)
 val input : path -> 'a t

@@ -18,3 +18,8 @@ Executable base_test
   Path:         src/test
   MainIs:       base_test.ml
   BuildDepends: bistro
+
+Executable dft
+  Path:         src/test
+  MainIs:       dft.ml
+  BuildDepends: bistro
