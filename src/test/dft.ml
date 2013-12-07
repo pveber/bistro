@@ -14,6 +14,9 @@ let rec task i =
   make [
     S [ A"echo" ; A(string_of_int i) ; A">" ; D ]
   ]
-  |> fun init -> List.fold_left deps ~init ~f:(fun accu dep -> depends ~on:dep accu)
+  |> fun init ->
+    List.fold_left deps
+      ~init
+      ~f:(fun accu dep -> depends ~on:dep accu)
 
 let () = Export.to_script ~cache_dir:"_bistro" (task 20) stdout
