@@ -11,8 +11,8 @@ BuildTools: ocamlbuild
 Library bistro
   Path:         src/lib
   Pack:         true
-  Modules:      Export, File, Workflow
-  BuildDepends: core, threads
+  Modules:      Db, Export, File, Sequential, Workflow
+  BuildDepends: core, shell, threads
 
 Executable base_test
   Path:         src/test
@@ -22,4 +22,9 @@ Executable base_test
 Executable dft
   Path:         src/test
   MainIs:       dft.ml
+  BuildDepends: bistro
+
+Executable nlp_test
+  Path:         src/test
+  MainIs:       nlp_test.ml
   BuildDepends: bistro

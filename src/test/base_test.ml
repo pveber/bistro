@@ -27,4 +27,4 @@ let pdf : [`pdf] File.t = Workflow.(
   |> depends ~on:fig (* fig is added as a new dep although it is useless *)
 )
 
-let () = Export.to_script ~cache_dir:"_bistro" pdf stdout
+let () = Export.to_script (Db.make "_bistro") pdf stdout

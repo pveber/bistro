@@ -24,14 +24,6 @@ and cmd =
 let digest x =
   Digest.to_hex (Digest.string (Marshal.to_string x []))
 
-let rec path ~cache_dir = function
-  | Input p -> p
-  | Select (dir, p) ->
-    Filename.concat (path ~cache_dir dir) p
-  | Rule r as w ->
-    Filename.concat cache_dir (digest w)
-
-
 let quote = sprintf "'%s'"
 
 let exec_cmd dest path x =

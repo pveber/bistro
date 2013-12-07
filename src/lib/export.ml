@@ -17,9 +17,9 @@ let script_calls_of_workflow path oc = function
     )
 
 
-let to_script ~cache_dir (w : _ t) oc =
-  let path = Workflow.path ~cache_dir in
-  fprintf oc "mkdir -p %s" cache_dir ;
+let to_script db (w : _ t) oc =
+  let path x = Db.path db (x :> u) in
+  fprintf oc "mkdir -p %s" (Db.cache_dir db) ;
   depth_first_traversal
     ~init:()
     ~f:(fun w () -> script_calls_of_workflow path oc w)

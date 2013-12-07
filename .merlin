@@ -3,3 +3,4 @@ B _build/src/test
 S src/lib
 S src/test
 PKG core
+PKG shell

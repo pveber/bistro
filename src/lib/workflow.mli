@@ -27,9 +27,6 @@ and cmd =
 
 (** {5 Observers}*)
 val digest : u -> string
-val path :
-  cache_dir:string ->
-  u -> path
 val exec_cmd : string -> (u -> path) -> cmd -> string list
 
 val depth_first_traversal : _ t -> init:'a -> f:(u -> 'a -> 'a) -> 'a

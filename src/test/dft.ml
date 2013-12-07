@@ -19,4 +19,4 @@ let rec task i =
       ~init
       ~f:(fun accu dep -> depends ~on:dep accu)
 
-let () = Export.to_script ~cache_dir:"_bistro" (task 20) stdout
+let () = Export.to_script (Db.make "_bistro") (task 20) stdout
