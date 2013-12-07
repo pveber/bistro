@@ -14,21 +14,22 @@ let shell (log : _ Db.logger) s =
 
 
 let exec db w =
-  let upath = Db.cache_path db in
   let foreach = Workflow.(function
     | Input p ->
       if Sys.file_exists p <> `Yes
       then failwithf "File %s is declared as an input of a workflow but does not exist." p ()
 
-    | Select (dir, p) ->
-      if Sys.file_exists (Filename.concat (upath dir) p) <> `Yes
+    | Select (_, p) as x ->
+      if Sys.file_exists (Db.path db x) <> `Yes
       then failwithf "No file or directory named %s in directory workflow." p ()
     | Rule r as x ->
       Db.with_logger db x ~f:(fun log ->
 	List.iter r.cmds (fun cmd ->
-	  let tokens = exec_cmd (upath x) upath cmd in
+	  let tmp_path = Db.tmp_path db x in
+	  let tokens = exec_cmd tmp_path (Db.path db) cmd in
 	  let line = String.concat ~sep:" " tokens in
-	  shell log line
+	  shell log line ;
+	  Unix.rename ~src:tmp_path ~dst:(Db.cache_path db x)
 	)
       )
   )
