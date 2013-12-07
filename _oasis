@@ -11,5 +11,10 @@ BuildTools: ocamlbuild
 Library bistro
   Path:         src/lib
   Pack:         true
-  Modules:      Workflow
+  Modules:      Export, File, Workflow
   BuildDepends: core, threads
+
+Executable base_test
+  Path:         src/test
+  MainIs:       base_test.ml
+  BuildDepends: bistro
