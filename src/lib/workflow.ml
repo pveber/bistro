@@ -12,12 +12,14 @@ and rule = {
   deps : u list ;
 }
 and cmd =
-| A : string -> cmd
-| W : u -> cmd
-| S : cmd list -> cmd
-| Q : cmd -> cmd
-| D : cmd
-| N : cmd
+| S : string -> cmd
+| I : int -> cmd
+| F : float -> cmd
+| W : u -> cmd (* workflow *)
+| L : cmd list -> cmd
+| Q : cmd -> cmd (* inside a quotation, nothing is quoted *)
+| D : cmd (* destination *)
+| E : cmd (* empty word *)
 
 let digest x =
   Digest.to_hex (Digest.string (Marshal.to_string x []))
@@ -34,21 +36,25 @@ let quote = sprintf "'%s'"
 
 let exec_cmd dest path x =
   let rec aux = function
-    | A a -> [ a ]
+    | S s -> [ s ]
+    | I i -> [ string_of_int i ]
+    | F f -> [ Float.to_string f ]
     | W w -> [ path w ]
-    | S s ->
-      List.fold_right (List.map s aux) ~f:( @ ) ~init:[]
+    | L l ->
+      List.fold_right (List.map l aux) ~f:( @ ) ~init:[]
     | Q q -> [ quote (aux_quotation q) ]
     | D -> [ dest ]
-    | N -> []
+    | E -> []
   and aux_quotation = function
-    | A a -> a
+    | S s -> s
+    | I i -> string_of_int i
+    | F f -> Float.to_string f
     | W w -> path w
-    | S s ->
+    | L s ->
       String.concat ~sep:"" (List.map s aux_quotation)
     | Q q -> aux_quotation q
     | D -> dest
-    | N -> ""
+    | E -> ""
   in
   aux x
 
@@ -73,8 +79,8 @@ let input x = Input x
 
 let deps_of_cmd x =
   let rec aux = function
-    | A _ | D | N -> []
-    | S s -> (
+    | S _ | F _ | I _ | D | E -> []
+    | L s -> (
       List.map s ~f:aux
       |> List.fold_left ~init:[] ~f:( @ )
     )

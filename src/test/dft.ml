@@ -12,7 +12,7 @@ let rec task i =
     )
   in
   make [
-    S [ A"echo" ; A(string_of_int i) ; A">" ; D ]
+    L [ S"echo" ; I i ; S">" ; D ]
   ]
   |> fun init ->
     List.fold_left deps

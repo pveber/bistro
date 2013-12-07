@@ -10,12 +10,14 @@ and rule = {
   deps : u list ;
 }
 and cmd =
-| A : string -> cmd (* atom = string *)
+| S : string -> cmd
+| I : int -> cmd
+| F : float -> cmd
 | W : 'a t -> cmd (* workflow *)
-| S : cmd list -> cmd
+| L : cmd list -> cmd
 | Q : cmd -> cmd (* inside a quotation, nothing is quoted *)
 | D : cmd (* destination *)
-| N : cmd (* nothing *)
+| E : cmd (* empty word *)
 
   (**
      Examples of command:
