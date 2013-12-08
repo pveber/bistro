@@ -1,6 +1,10 @@
 open Core.Std
 
-let shell (log : _ Db.logger) s =
+let shell
+    (log : _ Db.logger)
+    ?(stdout = stdout)
+    ?(stderr = stderr)
+    s =
   log `debug "sh call:\n\n%s\n\n" s ;
   try
     Shell.call
@@ -24,12 +28,16 @@ let exec db w =
       then failwithf "No file or directory named %s in directory workflow." p ()
     | Rule r as x ->
       Db.with_logger db x ~f:(fun log ->
-	List.iter r.cmds (fun cmd ->
-	  let tmp_path = Db.tmp_path db x in
-	  let tokens = exec_cmd tmp_path (Db.path db) cmd in
-	  let line = String.concat ~sep:" " tokens in
-	  shell log line ;
-	  Unix.rename ~src:tmp_path ~dst:(Db.cache_path db x)
+	Out_channel.with_file (Db.stdout_path db x) ~f:(fun stdout ->
+	  Out_channel.with_file (Db.stderr_path db x) ~f:(fun stderr ->
+	    List.iter r.cmds (fun cmd ->
+	      let tmp_path = Db.tmp_path db x in
+	      let tokens = exec_cmd tmp_path (Db.path db) cmd in
+	      let line = String.concat ~sep:" " tokens in
+	      shell ~stdout ~stderr log line ;
+	      Unix.rename ~src:tmp_path ~dst:(Db.cache_path db x)
+	    )
+	  )
 	)
       )
   )

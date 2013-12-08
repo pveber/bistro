@@ -11,6 +11,8 @@ val tmp_dir : t -> string
 val path : t -> Workflow.u -> string
 val cache_path : t -> Workflow.u -> string
 val tmp_path   : t -> Workflow.u -> string
+val stdout_path : t -> Workflow.u -> string
+val stderr_path : t -> Workflow.u -> string
 
 type 'a logger = [ `debug | `info | `warning | `error ] -> ('a,unit,string,unit) format4 -> 'a
 
