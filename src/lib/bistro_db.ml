@@ -20,7 +20,7 @@ let setup base =
   Unix.mkdir_p (history_dir base)
 
 let aux_path f db w =
-  Filename.concat (f db) (Workflow.digest w)
+  Filename.concat (f db) (Bistro_workflow.digest w)
 
 let cache_path db w = aux_path cache_dir db w
 let log_path db w = aux_path log_dir db w
@@ -28,7 +28,7 @@ let tmp_path db w = aux_path tmp_dir db w
 let stdout_path db w = aux_path stdout_dir db w
 let stderr_path db w = aux_path stderr_dir db w
 
-let rec path db = Workflow.(function
+let rec path db = Bistro_workflow.(function
   | Input p -> p
   | Select (dir, p) ->
     Filename.concat (path db dir) p

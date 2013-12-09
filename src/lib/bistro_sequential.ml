@@ -1,7 +1,7 @@
 open Core.Std
 
 let shell
-    (log : _ Db.logger)
+    (log : _ Bistro_db.logger)
     ?(stdout = stdout)
     ?(stderr = stderr)
     s =
@@ -18,32 +18,32 @@ let shell
 
 
 let exec db w =
-  let foreach = Workflow.(function
+  let foreach = Bistro_workflow.(function
     | Input p ->
       if Sys.file_exists p <> `Yes
       then failwithf "File %s is declared as an input of a workflow but does not exist." p ()
 
     | Select (_, p) as x ->
-      if Sys.file_exists (Db.path db x) <> `Yes
+      if Sys.file_exists (Bistro_db.path db x) <> `Yes
       then failwithf "No file or directory named %s in directory workflow." p ()
     | Rule r as x ->
-      Db.with_logger db x ~f:(fun log ->
-	Out_channel.with_file (Db.stdout_path db x) ~f:(fun stdout ->
-	  Out_channel.with_file (Db.stderr_path db x) ~f:(fun stderr ->
+      Bistro_db.with_logger db x ~f:(fun log ->
+	Out_channel.with_file (Bistro_db.stdout_path db x) ~f:(fun stdout ->
+	  Out_channel.with_file (Bistro_db.stderr_path db x) ~f:(fun stderr ->
 	    List.iter r.cmds (fun cmd ->
-	      let tmp_path = Db.tmp_path db x in
-	      let tokens = exec_cmd tmp_path (Db.path db) cmd in
+	      let tmp_path = Bistro_db.tmp_path db x in
+	      let tokens = exec_cmd tmp_path (Bistro_db.path db) cmd in
 	      let line = String.concat ~sep:" " tokens in
 	      shell ~stdout ~stderr log line ;
-	      Unix.rename ~src:tmp_path ~dst:(Db.cache_path db x)
+	      Unix.rename ~src:tmp_path ~dst:(Bistro_db.cache_path db x)
 	    )
 	  )
 	)
       )
   )
   in
-  Db.setup db ;
-  Workflow.depth_first_traversal
+  Bistro_db.setup db ;
+  Bistro_workflow.depth_first_traversal
     ~init:()
     ~f:(fun w () -> foreach w)
     w

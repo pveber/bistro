@@ -1,5 +1,5 @@
 open Core.Std
-open Workflow
+open Bistro_workflow
 
 let fprintf fmt = Printf.kfprintf (fun oc -> output_char oc '\n') fmt
 
@@ -18,8 +18,8 @@ let script_calls_of_workflow path oc = function
 
 
 let to_script db (w : _ t) oc =
-  let path x = Db.path db (x :> u) in
-  fprintf oc "mkdir -p %s" (Db.cache_dir db) ;
+  let path x = Bistro_db.path db (x :> u) in
+  fprintf oc "mkdir -p %s" (Bistro_db.cache_dir db) ;
   depth_first_traversal
     ~init:()
     ~f:(fun w () -> script_calls_of_workflow path oc w)

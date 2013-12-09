@@ -9,22 +9,29 @@ Plugins:     META (0.3), DevFiles (0.3)
 BuildTools: ocamlbuild
 
 Library bistro
-  Path:         src/lib
-  Pack:         true
-  Modules:      Db, Export, File, Sequential, Workflow
-  BuildDepends: core, shell, threads
+  Path:          src/lib
+  Modules:       Bistro_db, Bistro_export,
+                 Bistro_file, Bistro_sequential, Bistro_workflow
+  BuildDepends:  core, shell, threads
+
+Library bistro_lwt
+  Path:          src/lib
+  Modules:       Bistro_concurrent
+  BuildDepends:  lwt, bistro
+  FindlibName:   lwt
+  FindlibParent: bistro
 
 Executable base_test
-  Path:         src/test
-  MainIs:       base_test.ml
-  BuildDepends: bistro
+  Path:          src/test
+  MainIs:        base_test.ml
+  BuildDepends:  bistro
 
 Executable dft
-  Path:         src/test
-  MainIs:       dft.ml
-  BuildDepends: bistro
+  Path:          src/test
+  MainIs:        dft.ml
+  BuildDepends:  bistro
 
 Executable nlp_test
-  Path:         src/test
-  MainIs:       nlp_test.ml
-  BuildDepends: bistro
+  Path:          src/test
+  MainIs:        nlp_test.ml
+  BuildDepends:  bistro

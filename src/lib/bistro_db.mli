@@ -8,13 +8,13 @@ val stdout_dir : t -> string
 val stderr_dir : t -> string
 val tmp_dir : t -> string
 
-val path : t -> Workflow.u -> string
-val cache_path : t -> Workflow.u -> string
-val tmp_path   : t -> Workflow.u -> string
-val stdout_path : t -> Workflow.u -> string
-val stderr_path : t -> Workflow.u -> string
+val path : t -> Bistro_workflow.u -> string
+val cache_path : t -> Bistro_workflow.u -> string
+val tmp_path   : t -> Bistro_workflow.u -> string
+val stdout_path : t -> Bistro_workflow.u -> string
+val stderr_path : t -> Bistro_workflow.u -> string
 
 type 'a logger = [ `debug | `info | `warning | `error ] -> ('a,unit,string,unit) format4 -> 'a
 
 val with_logger :
-  t -> Workflow.u -> f:(_ logger -> 'b) -> 'b
+  t -> Bistro_workflow.u -> f:(_ logger -> 'b) -> 'b

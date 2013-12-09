@@ -1,9 +1,8 @@
 open Core.Std
-open Bistro
 
-let tex : [`latex] File.t = Workflow.input "src/test/doc.tex"
+let tex : [`latex] Bistro_file.t = Bistro_workflow.input "src/test/doc.tex"
 
-let fig : [`pdf] File.t = Workflow.(
+let fig : [`pdf] Bistro_file.t = Bistro_workflow.(
   let script = L [
     S"set terminal pdf ; " ;
     S"set output \"" ; D ; S"\" ; " ;
@@ -14,7 +13,7 @@ let fig : [`pdf] File.t = Workflow.(
     L [S"gnuplot" ; S"-e" ; Q script]
   ])
 
-let pdf : [`pdf] File.t = Workflow.(
+let pdf : [`pdf] Bistro_file.t = Bistro_workflow.(
   let temp_dir = Q (L [ D ; S"_tmp" ]) in
   make [
     L [S"mkdir" ; S"-p" ; Q temp_dir] ;
@@ -27,4 +26,4 @@ let pdf : [`pdf] File.t = Workflow.(
   |> depends ~on:fig (* fig is added as a new dep although it is useless *)
 )
 
-let () = Export.to_script (Db.make "_bistro") pdf stdout
+let () = Bistro_export.to_script (Bistro_db.make "_bistro") pdf stdout
