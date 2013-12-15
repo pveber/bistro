@@ -16,5 +16,7 @@ val stderr_path : t -> Bistro_workflow.u -> string
 
 type 'a logger = [ `debug | `info | `warning | `error ] -> ('a,unit,string,unit) format4 -> 'a
 
+val log_msg : [ `debug | `info | `warning | `error ] -> string -> string
+
 val with_logger :
   t -> Bistro_workflow.u -> f:(_ logger -> 'b) -> 'b

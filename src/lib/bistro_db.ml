@@ -39,7 +39,7 @@ let rec path db = Bistro_workflow.(function
 
 type 'a logger = [ `debug | `info | `warning | `error ] -> ('a,unit,string,unit) format4 -> 'a
 
-let logger (type s) oc level (fmt : (s, unit, string, unit) format4) =
+let log_msg level msg =
   let open Unix in
   let open Printf in
   let label = match level with
@@ -48,12 +48,14 @@ let logger (type s) oc level (fmt : (s, unit, string, unit) format4) =
     | `warning -> "WARNING"
     | `error -> "ERROR"
   in
-  let f msg =
-    let t = localtime (time ()) in
-      fprintf
-        oc "[%s][%04d-%02d-%02d %02d:%02d] %s\n%!"
-        label (1900 + t.tm_year) (t.tm_mon + 1) t.tm_mday t.tm_hour t.tm_min msg
-  in
+  let t = localtime (time ()) in
+  sprintf
+    "[%s][%04d-%02d-%02d %02d:%02d] %s\n%!"
+    label (1900 + t.tm_year) (t.tm_mon + 1) t.tm_mday t.tm_hour t.tm_min msg
+
+let logger (type s) oc level (fmt : (s, unit, string, unit) format4) =
+  let open Printf in
+  let f msg = output_string oc (log_msg level msg) in
   ksprintf f fmt
 
 let with_logger db w ~f =

@@ -31,6 +31,11 @@ Executable dft
   MainIs:        dft.ml
   BuildDepends:  bistro
 
+Executable dft_lwt
+  Path:          src/test
+  MainIs:        dft_lwt.ml
+  BuildDepends:  bistro_lwt,core,lwt.unix,threads
+
 Executable nlp_test
   Path:          src/test
   MainIs:        nlp_test.ml

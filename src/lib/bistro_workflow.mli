@@ -28,6 +28,7 @@ and cmd =
 (** {5 Observers}*)
 val digest : u -> string
 val exec_cmd : string -> (u -> path) -> cmd -> string list
+val deps : u -> u list
 
 val depth_first_traversal : _ t -> init:'a -> f:(u -> 'a -> 'a) -> 'a
 

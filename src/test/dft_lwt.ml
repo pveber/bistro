@@ -2,11 +2,11 @@ open Core.Std
 open Printf
 
 let rec task i =
-  let target_deps =
+  let task_deps =
     List.init (i - 1) succ
     |> List.filter_map ~f:(
       fun j ->
-	if i mod j = 0 then Some (task j)
+	if j <> 1 && i mod j = 0 then Some (task j)
 	else None
     )
   in
@@ -15,9 +15,10 @@ let rec task i =
       L [ S"echo" ; I i ; S">" ; D ]
     ]
     |> fun init ->
-      List.fold_left target_deps
+      List.fold_right task_deps
 	~init
-	~f:(fun accu dep -> depends ~on:dep accu)
+	~f:(fun dep accu -> depends ~on:dep accu)
   )
 
-let () = Bistro_export.to_script (Bistro_db.make "_bistro") (task 20) stdout
+let () =
+  Lwt_unix.run (Bistro_concurrent.dryrun (Bistro_db.make "_bistro") (task 60))
