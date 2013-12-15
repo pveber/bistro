@@ -20,23 +20,3 @@ Library bistro_lwt
   BuildDepends:  lwt, bistro
   FindlibName:   lwt
   FindlibParent: bistro
-
-Executable base_test
-  Path:          src/test
-  MainIs:        base_test.ml
-  BuildDepends:  bistro
-
-Executable dft
-  Path:          src/test
-  MainIs:        dft.ml
-  BuildDepends:  bistro
-
-Executable dft_lwt
-  Path:          src/test
-  MainIs:        dft_lwt.ml
-  BuildDepends:  bistro_lwt,core,lwt.unix,threads
-
-Executable nlp_test
-  Path:          src/test
-  MainIs:        nlp_test.ml
-  BuildDepends:  bistro
