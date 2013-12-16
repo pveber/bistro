@@ -12,7 +12,9 @@ let rec task i =
   in
   Bistro_workflow.(
     make [
-      L [ S"echo" ; I i ; S">" ; D ]
+      L [ S"sleep" ; I 1 ] ;
+      L [ S"echo" ; I i ; S">" ; D ] ;
+      S"beep" ;
     ]
     |> fun init ->
       List.fold_right task_deps
@@ -20,5 +22,13 @@ let rec task i =
 	~f:(fun dep accu -> depends ~on:dep accu)
   )
 
+let db = Bistro_db.make "_bistro"
+
+let () = Bistro_db.setup db
+
 let () =
-  Lwt_unix.run (Bistro_concurrent.dryrun (Bistro_db.make "_bistro") (task 60))
+  Lwt_unix.run (Bistro_concurrent.dryrun db (task 60))
+
+let () =
+  Lwt_unix.run (Bistro_concurrent.exec db (Bistro_concurrent.local_worker 1) (task 60))
+

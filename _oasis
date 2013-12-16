@@ -17,6 +17,26 @@ Library bistro
 Library bistro_lwt
   Path:          src/lib
   Modules:       Bistro_concurrent
-  BuildDepends:  lwt, bistro
+  BuildDepends:  lwt, lwt.syntax, bistro
   FindlibName:   lwt
   FindlibParent: bistro
+
+Executable base_test
+  Path:          src/examples
+  MainIs:        base_test.ml
+  BuildDepends:  bistro
+
+Executable dft
+  Path:          src/examples
+  MainIs:        dft.ml
+  BuildDepends:  bistro
+
+Executable dft_lwt
+  Path:          src/examples
+  MainIs:        dft_lwt.ml
+  BuildDepends:  bistro_lwt,core,lwt.unix,threads
+
+Executable nlp_test
+  Path:          src/examples
+  MainIs:        nlp_test.ml
+  BuildDepends:  bistro
