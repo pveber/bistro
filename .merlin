@@ -4,4 +4,5 @@ S src/lib
 S src/test
 PKG core
 PKG lwt
+PKG react
 PKG shell
