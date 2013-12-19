@@ -8,7 +8,11 @@ and u =
 and rule = {
   cmds : cmd list ;
   deps : u list ;
+  np : int ;
+  mem : int ;
+  timeout : duration ;
 }
+and duration = [`minute | `hour | `day | `week | `month]
 and cmd =
 | S : string -> cmd
 | I : int -> cmd
@@ -34,7 +38,7 @@ val depth_first_traversal : _ t -> init:'a -> f:(u -> 'a -> 'a) -> 'a
 
 (** {5 Constructors} *)
 val input : path -> 'a t
-val make : cmd list -> 'a t
+val make : ?np:int -> ?mem:int -> ?timeout:duration -> cmd list -> 'a t
 val select : [`dir of _] t -> path -> _ t
 
 

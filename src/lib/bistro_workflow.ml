@@ -10,7 +10,11 @@ and u =
 and rule = {
   cmds : cmd list ;
   deps : u list ;
+  np : int ;
+  mem : int ;
+  timeout : duration ;
 }
+and duration = [`minute | `hour | `day | `week | `month]
 and cmd =
 | S : string -> cmd
 | I : int -> cmd
@@ -81,7 +85,8 @@ let deps_of_cmd x =
   in
   List.dedup (aux x)
 
-let make cmds = Rule {
+let make ?(np = 1) ?(mem = 100) ?(timeout = `day) cmds = Rule {
+  np ; mem ; timeout ;
   cmds = cmds ;
   deps = (
     List.map cmds ~f:deps_of_cmd

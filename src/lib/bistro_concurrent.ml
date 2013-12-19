@@ -1,11 +1,5 @@
 open Core.Std
 
-type event = [
-| `started_build of Bistro_workflow.u
-| `finished_build of Bistro_workflow.u
-| `msg of string
-]
-
 let ( >>= ) = Lwt.( >>= )
 let ( >|= ) = Lwt.( >|= )
 
@@ -26,7 +20,7 @@ let shell
     Lwt.fail (Failure (Printf.sprintf "shell call failed:\n%s\n" s))
 
 type backend =
-  ?np:int -> ?mem:int ->
+  np:int -> mem:int ->
   stdout:string -> stderr:string ->
   Lwt_process.command list -> unit Lwt.t
 
@@ -39,7 +33,7 @@ let redirection filename =
 
 let local_worker ~np ~mem : backend =
   let pool = Bistro_pool.create ~np ~mem in
-  fun ?(np = 1) ?(mem = 100) ~stdout ~stderr cmds ->
+  fun ~np ~mem ~stdout ~stderr cmds ->
     let exec cmd =
       redirection stdout >>= fun stdout ->
       redirection stderr >>= fun stderr ->
@@ -71,7 +65,7 @@ let thread_of_workflow_exec blog (backend : backend) db w dep_threads =
       if Sys.file_exists (Bistro_db.path db x) <> `Yes
       then failwithf "No file or directory named %s in directory workflow." p ()
     )
-  | Rule r as x ->
+  | Rule { np ; mem ; cmds } as x ->
     Lwt.join dep_threads >>= fun () -> (
       let stdout_path = Bistro_db.stdout_path db x in
       let stderr_path = Bistro_db.stderr_path db x in
@@ -80,12 +74,12 @@ let thread_of_workflow_exec blog (backend : backend) db w dep_threads =
 	let tokens = exec_cmd tmp_path (Bistro_db.path db) cmd in
 	Lwt_process.shell (String.concat ~sep:" " tokens)
       in
-      let cmds = List.map r.cmds ~f in
+      let cmds = List.map cmds ~f in
       remove_if_exists stdout_path >>= fun () ->
       remove_if_exists stderr_path >>= fun () ->
       remove_if_exists tmp_path >>= fun () ->
       Bistro_log.started blog x ;
-      backend ~stdout:stdout_path ~stderr:stderr_path cmds >>= fun () ->
+      backend ~np:np ~mem:mem ~stdout:stdout_path ~stderr:stderr_path cmds >>= fun () ->
       if Sys.file_exists tmp_path = `Yes then (
 	Bistro_log.finished blog x ;
 	Lwt_unix.rename tmp_path (Bistro_db.cache_path db x)

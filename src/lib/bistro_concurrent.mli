@@ -1,11 +1,5 @@
-type event = [
-| `started_build of Bistro_workflow.u
-| `finished_build of Bistro_workflow.u
-| `msg of string
-]
-
 type backend =
-  ?np:int -> ?mem:int ->
+  np:int -> mem:int ->
   stdout:string -> stderr:string ->
   Lwt_process.command list -> unit Lwt.t
 
