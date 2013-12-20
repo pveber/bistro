@@ -2,15 +2,15 @@ type path = string
 
 type 'a t = private u
 and u =
-| Input of path
-| Rule of rule
-| Select of u * path
+| Input of path (* input file *)
+| Rule of rule (* commands to build a target *)
+| Select of u * path (* access to a file in a directory *)
 and rule = {
   cmds : cmd list ;
   deps : u list ;
-  np : int ;
-  mem : int ;
-  timeout : duration ;
+  np : int ; (* required number of processors *)
+  mem : int ; (* required memory *)
+  timeout : duration ; (* maximum allowed running time *)
 }
 and duration = [`minute | `hour | `day | `week | `month]
 and cmd =

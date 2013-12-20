@@ -23,12 +23,12 @@ let rec task i =
 
 let db = Bistro_db.make "_bistro"
 let () = Bistro_db.setup db
-let logger = Bistro_log.make ()
+let logger = Bistro_logger.make ()
 
 (* let () = *)
 (*   Lwt_unix.run (Bistro_concurrent.dryrun db (task 60)) *)
 
-let logger_thread = Lwt_stream.iter_s Lwt_io.printl (Lwt_react.E.to_stream (Bistro_log.to_strings logger))
+let logger_thread = Lwt_stream.iter_s Lwt_io.printl (Lwt_react.E.to_stream (Bistro_logger.to_strings logger))
 
 let () =
   Lwt_unix.run (Bistro_concurrent.exec db logger (Bistro_concurrent.local_worker ~np:4 ~mem:(6 * 1024)) (task 210))

@@ -10,9 +10,9 @@ BuildTools: ocamlbuild
 
 Library bistro
   Path:          src/lib
-  Modules:       Bistro_db, Bistro_export,
+  Modules:       Bistro_db, Bistro_dir, Bistro_export,
                  Bistro_file,
-                 Bistro_log, Bistro_sequential, Bistro_workflow
+                 Bistro_logger, Bistro_sequential, Bistro_workflow
   BuildDepends:  core, react, shell, threads
 
 Library bistro_lwt
@@ -40,4 +40,4 @@ Executable dft_lwt
 Executable nlp_test
   Path:          src/examples
   MainIs:        nlp_test.ml
-  BuildDepends:  bistro
+  BuildDepends:  bistro_lwt,core,lwt.react,lwt.unix,threads

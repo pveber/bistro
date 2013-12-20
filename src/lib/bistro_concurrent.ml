@@ -22,6 +22,7 @@ let shell
 type backend =
   np:int -> mem:int ->
   stdout:string -> stderr:string ->
+  Bistro_logger.t ->
   Lwt_process.command list -> unit Lwt.t
 
 let string_of_cmd (h, t) =
@@ -33,22 +34,25 @@ let redirection filename =
 
 let local_worker ~np ~mem : backend =
   let pool = Bistro_pool.create ~np ~mem in
-  fun ~np ~mem ~stdout ~stderr cmds ->
+  fun ~np ~mem ~stdout ~stderr logger cmds ->
     let exec cmd =
       redirection stdout >>= fun stdout ->
       redirection stderr >>= fun stderr ->
+      Bistro_logger.info logger "Running\n\t%s\n" (string_of_cmd cmd) ;
       Lwt_process.exec ~stdout ~stderr cmd
       >>=
 	function
 	| Caml.Unix.WEXITED 0 -> Lwt.return ()
 	| _ ->
-	  Lwt.fail (Failure (Printf.sprintf "shell call failed:\n%s\n" (string_of_cmd cmd)))
+	  let msg = Printf.sprintf "shell call failed:\n%s\n" (string_of_cmd cmd) in
+	  Bistro_logger.error logger "%s" msg ;
+	  Lwt.fail (Failure msg)
     in
     Bistro_pool.use pool ~np ~mem ~f:(fun ~np ~mem -> Lwt_list.iter_s exec cmds)
 
 let remove_if_exists fn =
   if Sys.file_exists fn = `Yes then
-    Lwt_process.exec ("rm", [| "-r" ; fn |]) >|= ignore
+    Lwt_process.exec ("", [| "rm" ; "-r" ; fn |]) >|= ignore
   else
     Lwt.return ()
 
@@ -66,26 +70,31 @@ let thread_of_workflow_exec blog (backend : backend) db w dep_threads =
       then failwithf "No file or directory named %s in directory workflow." p ()
     )
   | Rule { np ; mem ; cmds } as x ->
-    Lwt.join dep_threads >>= fun () -> (
-      let stdout_path = Bistro_db.stdout_path db x in
-      let stderr_path = Bistro_db.stderr_path db x in
-      let tmp_path = Bistro_db.tmp_path db x in
-      let f cmd =
-	let tokens = exec_cmd tmp_path (Bistro_db.path db) cmd in
-	Lwt_process.shell (String.concat ~sep:" " tokens)
-      in
-      let cmds = List.map cmds ~f in
-      remove_if_exists stdout_path >>= fun () ->
-      remove_if_exists stderr_path >>= fun () ->
-      remove_if_exists tmp_path >>= fun () ->
-      Bistro_log.started blog x ;
-      backend ~np:np ~mem:mem ~stdout:stdout_path ~stderr:stderr_path cmds >>= fun () ->
-      if Sys.file_exists tmp_path = `Yes then (
-	Bistro_log.finished blog x ;
-	Lwt_unix.rename tmp_path (Bistro_db.cache_path db x)
-      )
-      else
-	Lwt.fail (Failure "rule failed to produce its target at the prescribed location")
+    let dest_path = Bistro_db.cache_path db x in
+    Lwt.return () >>= fun () ->
+    if Sys.file_exists_exn dest_path then Lwt.return ()
+    else (
+      Lwt.join dep_threads >>= fun () -> (
+	let stdout_path = Bistro_db.stdout_path db x in
+	let stderr_path = Bistro_db.stderr_path db x in
+	let tmp_path = Bistro_db.tmp_path db x in
+	let f cmd =
+	  let tokens = exec_cmd tmp_path (Bistro_db.path db) cmd in
+	  Lwt_process.shell (String.concat ~sep:" " tokens)
+	in
+	let cmds = List.map cmds ~f in
+	remove_if_exists stdout_path >>= fun () ->
+	remove_if_exists stderr_path >>= fun () ->
+	remove_if_exists tmp_path >>= fun () ->
+	Bistro_logger.started blog x ;
+	backend ~np:np ~mem:mem ~stdout:stdout_path ~stderr:stderr_path blog cmds >>= fun () ->
+	if Sys.file_exists tmp_path = `Yes then (
+	  Bistro_logger.finished blog x ;
+	  Lwt_unix.rename tmp_path dest_path
+	)
+	else
+	  Lwt.fail (Failure "rule failed to produce its target at the prescribed location")
+	)
     )
 
 

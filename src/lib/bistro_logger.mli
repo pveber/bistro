@@ -14,4 +14,7 @@ val event : t ->  (timestamp * event) React.event
 val started : t -> Bistro_workflow.u -> unit
 val finished : t -> Bistro_workflow.u -> unit
 val debug : t -> ('a,unit,string,unit) format4 -> 'a
+val info : t -> ('a,unit,string,unit) format4 -> 'a
+val warning : t -> ('a,unit,string,unit) format4 -> 'a
+val error : t -> ('a,unit,string,unit) format4 -> 'a
 val to_strings : t -> string React.event
