@@ -1,3 +1,4 @@
+open Bistro_types
 open Core.Std
 
 (* Unix utilities *)
@@ -7,13 +8,13 @@ let wget url = Bistro_workflow.(
   ]
 )
 
-let unzip (zip : [`zip of [`dir of 'a]] Bistro_file.t) : 'a Bistro_dir.t = Bistro_workflow.(
+let unzip (zip : 'a directory zip workflow) : 'a directory workflow = Bistro_workflow.(
   make [
     L [S"unzip" ; S"-d" ; D ; W zip]
   ]
 )
 
-let tar_xfz (tgz : [`tgz of [`dir of 'a]] Bistro_file.t) : 'a Bistro_dir.t = Bistro_workflow.(
+let tar_xfz (tgz : 'a directory tgz workflow) : 'a directory workflow = Bistro_workflow.(
   make [
     L [S"mkdir" ; S"-p" ; D] ;
     L [S"tar" ; S"xfz" ; W tgz ; S"-C" ; D]
@@ -21,15 +22,19 @@ let tar_xfz (tgz : [`tgz of [`dir of 'a]] Bistro_file.t) : 'a Bistro_dir.t = Bis
 )
 
 (* Wikipedia extractor toolkit *)
-let wet_archive : [`tgz of [`dir of unit]] Bistro_file.t = wget "http://www.polishmywriting.com/download/wikipedia2text_rsm_mods.tgz"
+let wet_archive : [`wet_archive] tgz workflow = wget "http://www.polishmywriting.com/download/wikipedia2text_rsm_mods.tgz"
 
-let wet_distribution = tar_xfz wet_archive
+let wet_package =
+  make [
+    L [S"mkdir" ; "-p" ; D ] ;
+  ] 
+(* tar_xfz wet_archive*)
 
 
-let stanford_parser_archive : [`zip of [`dir of [`stanford_parser_distribution]]] Bistro_file.t =
+let stanford_parser_archive : [`stanford_parser_distribution] directory zip workflow =
   wget "http://nlp.stanford.edu/software/stanford-parser-full-2013-11-12.zip"
 
-let stanford_parser_distribution : [`dir of [`stanford_parser_distribution]] Bistro_workflow.t =
+let stanford_parser_distribution : [`stanford_parser_distribution] directory workflow =
   unzip stanford_parser_archive
 
 let db = Bistro_db.make "_bistro"
@@ -44,3 +49,9 @@ let logger_thread = Lwt_stream.iter_s Lwt_io.printl (Lwt_react.E.to_stream (Bist
 let () =
   Lwt_unix.run (Bistro_concurrent.exec db logger (Bistro_concurrent.local_worker ~np:4 ~mem:(6 * 1024)) wet_distribution)
 
+
+
+<:script<
+  mkdir -p $w:$
+  
+>>

@@ -22,6 +22,10 @@ and cmd =
 | Q : cmd -> cmd (* inside a quotation, nothing is quoted *)
 | D : cmd (* destination *)
 | E : cmd (* empty word *)
+| PATH : package list -> cmd
+and 'a file = [`file of 'a] t
+and 'a directory = [`directory of 'a] t
+and package = [`package] directory
 
   (**
      Examples of command:
@@ -38,7 +42,11 @@ val depth_first_traversal : _ t -> init:'a -> f:(u -> 'a -> 'a) -> 'a
 
 (** {5 Constructors} *)
 val input : path -> 'a t
-val make : ?np:int -> ?mem:int -> ?timeout:duration -> cmd list -> 'a t
+val make :
+  ?np:int ->
+  ?mem:int ->
+  ?timeout:duration ->
+  cmd list -> 'a t
 val select : [`dir of _] t -> path -> _ t
 
 

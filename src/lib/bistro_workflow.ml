@@ -24,6 +24,10 @@ and cmd =
 | Q : cmd -> cmd (* inside a quotation, nothing is quoted *)
 | D : cmd (* destination *)
 | E : cmd (* empty word *)
+| PATH : u list -> cmd
+and 'a file = [`file of 'a] t
+and 'a directory = [`directory of 'a] t
+and package = [`package] directory
 
 let digest x =
   Digest.to_hex (Digest.string (Marshal.to_string x []))
@@ -41,6 +45,7 @@ let exec_cmd dest path x =
     | Q q -> [ quote (aux_quotation q) ]
     | D -> [ dest ]
     | E -> []
+    | PATH ps as x -> [ aux_quotation x ]
   and aux_quotation = function
     | S s -> s
     | I i -> string_of_int i
@@ -51,6 +56,8 @@ let exec_cmd dest path x =
     | Q q -> aux_quotation q
     | D -> dest
     | E -> ""
+    | PATH ps ->
+      sprintf "PATH=%s:$PATH" (String.concat ~sep:":" (List.map ps ~f:(fun p -> sprintf "%s/bin" (path p))))
   in
   aux x
 
@@ -82,6 +89,7 @@ let deps_of_cmd x =
     )
     | Q q -> aux q
     | W w -> [ w ]
+    | PATH ps -> ps
   in
   List.dedup (aux x)
 

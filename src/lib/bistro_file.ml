@@ -1,1 +1,1 @@
-type 'a t = [`file of 'a] Bistro_workflow.t
+type 'a t = 'a Bistro_workflow.file
