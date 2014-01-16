@@ -19,10 +19,10 @@ and cmd =
 | F : float -> cmd
 | W : 'a t -> cmd (* workflow *)
 | L : cmd list -> cmd
-| Q : cmd -> cmd (* inside a quotation, nothing is quoted *)
+| Q : cmd * char -> cmd (* inside a quotation, quotes are not allowed *)
 | D : cmd (* destination *)
+| TMP : cmd
 | E : cmd (* empty word *)
-| PATH : package list -> cmd
 and 'a file = [`file of 'a] t
 and 'a directory = [`directory of 'a] t
 and package = [`package] directory
@@ -35,7 +35,7 @@ and package = [`package] directory
 
 (** {5 Observers}*)
 val digest : u -> string
-val exec_cmd : string -> (u -> path) -> cmd -> string list
+val exec_cmd : dest:string -> tmp:string -> (u -> path) -> cmd -> string
 val deps : u -> u list
 
 val depth_first_traversal : _ t -> init:'a -> f:(u -> 'a -> 'a) -> 'a

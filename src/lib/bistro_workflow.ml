@@ -21,10 +21,10 @@ and cmd =
 | F : float -> cmd
 | W : u -> cmd (* workflow *)
 | L : cmd list -> cmd
-| Q : cmd -> cmd (* inside a quotation, nothing is quoted *)
+| Q : cmd * char -> cmd (* inside a quotation, nothing is quoted *)
 | D : cmd (* destination *)
+| TMP : cmd
 | E : cmd (* empty word *)
-| PATH : u list -> cmd
 and 'a file = [`file of 'a] t
 and 'a directory = [`directory of 'a] t
 and package = [`package] directory
@@ -32,32 +32,20 @@ and package = [`package] directory
 let digest x =
   Digest.to_hex (Digest.string (Marshal.to_string x []))
 
-let quote = sprintf "'%s'"
+let quote c s = sprintf "%c%s%c" c s c
 
-let exec_cmd dest path x =
+let exec_cmd ~dest ~tmp path x =
   let rec aux = function
-    | S s -> [ s ]
-    | I i -> [ string_of_int i ]
-    | F f -> [ Float.to_string f ]
-    | W w -> [ path w ]
-    | L l ->
-      List.fold_right (List.map l aux) ~f:( @ ) ~init:[]
-    | Q q -> [ quote (aux_quotation q) ]
-    | D -> [ dest ]
-    | E -> []
-    | PATH ps as x -> [ aux_quotation x ]
-  and aux_quotation = function
     | S s -> s
     | I i -> string_of_int i
     | F f -> Float.to_string f
     | W w -> path w
-    | L s ->
-      String.concat ~sep:"" (List.map s aux_quotation)
-    | Q q -> aux_quotation q
+    | L l ->
+      List.fold_right (List.map l aux) ~f:( ^ ) ~init:""
+    | Q (q, c) -> quote c (aux q)
     | D -> dest
     | E -> ""
-    | PATH ps ->
-      sprintf "PATH=%s:$PATH" (String.concat ~sep:":" (List.map ps ~f:(fun p -> sprintf "%s/bin" (path p))))
+    | TMP -> tmp
   in
   aux x
 
@@ -82,14 +70,13 @@ let input x = Input x
 
 let deps_of_cmd x =
   let rec aux = function
-    | S _ | F _ | I _ | D | E -> []
+    | S _ | F _ | I _ | D | TMP | E -> []
     | L s -> (
       List.map s ~f:aux
       |> List.fold_left ~init:[] ~f:( @ )
     )
-    | Q q -> aux q
+    | Q (q,_) -> aux q
     | W w -> [ w ]
-    | PATH ps -> ps
   in
   List.dedup (aux x)
 

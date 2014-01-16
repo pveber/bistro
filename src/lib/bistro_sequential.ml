@@ -16,6 +16,9 @@ let shell
     Core.Std.failwithf "shell call failed:\n%s\n" s ()
   )
 
+let remove_if_exists fn =
+  if Sys.file_exists fn = `Yes
+  then Sys.command_exn ("rm -r " ^ fn) |> ignore
 
 let exec db w =
   let foreach = Bistro_workflow.(function
@@ -31,9 +34,11 @@ let exec db w =
 	Out_channel.with_file (Bistro_db.stdout_path db x) ~f:(fun stdout ->
 	  Out_channel.with_file (Bistro_db.stderr_path db x) ~f:(fun stderr ->
 	    List.iter r.cmds (fun cmd ->
+	      let build_path = Bistro_db.build_path db x in
 	      let tmp_path = Bistro_db.tmp_path db x in
-	      let tokens = exec_cmd tmp_path (Bistro_db.path db) cmd in
-	      let line = String.concat ~sep:" " tokens in
+	      let line = exec_cmd ~dest:build_path ~tmp:tmp_path (Bistro_db.path db) cmd in
+	      remove_if_exists tmp_path ;
+	      Sys.command_exn ("mkdir -p " ^ tmp_path) ;
 	      shell ~stdout ~stderr log line ;
 	      Unix.rename ~src:tmp_path ~dst:(Bistro_db.cache_path db x)
 	    )

@@ -15,6 +15,7 @@ Library bistro
                  Bistro_logger, Bistro_sequential, Bistro_types,
                  Bistro_workflow
   BuildDepends:  core, react, shell, threads
+  FindlibName:   bistro
 
 Library bistro_lwt
   Path:          src/lib
@@ -22,6 +23,17 @@ Library bistro_lwt
   BuildDepends:  lwt, lwt.react, lwt.syntax, bistro
   FindlibName:   lwt
   FindlibParent: bistro
+
+Library bistro_syntax
+  FindlibName:      syntax
+  FindlibParent:    bistro
+  Path:             src/syntax
+  Modules:          Pa_bistro_script, Bistro_script_ast, Bistro_script_lexer, Bistro_script_parser
+  BuildDepends:     camlp4.lib, camlp4.quotations.r, camlp4.extend
+  Buildtools:       menhir
+  XMETAType:        syntax
+  XMETADescription: Syntactic sugar for sh scripts
+  XMETARequires:    camlp4
 
 Executable base_test
   Path:          src/examples
@@ -36,9 +48,9 @@ Executable dft
 Executable dft_lwt
   Path:          src/examples
   MainIs:        dft_lwt.ml
-  BuildDepends:  bistro_lwt,core,lwt.react,lwt.unix,threads
+  BuildDepends:  bistro.lwt,core,lwt.react,lwt.unix,threads
 
 Executable nlp_test
   Path:          src/examples
   MainIs:        nlp_test.ml
-  BuildDepends:  bistro_lwt,core,lwt.react,lwt.unix,threads
+  BuildDepends:  bistro.lwt,bistro.syntax,core,lwt.react,lwt.unix,threads

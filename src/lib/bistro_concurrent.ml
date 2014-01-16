@@ -77,15 +77,18 @@ let thread_of_workflow_exec blog (backend : backend) db w dep_threads =
       Lwt.join dep_threads >>= fun () -> (
 	let stdout_path = Bistro_db.stdout_path db x in
 	let stderr_path = Bistro_db.stderr_path db x in
+	let build_path = Bistro_db.build_path db x in
 	let tmp_path = Bistro_db.tmp_path db x in
 	let f cmd =
-	  let tokens = exec_cmd tmp_path (Bistro_db.path db) cmd in
-	  Lwt_process.shell (String.concat ~sep:" " tokens)
+	  let line = exec_cmd ~dest:build_path ~tmp:tmp_path (Bistro_db.path db) cmd in
+	  Lwt_process.shell line
 	in
 	let cmds = List.map cmds ~f in
 	remove_if_exists stdout_path >>= fun () ->
 	remove_if_exists stderr_path >>= fun () ->
+	remove_if_exists build_path >>= fun () ->
 	remove_if_exists tmp_path >>= fun () ->
+	Lwt_unix.mkdir tmp_path 0o640 >>= fun () ->
 	Bistro_logger.started blog x ;
 	backend ~np:np ~mem:mem ~stdout:stdout_path ~stderr:stderr_path blog cmds >>= fun () ->
 	if Sys.file_exists tmp_path = `Yes then (
@@ -109,8 +112,7 @@ let thread_of_workflow_fake_exec db w dep_threads =
     Lwt.join dep_threads >>= fun () -> (
       let output = Bistro_db.path db x in
       let f cmd =
-	let tokens = exec_cmd output (Bistro_db.path db) cmd in
-	String.concat ~sep:" " tokens
+	exec_cmd ~dest:output ~tmp:(Bistro_db.tmp_path db x) (Bistro_db.path db) cmd
       in
       Lwt_io.printf
 	"Rule(%s): exec script\n\t%s\n"
