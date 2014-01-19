@@ -23,7 +23,7 @@ type backend =
   np:int -> mem:int ->
   stdout:string -> stderr:string ->
   Bistro_logger.t ->
-  Lwt_process.command list -> unit Lwt.t
+  string list -> unit Lwt.t
 
 let string_of_cmd (h, t) =
   String.concat ~sep:" " (h :: (Array.to_list t))
@@ -31,6 +31,10 @@ let string_of_cmd (h, t) =
 let redirection filename =
   Lwt_unix.openfile filename Unix.([O_APPEND ; O_CREAT ; O_WRONLY]) 0o640 >>= fun fd ->
   Lwt.return (`FD_move (Lwt_unix.unix_file_descr fd))
+
+let make_cmd cmds =
+  String.concat ~sep:" && \\\n " cmds
+  |> Lwt_process.shell
 
 let local_worker ~np ~mem : backend =
   let pool = Bistro_pool.create ~np ~mem in
@@ -48,7 +52,7 @@ let local_worker ~np ~mem : backend =
 	  Bistro_logger.error logger "%s" msg ;
 	  Lwt.fail (Failure msg)
     in
-    Bistro_pool.use pool ~np ~mem ~f:(fun ~np ~mem -> Lwt_list.iter_s exec cmds)
+    Bistro_pool.use pool ~np ~mem ~f:(fun ~np ~mem -> exec (make_cmd cmds))
 
 let remove_if_exists fn =
   if Sys.file_exists fn = `Yes then
@@ -79,21 +83,19 @@ let thread_of_workflow_exec blog (backend : backend) db w dep_threads =
 	let stderr_path = Bistro_db.stderr_path db x in
 	let build_path = Bistro_db.build_path db x in
 	let tmp_path = Bistro_db.tmp_path db x in
-	let f cmd =
-	  let line = exec_cmd ~dest:build_path ~tmp:tmp_path (Bistro_db.path db) cmd in
-	  Lwt_process.shell line
-	in
+	let f cmd = exec_cmd ~dest:build_path ~tmp:tmp_path (Bistro_db.path db) cmd in
 	let cmds = List.map cmds ~f in
 	remove_if_exists stdout_path >>= fun () ->
 	remove_if_exists stderr_path >>= fun () ->
 	remove_if_exists build_path >>= fun () ->
 	remove_if_exists tmp_path >>= fun () ->
-	Lwt_unix.mkdir tmp_path 0o640 >>= fun () ->
+	Lwt_unix.mkdir tmp_path 0o750 >>= fun () ->
 	Bistro_logger.started blog x ;
 	backend ~np:np ~mem:mem ~stdout:stdout_path ~stderr:stderr_path blog cmds >>= fun () ->
-	if Sys.file_exists tmp_path = `Yes then (
+	if Sys.file_exists build_path = `Yes then (
 	  Bistro_logger.finished blog x ;
-	  Lwt_unix.rename tmp_path dest_path
+	  remove_if_exists tmp_path >>= fun () ->
+	  Lwt_unix.rename build_path dest_path
 	)
 	else
 	  Lwt.fail (Failure "rule failed to produce its target at the prescribed location")

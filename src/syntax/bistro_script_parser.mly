@@ -7,7 +7,8 @@
     | "f" -> `float
     | "w" -> `workflow
     | "bin" -> `pkg_bin
-    | x -> failwith (sprintf "Unknown conversion character %s" x)
+    | "PATH" -> `PATH
+    | x -> failwith (sprintf "Unknown conversion id %s" x)
 %}
 
 %token <string> STRING

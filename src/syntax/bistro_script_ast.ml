@@ -13,6 +13,7 @@ and antiquotation_typ = [
 | `float
 | `workflow
 | `pkg_bin
+| `PATH
 ]
 
 let rec remove_prefix_spaces = function

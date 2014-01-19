@@ -23,15 +23,14 @@ and cmd =
 | D : cmd (* destination *)
 | TMP : cmd
 | E : cmd (* empty word *)
-and 'a file = [`file of 'a] t
-and 'a directory = [`directory of 'a] t
-and package = [`package] directory
 
   (**
      Examples of command:
      S[A"touch" ; D]
      S[A"gunzip" ; A"-c" ; W archive ; A">" ; D]
   *)
+
+val export_PATH_cmd : [`directory of [`package]] t list -> cmd
 
 (** {5 Observers}*)
 val digest : u -> string

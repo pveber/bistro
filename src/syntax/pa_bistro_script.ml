@@ -11,6 +11,7 @@ let script_expander _loc _ s =
     | `int -> <:expr< Bistro_workflow.I $e$>>
     | `string -> <:expr< Bistro_workflow.S $e$>>
     | `float -> <:expr< Bistro_workflow.F $e$>>
+    | `PATH -> <:expr< Bistro_workflow.export_PATH_cmd $e$ >>
   in
   let rec extract_quotation c = function
     | [] -> failwith "bistro_script: quotation not ended"

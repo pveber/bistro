@@ -14,6 +14,7 @@ let history_dir base = Filename.concat base "history"
 
 let setup base =
   Unix.mkdir_p (tmp_dir base) ;
+  Unix.mkdir_p (build_dir base) ;
   Unix.mkdir_p (cache_dir base) ;
   Unix.mkdir_p (stderr_dir base) ;
   Unix.mkdir_p (stdout_dir base) ;
@@ -25,7 +26,7 @@ let aux_path f db w =
 
 let cache_path db w = aux_path cache_dir db w
 let log_path db w = aux_path log_dir db w
-let build_path db w = aux_path tmp_dir db w
+let build_path db w = aux_path build_dir db w
 let tmp_path db w = aux_path tmp_dir db w
 let stdout_path db w = aux_path stdout_dir db w
 let stderr_path db w = aux_path stderr_dir db w

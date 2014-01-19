@@ -2,7 +2,7 @@ type backend =
   np:int -> mem:int ->
   stdout:string -> stderr:string ->
   Bistro_logger.t ->
-  Lwt_process.command list -> unit Lwt.t
+  string list -> unit Lwt.t
 
 val local_worker : np:int -> mem:int -> backend
 

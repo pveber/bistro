@@ -25,14 +25,20 @@ and cmd =
 | D : cmd (* destination *)
 | TMP : cmd
 | E : cmd (* empty word *)
-and 'a file = [`file of 'a] t
-and 'a directory = [`directory of 'a] t
-and package = [`package] directory
 
 let digest x =
   Digest.to_hex (Digest.string (Marshal.to_string x []))
 
 let quote c s = sprintf "%c%s%c" c s c
+
+let export_PATH_cmd l =
+  let bindir h = L [ W h ; S "/bin" ] in
+  let rec aux = function
+    | [] -> []
+    | h :: [] -> bindir h :: []
+    | h :: t -> bindir h :: (S ":") :: (aux t)
+  in
+  L [S "export PATH=" ; L (aux l) ; S ":$PATH"]
 
 let exec_cmd ~dest ~tmp path x =
   let rec aux = function
