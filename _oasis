@@ -28,28 +28,36 @@ Library bistro_syntax
   FindlibParent:    bistro
   Path:             src/syntax
   Modules:          Pa_bistro_script, Bistro_script_ast, Bistro_script_lexer, Bistro_script_parser
-  BuildDepends:     camlp4.lib, camlp4.quotations.r, camlp4.extend
+  BuildDepends:     camlp4.lib, camlp4.quotations.r
   Buildtools:       menhir
   XMETAType:        syntax
   XMETADescription: Syntactic sugar for sh scripts
-  XMETARequires:    camlp4
+  XMETARequires:    camlp4, camlp4.quotations.r
+
+Flag examples
+  Description:      Build examples?
+  Default:          false
 
 Executable base_test
   Path:          src/examples
+  Build$:        flag(examples)
   MainIs:        base_test.ml
   BuildDepends:  bistro
 
 Executable dft
   Path:          src/examples
+  Build$:        flag(examples)
   MainIs:        dft.ml
   BuildDepends:  bistro
 
 Executable dft_lwt
   Path:          src/examples
+  Build$:        flag(examples)
   MainIs:        dft_lwt.ml
   BuildDepends:  bistro.lwt,core,lwt.react,lwt.unix,threads
 
 Executable nlp_test
   Path:          src/examples
+  Build$:        flag(examples)
   MainIs:        nlp_test.ml
   BuildDepends:  bistro.lwt,bistro.syntax,core,lwt.react,lwt.unix,threads

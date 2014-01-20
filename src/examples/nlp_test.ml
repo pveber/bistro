@@ -5,9 +5,7 @@ open Core.Std
 (* {5 Unix utilities} *)
 
 let wget url = Bistro_workflow.(
-  make <:script<
-    wget -O %@ %s:url%
-  >>
+  make <:script< wget -O %@ %s:url% >>
 )
 
 let unzip (zip : 'a directory zip workflow) : 'a directory workflow = Bistro_workflow.(
