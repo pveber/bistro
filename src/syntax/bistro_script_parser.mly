@@ -31,7 +31,7 @@ commands:
 |
     { [] }
 | command
-    { $1 :: [] }
+    { (List.rev $1) :: [] }
 | commands EOL
     { $1 }
 | commands EOL command
