@@ -37,6 +37,9 @@ rule token = parse
 | '"'
     { QUOTE '"'}
 
+| '`'
+    { QUOTE '`'}
+
 | '%' ([^ ':' '%' '@']+ as typ) ':' ([^'%']* as e) '%'
     { ANTIQUOT (typ, expr lexbuf (2 + String.length typ) e) }
 

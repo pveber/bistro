@@ -30,7 +30,10 @@ let script_expander _loc _ s =
 	let f = <:expr< $chr:sprintf "%c" c$ >> in
 	let g =
 	  Ast.ExApp (_loc,
-		     Ast.ExId (_loc, (Ast.IdUid (_loc, "Q"))),
+		     Ast.ExId (_loc,
+			       Ast.IdAcc (_loc,
+					  Ast.IdUid (_loc, "Bistro_workflow"),
+					  Ast.IdUid (_loc, "Q"))),
 		     Ast.ExTup (_loc, Ast.ExCom (_loc, e, f)))
 	in
 	<:expr< [ $g$ :: $aux false rest$ ] >>
