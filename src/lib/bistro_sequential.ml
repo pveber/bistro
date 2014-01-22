@@ -32,17 +32,18 @@ let exec db logger w =
     | Rule r as x ->
       Out_channel.with_file (Bistro_db.stdout_path db x) ~f:(fun stdout ->
 	Out_channel.with_file (Bistro_db.stderr_path db x) ~f:(fun stderr ->
-	  List.iter r.cmds (fun cmd ->
-	    let build_path = Bistro_db.build_path db x in
-	    let tmp_path = Bistro_db.tmp_path db x in
-	    let line = exec_cmd ~dest:build_path ~tmp:tmp_path (Bistro_db.path db) cmd in
-	    remove_if_exists tmp_path ;
-	    Sys.command_exn ("mkdir -p " ^ tmp_path) ;
-	    Bistro_logger.started logger x ;
-	    shell ~stdout ~stderr logger line ;
-	    Bistro_logger.finished logger x ;
-	    Unix.rename ~src:tmp_path ~dst:(Bistro_db.cache_path db x)
-	  )
+	  let build_path = Bistro_db.build_path db x in
+	  let tmp_path = Bistro_db.tmp_path db x in
+	  let command =
+	    List.map r.cmds ~f:(exec_cmd ~dest:build_path ~tmp:tmp_path (Bistro_db.path db))
+            |> String.concat ~sep:" && \\\n "
+	  in
+	  remove_if_exists tmp_path ;
+	  Sys.command_exn ("mkdir -p " ^ tmp_path) ;
+	  Bistro_logger.started logger x ;
+	  shell ~stdout ~stderr logger command ;
+	  Bistro_logger.finished logger x ;
+	  Unix.rename ~src:tmp_path ~dst:(Bistro_db.cache_path db x)
 	)
       )
   )
