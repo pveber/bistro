@@ -43,7 +43,7 @@ let exec db logger w =
 	  Bistro_logger.started logger x ;
 	  shell ~stdout ~stderr logger command ;
 	  Bistro_logger.finished logger x ;
-	  Unix.rename ~src:tmp_path ~dst:(Bistro_db.cache_path db x)
+	  Unix.rename ~src:build_path ~dst:(Bistro_db.cache_path db x)
 	)
       )
   )
