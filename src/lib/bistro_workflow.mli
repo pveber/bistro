@@ -13,22 +13,40 @@ and rule = {
   timeout : duration ; (* maximum allowed running time *)
 }
 and duration = [`minute | `hour | `day | `week | `month]
-and cmd =
-| S : string -> cmd
-| I : int -> cmd
-| F : float -> cmd
-| W : 'a t -> cmd (* workflow *)
-| L : cmd list -> cmd
-| Q : cmd * char -> cmd (* inside a quotation, quotes are not allowed *)
-| D : cmd (* destination *)
-| TMP : cmd
-| E : cmd (* empty word *)
+and cmd = Cmd of token list
+and token =
+| S : string -> token
+| I : int -> token
+| F : float -> token
+| W : 'a t -> token
+| L : token list -> token
+| D : token
+| TMP : token
+| Q : token * char -> token
 
   (**
      Examples of command:
-     S[A"touch" ; D]
-     S[A"gunzip" ; A"-c" ; W archive ; A">" ; D]
+     prog "htseq"
+       @@ opt (arg string ~o:"-m") mode
+       @@ flag "-m"
+       @@ arg string
   *)
+
+module Cmd : sig
+  type 'a t = (cmd -> 'a) -> 'a
+  val cmd : string -> 'a t
+  val string : cmd -> string -> 'a t
+  val int : cmd -> int -> 'a t
+  val dest : cmd -> 'a t
+  val opt : cmd -> (cmd -> 'a -> 'b t) -> 'a option -> 'b t
+  val opt2 : cmd -> (cmd -> 'a -> 'b -> 'c t) -> 'a -> 'b option -> 'c t
+  val arg : cmd -> (cmd -> 'a -> 'b -> 'c) -> 'a -> 'b -> 'c
+  val argp : cmd -> (cmd -> 'a -> 'b -> 'c) -> string -> 'a -> 'b -> 'c
+  val stdout_to : cmd -> 'a t
+
+  val make : ((cmd -> cmd) -> 'a) -> 'a
+  val script : ((cmd -> cmd) -> 'a) list -> 'a list
+end
 
 val export_PATH_cmd : [`directory of [`package]] t list -> cmd
 

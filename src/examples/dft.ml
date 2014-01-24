@@ -11,9 +11,9 @@ let rec task i =
     )
   in
   Bistro_workflow.(
-    make [
-      L [ S"echo" ; I i ; S">" ; D ]
-    ]
+    make Cmd.(script [
+      cmd "echo" arg int i stdout_to dest
+    ])
     |> fun init ->
       List.fold_left target_deps
 	~init

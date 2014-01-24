@@ -13,6 +13,9 @@ let script_expander _loc _ s =
     | `float -> <:expr< Bistro_workflow.F $e$>>
     | `PATH -> <:expr< Bistro_workflow.export_PATH_cmd $e$ >>
   in
+  let expr_of_optantiquot expr format =
+    assert false
+  in
   let rec extract_quotation c = function
     | [] -> failwith "bistro_script: quotation not ended"
     | Bistro_script_ast.QUOTE c' :: t when c = c' -> [], t
@@ -42,6 +45,8 @@ let script_expander _loc _ s =
 	let h = Bistro_script_ast.(match h with
 	  | ANTIQUOT (typ, e) ->
 	    expr_of_antiquot typ e
+	  | OPTANTIQUOT (expr, format) ->
+	    expr_of_optantiquot expr format
 	  | S s ->
 	    <:expr< Bistro_workflow.S $str:s$ >>
 	  | D ->
@@ -57,7 +62,7 @@ let script_expander _loc _ s =
 	in
 	<:expr< [ $h$ :: $aux inquotation rest$ ] >>
     in
-    <:expr< Bistro_workflow.L $aux false cmd$ >>
+    <:expr< Bistro_workflow.Cmd $aux false cmd$ >>
   in
   List.fold_right
     (fun cmd accu -> <:expr< [ $command cmd$ :: $accu$ ] >>)

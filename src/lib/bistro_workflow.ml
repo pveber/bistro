@@ -15,16 +15,16 @@ and rule = {
   timeout : duration ;
 }
 and duration = [`minute | `hour | `day | `week | `month]
-and cmd =
-| S : string -> cmd
-| I : int -> cmd
-| F : float -> cmd
-| W : u -> cmd (* workflow *)
-| L : cmd list -> cmd
-| Q : cmd * char -> cmd (* inside a quotation, nothing is quoted *)
-| D : cmd (* destination *)
-| TMP : cmd
-| E : cmd (* empty word *)
+and cmd = Cmd of token list
+and token =
+| S : string -> token
+| I : int -> token
+| F : float -> token
+| W : u -> token
+| L : token list -> token
+| D : token
+| TMP : token
+| Q : token * char -> token
 
 let digest x =
   Digest.to_hex (Digest.string (Marshal.to_string x []))
@@ -38,22 +38,64 @@ let export_PATH_cmd l =
     | h :: [] -> bindir h :: []
     | h :: t -> bindir h :: (S ":") :: (aux t)
   in
-  L [S "export PATH=" ; L (aux l) ; S ":$PATH"]
+  Cmd [S "export PATH=" ; L (aux l) ; S ":$PATH"]
 
-let exec_cmd ~dest ~tmp path x =
-  let rec aux = function
+
+module Cmd = struct
+  type 'a t = (cmd -> 'a) -> 'a
+
+  let make f = f (function Cmd l -> Cmd (List.rev l))
+
+  let script l =
+    List.map l make
+
+  let cmd prog k = k (Cmd [S prog])
+
+  let string (Cmd tokens) s k = k (Cmd (S s :: tokens))
+
+  let int (Cmd tokens) i k = k (Cmd (I i :: tokens))
+
+  let dest (Cmd tokens) k = k (Cmd (D :: tokens))
+
+  let opt cmd f o k = match o with
+    | None -> k cmd
+    | Some x -> f cmd x k
+
+  let opt2 cmd f y o k = match o with
+    | None -> k cmd
+    | Some x -> f cmd y x k
+
+  let arg (Cmd tokens) f v k =
+    f (Cmd (S " " :: tokens)) v k
+
+  let argp (Cmd tokens) f o v k =
+    f (Cmd (S " " :: S o :: S " " :: tokens)) v k
+
+  let flag (Cmd tokens as cmd) f b k =
+    k (
+      if b then Cmd (S f :: S " " :: tokens)
+      else cmd
+    )
+
+  let stdout_to (Cmd tokens) k =
+    k (Cmd (S" > " :: tokens))
+end
+
+
+let exec_cmd ~dest ~tmp path (Cmd tokens) =
+  let rec token = function
     | S s -> s
     | I i -> string_of_int i
     | F f -> Float.to_string f
     | W w -> path w
-    | L l ->
-      List.fold_right (List.map l aux) ~f:( ^ ) ~init:""
-    | Q (q, c) -> quote c (aux q)
+    | L l -> token_list l
+    | Q (q, c) -> quote c (token q)
     | D -> dest
-    | E -> ""
     | TMP -> tmp
+  and token_list l =
+    List.fold_right (List.map l token) ~f:( ^ ) ~init:""
   in
-  aux x
+  token_list tokens
 
 let deps = function
   | Input _ -> []
@@ -74,17 +116,17 @@ let depth_first_traversal w ~init ~f =
 
 let input x = Input x
 
-let deps_of_cmd x =
-  let rec aux = function
-    | S _ | F _ | I _ | D | TMP | E -> []
-    | L s -> (
-      List.map s ~f:aux
-      |> List.fold_left ~init:[] ~f:( @ )
-    )
-    | Q (q,_) -> aux q
+let deps_of_cmd (Cmd tokens) =
+  let rec token = function
+    | S _ | F _ | I _ | D | TMP -> []
+    | L s -> token_list s
+    | Q (q,c) -> token q
     | W w -> [ w ]
+  and token_list l =
+    List.map l ~f:token
+    |> List.fold_left ~init:[] ~f:( @ )
   in
-  List.dedup (aux x)
+  List.dedup (token_list tokens)
 
 let make ?(np = 1) ?(mem = 100) ?(timeout = `day) cmds = Rule {
   np ; mem ; timeout ;

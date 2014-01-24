@@ -4,6 +4,7 @@ and token =
 | S of string
 | SPACE of string
 | ANTIQUOT of antiquotation_typ * Camlp4.PreCast.Syntax.Ast.expr
+| OPTANTIQUOT of Camlp4.PreCast.Syntax.Ast.expr * string
 | QUOTE of char
 | D
 | TMP

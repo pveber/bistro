@@ -13,6 +13,7 @@
 
 %token <string> STRING
 %token <string * Camlp4.PreCast.Syntax.Ast.expr> ANTIQUOT
+%token <Camlp4.PreCast.Syntax.Ast.expr * string> OPTANTIQUOT
 %token EOL EOF DEST TMP
 %token <string> SPACE
 %token <char> QUOTE
@@ -51,6 +52,9 @@ token:
 | ANTIQUOT
     { let (k,expr) = $1 in
       Bistro_script_ast.ANTIQUOT (typ_of_string k, expr) }
+| OPTANTIQUOT
+    { let (expr, format) = $1 in
+      Bistro_script_ast.OPTANTIQUOT (expr,format) }
 | DEST
     { Bistro_script_ast.D }
 | TMP

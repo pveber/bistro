@@ -40,7 +40,7 @@ rule token = parse
 | '`'
     { QUOTE '`'}
 
-| '%' ([^ ':' '%' '@']+ as typ) ':' ([^'%']* as e) '%'
+| '%' ([^ ':' '%' '@' '?']+ as typ) ':' ([^'%']* as e) '%'
     { ANTIQUOT (typ, expr lexbuf (2 + String.length typ) e) }
 
 | '%' '@'
@@ -49,8 +49,11 @@ rule token = parse
 | '%' '@' 'T' 'M' 'P'
     { TMP }
 
-| '%' ([^ '%' '@']+ as e) '%'
+| '%' ([^ '%' '@' ':' '?']+ as e) '%'
     { ANTIQUOT ("w", expr lexbuf 1 e) }
+
+| '%' '?' ([^ '%']+ as e) '{' ([^ '}']+ as f) '}'
+    { OPTANTIQUOT (expr lexbuf 2 e, f) }
 
 | eof
     { EOF }
