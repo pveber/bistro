@@ -6,14 +6,14 @@ and u =
 | Rule of rule (* commands to build a target *)
 | Select of u * path (* access to a file in a directory *)
 and rule = {
-  cmds : cmd list ;
+  script : script ;
   deps : u list ;
   np : int ; (* required number of processors *)
   mem : int ; (* required memory *)
   timeout : duration ; (* maximum allowed running time *)
 }
 and duration = [`minute | `hour | `day | `week | `month]
-and cmd = Cmd of token list
+and script = token list
 and token =
 | S : string -> token
 | I : int -> token
@@ -32,27 +32,29 @@ and token =
        @@ arg string
   *)
 
-module Cmd : sig
-  type 'a t = (cmd -> 'a) -> 'a
-  val cmd : string -> 'a t
-  val string : cmd -> string -> 'a t
-  val int : cmd -> int -> 'a t
-  val dest : cmd -> 'a t
-  val opt : cmd -> (cmd -> 'a -> 'b t) -> 'a option -> 'b t
-  val opt2 : cmd -> (cmd -> 'a -> 'b -> 'c t) -> 'a -> 'b option -> 'c t
-  val arg : cmd -> (cmd -> 'a -> 'b -> 'c) -> 'a -> 'b -> 'c
-  val argp : cmd -> (cmd -> 'a -> 'b -> 'c) -> string -> 'a -> 'b -> 'c
-  val stdout_to : cmd -> 'a t
+module Script : sig
+  type t = script
+  type 'a cons = (t -> 'a) -> 'a
 
-  val make : ((cmd -> cmd) -> 'a) -> 'a
-  val script : ((cmd -> cmd) -> 'a) list -> 'a list
+  val begin_ : 'a cons
+  val cmd : t -> string -> 'a cons
+  val string : t -> string -> 'a cons
+  val int : t -> int -> 'a cons
+  val dest : t -> 'a cons
+  val opt : t -> (t -> 'a -> 'b cons) -> 'a option -> 'b cons
+  val opt2 : t -> (t -> 'a -> 'b -> 'c cons) -> 'a -> 'b option -> 'c cons
+  val arg : t -> (t -> 'a -> 'b -> 'c) -> 'a -> 'b -> 'c
+  val argp : t -> (t -> 'a -> 'b -> 'c) -> string -> 'a -> 'b -> 'c
+  val stdout_to : t -> 'a cons
+
+  val end_ : t -> t
 end
 
-val export_PATH_cmd : [`directory of [`package]] t list -> cmd
+(* val export_PATH_cmd : [`directory of [`package]] t list -> cmd *)
 
 (** {5 Observers}*)
 val digest : u -> string
-val exec_cmd : dest:string -> tmp:string -> (u -> path) -> cmd -> string
+val string_of_script : dest:string -> tmp:string -> (u -> path) -> script -> string
 val deps : u -> u list
 
 val depth_first_traversal : _ t -> init:'a -> f:(u -> 'a -> 'a) -> 'a
@@ -63,7 +65,7 @@ val make :
   ?np:int ->
   ?mem:int ->
   ?timeout:duration ->
-  cmd list -> 'a t
+  Script.t -> 'a t
 val select : [`dir of _] t -> path -> _ t
 
 

@@ -11,10 +11,12 @@ let rec task i =
     )
   in
   Bistro_workflow.(
-    make Cmd.(script [
-      cmd "sleep" arg int 1 ;
-      cmd "echo"  arg int 1 stdout_to dest ;
-    ])
+    make Script.(
+      begin_
+	cmd "sleep" arg int i
+	cmd "echo"  arg int i stdout_to dest
+      end_
+    )
     |> fun init ->
       List.fold_right task_deps
 	~init

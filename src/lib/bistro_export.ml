@@ -1,3 +1,5 @@
+(*  SCRIPT GENERATION IS CURRENTLY BROKEN *)
+
 open Core.Std
 open Bistro_workflow
 
@@ -11,10 +13,11 @@ let script_calls_of_workflow ~path ~tmp oc = function
     fprintf oc "test -e %s/%s || (echo 'Missing file %s in dir %s, stopping' ; exit)" (path dir) p (path dir) p
   | Rule r as x ->
     fprintf oc "rm -rf %s && mkdir -p %s" (tmp x) (tmp x) ;
-    List.iter r.cmds (fun cmd ->
-      let line = exec_cmd ~dest:(path x) ~tmp:(tmp x) path cmd in
-      fprintf oc "%s" line
-    ) ;
+    (* FIXME *)
+    (* List.iter r.cmds (fun cmd -> *)
+    (*   let line = exec_cmd ~dest:(path x) ~tmp:(tmp x) path cmd in *)
+    (*   fprintf oc "%s" line *)
+    (* ) ; *)
     fprintf oc "rm -rf %s" (tmp x)
 
 

@@ -4,26 +4,28 @@ let ( >>= ) = Lwt.( >>= )
 let ( >|= ) = Lwt.( >|= )
 
 let shell
-    (log : _ Bistro_db.logger)
-    ?(stdout = stdout)
-    ?(stderr = stderr)
-    s =
-  log `debug "sh call:\n\n%s\n\n" s ;
-  Lwt_process.exec
-    ~stdout:(`FD_move (Unix.descr_of_out_channel stdout))
-    ~stderr:(`FD_move (Unix.descr_of_out_channel stderr))
-    (Lwt_process.shell s) >>= fun exitcode ->
+    ~logger
+    ~stdout
+    ~stderr
+    script =
+  let script_file = Filename.temp_file "bistro" ".sh" in
+  Bistro_logger.info logger "Started script:\n\n%s\n\n" script ;
+  Lwt_io.(with_file ~mode:output script_file (fun oc -> write oc script)) >>= fun () ->
+  Lwt_process.exec ~stdout ~stderr
+    ("", [| "sh" ; script_file |]) >>= fun exitcode ->
   match exitcode with
   | Caml.Unix.WEXITED 0 -> Lwt.return ()
-  | _ ->
-    log `error "sh call exited with non-zero code:\n\n%s\n\n" s ;
-    Lwt.fail (Failure (Printf.sprintf "shell call failed:\n%s\n" s))
+  | _ -> (
+    let msg = Printf.sprintf "shell script %s failed" script_file in
+    Bistro_logger.error logger "%s" msg ;
+    Lwt.fail (Failure msg)
+  )
 
 type backend =
   np:int -> mem:int ->
   stdout:string -> stderr:string ->
   Bistro_logger.t ->
-  string list -> unit Lwt.t
+  string -> unit Lwt.t
 
 let string_of_cmd (h, t) =
   String.concat ~sep:" " (h :: (Array.to_list t))
@@ -38,21 +40,12 @@ let make_cmd cmds =
 
 let local_worker ~np ~mem : backend =
   let pool = Bistro_pool.create ~np ~mem in
-  fun ~np ~mem ~stdout ~stderr logger cmds ->
-    let exec cmd =
+  fun ~np ~mem ~stdout ~stderr logger script ->
+    Bistro_pool.use pool ~np ~mem ~f:(fun ~np ~mem ->
       redirection stdout >>= fun stdout ->
       redirection stderr >>= fun stderr ->
-      Bistro_logger.info logger "Running\n\t%s\n" (string_of_cmd cmd) ;
-      Lwt_process.exec ~stdout ~stderr cmd
-      >>=
-	function
-	| Caml.Unix.WEXITED 0 -> Lwt.return ()
-	| _ ->
-	  let msg = Printf.sprintf "shell call failed:\n%s\n" (string_of_cmd cmd) in
-	  Bistro_logger.error logger "%s" msg ;
-	  Lwt.fail (Failure msg)
-    in
-    Bistro_pool.use pool ~np ~mem ~f:(fun ~np ~mem -> exec (make_cmd cmds))
+      shell ~logger ~stdout ~stderr script
+    )
 
 let remove_if_exists fn =
   if Sys.file_exists fn = `Yes then
@@ -73,7 +66,7 @@ let thread_of_workflow_exec blog (backend : backend) db w dep_threads =
       if Sys.file_exists (Bistro_db.path db x) <> `Yes
       then failwithf "No file or directory named %s in directory workflow." p ()
     )
-  | Rule { np ; mem ; cmds } as x ->
+  | Rule { np ; mem ; script } as x ->
     let dest_path = Bistro_db.cache_path db x in
     Lwt.return () >>= fun () ->
     if Sys.file_exists_exn dest_path then Lwt.return ()
@@ -83,15 +76,14 @@ let thread_of_workflow_exec blog (backend : backend) db w dep_threads =
 	let stderr_path = Bistro_db.stderr_path db x in
 	let build_path = Bistro_db.build_path db x in
 	let tmp_path = Bistro_db.tmp_path db x in
-	let f cmd = exec_cmd ~dest:build_path ~tmp:tmp_path (Bistro_db.path db) cmd in
-	let cmds = List.map cmds ~f in
+	let script = string_of_script ~dest:build_path ~tmp:tmp_path (Bistro_db.path db) script in
 	remove_if_exists stdout_path >>= fun () ->
 	remove_if_exists stderr_path >>= fun () ->
 	remove_if_exists build_path >>= fun () ->
 	remove_if_exists tmp_path >>= fun () ->
 	Lwt_unix.mkdir tmp_path 0o750 >>= fun () ->
 	Bistro_logger.started blog x ;
-	backend ~np:np ~mem:mem ~stdout:stdout_path ~stderr:stderr_path blog cmds >>= fun () ->
+	backend ~np:np ~mem:mem ~stdout:stdout_path ~stderr:stderr_path blog script >>= fun () ->
 	if Sys.file_exists build_path = `Yes then (
 	  Bistro_logger.finished blog x ;
 	  remove_if_exists tmp_path >>= fun () ->
@@ -113,13 +105,10 @@ let thread_of_workflow_fake_exec db w dep_threads =
   | Rule r as x ->
     Lwt.join dep_threads >>= fun () -> (
       let output = Bistro_db.path db x in
-      let f cmd =
-	exec_cmd ~dest:output ~tmp:(Bistro_db.tmp_path db x) (Bistro_db.path db) cmd
-      in
       Lwt_io.printf
 	"Rule(%s): exec script\n\t%s\n"
 	output
-	(String.concat ~sep:"\n\t" (List.map r.cmds ~f))
+	(string_of_script ~dest:output ~tmp:(Bistro_db.tmp_path db x) (Bistro_db.path db) r.script)
     )
 
 let rec thread_of_workflow f db map w =

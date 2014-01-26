@@ -2,6 +2,7 @@ B _build/src/lib
 B _build/src/test
 S src/lib
 S src/test
+PKG camlp4.lib
 PKG core
 PKG lwt
 PKG react

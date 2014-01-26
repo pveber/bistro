@@ -11,13 +11,22 @@ let rec task i =
     )
   in
   Bistro_workflow.(
-    make Cmd.(script [
-      cmd "echo" arg int i stdout_to dest
-    ])
+    make Script.(
+      begin_
+	cmd "echo" arg int i stdout_to dest
+      end_
+    )
     |> fun init ->
       List.fold_left target_deps
 	~init
 	~f:(fun accu dep -> depends ~on:dep accu)
   )
 
-let () = Bistro_export.to_script (Bistro_db.make "_bistro") (task 20) stdout
+let db = Bistro_db.make "_bistro"
+let () = Bistro_db.setup db
+let logger = Bistro_logger.make ()
+
+let _ = React.E.trace print_endline (Bistro_logger.to_strings logger)
+
+let () = Bistro_sequential.exec db logger (task 20)
+
