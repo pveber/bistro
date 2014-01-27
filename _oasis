@@ -11,7 +11,8 @@ BuildTools: ocamlbuild
 Library bistro
   Path:          src/lib
   Modules:       Bistro_db, Bistro_export,
-                 Bistro_logger, Bistro_sequential, Bistro_types,
+                 Bistro_logger, Bistro_repo,
+                 Bistro_sequential, Bistro_types,
                  Bistro_workflow
   BuildDepends:  core, react, shell, threads
   FindlibName:   bistro

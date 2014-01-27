@@ -52,7 +52,7 @@ let stanford_parser x : [`stanford_parser_typed_dependencies] file workflow = ma
   lexparser.sh #w:x# > #{DEST}
 >>
 
-let dependensee (x : [`stanford_parser_typed_dependencies] file workflow) = make <:script<
+let dependensee (x : [`stanford_parser_typed_dependencies] file workflow) : [`png] file workflow = make <:script<
   java -cp #w:stanford_parser_package#/DependenSee.2.0.5.jar:#w:stanford_parser_package#/stanford-parser.jar:#w:stanford_parser_package#/stanford-parser-3.3.0-models.jar com.chaoticity.dependensee.Main -t #w:x# #{DEST}
 >>
 
@@ -68,6 +68,14 @@ let logger = Bistro_logger.make ()
 
 let logger_thread = Lwt_stream.iter_s Lwt_io.printl (Lwt_react.E.to_stream (Bistro_logger.to_strings logger))
 
+let picture = dependensee (stanford_parser (wikipedia_query "Gene"))
 let () =
-  let goal = dependensee (stanford_parser (wikipedia_query "Gene")) in
-  Lwt_unix.run (Bistro_concurrent.exec db logger (Bistro_concurrent.local_worker ~np:4 ~mem:(6 * 1024)) goal)
+  Lwt_unix.run (Bistro_concurrent.exec db logger (Bistro_concurrent.local_worker ~np:4 ~mem:(6 * 1024)) picture)
+
+let () = Bistro_repo.(
+  setup
+    ~wipeout:true
+    db
+    (make [ item [ "gene.png" ] picture ])
+    "nlp_output"
+)
