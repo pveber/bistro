@@ -21,7 +21,7 @@ Library bistro
 Library bistro_lwt
   Path:          src/lib
   Modules:       Bistro_concurrent, Bistro_pool
-  BuildDepends:  lwt, lwt.react, lwt.syntax, bistro
+  BuildDepends:  lwt, lwt.react, lwt.syntax, lwt.unix, bistro
   FindlibName:   lwt
   FindlibParent: bistro
   XMETARequires: bistro, lwt, lwt.react, lwt.unix
@@ -63,4 +63,10 @@ Executable nlp_test
   Path:          src/examples
   Build$:        flag(examples)
   MainIs:        nlp_test.ml
+  BuildDepends:  bistro.lwt, bistro.syntax
+
+Executable failure
+  Path:          src/examples
+  Build$:        flag(examples)
+  MainIs:        failure.ml
   BuildDepends:  bistro.lwt, bistro.syntax
