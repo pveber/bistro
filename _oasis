@@ -16,6 +16,7 @@ Library bistro
                  Bistro_workflow
   BuildDepends:  core, react, shell, threads
   FindlibName:   bistro
+  XMETARequires: core, react, shell, threads
 
 Library bistro_lwt
   Path:          src/lib
@@ -23,6 +24,7 @@ Library bistro_lwt
   BuildDepends:  lwt, lwt.react, lwt.syntax, bistro
   FindlibName:   lwt
   FindlibParent: bistro
+  XMETARequires: bistro, lwt, lwt.react, lwt.unix
 
 Library bistro_syntax
   FindlibName:      syntax
@@ -61,4 +63,4 @@ Executable nlp_test
   Path:          src/examples
   Build$:        flag(examples)
   MainIs:        nlp_test.ml
-  BuildDepends:  bistro.lwt,bistro.syntax,core,lwt.react,lwt.unix,threads
+  BuildDepends:  bistro.lwt, bistro.syntax
