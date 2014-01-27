@@ -134,10 +134,12 @@ let dryrun db  w =
   fst (thread_of_workflow thread_of_workflow_fake_exec db String.Map.empty (w : _ Bistro_workflow.t :> Bistro_workflow.u))
 
 let build_repo ~base ?wipeout db blog backend ((Bistro_repo.Repo items) as repo) =
-  List.fold_left items ~init:(Lwt.return (), String.Map.empty) ~f:(fun (t,accu) (Bistro_repo.Item (u,_,_)) ->
-    thread_of_workflow (thread_of_workflow_exec blog backend) db accu u
+  List.fold_left items ~init:([], String.Map.empty) ~f:(fun (roots,accu) (Bistro_repo.Item (u,_,_)) ->
+    let t, map = thread_of_workflow (thread_of_workflow_exec blog backend) db accu u in
+    t :: roots, map
   )
   |> fst
+  |> Lwt.join
   >>= fun () ->
   Bistro_repo.setup ?wipeout db repo base ;
   Lwt.return ()
