@@ -42,7 +42,7 @@
 
 let no_get = ([^ '<' '#'] | '<'+ [^ '<' '-' '#'])* '<'*
 
-let string_sequence = ([^ '#' '{' '}' '\\'] | '\\'+ [^ '\\' '!' '#' '{' '}'])+
+let string_sequence = ([^ '#' '[' ']' '\\'] | '\\'+ [^ '\\' '!' '#' '[' ']'])+
 
 rule token = parse
 
@@ -56,24 +56,24 @@ rule token = parse
     { IF (expr lexbuf 2 e) }
 
 (* other data *)
-| '#' (([^ '?' '{' '#'] [^ ':']* as typ) ':' ([^'#']* as e)) '#'
+| '#' (([^ '?' '[' '#' ':' ' ']* as typ) ':' ([^'#']* as e)) '#'
     { EXPR (typ, expr lexbuf (2 + String.length typ) e) }
 
-(* "{" and "}" keywords *)
-| '{' { LBR }
-| '}' { RBR }
+(* "[" and "]" keywords *)
+| "[" { LBR }
+| "]" { RBR }
 
 (* ordinary characters *)
 | string_sequence as s { STRING (Camlp4.Struct.Token.Eval.string s) }
 | "\\#" { STRING "#" }
-| "\\{" { STRING "{" }
-| "\\}" { STRING "}" }
+| "\\[" { STRING "[" }
+| "\\]" { STRING "]" }
 
 | eof { EOF}
 
-| "#{DEST}" { DEST }
+| "#DEST" { DEST }
 
-| "#{TMP}" { TMP }
+| "#TMP" { TMP }
 
 | _
     { failwith (Printf.sprintf "At offset %d: unexpected character.\n" (Lexing.lexeme_start lexbuf)) }
