@@ -46,15 +46,15 @@ module Script : sig
   val arg : t -> (t -> 'a -> 'b -> 'c) -> 'a -> 'b -> 'c
   val argp : t -> (t -> 'a -> 'b -> 'c) -> string -> 'a -> 'b -> 'c
   val stdout_to : t -> 'a cons
-
   val end_ : t -> t
+
+  val to_string : dest:string -> tmp:string -> (u -> path) -> t -> string
 end
 
 (* val export_PATH_cmd : [`directory of [`package]] t list -> cmd *)
 
 (** {5 Observers}*)
 val digest : u -> string
-val string_of_script : dest:string -> tmp:string -> (u -> path) -> script -> string
 val deps : u -> u list
 
 val depth_first_traversal : _ t -> init:'a -> f:(u -> 'a -> 'a) -> 'a

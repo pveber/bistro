@@ -35,6 +35,17 @@ let script_expander _loc _ s =
 	      | None -> $expr_of_ast none$]
 	  )
 	>>
+      | For (patt, e, body, sep) ->
+	 <:expr<
+	  Bistro_workflow.L (
+	    List.fold_right
+	      (fun $patt$ accu ->
+	         let h = $expr_of_ast body$ in
+		 if accu = [] then h else List.concat [ h ; $expr_of_ast sep$ ; accu])
+	      $e$
+	      []
+	  )
+	 >>
     in
     <:expr< [ $item_expr$ :: $accu$ ] >>
   and expr_of_ast ast =

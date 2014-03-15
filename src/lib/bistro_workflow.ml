@@ -81,23 +81,25 @@ module Script = struct
 
   let stdout_to tokens k =
     k (S" > " :: tokens)
+
+  let to_string ~dest ~tmp path tokens =
+    let rec token = function
+      | S s -> s
+      | I i -> string_of_int i
+      | F f -> Float.to_string f
+      | W w -> path w
+      | L l -> token_list l
+      | Q (q, c) -> quote c (token q)
+      | D -> dest
+      | TMP -> tmp
+    and token_list l =
+      List.fold_right (List.map l token) ~f:( ^ ) ~init:""
+    in
+    token_list tokens
+
 end
 
 
-let string_of_script ~dest ~tmp path tokens =
-  let rec token = function
-    | S s -> s
-    | I i -> string_of_int i
-    | F f -> Float.to_string f
-    | W w -> path w
-    | L l -> token_list l
-    | Q (q, c) -> quote c (token q)
-    | D -> dest
-    | TMP -> tmp
-  and token_list l =
-    List.fold_right (List.map l token) ~f:( ^ ) ~init:""
-  in
-  token_list tokens
 
 let deps = function
   | Input _ -> []

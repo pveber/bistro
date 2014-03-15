@@ -46,6 +46,11 @@ let string_sequence = ([^ '#' '[' ']' '\\'] | '\\'+ [^ '\\' '!' '#' '[' ']'])+
 
 rule token = parse
 
+(* for *)
+| "#!" (no_get as p) "<-" ([^ '#']* as e) '#'
+    { FOR (patt lexbuf 2 p,
+	   expr lexbuf (4 + String.length p) e) }
+
 (* option *)
 | "#?" (no_get as p) "<-" ([^ '#']* as e) '#'
     { OPT (patt lexbuf 2 p,

@@ -1,3 +1,26 @@
+(* This module is adapted from the format library [1] which is
+ * distributed under GPL.
+ *
+ * [1] https://forge.ocamlcore.org/projects/format/
+ *)
+
+(* Copyright 2009 Tiphaine Turpin
+
+   This file is part of Format.
+
+   Format is free software: you can redistribute it and/or modify it
+   under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   Format is distributed in the hope that it will be useful, but
+   WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with Format.  If not, see <http://www.gnu.org/licenses/>. *)
+
 open Camlp4.PreCast.Syntax.Ast
 
 type t = item list
@@ -8,6 +31,7 @@ and item =
 | Tmp
 | If of expr * t * t
 | Opt of patt * expr * t * t
+| For of patt * expr * t * t
 
 and expr_ty = [
 | `int
@@ -15,24 +39,3 @@ and expr_ty = [
 | `float
 | `workflow
 ]
-
-(* let rec remove_prefix_spaces = function *)
-(*   | Space _ :: t -> remove_prefix_spaces t *)
-(*   | x -> x *)
-
-(* let rec remove_trailing_spaces = function *)
-(*   | [] -> [] *)
-(*   | h :: t -> *)
-(*     match remove_trailing_spaces t, h with *)
-(*     | [], Space _ -> [] *)
-(*     | _ -> h :: t *)
-
-(* let remove_useless_spaces ast = *)
-(*   ast *)
-(*   |> List.map remove_prefix_spaces *)
-(*   |> List.map remove_trailing_spaces *)
-
-(* let simplify ast = *)
-(*   ast *)
-(*   |> remove_useless_spaces *)
-(*   |> List.filter (( <> ) []) *)

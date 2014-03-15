@@ -5,5 +5,6 @@ S src/test
 PKG camlp4.lib
 PKG core
 PKG lwt
+PKG oUnit
 PKG react
 PKG shell

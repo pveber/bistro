@@ -39,6 +39,7 @@
 %token <string * Camlp4.PreCast.Syntax.Ast.expr> EXPR
 %token <Camlp4.PreCast.Ast.expr> IF
 %token <Camlp4.PreCast.Ast.patt * Camlp4.PreCast.Ast.expr> OPT
+%token <Camlp4.PreCast.Ast.patt * Camlp4.PreCast.Ast.expr> FOR
 %token EOF LBR RBR
 %token DEST TMP
 
@@ -73,4 +74,8 @@ item:
     { If ($1, $3, []) }
 | IF LBR items RBR LBR items RBR
     { If ($1, $3, $6) }
+| FOR LBR items RBR
+    { let p, e = $1 in For (p, e, $3, []) }
+| FOR LBR items RBR LBR items RBR
+    { let p, e = $1 in For (p, e, $3, $6) }
 ;

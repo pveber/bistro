@@ -76,7 +76,7 @@ let thread_of_workflow_exec blog (backend : backend) db w dep_threads =
 	let stderr_path = Bistro_db.stderr_path db x in
 	let build_path = Bistro_db.build_path db x in
 	let tmp_path = Bistro_db.tmp_path db x in
-	let script = string_of_script ~dest:build_path ~tmp:tmp_path (Bistro_db.path db) script in
+	let script = Script.to_string ~dest:build_path ~tmp:tmp_path (Bistro_db.path db) script in
 	remove_if_exists stdout_path >>= fun () ->
 	remove_if_exists stderr_path >>= fun () ->
 	remove_if_exists build_path >>= fun () ->
@@ -108,7 +108,7 @@ let thread_of_workflow_fake_exec db w dep_threads =
       Lwt_io.printf
 	"Rule(%s): exec script\n\t%s\n"
 	output
-	(string_of_script ~dest:output ~tmp:(Bistro_db.tmp_path db x) (Bistro_db.path db) r.script)
+	(Script.to_string ~dest:output ~tmp:(Bistro_db.tmp_path db x) (Bistro_db.path db) r.script)
     )
 
 let rec thread_of_workflow f db map w =
