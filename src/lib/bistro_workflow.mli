@@ -66,7 +66,7 @@ val make :
   ?mem:int ->
   ?timeout:duration ->
   Script.t -> 'a t
-val select : [`dir of _] t -> path -> _ t
+val select : [`directory of _] t -> path -> _ t
 
 
 val depends : 'a t -> on:_ t -> 'a t
