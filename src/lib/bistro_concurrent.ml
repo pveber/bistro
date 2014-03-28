@@ -62,10 +62,13 @@ let thread_of_workflow_exec blog (backend : backend) db w dep_threads =
       then failwithf "File %s is declared as an input of a workflow but does not exist." p ()
     )
   | Select (_,p) as x ->
-    Lwt.wrap (fun () ->
-      if Sys.file_exists (Bistro_db.path db x) <> `Yes
-      then failwithf "No file or directory named %s in directory workflow." p ()
-    )
+     Lwt.join dep_threads >>= fun () ->
+     if Sys.file_exists (Bistro_db.path db x) <> `Yes
+     then (
+       let msg = sprintf "No file or directory named %s in directory workflow." p in
+       Lwt.fail (Failure msg)
+     )
+     else Lwt.return ()
   | Rule { np ; mem ; script } as x ->
     let dest_path = Bistro_db.cache_path db x in
     Lwt.return () >>= fun () ->
