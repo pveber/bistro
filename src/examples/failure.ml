@@ -1,4 +1,4 @@
-open Bistro_types
+open Bistro_workflow.Types
 open Core.Std
 
 let bar : unit workflow = Bistro_workflow.make <:script<

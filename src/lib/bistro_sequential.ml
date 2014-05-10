@@ -37,7 +37,7 @@ let exec db logger w =
 	Out_channel.with_file (Bistro_db.stderr_path db x) ~f:(fun stderr ->
 	  let build_path = Bistro_db.build_path db x in
 	  let tmp_path = Bistro_db.tmp_path db x in
-	  let script = Script.to_string ~dest:build_path ~tmp:tmp_path (Bistro_db.path db) r.script in
+	  let script = script_to_string ~dest:build_path ~tmp:tmp_path (Bistro_db.path db) r.script in
 	  remove_if_exists tmp_path ;
 	  Sys.command_exn ("mkdir -p " ^ tmp_path) ;
 	  Bistro_logger.started logger x ;

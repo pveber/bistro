@@ -9,6 +9,7 @@ and u =
 | Select of u * path
 and rule = {
   script : script ;
+  interpreter : path ;
   deps : u list ;
   np : int ;
   mem : int ;
@@ -24,7 +25,19 @@ and token =
 | L : token list -> token
 | D : token
 | TMP : token
-| Q : token * char -> token
+
+module Types = struct
+  type 'a workflow = 'a t
+
+  type 'a directory = [`directory of 'a]
+  type 'a file = [`file of 'a]
+  type package = [`package] directory
+
+  type 'a zip = [`zip of 'a] file
+  type 'a gz = [`gz of 'a file] file
+  type 'a tgz = [`tgz of 'a] file
+  type pdf = [`pdf] file
+end
 
 let digest x =
   Digest.to_hex (Digest.string (Marshal.to_string x []))
@@ -42,7 +55,8 @@ let export_PATH_cmd l =
   Cmd [S "export PATH=" ; L (aux l) ; S ":$PATH"]
 *)
 
-module Script = struct
+module Shell_script = struct
+  type 'a workflow = 'a t
   type t = script
   type 'a cons = (t -> 'a) -> 'a
 
@@ -50,8 +64,18 @@ module Script = struct
 
   let begin_ k = k []
 
+  let newline tokens =
+    if tokens = [] then tokens else S "\n" :: tokens
   let cmd tokens prog k =
-    k (S prog :: (if tokens = [] then tokens else S "\n" :: tokens))
+    k (S prog :: (newline tokens))
+
+  let export_path tokens ws k = match ws with
+    | [] -> k tokens
+    | h :: t ->
+      k (
+        (List.rev_map t ~f:(fun w -> L [ W w ; S ":" ]))
+        @ (W h :: S "export PATH=" :: (newline tokens))
+      )
 
   let string tokens s k = k (S s :: tokens)
 
@@ -59,43 +83,32 @@ module Script = struct
 
   let dest tokens k = k (D :: tokens)
 
-  let opt cmd f o k = match o with
-    | None -> k cmd
-    | Some x -> f cmd x k
+  let tmp tokens k = k (TMP :: tokens)
 
-  let opt2 cmd f y o k = match o with
-    | None -> k cmd
-    | Some x -> f cmd y x k
+  let workflow tokens w k = k (W w :: tokens)
 
-  let arg tokens f v k =
-    f (S " " :: tokens) v k
+  let arg' tokens f o k = match o with
+    | None -> k tokens
+    | Some x -> f (S " " :: tokens) x k
 
-  let argp tokens f o v k =
-    f (S " " :: S o :: S " " :: tokens) v k
+  let arg tokens f v k = arg' tokens f (Some v) k
 
-  let flag tokens f b k =
+  let param' tokens f switch o k = match o with
+    | None -> k tokens
+    | Some x -> f (S " " :: S switch :: S " " :: tokens) x k
+
+  let param tokens f switch x k = param' tokens f switch (Some x) k
+
+  let flag' tokens f b k =
     k (
       if b then S f :: S " " :: tokens
       else tokens
     )
 
+  let flag tokens f k = flag' tokens f true k
+
   let stdout_to tokens k =
     k (S" > " :: tokens)
-
-  let to_string ~dest ~tmp path tokens =
-    let rec token = function
-      | S s -> s
-      | I i -> string_of_int i
-      | F f -> Float.to_string f
-      | W w -> path w
-      | L l -> token_list l
-      | Q (q, c) -> quote c (token q)
-      | D -> dest
-      | TMP -> tmp
-    and token_list l =
-      List.fold_right (List.map l token) ~f:( ^ ) ~init:""
-    in
-    token_list tokens
 
 end
 
@@ -124,7 +137,6 @@ let deps_of_script tokens =
   let rec token = function
     | S _ | F _ | I _ | D | TMP -> []
     | L s -> token_list s
-    | Q (q,c) -> token q
     | W w -> [ w ]
   and token_list l =
     List.map l ~f:token
@@ -134,6 +146,7 @@ let deps_of_script tokens =
 
 let make ?(np = 1) ?(mem = 100) ?(timeout = `day) script = Rule {
   np ; mem ; timeout ; script ;
+  interpreter = "/bin/sh" ;
   deps = deps_of_script script
 }
 
@@ -147,3 +160,18 @@ let depends wflw ~on:dep = match wflw with
       r with deps = dep :: r.deps
     }
   | Input _ | Select _ -> wflw
+
+let script_to_string ~dest ~tmp path tokens =
+  let rec token = function
+    | S s -> s
+    | I i -> string_of_int i
+    | F f -> Float.to_string f
+    | W w -> path w
+    | L l -> token_list l
+    | D -> dest
+    | TMP -> tmp
+  and token_list l =
+    List.fold_right (List.map l token) ~f:( ^ ) ~init:""
+  in
+  token_list tokens
+

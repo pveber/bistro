@@ -1,5 +1,5 @@
 open Bistro_workflow
-open Bistro_types
+open Bistro_workflow.Types
 open Core.Std
 
 (* {5 Unix utilities} *)

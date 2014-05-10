@@ -36,3 +36,8 @@ setup.data:
 .PHONY: build doc test all install uninstall reinstall clean distclean configure
 
 # OASIS_STOP
+
+top: build
+	ocamlfind ocamlmktop -o bistro.top -linkpkg -thread _build/src/lib/bistro.cma _build/src/lib/bistro_lwt.cma -package core,react,shell,lwt.unix,utop bistro_toplevel.cmo
+
+.PHONY: top

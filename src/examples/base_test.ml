@@ -1,5 +1,5 @@
 open Core.Std
-open Bistro_types
+open Bistro_workflow.Types
 
 let tex : [`latex] file workflow = Bistro_workflow.input "src/examples/doc.tex"
 

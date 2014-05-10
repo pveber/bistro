@@ -11,7 +11,7 @@ let rec task i =
     )
   in
   Bistro_workflow.(
-    make Script.(
+    make Shell_script.(
       begin_
 	cmd "echo" arg int i stdout_to dest
       end_
