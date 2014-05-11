@@ -70,7 +70,7 @@ let thread_of_workflow_exec blog (backend : backend) db w dep_threads =
      )
      else Lwt.return ()
   | Rule { np ; mem ; script } as x ->
-    let dest_path = Bistro_db.cache_path db x in
+    let dest_path = Bistro_db.path db x in
     Lwt.return () >>= fun () ->
     if Sys.file_exists_exn dest_path then Lwt.return ()
     else (

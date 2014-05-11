@@ -43,12 +43,11 @@ let exec db logger w =
 	  Bistro_logger.started logger x ;
 	  shell ~stdout ~stderr logger script ;
 	  Bistro_logger.finished logger x ;
-	  Unix.rename ~src:build_path ~dst:(Bistro_db.cache_path db x)
+	  Unix.rename ~src:build_path ~dst:(Bistro_db.path db x)
 	)
       )
   )
   in
-  Bistro_db.setup db ;
   Bistro_workflow.depth_first_traversal
     ~init:()
     ~f:(fun w () -> foreach w)
