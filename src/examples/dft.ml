@@ -22,11 +22,10 @@ let rec task i =
 	~f:(fun accu dep -> depends ~on:dep accu)
   )
 
-let db = Bistro_db.make "_bistro"
-let () = Bistro_db.setup db
+let db = Bistro_db.init "_bistro"
 let logger = Bistro_logger.make ()
 
 let _ = React.E.trace print_endline (Bistro_logger.to_strings logger)
 
-let () = Bistro_sequential.exec db logger (task 20)
+let () = Bistro_run.exec db logger (task 20)
 

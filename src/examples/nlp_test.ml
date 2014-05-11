@@ -59,8 +59,7 @@ let dependensee (x : [`stanford_parser_typed_dependencies] file workflow) : [`pn
 
 
 
-let db = Bistro_db.make "_bistro"
-let () = Bistro_db.setup db
+let db = Bistro_db.init "_bistro"
 let logger = Bistro_logger.make ()
 
 (* let () = *)
@@ -73,6 +72,6 @@ let repo = Bistro_repo.(
 )
 
 let () =
-  let backend = Bistro_concurrent.local_worker ~np:4 ~mem:(6 * 1024) in
-  let t = Bistro_concurrent.build_repo ~base:"nlp_output" ~wipeout:true db logger backend repo in
+  let backend = Bistro_run_lwt.local_worker ~np:4 ~mem:(6 * 1024) in
+  let t = Bistro_run_lwt.build_repo ~base:"nlp_output" ~wipeout:true db logger backend repo in
   Lwt_unix.run t

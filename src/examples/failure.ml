@@ -14,11 +14,10 @@ let fail x = Bistro_workflow.make <:script<
   echo #w:x# > #DEST
 >>
 
-let db = Bistro_db.make "_bistro"
-let () = Bistro_db.setup db
+let db = Bistro_db.init "_bistro"
 let logger = Bistro_logger.make ()
 
 let goal = foo (fail bar)
 
 let () =
-  Bistro_sequential.exec db logger goal
+  Bistro_run.exec db logger goal

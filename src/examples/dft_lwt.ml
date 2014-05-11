@@ -23,8 +23,7 @@ let rec task i =
 	~f:(fun dep accu -> depends ~on:dep accu)
   )
 
-let db = Bistro_db.make "_bistro"
-let () = Bistro_db.setup db
+let db = Bistro_db.init "_bistro"
 let logger = Bistro_logger.make ()
 
 (* let () = *)
@@ -33,5 +32,5 @@ let logger = Bistro_logger.make ()
 let logger_thread = Lwt_stream.iter_s Lwt_io.printl (Lwt_react.E.to_stream (Bistro_logger.to_strings logger))
 
 let () =
-  Lwt_unix.run (Bistro_concurrent.exec db logger (Bistro_concurrent.local_worker ~np:4 ~mem:(6 * 1024)) (task 210))
+  Lwt_unix.run (Bistro_run_lwt.exec db logger (Bistro_run_lwt.local_worker ~np:4 ~mem:(6 * 1024)) (task 210))
 
