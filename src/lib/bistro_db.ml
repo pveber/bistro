@@ -55,54 +55,58 @@ let rec path db = Bistro_workflow.(function
   )
 
 module Log_msg = struct
-  type level = [ `debug | `info | `warning | `error ]
-  type t = Bistro_workflow.u option * level * Core.Time.t * string
+  type kind = [
+    | `debug
+    | `info
+    | `warning
+    | `error
+    | `workflow_start of Bistro_workflow.u
+    | `workflow_end of Bistro_workflow.u
+    | `workflow_error of Bistro_workflow.u ]
+  type t = {
+    kind : kind ;
+    contents : string ;
+    time : Core.Time.t ;
+  }
 
-  let make ?w level fmt =
+  let make kind fmt =
     let open Printf in
-    let f msg = w, level, Core.Time.now (), msg in
+    let f msg = {
+      kind ;
+      time = Core.Time.now () ;
+      contents = msg
+    }
+    in
     ksprintf f fmt
 
-  let string_of_level = function
+  let string_of_kind = function
     | `info -> "INFO"
     | `debug -> "DEBUG"
     | `warning -> "WARNING"
     | `error -> "ERROR"
+    | `workflow_start u -> sprintf "STARTED %s" (Bistro_workflow.digest u)
+    | `workflow_end u -> sprintf "FINISHED %s" (Bistro_workflow.digest u)
+    | `workflow_error u -> sprintf "ERROR on %s" (Bistro_workflow.digest u)
 
-  let to_string (_,level,t,msg) =
+  let to_string msg =
     let open Unix in
     sprintf
       "[%s][%s] %s"
-      (string_of_level level) (Time.format t "%Y-%m-%d %H:%M:%S") msg
-end
-
-
-module type Thread = sig
-  type 'a t
-  val return : 'a -> 'a t
-  val bind : 'a t -> ('a -> 'b t) -> 'b t
-  val fail : exn -> 'a t
-  val catch : (unit -> 'a t) -> (exn -> 'a t) -> 'a t
-
-  val mkdir_p : string -> unit t
-  (** Equivalent of [mkdir -p] *)
-
-  val echo : path:string -> string -> unit t
-  (** [echo ~path msg] should append the string [msg] and a newline
-      character to the file at location [path], creating it if it does
-      not exist.
-
-      @raise Invalid_argument if no file can be created at path
-      [path] *)
+      (string_of_kind msg.kind) (Time.format msg.time "%Y-%m-%d %H:%M:%S") msg.contents
 end
 
 let echo ~path msg =
   Out_channel.with_file ~append:true path ~f:(Fn.flip output_string msg)
 
-let log ?hook db ?w level fmt =
-  let msg = Log_msg.make ?w level fmt in
+let log ?hook db kind fmt =
+  let msg = Log_msg.make kind fmt in
   let () = match hook with
     | None -> ()
     | Some f -> f msg
   in
-  echo ~path:(assert false) (Log_msg.to_string msg)
+  let path =
+    Filename.concat
+      (log_dir db)
+      (Time.format (Time.now ()) "%Y-%m-%d.log")
+  in
+  echo ~path (Log_msg.to_string msg)

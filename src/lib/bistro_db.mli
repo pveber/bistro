@@ -50,14 +50,25 @@ val tmp_dir : t -> string
 
 (** {5 Logging} *)
 module Log_msg : sig
-  type level = [ `debug | `info | `warning | `error ]
-  type t = Bistro_workflow.u option * level * Core.Time.t * string
+  type kind = [
+    | `debug
+    | `info
+    | `warning
+    | `error
+    | `workflow_start of Bistro_workflow.u
+    | `workflow_end of Bistro_workflow.u
+    | `workflow_error of Bistro_workflow.u ]
+  type t = {
+    kind : kind ;
+    contents : string ;
+    time : Core.Time.t ;
+  }
 
-  val make : ?w:Bistro_workflow.u -> level -> ('a, unit, string, t) format4 -> 'a
+  val make : kind -> ('a, unit, string, t) format4 -> 'a
   val to_string : t -> string
 end
 
 val log :
   ?hook:(Log_msg.t -> unit) ->
-  t -> ?w:Bistro_workflow.u -> Log_msg.level ->
+  t -> Log_msg.kind ->
   (Log_msg.t, unit, string, Log_msg.t) format4 -> unit
