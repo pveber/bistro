@@ -58,17 +58,17 @@ let run db log backend w =
       if not (Sys.file_exists_exn (Bistro_db.path db x)) then (
         let stdout = Bistro_db.stdout_path db x in
         let stderr = Bistro_db.stderr_path db x in
-        let build_path = Bistro_db.build_path db x in
-        let tmp_path = Bistro_db.tmp_path db x in
-        let script = script_to_string ~dest:build_path ~tmp:tmp_path (Bistro_db.path db) r.script in
-        remove_if_exists tmp_path ;
-        Sys.command_exn ("mkdir -p " ^ tmp_path) ;
+        let dest = Bistro_db.build_path db x in
+        let tmp = Bistro_db.tmp_path db x in
+        let script = script_to_string ~dest ~tmp (Bistro_db.path db) r.script in
+        remove_if_exists tmp ;
+        Sys.command_exn ("mkdir -p " ^ tmp) ;
         Bistro_log.started_build log x ;
         match backend ~np ~mem ~timeout ~interpreter ~stdout ~stderr script with
         | `Ok ->
           Bistro_log.finished_build log x ;
-          Unix.rename ~src:build_path ~dst:(Bistro_db.path db x) ;
-          remove_if_exists tmp_path
+          Unix.rename ~src:dest ~dst:(Bistro_db.path db x) ;
+          remove_if_exists tmp
         | `Error ->
           Bistro_log.failed_build log x ;
           failwithf "Build of workflow %s failed!" (Bistro_workflow.digest x) ()

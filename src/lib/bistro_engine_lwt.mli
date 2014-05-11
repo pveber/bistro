@@ -2,7 +2,7 @@ type backend =
   np:int -> mem:int -> timeout:Bistro_workflow.duration ->
   interpreter:Bistro_workflow.interpreter ->
   stdout:string -> stderr:string ->
-  string -> unit Lwt.t
+  string -> [`Ok | `Error] Lwt.t
 
 val local_worker : np:int -> mem:int -> Bistro_log.t -> backend
 
