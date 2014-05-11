@@ -45,7 +45,7 @@ let local_worker (log : Bistro_log.t) ~np ~mem ~timeout ~interpreter ~stdout ~st
       `Error
     )
 
-let run db log backend w =
+let run db blog backend w =
   let foreach = Bistro_workflow.(function
     | Input p ->
       if Sys.file_exists p <> `Yes
@@ -62,15 +62,25 @@ let run db log backend w =
         let tmp = Bistro_db.tmp_path db x in
         let script = script_to_string ~dest ~tmp (Bistro_db.path db) r.script in
         remove_if_exists tmp ;
+        remove_if_exists stdout ;
+        remove_if_exists stderr ;
+        remove_if_exists dest ;
         Sys.command_exn ("mkdir -p " ^ tmp) ;
-        Bistro_log.started_build log x ;
-        match backend ~np ~mem ~timeout ~interpreter ~stdout ~stderr script with
-        | `Ok ->
-          Bistro_log.finished_build log x ;
+        Bistro_log.started_build blog x ;
+        match
+          (backend ~np ~mem ~timeout ~interpreter ~stdout ~stderr script,
+           Sys.file_exists_exn dest) with
+        | `Ok, true ->
+          Bistro_log.finished_build blog x ;
           Unix.rename ~src:dest ~dst:(Bistro_db.path db x) ;
           remove_if_exists tmp
-        | `Error ->
-          Bistro_log.failed_build log x ;
+        | `Ok, false ->
+          let msg = "rule failed to produce its target at the prescribed location" in
+          Bistro_log.failed_build blog x ;
+          Bistro_log.error blog "%s" msg ;
+          failwith msg
+        | `Error, _ ->
+          Bistro_log.failed_build blog x ;
           failwithf "Build of workflow %s failed!" (Bistro_workflow.digest x) ()
       )
     )
