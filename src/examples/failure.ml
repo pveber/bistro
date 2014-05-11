@@ -15,9 +15,9 @@ let fail x = Bistro_workflow.make <:script<
 >>
 
 let db = Bistro_db.init "_bistro"
-let logger = Bistro_logger.make ()
+let blog = Bistro_log.make ~db ~hook:(fun x -> print_endline (Bistro_log.Entry.to_string x)) ()
+let backend = Bistro_engine.local_worker blog
 
 let goal = foo (fail bar)
 
-let () =
-  Bistro_run.exec db logger goal
+let () = Bistro_engine.run db blog backend goal

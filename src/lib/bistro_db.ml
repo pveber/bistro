@@ -24,9 +24,10 @@ let well_formed_db path =
 
 let init base =
   if Sys.file_exists_exn base
-  then
+  then (
     if not (well_formed_db base)
     then invalid_argf "Bistro_db.init: the path %s is not available for a bistro database" base ()
+  )
   else (
     Unix.mkdir_p (tmp_dir base) ;
     Unix.mkdir_p (build_dir base) ;
@@ -54,59 +55,19 @@ let rec path db = Bistro_workflow.(function
     | Rule r as w -> aux_path cache_dir db w
   )
 
-module Log_msg = struct
-  type kind = [
-    | `debug
-    | `info
-    | `warning
-    | `error
-    | `workflow_start of Bistro_workflow.u
-    | `workflow_end of Bistro_workflow.u
-    | `workflow_error of Bistro_workflow.u ]
-  type t = {
-    kind : kind ;
-    contents : string ;
-    time : Core.Time.t ;
-  }
-
-  let make kind fmt =
-    let open Printf in
-    let f msg = {
-      kind ;
-      time = Core.Time.now () ;
-      contents = msg
-    }
-    in
-    ksprintf f fmt
-
-  let string_of_kind = function
-    | `info -> "INFO"
-    | `debug -> "DEBUG"
-    | `warning -> "WARNING"
-    | `error -> "ERROR"
-    | `workflow_start u -> sprintf "STARTED %s" (Bistro_workflow.digest u)
-    | `workflow_end u -> sprintf "FINISHED %s" (Bistro_workflow.digest u)
-    | `workflow_error u -> sprintf "ERROR on %s" (Bistro_workflow.digest u)
-
-  let to_string msg =
-    let open Unix in
-    sprintf
-      "[%s][%s] %s"
-      (string_of_kind msg.kind) (Time.format msg.time "%Y-%m-%d %H:%M:%S") msg.contents
-end
-
 let echo ~path msg =
-  Out_channel.with_file ~append:true path ~f:(Fn.flip output_string msg)
+  Out_channel.with_file ~append:true path ~f:(fun oc ->
+      output_string oc msg ;
+      output_string oc "\n"
+    )
 
-let log ?hook db kind fmt =
-  let msg = Log_msg.make kind fmt in
-  let () = match hook with
-    | None -> ()
-    | Some f -> f msg
+let log db fmt =
+  let f msg =
+    let path =
+      Filename.concat
+        (log_dir db)
+        (Time.format (Time.now ()) "%Y-%m-%d.log")
+    in
+    echo ~path msg
   in
-  let path =
-    Filename.concat
-      (log_dir db)
-      (Time.format (Time.now ()) "%Y-%m-%d.log")
-  in
-  echo ~path (Log_msg.to_string msg)
+  Printf.ksprintf f fmt

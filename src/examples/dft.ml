@@ -23,9 +23,8 @@ let rec task i =
   )
 
 let db = Bistro_db.init "_bistro"
-let logger = Bistro_logger.make ()
+let blog = Bistro_log.make ~db ~hook:(fun x -> print_endline (Bistro_log.Entry.to_string x)) ()
+let backend = Bistro_engine.local_worker blog
 
-let _ = React.E.trace print_endline (Bistro_logger.to_strings logger)
-
-let () = Bistro_run.exec db logger (task 20)
+let () = Bistro_engine.run db blog backend (task 20)
 

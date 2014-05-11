@@ -23,14 +23,17 @@ let rec task i =
 	~f:(fun dep accu -> depends ~on:dep accu)
   )
 
+let log_event, send_to_log_event = React.E.create ()
+
 let db = Bistro_db.init "_bistro"
-let logger = Bistro_logger.make ()
+let blog = Bistro_log.make ~db ~hook:(fun x -> send_to_log_event (Bistro_log.Entry.to_string x)) ()
+let backend = Bistro_engine_lwt.local_worker ~np:4 ~mem:(6 * 1024) blog
 
 (* let () = *)
 (*   Lwt_unix.run (Bistro_concurrent.dryrun db (task 60)) *)
 
-let logger_thread = Lwt_stream.iter_s Lwt_io.printl (Lwt_react.E.to_stream (Bistro_logger.to_strings logger))
+let blog_thread = Lwt_stream.iter_s Lwt_io.printl (Lwt_react.E.to_stream log_event)
 
 let () =
-  Lwt_unix.run (Bistro_run_lwt.exec db logger (Bistro_run_lwt.local_worker ~np:4 ~mem:(6 * 1024)) (task 210))
+  Lwt_unix.run (Bistro_engine_lwt.run db blog backend (task 210))
 

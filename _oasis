@@ -11,16 +11,16 @@ BuildTools: ocamlbuild
 Library bistro
   Path:          src/lib
   Modules:       Bistro_db, Bistro_export,
-                 Bistro_logger, Bistro_repo,
-                 Bistro_run,
+                 Bistro_log, Bistro_repo,
+                 Bistro_engine,
                  Bistro_workflow
-  BuildDepends:  core, react, shell, threads
+  BuildDepends:  core, shell, threads
   FindlibName:   bistro
-  XMETARequires: core, react, shell, threads
+  XMETARequires: core, shell, threads
 
 Library bistro_lwt
   Path:          src/lib
-  Modules:       Bistro_db_lwt, Bistro_pool, Bistro_run_lwt
+  Modules:       Bistro_db_lwt, Bistro_pool, Bistro_engine_lwt
   BuildDepends:  lwt, lwt.react, lwt.syntax, lwt.unix, bistro
   FindlibName:   lwt
   FindlibParent: bistro

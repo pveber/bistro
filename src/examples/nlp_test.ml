@@ -58,20 +58,25 @@ let dependensee (x : [`stanford_parser_typed_dependencies] file workflow) : [`pn
 
 
 
+let log_event, send_to_log_event = React.E.create ()
 
 let db = Bistro_db.init "_bistro"
-let logger = Bistro_logger.make ()
+let blog = Bistro_log.make ~db ~hook:(fun x -> send_to_log_event (Bistro_log.Entry.to_string x)) ()
+let backend = Bistro_engine_lwt.local_worker ~np:4 ~mem:(6 * 1024) blog
 
-(* let () = *)
-(*   Lwt_unix.run (Bistro_concurrent.dryrun db (task 60)) *)
-
-let logger_thread = Lwt_stream.iter_s Lwt_io.printl (Lwt_react.E.to_stream (Bistro_logger.to_strings logger))
+let blog_thread = Lwt_stream.iter_s Lwt_io.printl (Lwt_react.E.to_stream log_event)
 
 let repo = Bistro_repo.(
-  make [ item [ "gene.png" ] (dependensee (stanford_parser (wikipedia_query "Gene"))) ]
-)
+    let workflow word =
+      dependensee (stanford_parser (wikipedia_query word))
+    in
+    make [
+      item [ "gene.png" ] (workflow "Gene") ;
+      item [ "space.png" ] (workflow "Space") ;
+    ]
+  )
 
 let () =
-  let backend = Bistro_run_lwt.local_worker ~np:4 ~mem:(6 * 1024) in
-  let t = Bistro_run_lwt.build_repo ~base:"nlp_output" ~wipeout:true db logger backend repo in
+  let backend = Bistro_engine_lwt.local_worker ~np:4 ~mem:(6 * 1024) blog in
+  let t = Bistro_engine_lwt.build_repo ~base:"nlp_output" ~wipeout:true db blog backend repo in
   Lwt_unix.run t

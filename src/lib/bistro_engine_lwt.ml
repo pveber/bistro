@@ -1,15 +1,22 @@
 open Core.Std
 
+type backend =
+  np:int -> mem:int -> timeout:Bistro_workflow.duration ->
+  interpreter:Bistro_workflow.interpreter ->
+  stdout:string -> stderr:string ->
+  string -> unit Lwt.t
+
+
 let ( >>= ) = Lwt.( >>= )
 let ( >|= ) = Lwt.( >|= )
 
 let shell
-    ~logger
+    ~log
     ~stdout
     ~stderr
     script =
   let script_file = Filename.temp_file "bistro" ".sh" in
-  Bistro_logger.info logger "Started script:\n\n%s\n\n" script ;
+  Bistro_log.info log "Started script:\n\n%s\n\n" script ;
   Lwt_io.(with_file ~mode:output script_file (fun oc -> write oc script)) >>= fun () ->
   Lwt_process.exec ~stdout ~stderr
     ("", [| "sh" ; script_file |]) >>= fun exitcode ->
@@ -17,15 +24,9 @@ let shell
   | Caml.Unix.WEXITED 0 -> Lwt.return ()
   | _ -> (
     let msg = Printf.sprintf "shell script %s failed" script_file in
-    Bistro_logger.error logger "%s" msg ;
+    Bistro_log.error log "%s" msg ;
     Lwt.fail (Failure msg)
   )
-
-type backend =
-  np:int -> mem:int ->
-  stdout:string -> stderr:string ->
-  Bistro_logger.t ->
-  string -> unit Lwt.t
 
 let string_of_cmd (h, t) =
   String.concat ~sep:" " (h :: (Array.to_list t))
@@ -38,13 +39,13 @@ let make_cmd cmds =
   String.concat ~sep:" && \\\n " cmds
   |> Lwt_process.shell
 
-let local_worker ~np ~mem : backend =
+let local_worker ~np ~mem log : backend =
   let pool = Bistro_pool.create ~np ~mem in
-  fun ~np ~mem ~stdout ~stderr logger script ->
+  fun ~np ~mem ~timeout ~interpreter ~stdout ~stderr script ->
     Bistro_pool.use pool ~np ~mem ~f:(fun ~np ~mem ->
       redirection stdout >>= fun stdout ->
       redirection stderr >>= fun stderr ->
-      shell ~logger ~stdout ~stderr script
+      shell ~log ~stdout ~stderr script
     )
 
 let remove_if_exists fn =
@@ -69,7 +70,7 @@ let thread_of_workflow_exec blog (backend : backend) db w dep_threads =
        Lwt.fail (Failure msg)
      )
      else Lwt.return ()
-  | Rule { np ; mem ; script } as x ->
+  | Rule { np ; mem ; timeout ; interpreter ; script } as x ->
     let dest_path = Bistro_db.path db x in
     Lwt.return () >>= fun () ->
     if Sys.file_exists_exn dest_path then Lwt.return ()
@@ -85,10 +86,10 @@ let thread_of_workflow_exec blog (backend : backend) db w dep_threads =
 	remove_if_exists build_path >>= fun () ->
 	remove_if_exists tmp_path >>= fun () ->
 	Lwt_unix.mkdir tmp_path 0o750 >>= fun () ->
-	Bistro_logger.started blog x ;
-	backend ~np:np ~mem:mem ~stdout:stdout_path ~stderr:stderr_path blog script >>= fun () ->
+	Bistro_log.started_build blog x ;
+	backend ~np ~mem ~timeout ~interpreter ~stdout:stdout_path ~stderr:stderr_path script >>= fun () ->
 	if Sys.file_exists build_path = `Yes then (
-	  Bistro_logger.finished blog x ;
+	  Bistro_log.finished_build blog x ;
 	  remove_if_exists tmp_path >>= fun () ->
 	  Lwt_unix.rename build_path dest_path
 	)
@@ -130,7 +131,7 @@ let rec thread_of_workflow f db map w =
     t, String.Map.add map ~key:id ~data:t
   )
 
-let exec db blog backend w =
+let run db blog backend w =
   fst (thread_of_workflow (thread_of_workflow_exec blog backend) db String.Map.empty (w : _ Bistro_workflow.t :> Bistro_workflow.u))
 
 let dryrun db  w =

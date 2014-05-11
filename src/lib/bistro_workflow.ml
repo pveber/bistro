@@ -176,3 +176,10 @@ let script_to_string ~dest ~tmp path tokens =
   in
   token_list tokens
 
+let extension_of_interpreter = function
+  | `bash -> "sh"
+  | `ocaml -> "ml"
+  | `perl -> "pl"
+  | `python -> "py"
+  | `R -> "R"
+  | `sh -> "sh"

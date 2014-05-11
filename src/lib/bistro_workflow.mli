@@ -129,3 +129,4 @@ val depends : 'a t -> on:_ t -> 'a t
 (** {5 Utilities} *)
 
 val script_to_string : dest:string -> tmp:string -> (u -> path) -> script -> string
+val extension_of_interpreter : interpreter -> string
