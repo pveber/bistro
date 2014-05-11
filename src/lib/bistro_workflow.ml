@@ -9,13 +9,14 @@ and u =
 | Select of u * path
 and rule = {
   script : script ;
-  interpreter : path ;
+  interpreter : interpreter ;
   deps : u list ;
   np : int ;
   mem : int ;
   timeout : duration ;
 }
 and duration = [`minute | `hour | `day | `week | `month]
+and interpreter = [ `bash | `ocaml | `perl | `python | `R | `sh ]
 and script = token list
 and token =
 | S : string -> token
@@ -144,9 +145,9 @@ let deps_of_script tokens =
   in
   List.dedup (token_list tokens)
 
-let make ?(np = 1) ?(mem = 100) ?(timeout = `day) script = Rule {
+let make ?(np = 1) ?(mem = 100) ?(timeout = `day) ?(interpreter = `sh) script = Rule {
   np ; mem ; timeout ; script ;
-  interpreter = "/bin/sh" ;
+  interpreter ;
   deps = deps_of_script script
 }
 

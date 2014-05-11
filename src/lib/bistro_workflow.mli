@@ -11,7 +11,7 @@ and u =
 
 and rule = {
   script : script ; (** Script to execute in order to build the target *)
-  interpreter : path ; (** Path to a binary to execute the script *)
+  interpreter : interpreter ; (** Interpreter that should be used to execute the script *)
   deps : u list ; (** Workflow that must be run before *)
   np : int ; (** Required number of processors *)
   mem : int ; (** Required memory *)
@@ -20,6 +20,7 @@ and rule = {
 
 and duration = [`minute | `hour | `day | `week | `month]
 
+and interpreter = [ `bash | `ocaml | `perl | `python | `R | `sh ]
 and script = token list
 and token =
   | S : string -> token (** A string fragment *)
@@ -118,6 +119,7 @@ val make :
   ?np:int ->
   ?mem:int ->
   ?timeout:duration ->
+  ?interpreter:interpreter ->
   script -> 'a t
 val select : _ directory t -> path -> _ t
 
