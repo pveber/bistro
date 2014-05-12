@@ -109,8 +109,7 @@ let thread_of_workflow_exec blog (backend : backend) db w dep_threads =
           Lwt_unix.rename dest (Bistro_db.path db x)
         | `Ok, false ->
           let msg = "rule failed to produce its target at the prescribed location" in
-          Bistro_log.failed_build blog x ;
-          Bistro_log.error blog "%s" msg ;
+          Bistro_log.failed_build ~msg blog x ;
           Lwt.fail (Failure msg)
         | `Error, _ ->
           Bistro_log.failed_build blog x ;

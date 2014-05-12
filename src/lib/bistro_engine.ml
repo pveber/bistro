@@ -76,8 +76,7 @@ let run db blog backend w =
           remove_if_exists tmp
         | `Ok, false ->
           let msg = "rule failed to produce its target at the prescribed location" in
-          Bistro_log.failed_build blog x ;
-          Bistro_log.error blog "%s" msg ;
+          Bistro_log.failed_build ~msg blog x ;
           failwith msg
         | `Error, _ ->
           Bistro_log.failed_build blog x ;

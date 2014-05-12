@@ -11,7 +11,7 @@ let string_of_level = function
 type event = [
 | `started_build of Bistro_workflow.u
 | `finished_build of Bistro_workflow.u
-| `failed_build of Bistro_workflow.u
+| `failed_build of Bistro_workflow.u * string option
 | `msg of level * string
 ]
 
@@ -29,17 +29,19 @@ module Entry = struct
         (string_of_timestamp t) (string_of_level level) msg
     | `started_build u ->
       sprintf
-        "[%s] %s"
-        (string_of_timestamp t) (Printf.sprintf "Started building %s" (Bistro_workflow.digest u))
+        "[%s] Started building %s"
+        (string_of_timestamp t) (Bistro_workflow.digest u)
     | `finished_build u ->
        sprintf
-         "[%s] %s"
-         (string_of_timestamp t) (Printf.sprintf "Finished building %s" (Bistro_workflow.digest u))
+         "[%s] Finished building %s"
+         (string_of_timestamp t) (Bistro_workflow.digest u)
 
-    | `failed_build u ->
+    | `failed_build (u, msg) ->
        sprintf
-         "[%s] %s"
-         (string_of_timestamp t) (Printf.sprintf "Build of %s failed!" (Bistro_workflow.digest u))
+         "[%s] Build of %s failed!%s"
+         (string_of_timestamp t)
+         (Bistro_workflow.digest u)
+         (Option.value_map msg ~default:"" ~f:(fun x -> "\n" ^ x))
 
 end
 
@@ -59,8 +61,8 @@ let started_build log u =
 let finished_build log u =
   log (`finished_build u, Time.now ())
 
-let failed_build log u =
-  log (`failed_build u, Time.now ())
+let failed_build log ?msg u =
+  log (`failed_build (u, msg), Time.now ())
 
 let logger (type s) log level (fmt : (s, unit, string, unit) format4) =
   let open Printf in
