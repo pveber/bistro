@@ -42,6 +42,14 @@ module Types = struct
   type 'a gz = ([`gz of 'a], [`binary]) file constraint 'a = (_,_) file
   type 'a tgz = ([`tgz of 'a],[`binary]) file
   type pdf = ([`pdf],[`text]) file
+
+  class type ['a, 'b, 'c] tsv = object
+    inherit [[`tsv], [`text]] file
+    method columns : 'a
+    method header : [< `yes | `no] as 'b
+    method comment_char : 'c
+  end
+
 end
 
 let digest x =
