@@ -21,7 +21,7 @@ let tar_xfz (tgz : 'a directory tgz workflow) : 'a directory workflow = Bistro_w
   >>
 )
 
-let wikipedia_query q : [`text] file workflow = make <:script<
+let wikipedia_query q : ([`txt], [`text]) file workflow = make <:script<
   dig +short txt "#s:q#".wp.dg.cx | sed -e 's/.\{1\}//1' | sed -e 's/\./\.\\\\n/g' | head -n 1 > #DEST
 >>
 
@@ -47,12 +47,12 @@ let stanford_parser_package : package workflow = make <:script<
   sed -i 's/penn,//g' #DEST/lexparser.sh
 >>
 
-let stanford_parser x : [`stanford_parser_typed_dependencies] file workflow = make <:script<
+let stanford_parser x : ([`stanford_parser_typed_dependencies], [`text]) file workflow = make <:script<
   export PATH=#w:stanford_parser_package#:$PATH
   lexparser.sh #w:x# > #DEST
 >>
 
-let dependensee (x : [`stanford_parser_typed_dependencies] file workflow) : [`png] file workflow = make <:script<
+let dependensee (x : ([`stanford_parser_typed_dependencies],[`text]) file workflow) : ([`png],[`text]) file workflow = make <:script<
   java -cp #w:stanford_parser_package#/DependenSee.2.0.5.jar:#w:stanford_parser_package#/stanford-parser.jar:#w:stanford_parser_package#/stanford-parser-3.3.0-models.jar com.chaoticity.dependensee.Main -t #w:x# #DEST
 >>
 

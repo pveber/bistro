@@ -34,14 +34,18 @@ and token =
 module Types : sig
   type 'a workflow = 'a t
 
+  class type ['a,'b] file = object
+    method format : 'a
+    method encoding : [< `text | `binary] as 'b
+  end
+
   type 'a directory = [`directory of 'a]
-  type 'a file = [`file of 'a]
   type package = [`package] directory
 
-  type 'a zip = [`zip of 'a] file
-  type 'a gz = [`gz of 'a file] file
-  type 'a tgz = [`tgz of 'a] file
-  type pdf = [`pdf] file
+  type 'a zip = ([`zip of 'a], [`binary]) file
+  type 'a gz = ([`gz of 'a], [`binary]) file constraint 'a = (_,_) file
+  type 'a tgz = ([`tgz of 'a],[`binary]) file
+  type pdf = ([`pdf],[`text]) file
 end
 
 open Types
