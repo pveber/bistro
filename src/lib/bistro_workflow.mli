@@ -55,6 +55,8 @@ module Types : sig
     method comment : 'd
   end
 
+  type ('a, 'b, 'c) tsv = ('a, 'b, [`tab], 'c) tabular
+
 end
 
 open Types
