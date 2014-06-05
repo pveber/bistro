@@ -42,6 +42,7 @@ module Types = struct
   type 'a gz = ([`gz of 'a], [`binary]) file constraint 'a = (_,_) file
   type 'a tgz = ([`tgz of 'a],[`binary]) file
   type pdf = ([`pdf],[`text]) file
+  type html = ([`html], [`text]) file
 
   class type ['a, 'b, 'c, 'd] tabular = object
     inherit [[`tabular], [`text]] file
