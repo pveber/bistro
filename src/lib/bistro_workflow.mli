@@ -46,6 +46,15 @@ module Types : sig
   type 'a gz = ([`gz of 'a], [`binary]) file constraint 'a = (_,_) file
   type 'a tgz = ([`tgz of 'a],[`binary]) file
   type pdf = ([`pdf],[`text]) file
+
+  class type ['a, 'b, 'c, 'd] tabular = object
+    inherit [[`tabular], [`text]] file
+    method columns : 'a
+    method header : [< `yes | `no] as 'b
+    method sep : 'c
+    method comment : 'd
+  end
+
 end
 
 open Types

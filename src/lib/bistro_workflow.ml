@@ -43,12 +43,15 @@ module Types = struct
   type 'a tgz = ([`tgz of 'a],[`binary]) file
   type pdf = ([`pdf],[`text]) file
 
-  class type ['a, 'b, 'c] tsv = object
-    inherit [[`tsv], [`text]] file
+  class type ['a, 'b, 'c, 'd] tabular = object
+    inherit [[`tabular], [`text]] file
     method columns : 'a
     method header : [< `yes | `no] as 'b
-    method comment_char : 'c
+    method sep : 'c
+    method comment : 'd
   end
+
+  type ('a, 'b, 'c) tsv = ('a, 'b, [`tab], 'c) tabular
 
 end
 
