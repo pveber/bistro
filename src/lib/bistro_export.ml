@@ -28,4 +28,4 @@ let to_script db (w : _ t) oc =
   depth_first_traversal
     ~init:()
     ~f:(fun w () -> script_calls_of_workflow ~path ~tmp oc w)
-    w
+    (w : _ t :> u)

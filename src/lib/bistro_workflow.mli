@@ -127,7 +127,7 @@ end
 val digest : u -> string
 val deps : u -> u list
 
-val depth_first_traversal : _ t -> init:'a -> f:(u -> 'a -> 'a) -> 'a
+val depth_first_traversal : u -> init:'a -> f:(u -> 'a -> 'a) -> 'a
 
 (** {5 Constructors} *)
 val input : path -> 'a t

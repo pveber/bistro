@@ -45,7 +45,7 @@ let local_worker (log : Bistro_log.t) ~np ~mem ~timeout ~interpreter ~stdout ~st
       `Error
     )
 
-let run db blog backend w =
+let run_u db blog backend u =
   let foreach = Bistro_workflow.(function
     | Input p ->
       if Sys.file_exists p <> `Yes
@@ -87,4 +87,14 @@ let run db blog backend w =
   Bistro_workflow.depth_first_traversal
     ~init:()
     ~f:(fun w () -> foreach w)
-    w
+    u
+
+let run db blog backend w =
+  run_u db blog backend (w : _ Bistro_workflow.t :> Bistro_workflow.u)
+
+let build_repo ~base ?wipeout db blog backend ((Bistro_repo.Repo items) as repo) =
+  List.iter items ~f:(fun (Bistro_repo.Item (u,_,_)) ->
+      run_u db blog backend u
+    ) ;
+  Bistro_repo.setup ?wipeout db repo base
+
