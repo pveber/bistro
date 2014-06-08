@@ -1,0 +1,6 @@
+* pass proc and mem constraints to scripts
+* syntax extension: list antiquotations
+* unit tests for syntax extension
+* specify script execution
+** #DEST is an absolute directory?
+** POSIX sh
