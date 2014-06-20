@@ -13,3 +13,10 @@ val build_repo :
   base:string ->
   ?wipeout:bool->
   Bistro_db.t -> Bistro_log.t -> backend -> Bistro_repo.t -> unit Lwt.t
+
+
+module Daemon : sig
+  type t
+  val make : Bistro_db.t -> Bistro_log.t -> backend -> t
+  val run : t -> _ Bistro_workflow.t -> unit Lwt.t
+end

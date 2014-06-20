@@ -178,6 +178,8 @@ let depends wflw ~on:dep = match wflw with
     }
   | Input _ | Select _ -> wflw
 
+let u x = x
+
 let script_to_string ~dest ~tmp path tokens =
   let rec token = function
     | S s -> s

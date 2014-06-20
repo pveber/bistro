@@ -67,71 +67,49 @@ let remove_if_exists fn =
   else
     Lwt.return ()
 
-let thread_of_workflow_exec blog (backend : backend) db w dep_threads =
+let thread_of_rule blog (backend : backend) db r dep_threads =
   let open Bistro_workflow in
-  match w with
-  | Input p ->
-    Lwt.wrap (fun () ->
-      if Sys.file_exists p <> `Yes
-      then failwithf "File %s is declared as an input of a workflow but does not exist." p ()
-    )
-  | Select (_,p) as x ->
-     Lwt.join dep_threads >>= fun () ->
-     if Sys.file_exists (Bistro_db.path db x) <> `Yes
-     then (
-       let msg = sprintf "No file or directory named %s in directory workflow." p in
-       Lwt.fail (Failure msg)
-     )
-     else Lwt.return ()
-  | Rule { np ; mem ; timeout ; interpreter ; script } as x ->
-    let dest_path = Bistro_db.path db x in
-    Lwt.return () >>= fun () ->
-    if Sys.file_exists_exn dest_path then Lwt.return ()
-    else (
-      Lwt.join dep_threads >>= fun () ->
-      (
-        let stdout = Bistro_db.stdout_path db x in
-        let stderr = Bistro_db.stderr_path db x in
-        let dest = Bistro_db.build_path db x in
-        let tmp = Bistro_db.tmp_path db x in
-        let script = script_to_string ~dest ~tmp (Bistro_db.path db) script in
-        remove_if_exists stdout >>= fun () ->
-        remove_if_exists stderr >>= fun () ->
-        remove_if_exists dest >>= fun () ->
-        remove_if_exists tmp >>= fun () ->
-        Lwt_unix.mkdir tmp 0o750 >>= fun () ->
-        Bistro_log.started_build blog x ;
-        backend ~np ~mem ~timeout ~interpreter ~stdout ~stderr script >>= fun backend_response ->
-        match backend_response, Sys.file_exists_exn dest with
-        | `Ok, true ->
-          Bistro_log.finished_build blog x ;
-          remove_if_exists tmp >>= fun () ->
-          Lwt_unix.rename dest (Bistro_db.path db x)
-        | `Ok, false ->
-          let msg = "rule failed to produce its target at the prescribed location" in
-          Bistro_log.failed_build ~msg blog x ;
-          Lwt.fail (Failure msg)
-        | `Error, _ ->
-          Bistro_log.failed_build blog x ;
-          Lwt.fail (Failure (sprintf "Build of workflow %s failed!" (Bistro_workflow.digest x)))
-      )
-    )
+  match r with { np ; mem ; timeout ; interpreter ; script } ->
+  let x = Rule r in
+  Lwt.join dep_threads >>= fun () ->
+  (
+    let stdout = Bistro_db.stdout_path db x in
+    let stderr = Bistro_db.stderr_path db x in
+    let dest = Bistro_db.build_path db x in
+    let tmp = Bistro_db.tmp_path db x in
+    let script = script_to_string ~dest ~tmp (Bistro_db.path db) script in
+    remove_if_exists stdout >>= fun () ->
+    remove_if_exists stderr >>= fun () ->
+    remove_if_exists dest >>= fun () ->
+    remove_if_exists tmp >>= fun () ->
+    Lwt_unix.mkdir tmp 0o750 >>= fun () ->
+    Bistro_log.started_build blog x ;
+    backend ~np ~mem ~timeout ~interpreter ~stdout ~stderr script >>= fun backend_response ->
+    match backend_response, Sys.file_exists_exn dest with
+    | `Ok, true ->
+      Bistro_log.finished_build blog x ;
+      remove_if_exists tmp >>= fun () ->
+      Lwt_unix.rename dest (Bistro_db.path db x)
+    | `Ok, false ->
+      let msg = "rule failed to produce its target at the prescribed location" in
+      Bistro_log.failed_build ~msg blog x ;
+      Lwt.fail (Failure msg)
+    | `Error, _ ->
+      Bistro_log.failed_build blog x ;
+      Lwt.fail (Failure (sprintf "Build of workflow %s failed!" (Bistro_workflow.digest x)))
+  )
 
-let thread_of_workflow_fake_exec db w dep_threads =
+
+let thread_of_rule_fake db r dep_threads =
   let open Bistro_workflow in
-  match w with
-  | Input p ->
-    Lwt_io.printf "Input(%s): check that file exists\n" p ;
-  | Select (dir,p) ->
-    Lwt_io.printf "Dir(%s,%s): check that file exists\n" (Bistro_db.path db dir) p ;
-  | Rule r as x ->
-    Lwt.join dep_threads >>= fun () -> (
-      let output = Bistro_db.path db x in
-      Lwt_io.printf
-        "Rule(%s): exec script\n\t%s\n"
-        output
-        (script_to_string ~dest:output ~tmp:(Bistro_db.tmp_path db x) (Bistro_db.path db) r.script)
-    )
+  let x = Rule r in
+  Lwt.join dep_threads >>= fun () -> (
+    let output = Bistro_db.path db x in
+    Lwt_io.printf
+      "Rule(%s): exec script\n\t%s\n"
+      output
+      (script_to_string ~dest:output ~tmp:(Bistro_db.tmp_path db x) (Bistro_db.path db) r.script)
+  )
 
 let rec thread_of_workflow f db map w =
   let open Bistro_workflow in
@@ -139,25 +117,54 @@ let rec thread_of_workflow f db map w =
   match Map.find map id with
   | Some t -> (t, map)
   | None -> (
-      let dep_threads, map =
-        List.fold_right (Bistro_workflow.deps w) ~init:([], map) ~f:(fun w (accu, map) ->
-            let t, map = thread_of_workflow f db map w in
-            t :: accu, map
+      let open Bistro_workflow in
+      match w with
+      | Input p ->
+        Lwt.wrap (fun () ->
+            if Sys.file_exists p <> `Yes
+            then failwithf "File %s is declared as an input of a workflow but does not exist." p ()
+          ),
+        map
+      | Select (dir,p) as x ->
+        let dir_path = Bistro_db.path db dir in
+        let check_in_dir () =
+          if Sys.file_exists (Bistro_db.path db x) <> `Yes
+          then (
+            let msg = sprintf "No file or directory named %s in directory workflow." p in
+            Lwt.fail (Failure msg)
           )
-      in
-      let t = f db w dep_threads in
-      t, String.Map.add map ~key:id ~data:t
+          else Lwt.return ()
+        in
+        if Sys.file_exists_exn dir_path then check_in_dir (), map
+        else (
+          let dir_thread, map = thread_of_workflow f db map dir in
+          dir_thread >>= check_in_dir,
+          map
+        )
+      | Rule r as x ->
+        let dest_path = Bistro_db.path db x in
+        if Sys.file_exists_exn dest_path then Lwt.return (), map
+        else (
+          let dep_threads, map =
+            List.fold_right (Bistro_workflow.deps w) ~init:([], map) ~f:(fun w (accu, map) ->
+                let t, map = thread_of_workflow f db map w in
+                t :: accu, map
+              )
+          in
+          let t = f db r dep_threads in
+          t, String.Map.add map ~key:id ~data:t
+        )
     )
 
 let run db blog backend w =
-  fst (thread_of_workflow (thread_of_workflow_exec blog backend) db String.Map.empty (w : _ Bistro_workflow.t :> Bistro_workflow.u))
+  fst (thread_of_workflow (thread_of_rule blog backend) db String.Map.empty (Bistro_workflow.u w))
 
 let dryrun db  w =
-  fst (thread_of_workflow thread_of_workflow_fake_exec db String.Map.empty (w : _ Bistro_workflow.t :> Bistro_workflow.u))
+  fst (thread_of_workflow thread_of_rule_fake db String.Map.empty (Bistro_workflow.u w))
 
 let build_repo ~base ?wipeout db blog backend ((Bistro_repo.Repo items) as repo) =
   List.fold_left items ~init:([], String.Map.empty) ~f:(fun (roots,accu) (Bistro_repo.Item (u,_,_)) ->
-      let t, map = thread_of_workflow (thread_of_workflow_exec blog backend) db accu u in
+      let t, map = thread_of_workflow (thread_of_rule blog backend) db accu u in
       t :: roots, map
     )
   |> fst
@@ -166,3 +173,25 @@ let build_repo ~base ?wipeout db blog backend ((Bistro_repo.Repo items) as repo)
   Bistro_repo.setup ?wipeout db repo base ;
   Lwt.return ()
 
+module Daemon = struct
+  (* FIXME: this implementation leaks memory. When calling run on a
+     [d] with new workflows, the size of [d.threads] grows without any
+     possibility to shrink. A good fix should be to switch to a weak
+     array to store threads. *)
+  type t = {
+    mutable threads : unit Lwt.t String.Map.t ;
+    db : Bistro_db.t ;
+    log : Bistro_log.t ;
+    backend : backend ;
+  }
+
+  let make db log backend = {
+    threads = String.Map.empty ;
+    db ; log ; backend
+  }
+
+  let run d w =
+    let t, threads = thread_of_workflow (thread_of_rule d.log d.backend) d.db String.Map.empty (Bistro_workflow.u w) in
+    d.threads <- threads ;
+    t
+end

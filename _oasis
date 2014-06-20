@@ -73,6 +73,12 @@ Executable dft_lwt
   MainIs:        dft_lwt.ml
   BuildDepends:  bistro.lwt,core,lwt.react,lwt.unix,threads
 
+Executable dft_lwt_interactive
+  Path:          src/examples
+  Build$:        flag(examples)
+  MainIs:        dft_lwt_interactive.ml
+  BuildDepends:  bistro.lwt,core,lwt.react,lwt.unix,threads
+
 Executable nlp_test
   Path:          src/examples
   Build$:        flag(examples)
