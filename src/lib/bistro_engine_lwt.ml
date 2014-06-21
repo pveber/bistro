@@ -190,7 +190,7 @@ module Daemon = struct
     db ; log ; backend
   }
 
-  let run d w =
+  let send d w =
     let t, threads = thread_of_workflow (thread_of_rule d.log d.backend) d.db String.Map.empty (Bistro_workflow.u w) in
     d.threads <- threads ;
     t

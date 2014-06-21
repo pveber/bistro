@@ -40,7 +40,7 @@ let daemon = Bistro_engine_lwt.Daemon.make db blog backend
 
 let rec main () =
   Lwt_io.read_line Lwt_io.stdin >>= fun l ->
-  ignore (Bistro_engine_lwt.Daemon.run daemon (task (Int.of_string l))) ;
+  ignore (Bistro_engine_lwt.Daemon.send daemon (task (Int.of_string l))) ;
   main ()
 
 let () =

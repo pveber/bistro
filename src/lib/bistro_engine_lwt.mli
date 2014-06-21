@@ -18,5 +18,5 @@ val build_repo :
 module Daemon : sig
   type t
   val make : Bistro_db.t -> Bistro_log.t -> backend -> t
-  val run : t -> _ Bistro_workflow.t -> unit Lwt.t
+  val send : t -> _ Bistro_workflow.t -> unit Lwt.t
 end
