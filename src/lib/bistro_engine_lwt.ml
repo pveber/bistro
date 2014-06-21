@@ -192,13 +192,15 @@ module Daemon = struct
     db ; log ; backend
   }
 
-  let send d w =
+  let send' d u =
     if d.on then (
-      let t, threads = thread_of_workflow (thread_of_rule d.log d.backend) d.db String.Map.empty (Bistro_workflow.u w) in
+      let t, threads = thread_of_workflow (thread_of_rule d.log d.backend) d.db String.Map.empty u in
       d.threads <- threads ;
       Some t
     )
     else None
+
+  let send d w = send' d (Bistro_workflow.u w)
 
   let shutdown d =
     d.on <- false ;
