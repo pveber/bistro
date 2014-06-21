@@ -180,6 +180,7 @@ module Daemon = struct
      array to store threads. *)
   type t = {
     mutable threads : unit Lwt.t String.Map.t ;
+    mutable on : bool ;
     db : Bistro_db.t ;
     log : Bistro_log.t ;
     backend : backend ;
@@ -187,11 +188,21 @@ module Daemon = struct
 
   let make db log backend = {
     threads = String.Map.empty ;
+    on = true ;
     db ; log ; backend
   }
 
   let send d w =
-    let t, threads = thread_of_workflow (thread_of_rule d.log d.backend) d.db String.Map.empty (Bistro_workflow.u w) in
-    d.threads <- threads ;
-    t
+    if d.on then (
+      let t, threads = thread_of_workflow (thread_of_rule d.log d.backend) d.db String.Map.empty (Bistro_workflow.u w) in
+      d.threads <- threads ;
+      Some t
+    )
+    else None
+
+  let shutdown d =
+    d.on <- false ;
+    String.Map.to_alist d.threads
+    |> List.map ~f:snd
+    |> Lwt.join
 end
