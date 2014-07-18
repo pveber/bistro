@@ -60,7 +60,6 @@ let local_worker ~np ~mem log : backend =
       local_worker_aux log ~np ~mem ~stdout ~stderr ~interpreter ~timeout script
     )
 
-
 let remove_if_exists fn =
   if Sys.file_exists fn = `Yes then
     Lwt_process.exec ("", [| "rm" ; "-r" ; fn |]) >|= ignore
