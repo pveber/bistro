@@ -41,12 +41,21 @@ val stderr_path : t -> Bistro_workflow.u -> string
 (** Returns a path where to store the stderr of the execution of a
     workflow *)
 
+val history_path : t -> Bistro_workflow.u -> string
+(** Returns a path where to the usage history of a workflow is
+    stored *)
+
 val log_dir : t -> string
 val cache_dir : t -> string
 val stdout_dir : t -> string
 val stderr_dir : t -> string
 val build_dir : t -> string
 val tmp_dir : t -> string
+
+(** {5 History read/write} *)
+val used : t -> Bistro_workflow.u -> unit
+val created : t -> Bistro_workflow.u -> unit
+val history : t -> Bistro_workflow.u -> (Core.Time.t * [`created | `used]) list
 
 (** {5 Logging} *)
 val log : t -> ('a, unit, string, unit) format4 -> 'a

@@ -145,5 +145,11 @@ val depends : 'a t -> on:_ t -> 'a t
 (** {5 Utilities} *)
 
 val u : _ t -> u
+
+val unselect : u -> u option
+(** [unselect u] returns [Some u] if [u] is a rule, [None] if [u] is
+    an input and [unselect dir] if [u] is a selection in [dir]. *)
+
+
 val script_to_string : dest:string -> tmp:string -> (u -> path) -> script -> string
 val extension_of_interpreter : interpreter -> string

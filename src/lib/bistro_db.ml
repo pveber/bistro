@@ -47,6 +47,7 @@ let build_path db w = aux_path build_dir db w
 let tmp_path db w = aux_path tmp_dir db w
 let stdout_path db w = aux_path stdout_dir db w
 let stderr_path db w = aux_path stderr_dir db w
+let history_path db w = aux_path history_dir db w
 
 let rec path db = Bistro_workflow.(function
     | Input p -> p
@@ -55,6 +56,48 @@ let rec path db = Bistro_workflow.(function
     | Rule r as w -> aux_path cache_dir db w
   )
 
+
+
+let used_tag = "U"
+let created_tag = "C"
+
+let history_tag_of_string x =
+  if x = used_tag then `used
+  else if x = created_tag then `created
+  else invalid_argf "Bistro_db.history_tag_of_string: %s" x ()
+
+let append_history ~db ~msg u =
+  Out_channel.with_file ~append:true (history_path db u) ~f:(fun oc ->
+      let time_stamp = Time.to_string_fix_proto `Local (Time.now ()) in
+      fprintf oc "%s: %s\n" time_stamp msg
+    )
+
+let rec used db = Bistro_workflow.(function
+  | Input _ -> ()
+  | Rule _ as u -> append_history ~db ~msg:used_tag u
+  | Select (u, _) -> used db u
+  )
+
+let created db = Bistro_workflow.(function
+  | Input _
+  | Select _ -> raise (Invalid_argument "")
+  | Rule _ as u -> append_history ~db ~msg:created_tag u
+  )
+
+let parse_history_line l =
+  let stamp, tag = String.lsplit2_exn l ~on:':' in
+  Time.of_string_fix_proto `Local stamp,
+  history_tag_of_string (String.lstrip tag)
+
+let history db = Bistro_workflow.(function
+  | Input _ | Select _ -> invalid_argf "Bistro_db.history: this workflow cannot have an history" ()
+  | Rule _ as u ->
+    let p_u = path db u in
+    if Sys.file_exists_exn p_u then
+      List.map (In_channel.read_lines p_u) ~f:parse_history_line
+    else
+      []
+  )
 let echo ~path msg =
   Out_channel.with_file ~append:true path ~f:(fun oc ->
       output_string oc msg ;

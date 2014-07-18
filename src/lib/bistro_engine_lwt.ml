@@ -89,6 +89,7 @@ let thread_of_rule blog (backend : backend) db r dep_threads =
     | `Ok, true ->
       Bistro_log.finished_build blog x ;
       remove_if_exists tmp >>= fun () ->
+      Bistro_db.created db x ;
       Lwt_unix.rename dest (Bistro_db.path db x)
     | `Ok, false ->
       let msg = "rule failed to produce its target at the prescribed location" in
@@ -135,7 +136,10 @@ let rec thread_of_workflow f db map w =
           )
           else Lwt.return ()
         in
-        if Sys.file_exists_exn dir_path then check_in_dir (), map
+        if Sys.file_exists_exn dir_path then (
+          Option.iter (Bistro_workflow.unselect dir) ~f:(Bistro_db.used db) ;
+          check_in_dir (), map
+        )
         else (
           let dir_thread, map = thread_of_workflow f db map dir in
           dir_thread >>= check_in_dir,
@@ -143,7 +147,10 @@ let rec thread_of_workflow f db map w =
         )
       | Rule r as x ->
         let dest_path = Bistro_db.path db x in
-        if Sys.file_exists_exn dest_path then Lwt.return (), map
+        if Sys.file_exists_exn dest_path then (
+          Bistro_db.used db x ;
+          Lwt.return (), map
+        )
         else (
           let dep_threads, map =
             List.fold_right (Bistro_workflow.deps w) ~init:([], map) ~f:(fun w (accu, map) ->

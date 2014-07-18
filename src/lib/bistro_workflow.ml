@@ -180,6 +180,11 @@ let depends wflw ~on:dep = match wflw with
 
 let u x = x
 
+let rec unselect = function
+  | Rule _ as u -> Some u
+  | Input _ -> None
+  | Select (dir,_) -> unselect dir
+
 let script_to_string ~dest ~tmp path tokens =
   let rec token = function
     | S s -> s

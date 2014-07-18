@@ -51,9 +51,11 @@ let run_u db blog backend u =
       if Sys.file_exists p <> `Yes
       then failwithf "File %s is declared as an input of a workflow but does not exist." p ()
 
-    | Select (_, p) as x ->
-      if Sys.file_exists (Bistro_db.path db x) <> `Yes
-      then failwithf "No file or directory named %s in directory workflow." p ()
+    | Select (dir, p) as x ->
+      if Sys.file_exists_exn (Bistro_db.path db x)
+      then Option.iter (Bistro_workflow.unselect dir) ~f:(Bistro_db.used db)
+      else failwithf "No file or directory named %s in directory workflow." p ()
+
     | Rule ({ np ; mem ; timeout ; interpreter } as r) as x ->
       if not (Sys.file_exists_exn (Bistro_db.path db x)) then (
         let stdout = Bistro_db.stdout_path db x in
@@ -67,13 +69,14 @@ let run_u db blog backend u =
         remove_if_exists dest ;
         Sys.command_exn ("mkdir -p " ^ tmp) ;
         Bistro_log.started_build blog x ;
-        match
-          (backend ~np ~mem ~timeout ~interpreter ~stdout ~stderr script,
-           Sys.file_exists_exn dest) with
+        let backend_answer = backend ~np ~mem ~timeout ~interpreter ~stdout ~stderr script in
+        let dest_exists = Sys.file_exists_exn dest in
+        match backend_answer, dest_exists with
         | `Ok, true ->
           Bistro_log.finished_build blog x ;
           Unix.rename ~src:dest ~dst:(Bistro_db.path db x) ;
-          remove_if_exists tmp
+          remove_if_exists tmp ;
+          Bistro_db.created db x
         | `Ok, false ->
           let msg = "rule failed to produce its target at the prescribed location" in
           Bistro_log.failed_build ~msg blog x ;
@@ -82,6 +85,7 @@ let run_u db blog backend u =
           Bistro_log.failed_build blog x ;
           failwithf "Build of workflow %s failed!" (Bistro_workflow.digest x) ()
       )
+      else Bistro_db.used db x
     )
   in
   Bistro_workflow.depth_first_traversal
