@@ -28,24 +28,46 @@ let pbs_header ~mem ~np ~timeout ~stderr ~stdout ~interpreter =
   |> to_string
 
 
+let pread_status cmd =
+  let p = Lwt_process.open_process_in cmd in
+  Lwt.catch (fun () -> Lwt_io.read p#stdout >|= Core.Option.some) (fun _ -> Lwt.return None) >>= fun s ->
+  p#close >>= fun e ->
+  Lwt.return (s, e)
+
 let query_job_stats job_id =
-  Lwt_process.pread ("", [| "qstat" ; "-f1" ; job_id |]) >|=
-  Pbs.Qstat.parse_qstat >>= function
-  | `Ok r -> Lwt.return r
-  | `Error msg -> Lwt.fail (Failure (Pbs.Qstat.error_to_string msg))
+  pread_status ("", [| "qstat" ; "-f1" ; job_id |]) >>=
+  (
+    function
+    | Some s, Unix.WEXITED 0 -> Lwt.return (Pbs.Qstat.parse_qstat s)
+    | _ -> Lwt.return (`Error `error_calling_qstat)
+  )
 
 let rec wait_for_termination job_id =
-  query_job_stats job_id >>= fun stats ->
-  match Pbs.Qstat.get_status stats with
-  | `Ok `completed -> (
-    match Pbs.Qstat.raw_field stats "exit_status" with
-    | Some s -> Lwt.return (int_of_string s)
-    | None -> Lwt.fail (Failure "Bistro_pbs.wait_for_termination: no exit_status in completed job")
-    )
-  | `Error _ -> Lwt.fail (Failure "Bistro.wait_for_termination: failed to parse qstat output")
-  | _ ->
-    Lwt_unix.sleep 600. >>= fun () ->
-    wait_for_termination job_id
+  query_job_stats job_id >|= (
+    function
+    | `Ok stats -> (
+        match Pbs.Qstat.get_status stats with
+        | `Ok `completed -> (
+            match Pbs.Qstat.raw_field stats "exit_status" with
+            | Some s -> `Ok (int_of_string s)
+            | None -> `Error `no_exit_status_in_completed_job
+          )
+        | `Ok _ -> `Error `job_not_finished
+        | `Error e -> `Error `unable_to_get_status
+      )
+    | `Error e -> `Error e
+  )
+  >>= (
+    function
+    | `Ok code -> Lwt.return code
+    | `Error `no_exit_status_in_completed_job ->
+      Lwt.fail (Failure "Bistro_pbs.wait_for_termination: no exit_status in completed job")
+    | `Error (`job_not_finished | `error_calling_qstat) ->
+      Lwt_unix.sleep 600. >>= fun () ->
+      wait_for_termination job_id
+    | `Error (`unable_to_get_status | `qstat _) ->
+      Lwt.fail (Failure "Bistro.wait_for_termination: failed to parse qstat output")
+  )
 
 let worker blog ~np ~mem ~timeout ~interpreter ~(stdout : string) ~stderr script =
   let ext = Bistro_workflow.extension_of_interpreter interpreter in
