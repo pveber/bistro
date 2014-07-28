@@ -2,7 +2,7 @@ open OUnit
 
 let assert_equal = assert_equal ~printer:(fun x -> x)
 let string_of_script s =
-  Bistro_workflow.Script.to_string ~dest:"#DEST" ~tmp:"#TMP" Bistro_workflow.digest s
+  Bistro_workflow.script_to_string ~dest:"#DEST" ~tmp:"#TMP" Bistro_workflow.digest s
 
 let test_for_loops () =
   assert_equal ~msg:"Loop without sep"

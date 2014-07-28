@@ -45,6 +45,14 @@ Executable test
   Build$: flag(tests)
   BuildDepends: bistro, bistro.syntax, findlib, oUnit (>= 1.1.0)
 
+Executable race_condition
+  Path: src/tests
+  MainIs: race_condition.ml
+  Install: false
+  CompiledObject: byte
+  Build$: flag(tests)
+  BuildDepends: bistro.lwt, bistro.syntax, findlib, oUnit (>= 1.1.0)
+
 Test main
   Type: custom (0.3)
   Command: $test
