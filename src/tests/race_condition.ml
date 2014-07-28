@@ -33,9 +33,12 @@ let t1 = task 1 []
 let t2 = task 2 [ t1 ]
 let t3 = task 3 [ t1 ]
 
+let submit x =
+  Option.value_exn (Bistro_engine_lwt.Daemon.send daemon x)
+
 let main () =
-  let j2 = Option.value_exn (Bistro_engine_lwt.Daemon.send daemon t2) in
-  let j3 = Option.value_exn (Bistro_engine_lwt.Daemon.send daemon t3) in
+  let j2 = submit t2 in
+  let j3 = submit t3 in
   Lwt.join [j2 ; j3]
 
 let () = Lwt_unix.run (main ())

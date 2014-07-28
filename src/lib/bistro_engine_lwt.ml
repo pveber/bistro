@@ -1,4 +1,5 @@
 open Core.Std
+open Printf
 
 type backend =
   np:int -> mem:int -> timeout:Bistro_workflow.duration ->
@@ -200,7 +201,7 @@ module Daemon = struct
 
   let send' d u =
     if d.on then (
-      let t, threads = thread_of_workflow (thread_of_rule d.log d.backend) d.db String.Map.empty u in
+      let t, threads = thread_of_workflow (thread_of_rule d.log d.backend) d.db d.threads u in
       d.threads <- threads ;
       Some t
     )
