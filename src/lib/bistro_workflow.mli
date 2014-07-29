@@ -14,7 +14,7 @@ and rule = {
   interpreter : interpreter ; (** Interpreter that should be used to execute the script *)
   deps : u list ; (** Workflow that must be run before *)
   np : int ; (** Required number of processors *)
-  mem : int ; (** Required memory *)
+  mem : int ; (** Required memory in MB *)
   timeout : duration ; (** Maximum allowed running time *)
 }
 
