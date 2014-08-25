@@ -4,3 +4,4 @@
 * specify script execution
 ** #DEST is an absolute directory?
 ** POSIX sh
+* hash should depend on interpreter

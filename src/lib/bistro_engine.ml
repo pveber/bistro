@@ -78,7 +78,7 @@ let run_u db blog backend u =
           remove_if_exists tmp ;
           Bistro_db.created db x
         | `Ok, false ->
-          let msg = "rule failed to produce its target at the prescribed location" in
+          let msg = sprintf "Build of workflow %s failed: rule failed to produce its target at the prescribed location" (Bistro_workflow.digest x) in
           Bistro_log.failed_build ~msg blog x ;
           failwith msg
         | `Error, _ ->
