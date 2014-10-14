@@ -20,11 +20,19 @@ Library bistro
 
 Library bistro_lwt
   Path:          src/lib
-  Modules:       Bistro_db_lwt, Bistro_engine_lwt, Bistro_pbs, Bistro_pool
-  BuildDepends:  bistro, lwt, lwt.react, lwt.syntax, lwt.unix, pbs
+  Modules:       Bistro_db_lwt, Bistro_engine_lwt, Bistro_pool
+  BuildDepends:  bistro, lwt, lwt.react, lwt.syntax, lwt.unix
   FindlibName:   lwt
   FindlibParent: bistro
   XMETARequires: bistro, lwt, lwt.react, lwt.unix
+
+Library bistro_pbs
+  Path:          src/lib
+  Modules:       Bistro_pbs
+  BuildDepends:  pbs, bistro.lwt
+  FindlibName:   pbs
+  FindlibParent: bistro
+  XMETARequires: pbs, bistro.lwt
 
 Library bistro_syntax
   FindlibName:      syntax
