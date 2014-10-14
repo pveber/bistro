@@ -8,6 +8,10 @@ License:     GPL-3.0
 Plugins:     META (0.3), DevFiles (0.3)
 BuildTools: ocamlbuild
 
+Flag pbs
+  Description: Distribution on PBS cluster
+  Default$: false
+
 Library bistro
   Path:          src/lib
   Modules:       Bistro_db, Bistro_export,
@@ -28,6 +32,8 @@ Library bistro_lwt
 
 Library bistro_pbs
   Path:          src/lib
+  Build$:        flag(pbs)
+  Install$:      flag(pbs)
   Modules:       Bistro_pbs
   BuildDepends:  pbs, bistro.lwt
   FindlibName:   pbs
