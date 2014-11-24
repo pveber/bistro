@@ -22,6 +22,7 @@ let pbs_header ~mem ~np ~timeout ~stderr ~stdout ~interpreter =
     ~walltime:(`Hours (hours_of_duration timeout))
     ~stderr_path:stderr
     ~stdout_path:stdout
+    ~working_directory:(Sys.getcwd ())
     ~ppn:np
     ~shell:(interpreter_path interpreter)
     (Program.command_sequence [])
