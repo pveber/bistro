@@ -3,4 +3,3 @@
 <src/syntax/*.ml>: syntax_camlp4o, pkg_camlp4.lib, pkg_camlp4.extend, pkg_camlp4.quotations
 true: use_menhir, annot
 <src/syntax/*.mly>: pkg_camlp4.lib
-<src/examples/*.ml>: use_bistro_syntax
