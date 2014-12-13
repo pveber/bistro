@@ -351,10 +351,26 @@ module Engine(Conf : Configuration) = struct
           )
           else build dir >>= check_in_dir
         | Path_workflow (_, t) -> assert false
-        | Value_workflow (_, t) -> assert false
+        | Value_workflow (_, term_w) ->
+          let cache_path = Db.cache_path db w in
+          if Sys.file_exists_exn cache_path then (
+            Db.used db w ;
+            Lwt.return ()
+          )
+          else
+            build_aux_terms term_w >>= fun f ->
+            send_task (create_task w f)
       in
       add_build_thread w t ;
       t
+  and build_aux_terms : type s. s term -> s Lwt.t = function
+    | Prim (_, v) -> return v
+    | App (f, x, _) ->
+      build_aux_terms f >>= fun f ->
+      build_aux_terms x >>= fun x ->
+      return (f x)
+    | Int i -> return i
+    | _ -> assert false
 
   let eval : type s. s workflow -> s Lwt.t = fun w ->
     let path = Db.cache_path db w in
