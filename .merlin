@@ -1,10 +1,11 @@
-B _build/src/lib
-B _build/src/test
+B _build/src
+B _build/src
 S src/lib
 S src/test
 PKG camlp4.lib
 PKG core
 PKG lwt
+PKG nproc
 PKG oUnit
 PKG react
 PKG shell

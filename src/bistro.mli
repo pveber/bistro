@@ -46,9 +46,8 @@ type env = {
   sh : 'a. ('a,unit,string,unit) format4 -> 'a ; (** Execute a shell command (with {v /bin/sh v}) *)
   stdout : out_channel ;
   stderr : out_channel ;
-  debug : 'a. ('a,unit,string,unit) format4 -> 'a ;
-  info  : 'a. ('a,unit,string,unit) format4 -> 'a ;
-  error : 'a. ('a,unit,string,unit) format4 -> 'a ;
+  out : 'a. ('a,out_channel,unit) format -> 'a ;
+  err : 'a. ('a,out_channel,unit) format -> 'a ;
   with_temp_file : 'a. (string -> 'a) -> 'a ;
   np : int ;
   mem : int ; (** in MB *)
@@ -70,7 +69,7 @@ val workflow : (env -> 'a) Term.t -> 'a workflow
     information on the file/directory format. *)
 type 'a path = private Path of string
 
-val path_workflow : (env -> string -> unit) Term.t -> 'a path workflow
+val path_workflow : (string -> env -> unit) Term.t -> 'a path workflow
 
 val extract : [`directory of 'a] path workflow -> string list -> 'b path workflow
 
