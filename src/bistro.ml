@@ -414,8 +414,8 @@ module Engine(Conf : Configuration) = struct
         List.iter ~f:Out_channel.close [ stderr ; stdout ]
       )
 
-  let send_task w t =
-    Pool.use resource_pool ~np:1 ~mem:1 ~f:(fun ~np ~mem ->
+  let send_task ~np ~mem w t =
+    Pool.use resource_pool ~np ~mem ~f:(fun ~np ~mem ->
         let f () = with_env ~np ~mem w ~f:t in
         Nproc.submit worker_pool ~f () >>= function
         | Some `Ok -> Lwt.return ()
@@ -511,7 +511,7 @@ module Engine(Conf : Configuration) = struct
               | Some pi -> pi.np, pi.mem
               | None -> 1, 100
             in
-            send_task w (create_task ~np ~mem w f)
+            send_task ~np ~mem w (create_task ~np ~mem w f)
         | Value_workflow (_, term_w) ->
           let cache_path = Db.cache_path db w in
           if Sys.file_exists_exn cache_path then (
@@ -529,7 +529,7 @@ module Engine(Conf : Configuration) = struct
               | Some pi -> pi.np, pi.mem
               | None -> 1, 100
             in
-            send_task w (create_task ~np ~mem w f)
+            send_task ~np ~mem w (create_task ~np ~mem w f)
       in
       add_build_thread w t ;
       t
