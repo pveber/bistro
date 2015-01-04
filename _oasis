@@ -10,7 +10,7 @@ Homepage:     https://github.com/pveber/bistro
 
 Library bistro
   Path:             src
-  Modules:          Bistro, Bistro_pool
+  Modules:          Bistro
   FindlibName:      bistro
   BuildDepends:     core, lwt.unix, netstring, nproc, shell, threads
   XMETARequires:    core, lwt.unix, netstring, nproc, shell, threads

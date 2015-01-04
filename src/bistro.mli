@@ -17,7 +17,7 @@ type 'a workflow
 
 (** A {! Term.t} represents the way a function is wrapped to build a
     workflow. A wrapped function (here called {i primitive}) can be
-    applied to constant argument or some workflow.
+    applied to a constant argument or some workflow.
 *)
 module Term : sig
   type 'a t
