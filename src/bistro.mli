@@ -42,8 +42,9 @@ end
 (** A collection of functions and values that are provided to a
     primitive and that can be used to execute shell command, log
     messages in proper locations. *)
-type env = {
-  sh : 'a. ('a,unit,string,unit) format4 -> 'a ; (** Execute a shell command (with {v /bin/sh v}) *)
+type env = <
+  sh : string -> unit ; (** Execute a shell command (with {v /bin/sh v}) *)
+  shf : 'a. ('a,unit,string,unit) format4 -> 'a ;
   stdout : out_channel ;
   stderr : out_channel ;
   out : 'a. ('a,out_channel,unit) format -> 'a ;
@@ -51,7 +52,7 @@ type env = {
   with_temp_file : 'a. (string -> 'a) -> 'a ;
   np : int ;
   mem : int ; (** in MB *)
-}
+>
 
 (** Workflow constructor *)
 val workflow : (env -> 'a) Term.t -> 'a workflow

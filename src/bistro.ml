@@ -32,21 +32,18 @@ module Utils = struct
     in
     ksprintf f fmt
 
-  let sh
-      ?(stdout = stdout)
-      ?(stderr = stderr)
-      fmt =
-    let shell s =
-      try
-        Shell.call
-          ~stdout:(Shell.to_fd (Unix.descr_of_out_channel stdout))
-          ~stderr:(Shell.to_fd (Unix.descr_of_out_channel stderr))
-          [ Shell.cmd "sh" [ "-c" ; s ] ]
-      with Shell.Subprocess_error _ -> (
-          Core.Std.failwithf "shell call failed:\n%s\n" s ()
-        )
-    in
-    Printf.ksprintf shell fmt
+  let sh ?(stdout = stdout) ?(stderr = stderr) cmd =
+    try
+      Shell.call
+        ~stdout:(Shell.to_fd (Unix.descr_of_out_channel stdout))
+        ~stderr:(Shell.to_fd (Unix.descr_of_out_channel stderr))
+        [ Shell.cmd "sh" [ "-c" ; cmd ] ]
+    with Shell.Subprocess_error _ -> (
+        Core.Std.failwithf "shell call failed:\n%s\n" cmd ()
+      )
+
+  let shf ?(stdout = stdout) ?(stderr = stderr) fmt =
+    Printf.ksprintf (sh ~stdout ~stderr) fmt
 end
 
 module Pool : sig
@@ -126,8 +123,9 @@ end
 
 type 'a path = Path of string
 
-type env = {
-  sh : 'a. ('a,unit,string,unit) format4 -> 'a ;
+type env = <
+  sh : string -> unit ; (** Execute a shell command (with {v /bin/sh v}) *)
+  shf : 'a. ('a,unit,string,unit) format4 -> 'a ;
   stdout : out_channel ;
   stderr : out_channel ;
   out : 'a. ('a,out_channel,unit) format -> 'a ;
@@ -135,7 +133,7 @@ type env = {
   with_temp_file : 'a. (string -> 'a) -> 'a ;
   np : int ;
   mem : int ; (** in MB *)
-}
+>
 
 
 type primitive_info = {
@@ -412,13 +410,21 @@ module Engine(Conf : Configuration) = struct
   let with_env ~np ~mem x ~f =
     let stderr = open_out (sprintf "%s/%s" (Db.stderr_dir Conf.db_path) (id x)) in
     let stdout = open_out (sprintf "%s/%s" (Db.stdout_dir Conf.db_path) (id x)) in
-    let env = {
-      stderr ; stdout ; np ; mem ;
-      out = (fun fmt -> fprintf stdout fmt) ;
-      err = (fun fmt -> fprintf stderr fmt) ;
-      sh = (fun fmt -> Utils.sh ~stdout ~stderr fmt) ;
-      with_temp_file = fun f -> Utils.with_temp_file ~in_dir:(Db.tmp_dir Conf.db_path) ~f
-    }
+    let env = object
+      method stderr = stderr
+      method stdout = stdout
+      method np = np
+      method mem = mem
+      method out : 'a. ('a,out_channel,unit) format -> 'a =
+        fun fmt -> fprintf stdout fmt
+      method err : 'a. ('a,out_channel,unit) format -> 'a =
+        fun fmt -> fprintf stderr fmt
+      method shf : 'a. ('a,unit,string,unit) format4 -> 'a =
+        fun fmt -> Utils.shf ~stdout ~stderr fmt
+      method sh = Utils.sh ~stdout ~stderr
+      method with_temp_file : 'a. (string -> 'a) -> 'a =
+        fun f -> Utils.with_temp_file ~in_dir:(Db.tmp_dir Conf.db_path) ~f
+    end
     in
     protect ~f:(fun () -> f env) ~finally:(fun () ->
         List.iter ~f:Out_channel.close [ stderr ; stdout ]
