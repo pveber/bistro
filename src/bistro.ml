@@ -123,7 +123,7 @@ end
 
 type 'a path = Path of string
 
-type env = <
+type env = {
   sh : string -> unit ; (** Execute a shell command (with {v /bin/sh v}) *)
   shf : 'a. ('a,unit,string,unit) format4 -> 'a ;
   stdout : out_channel ;
@@ -133,7 +133,7 @@ type env = <
   with_temp_file : 'a. (string -> 'a) -> 'a ;
   np : int ;
   mem : int ; (** in MB *)
->
+}
 
 
 type primitive_info = {
@@ -141,7 +141,7 @@ type primitive_info = {
   version : int option ;
   np : int ;
   mem : int ;
-}
+} with sexp
 
 type _ workflow =
   | Input : string * string -> 'a path workflow
@@ -202,6 +202,7 @@ module Description = struct
     | Workflow of workflow
     | Option of term option
     | List of term list
+  with sexp
 end
 
 
@@ -225,6 +226,9 @@ and workflow_description : type s. s workflow -> Description.workflow = function
   | Value_workflow (_, t) -> Description.Value_workflow (term_description t)
   | Path_workflow (_, t) -> Description.Path_workflow (term_description t)
   | Extract (_, dir, path) -> Description.Extract (workflow_description dir, path)
+
+let sexp_of_workflow w =
+  Description.sexp_of_workflow (workflow_description w)
 
 let workflow t = Value_workflow (digest (`workflow (term_description t)), t)
 let path_workflow t = Path_workflow (digest (`path_workflow (term_description t)), t)
@@ -263,6 +267,7 @@ module Db = struct
   let stdout_dir base = Filename.concat base "stdout"
   let log_dir base = Filename.concat base "logs"
   let history_dir base = Filename.concat base "history"
+  let description_dir base = Filename.concat base "description"
 
   let well_formed_db path =
     if Sys.file_exists_exn path then (
@@ -273,6 +278,7 @@ module Db = struct
       && Sys.file_exists_exn (stdout_dir path)
       && Sys.file_exists_exn (log_dir path)
       && Sys.file_exists_exn (history_dir path)
+      && Sys.file_exists_exn (description_dir path)
     )
     else false
 
@@ -289,7 +295,8 @@ module Db = struct
       Unix.mkdir_p (stderr_dir base) ;
       Unix.mkdir_p (stdout_dir base) ;
       Unix.mkdir_p (log_dir base) ;
-      Unix.mkdir_p (history_dir base)
+      Unix.mkdir_p (history_dir base) ;
+      Unix.mkdir_p (description_dir base)
     ) ;
     base
 
@@ -302,6 +309,7 @@ module Db = struct
   let stdout_path db w = aux_path stdout_dir db w
   let stderr_path db w = aux_path stderr_dir db w
   let history_path db w = aux_path history_dir db w
+  let description_path db w = aux_path description_dir db w
 
   let rec cache_path : type s. t -> s workflow -> string = fun db -> function
     | Extract (_, dir, p) ->
@@ -410,33 +418,27 @@ module Engine(Conf : Configuration) = struct
   let with_env ~np ~mem x ~f =
     let stderr = open_out (sprintf "%s/%s" (Db.stderr_dir Conf.db_path) (id x)) in
     let stdout = open_out (sprintf "%s/%s" (Db.stdout_dir Conf.db_path) (id x)) in
-    let env = object
-      method stderr = stderr
-      method stdout = stdout
-      method np = np
-      method mem = mem
-      method out : 'a. ('a,out_channel,unit) format -> 'a =
-        fun fmt -> fprintf stdout fmt
-      method err : 'a. ('a,out_channel,unit) format -> 'a =
-        fun fmt -> fprintf stderr fmt
-      method shf : 'a. ('a,unit,string,unit) format4 -> 'a =
-        fun fmt -> Utils.shf ~stdout ~stderr fmt
-      method sh = Utils.sh ~stdout ~stderr
-      method with_temp_file : 'a. (string -> 'a) -> 'a =
-        fun f -> Utils.with_temp_file ~in_dir:(Db.tmp_dir Conf.db_path) ~f
-    end
+    let env = {
+      stderr ; stdout ; np ; mem ;
+      out = (fun fmt -> fprintf stdout fmt) ;
+      err = (fun fmt -> fprintf stderr fmt) ;
+      shf = (fun fmt -> Utils.shf ~stdout ~stderr fmt) ;
+      sh = Utils.sh ~stdout ~stderr ;
+      with_temp_file = fun f -> Utils.with_temp_file ~in_dir:(Db.tmp_dir Conf.db_path) ~f
+    }
     in
     protect ~f:(fun () -> f env) ~finally:(fun () ->
         List.iter ~f:Out_channel.close [ stderr ; stdout ]
       )
 
-  let send_task ~np ~mem w t =
+  let send_task ~np ~mem w deps t =
+    deps >>= fun () ->
     Pool.use resource_pool ~np ~mem ~f:(fun ~np ~mem ->
         let f () = with_env ~np ~mem w ~f:t in
         Nproc.submit worker_pool ~f () >>= function
         | Some `Ok -> Lwt.return ()
         | Some (`Error msg) -> Lwt.fail (Failure msg)
-        | None -> Lwt.fail (Failure "nproc internal error")
+        | None -> Lwt.fail (Failure "A primitive raised an unknown exception")
       )
 
   (* Wrapping around a task, implementing:
@@ -455,6 +457,9 @@ module Engine(Conf : Configuration) = struct
       remove_if_exists stderr_path ;
       remove_if_exists build_path  ;
       remove_if_exists tmp_path    ;
+      Out_channel.with_file (Db.description_path db x) ~f:(fun oc ->
+          Sexplib.Sexp.output_hum_indent 2 oc (sexp_of_workflow x)
+        ) ;
       Unix.mkdir tmp_path ;
       let outcome = try f env ; `Ok with exn -> `Error exn in
       match outcome, Sys.file_exists_exn build_path with
@@ -468,9 +473,7 @@ module Engine(Conf : Configuration) = struct
       | `Error (Failure msg), _ ->
         let msg = sprintf "Workflow %s failed saying: %s" (id x) msg in
         `Error msg
-      | `Error _, __ ->
-        let msg = sprintf "Workflow %s failed with an exception." (id x) in
-        `Error msg
+      | `Error exn, _ -> raise exn
 
   (* Build workflow thread: store building workflows threads
 
@@ -514,93 +517,116 @@ module Engine(Conf : Configuration) = struct
     | Some t -> t
     | None ->
       let t = match w with
-        | Input (_, fn) ->
-          let f () =
-            if not (Sys.file_exists_exn fn)
-            then failwithf "File %s is declared as an input of a workflow but does not exist." fn ()
-          in
-          Lwt.wrap f
+        | Input (_, fn) -> build_input fn
 
         | Extract (_, dir, path_in_dir) ->
-          let dir_path = Db.cache_path db dir in
-          (* Checks the file to extract of the directory is there *)
-          let check_in_dir () =
-            if not (Sys.file_exists_exn (Db.cache_path db w))
-            then (
-              let msg = sprintf "No file or directory named %s in directory workflow." (String.concat ~sep:"/" path_in_dir) in
-              Lwt.fail (Failure msg)
-            )
-            else Lwt.return ()
-          in
-          if Sys.file_exists_exn dir_path then (
-            Db.used db dir ;
-            check_in_dir ()
-          )
-          else build dir >>= check_in_dir
+          build_extract (Db.cache_path db w) dir path_in_dir
+
         | Path_workflow (_, term_w) ->
-          let cache_path = Db.cache_path db w in
-          if Sys.file_exists_exn cache_path then (
-            Db.used db w ;
-            Lwt.return ()
-          )
-          else
-            let thunk = compile_term term_w in
-            let build_path = Db.build_path db w in
-            let f env = (thunk ()) build_path env in
-            let np, mem = match primitive_info_of_term term_w with
-              | Some pi -> pi.np, pi.mem
-              | None -> 1, 100
-            in
-            send_task ~np ~mem w (create_task ~np ~mem w f)
+          build_path_workflow w term_w
+
         | Value_workflow (_, term_w) ->
-          let cache_path = Db.cache_path db w in
-          if Sys.file_exists_exn cache_path then (
-            Db.used db w ;
-            Lwt.return ()
-          )
-          else
-            let thunk = compile_term term_w in
-            let build_path = Db.build_path db w in
-            let f env =
-              let y = (thunk ()) env in
-              Utils.save_value build_path y
-            in
-            let np, mem = match primitive_info_of_term term_w with
-              | Some pi -> pi.np, pi.mem
-              | None -> 1, 100
-            in
-            send_task ~np ~mem w (create_task ~np ~mem w f)
+          build_workflow w term_w
       in
       BWT.add w t ;
       t
-  and compile_term : type s. s term -> unit -> s = function
-    | Prim (_, v) -> const v
+
+  and build_input fn =
+    let f () =
+      if not (Sys.file_exists_exn fn)
+      then failwithf "File %s is declared as an input of a workflow but does not exist." fn ()
+    in
+    Lwt.wrap f
+
+  and build_extract : type s. string -> s workflow -> string list -> unit Lwt.t =
+    fun output dir path_in_dir ->
+      let dir_path = Db.cache_path db dir in
+      (* Checks the file to extract of the directory is there *)
+      let check_in_dir () =
+        if not (Sys.file_exists_exn output)
+        then (
+          let msg = sprintf "No file or directory named %s in directory workflow." (String.concat ~sep:"/" path_in_dir) in
+          Lwt.fail (Failure msg)
+        )
+        else Lwt.return ()
+      in
+      if Sys.file_exists_exn dir_path then (
+        Db.used db dir ;
+        check_in_dir ()
+      )
+      else build dir >>= check_in_dir
+
+  and build_path_workflow : type s. s workflow -> (string -> env -> unit) Term.t -> unit Lwt.t =
+    fun w term_w ->
+      let cache_path = Db.cache_path db w in
+      if Sys.file_exists_exn cache_path then (
+        Db.used db w ;
+        Lwt.return ()
+      )
+      else
+        let thunk, deps = compile_term term_w in
+        let build_path = Db.build_path db w in
+        let f env = (thunk ()) build_path env in
+        let np, mem = match primitive_info_of_term term_w with
+          | Some pi -> pi.np, pi.mem
+          | None -> 1, 100
+        in
+        send_task ~np ~mem w deps (create_task ~np ~mem w f)
+
+  and build_workflow : type s. s workflow -> (env -> s) Term.t -> unit Lwt.t =
+    fun w term_w ->
+      let cache_path = Db.cache_path db w in
+      if Sys.file_exists_exn cache_path then (
+        Db.used db w ;
+        Lwt.return ()
+      )
+      else
+        let thunk, deps = compile_term term_w in
+        let build_path = Db.build_path db w in
+        let f env =
+          let y = (thunk ()) env in
+          Utils.save_value build_path y
+        in
+        let np, mem = match primitive_info_of_term term_w with
+          | Some pi -> pi.np, pi.mem
+          | None -> 1, 100
+        in
+        send_task ~np ~mem w deps (create_task ~np ~mem w f)
+
+  and compile_term : type s. s term -> (unit -> s) * unit Lwt.t = function
+    | Prim (_, v) -> const v, Lwt.return ()
     | App (f, x, _) ->
-      let ff = compile_term f in
-      let xx = compile_term x in
-      fun () -> (ff ()) (xx ())
-    | Int i -> const i
-    | String s -> const s
-    | Bool b -> const b
-    | Option None -> const None
+      let ff, f_deps = compile_term f in
+      let xx, x_deps = compile_term x in
+      (fun () -> (ff ()) (xx ())),
+      Lwt.join [ f_deps ; x_deps ]
+    | Int i -> const i, Lwt.return ()
+    | String s -> const s, Lwt.return ()
+    | Bool b -> const b, Lwt.return ()
+    | Option None -> const None, Lwt.return ()
     | Option (Some t) ->
-      let tt = compile_term t in
-      fun () -> Some (tt ())
+      let tt,t_deps = compile_term t in
+      (fun () -> Some (tt ())), t_deps
     | List ts ->
-      let tts = List.map ts ~f:compile_term in
-      fun () -> List.map tts ~f:(fun ff -> ff ())
+      let tts, deps = List.map ts ~f:compile_term |> List.unzip in
+      (fun () -> List.map tts ~f:(fun ff -> ff ())),
+      Lwt.join deps
 
     | Workflow (Value_workflow _ as w) ->
-      fun () -> Utils.load_value (Db.cache_path db w)
+      (fun () -> Utils.load_value (Db.cache_path db w)),
+      build w
 
     | Workflow (Path_workflow _ as w) ->
-      fun () -> Path (Db.cache_path db w)
+      (fun () -> Path (Db.cache_path db w)),
+      build w
 
     | Workflow (Input (_, fn)) ->
-      fun () -> Path fn
+      (fun () -> Path fn),
+      Lwt.return ()
 
     | Workflow (Extract _ as w) ->
-      fun () -> Path (Db.cache_path db w)
+      (fun () -> Path (Db.cache_path db w)),
+      Lwt.return ()
 
   and primitive_info_of_term : type s. s term -> primitive_info option = function
     | Prim (pi, _) -> Some pi
@@ -617,4 +643,5 @@ module Engine(Conf : Configuration) = struct
         Lwt_io.(with_file ~mode:Input path read_value)
     in
     build w >>= fun () -> return_value w
+
 end

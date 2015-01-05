@@ -46,10 +46,23 @@ let test_input () =
     (fun () -> eval (Bistro.input "aze348753485")) ;
   assert_equal ~printer:string_of_int 37 (eval (wc (Bistro.input "_oasis")))
 
+let seq i j =
+  let open Bistro.Term in
+  Bistro.path_workflow (
+    prim "seq" (fun i j output env -> env.Bistro.out
+                   "seq %d %d > %s" i j output ; env.Bistro.shf "seq %d %d > %s" i j output)
+    $ int i
+    $ int j
+  )
+
+let test_shell_cmd () =
+  assert_equal ~printer:string_of_int 10 (eval (wc (seq 1 10)))
+
 let tests = [
   "Simple value workflow" >:: test_add ;
   "Simple path workflow depending on value workflow" >:: test_print_int ;
   "Input workflows" >:: test_input ;
+  "Shell commands" >:: test_shell_cmd ;
 ]
 
 let () =
