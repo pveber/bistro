@@ -234,9 +234,12 @@ let path_workflow t = Path_workflow (digest (`path_workflow (term_description t)
 let rec extract : type s. [`directory of s] path workflow -> string list -> 'a workflow = fun dir path ->
   match dir with
   | Extract (_, dir', path') -> extract dir' (path' @ path)
-  | Path_workflow _ -> Extract (digest (workflow_description dir), dir , path)
-  | Input (_, fn) -> Extract (digest (workflow_description dir), dir , path)
+  | Path_workflow _ -> extract_aux dir path
+  | Input (_, fn) -> extract_aux dir path
   | Value_workflow _ -> assert false (* unreachable case, due to typing constraints *)
+and extract_aux : type s. [`directory of s] path workflow -> string list -> 'a workflow = fun dir path ->
+  let id = digest (`extract (workflow_description dir, path)) in
+  Extract (id, dir , path)
 
 let input fn = Input (digest (`input fn), fn)
 
