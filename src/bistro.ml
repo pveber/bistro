@@ -456,35 +456,39 @@ module Engine(Conf : Configuration) = struct
         let msg = sprintf "Workflow %s failed with an exception." (id x) in
         `Error msg
 
-  (* Build workflow thread: store currently building workflows
+  (* Build workflow thread: store building workflows threads
 
      If two threads try to concurrently eval a workflow, we don't want
      the build procedure to be executed twice. So when the first
      thread tries to eval the workflow, we store the build thread in a
-     weak set. While the build thread is not completed, the Lwt engine
-     has a strong reference on it and it cannot disappear. So when the
-     second thread tries to eval, we give the build thread in the weak
-     set, which prevents the workflow from being built twice
-     concurrently.
+     hash table. So when the second thread tries to eval, we give the
+     build thread in the hash table, which prevents the workflow from
+     being built twice concurrently.
+
+     There is currently no means to empty the hash table, which means
+     it leaks memory. This should be very little memory anyway, and
+     keeping that information while the engine module is alive is
+     useful in case a build fails: you don't want to try and build it
+     later.
+
   *)
   module BWT = struct
-    module E = struct
-      type t = Pair : _ workflow * unit Lwt.t -> t
-      let equal (Pair (x, _)) (Pair (y, _)) = id x = id y
-      let hash (Pair (x, _)) = String.hash (id x)
+    module W = struct
+      type t = W : _ workflow -> t
+      let equal (W x) (W y) = id x = id y
+      let hash (W x) = String.hash (id x)
     end
 
-    module T = Caml.Weak.Make(E)
+    module T = Caml.Hashtbl.Make(W)
 
     let table = T.create 253
 
     let find x =
-      try
-        let E.Pair (_, t) = T.find table (E.Pair (x, Lwt.return ()))
-        in Some t
-      with Not_found -> None
+      match T.find table (W.W x) with
+      | t -> Some t
+      | exception Not_found -> None
 
-    let add x t = T.add table (E.Pair (x, t))
+    let add x t = T.add table (W.W x) t
   end
 
 
