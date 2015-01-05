@@ -146,6 +146,7 @@ type primitive_info = {
 }
 
 type _ workflow =
+  | Input : string * string -> 'a path workflow
   | Value_workflow : string * (env -> 'a) term -> 'a workflow
   | Path_workflow : string * (string -> env -> unit) term -> 'a path workflow
   | Extract : string * [`directory of 'a] path workflow * string list -> 'b path workflow
@@ -190,6 +191,7 @@ let digest x =
 
 module Description = struct
   type workflow =
+    | Input of string
     | Value_workflow of term
     | Path_workflow of term
     | Extract of workflow * string list
@@ -221,20 +223,25 @@ let rec term_description : type s. s term -> Description.term = function
   | List l -> Description.List (List.map l ~f:term_description)
 
 and workflow_description : type s. s workflow -> Description.workflow = function
+  | Input (_, fn) -> Description.Input fn
   | Value_workflow (_, t) -> Description.Value_workflow (term_description t)
   | Path_workflow (_, t) -> Description.Path_workflow (term_description t)
   | Extract (_, dir, path) -> Description.Extract (workflow_description dir, path)
 
-let workflow t = Value_workflow (digest (term_description t, `value), t)
-let path_workflow t = Path_workflow (digest (term_description t, `path), t)
+let workflow t = Value_workflow (digest (`workflow (term_description t)), t)
+let path_workflow t = Path_workflow (digest (`path_workflow (term_description t)), t)
 
 let rec extract : type s. [`directory of s] path workflow -> string list -> 'a workflow = fun dir path ->
   match dir with
   | Extract (_, dir', path') -> extract dir' (path' @ path)
   | Path_workflow _ -> Extract (digest (workflow_description dir), dir , path)
+  | Input (_, fn) -> Extract (digest (workflow_description dir), dir , path)
   | Value_workflow _ -> assert false (* unreachable case, due to typing constraints *)
 
+let input fn = Input (digest (`input fn), fn)
+
 let id : type s. s workflow -> string = function
+  | Input (id, fn) -> id
   | Value_workflow (id, _) -> id
   | Path_workflow (id, _) -> id
   | Extract (id, _, _) -> id
@@ -498,6 +505,13 @@ module Engine(Conf : Configuration) = struct
     | Some t -> t
     | None ->
       let t = match w with
+        | Input (_, fn) ->
+          let f () =
+            if not (Sys.file_exists_exn fn)
+            then failwithf "File %s is declared as an input of a workflow but does not exist." fn ()
+          in
+          Lwt.wrap f
+
         | Extract (_, dir, path_in_dir) ->
           let dir_path = Db.cache_path db dir in
           (* Checks the file to extract of the directory is there *)
@@ -573,6 +587,9 @@ module Engine(Conf : Configuration) = struct
     | Workflow (Path_workflow _ as w) ->
       fun () -> Path (Db.cache_path db w)
 
+    | Workflow (Input (_, fn)) ->
+      fun () -> Path fn
+
     | Workflow (Extract _ as w) ->
       fun () -> Path (Db.cache_path db w)
 
@@ -584,6 +601,7 @@ module Engine(Conf : Configuration) = struct
   let eval : type s. s workflow -> s Lwt.t = fun w ->
     let path = Db.cache_path db w in
     let return_value : type s. s workflow -> s Lwt.t = function
+      | Input (_, fn) -> Lwt.return (Path fn)
       | Extract (_, dir, _) -> Lwt.return (Path path)
       | Path_workflow (_, t) -> Lwt.return (Path path)
       | Value_workflow (_, t) ->

@@ -32,9 +32,24 @@ let test_print_int () =
   let Bistro.Path fn = eval (print_int (add 1 1)) in
   assert_equal ~printer:ident "2\n" (In_channel.read_all fn)
 
+let wc x =
+  let open Bistro.Term in
+  Bistro.workflow (
+    prim "wc" (fun (Bistro.Path p) _ -> List.length (In_channel.read_lines p))
+    $ workflow x
+  )
+
+let test_input () =
+  assert_raises
+    ~msg:"Eval an input of a non-existent file should raise"
+    (Failure "File aze348753485 is declared as an input of a workflow but does not exist.")
+    (fun () -> eval (Bistro.input "aze348753485")) ;
+  assert_equal ~printer:string_of_int 37 (eval (wc (Bistro.input "_oasis")))
+
 let tests = [
   "Simple value workflow" >:: test_add ;
   "Simple path workflow depending on value workflow" >:: test_print_int ;
+  "Input workflows" >:: test_input ;
 ]
 
 let () =

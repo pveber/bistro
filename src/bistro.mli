@@ -73,6 +73,7 @@ val path_workflow : (string -> env -> unit) Term.t -> 'a path workflow
 
 val extract : [`directory of 'a] path workflow -> string list -> 'b path workflow
 
+val input : string -> 'a path workflow
 
 (**
    A database to cache workflow result and execution traces
