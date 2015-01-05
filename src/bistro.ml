@@ -423,7 +423,11 @@ module Engine(Conf : Configuration) = struct
         | None -> Lwt.fail (Failure "nproc internal error")
       )
 
-
+  (* Wrapping around a task, implementing:
+     - removing previous stdout stderr tmp
+     - moving from build to cache and clearing tmp
+       if the task succeeded
+  *)
   let create_task ~np ~mem x (f : env -> unit) =
     let stdout_path = Db.stdout_path db x in
     let stderr_path = Db.stderr_path db x in
@@ -452,32 +456,41 @@ module Engine(Conf : Configuration) = struct
         let msg = sprintf "Workflow %s failed with an exception." (id x) in
         `Error msg
 
-  module Building_workflow = struct
-    type t = Cons : _ workflow * unit Lwt.t -> t
-    let equal (Cons (x, _)) (Cons (y, _)) = id x = id y
-    let hash (Cons (x, _)) = String.hash (id x)
+  (* Build workflow thread: store currently building workflows
+
+     If two threads try to concurrently eval a workflow, we don't want
+     the build procedure to be executed twice. So when the first
+     thread tries to eval the workflow, we store the build thread in a
+     weak set. While the build thread is not completed, the Lwt engine
+     has a strong reference on it and it cannot disappear. So when the
+     second thread tries to eval, we give the build thread in the weak
+     set, which prevents the workflow from being built twice
+     concurrently.
+  *)
+  module BWT = struct
+    module E = struct
+      type t = Pair : _ workflow * unit Lwt.t -> t
+      let equal (Pair (x, _)) (Pair (y, _)) = id x = id y
+      let hash (Pair (x, _)) = String.hash (id x)
+    end
+
+    module T = Caml.Weak.Make(E)
+
+    let table = T.create 253
+
+    let find x =
+      try
+        let E.Pair (_, t) = T.find table (E.Pair (x, Lwt.return ()))
+        in Some t
+      with Not_found -> None
+
+    let add x t = T.add table (E.Pair (x, t))
   end
 
-  module Building_workflow_table = Caml.Weak.Make(Building_workflow)
 
-  let building_workflow_table = Building_workflow_table.create 253
-
-  let find_build_thread x =
-    try
-      let Building_workflow.Cons (_, t) =
-        Building_workflow_table.find
-          building_workflow_table
-          (Building_workflow.Cons (x, Lwt.return ()))
-      in Some t
-    with Not_found -> None
-
-  let add_build_thread x t =
-    Building_workflow_table.add
-      building_workflow_table
-      (Building_workflow.Cons (x, t))
 
   let rec build : type s. s workflow -> unit Lwt.t = fun w ->
-    match find_build_thread w with
+    match BWT.find w with
     | Some t -> t
     | None ->
       let t = match w with
@@ -531,7 +544,7 @@ module Engine(Conf : Configuration) = struct
             in
             send_task ~np ~mem w (create_task ~np ~mem w f)
       in
-      add_build_thread w t ;
+      BWT.add w t ;
       t
   and compile_term : type s. s term -> unit -> s = function
     | Prim (_, v) -> const v
