@@ -44,7 +44,7 @@ let test_input () =
     ~msg:"Eval an input of a non-existent file should raise"
     (Failure "File aze348753485 is declared as an input of a workflow but does not exist.")
     (fun () -> eval (Bistro.input "aze348753485")) ;
-  assert_equal ~printer:string_of_int 37 (eval (wc (Bistro.input "_oasis")))
+  assert_equal ~printer:string_of_int 43 (eval (wc (Bistro.input "_oasis")))
 
 let seq i j =
   let open Bistro.Term in

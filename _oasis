@@ -16,6 +16,12 @@ Library bistro
   XMETARequires:    core, lwt.unix, netstring, nproc, shell, threads
   XMETADescription: FIXME
 
+Executable "ppx_bistro"
+  Path:             ppx
+  MainIs:           ppx_bistro.ml
+  BuildDepends:     compiler-libs.common, ppx_tools.metaquot
+  CompiledObject:   best
+
 Executable test
   Path:             src
   MainIs:           test.ml
