@@ -405,9 +405,24 @@ module Engine(Conf : Configuration) = struct
 
   let db = Db.init Conf.db_path
 
-  let worker_pool, _ = Nproc.create Conf.np
+  let worker_pool =
+    if !Sys.interactive then None
+    else Some (fst (Nproc.create Conf.np))
 
-  let resource_pool = Pool.create ~np:Conf.np ~mem:Conf.mem
+  let submit f =
+    match worker_pool with
+    | None ->
+      Lwt_preemptive.detach f () >|= fun x -> Some x
+    | Some pool ->
+      Nproc.submit pool ~f ()
+
+  let np = match worker_pool with
+    | None -> 1
+    | Some _ -> Conf.np
+
+  let mem = Conf.mem
+
+  let resource_pool = Pool.create ~np ~mem
 
   let with_env ~np ~mem x ~f =
     let stderr = open_out (sprintf "%s/%s" (Db.stderr_dir Conf.db_path) (id x)) in
@@ -429,7 +444,7 @@ module Engine(Conf : Configuration) = struct
     deps >>= fun () ->
     Pool.use resource_pool ~np:1 ~mem:100 ~f:(fun ~np ~mem ->
         let f () = with_env ~np ~mem w ~f:t in
-        Nproc.submit worker_pool ~f () >>= function
+        submit f >>= function
         | Some `Ok -> Lwt.return ()
         | Some (`Error msg) -> Lwt.fail (Failure msg)
         | None -> Lwt.fail (Failure "A primitive raised an unknown exception")

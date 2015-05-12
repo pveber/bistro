@@ -12,8 +12,8 @@ Library bistro
   Path:             src
   Modules:          Bistro
   FindlibName:      bistro
-  BuildDepends:     core, lwt.unix, netstring, nproc, sexplib.syntax, shell, threads
-  XMETARequires:    core, lwt.unix, netstring, nproc, shell, threads
+  BuildDepends:     core, lwt.preemptive, lwt.unix, netstring, nproc, sexplib.syntax, shell, threads
+  XMETARequires:    core, lwt.preemptive, lwt.unix, netstring, nproc, shell, threads
   XMETADescription: FIXME
 
 Executable "ppx_bistro"
