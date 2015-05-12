@@ -469,23 +469,17 @@ module Engine(Conf : Configuration) = struct
         `Error msg
       | `Error exn, _ -> raise exn
 
-  (* Build workflow thread: store building workflows threads
+  (* Currently Building Workflows
 
      If two threads try to concurrently eval a workflow, we don't want
      the build procedure to be executed twice. So when the first
      thread tries to eval the workflow, we store the build thread in a
-     hash table. So when the second thread tries to eval, we give the
+     hash table. When the second thread tries to eval, we give the
      build thread in the hash table, which prevents the workflow from
      being built twice concurrently.
 
-     There is currently no means to empty the hash table, which means
-     it leaks memory. This should be very little memory anyway, and
-     keeping that information while the engine module is alive is
-     useful in case a build fails: you don't want to try and build it
-     later.
-
   *)
-  module BWT = struct
+  module CBW = struct
     module W = struct
       type t = W : _ workflow -> t
       let equal (W x) (W y) = id x = id y
@@ -495,7 +489,6 @@ module Engine(Conf : Configuration) = struct
     module T = Caml.Hashtbl.Make(W)
 
     type contents =
-      | WIP of unit Lwt.t Lwt.t
       | Thread of unit Lwt.t
 
     let table : contents T.t = T.create 253
@@ -504,33 +497,30 @@ module Engine(Conf : Configuration) = struct
     let find_or_add x f =
       match T.find table (W.W x) with
       | Thread t -> t
-      | WIP waiter -> waiter >>= ident
       | exception Not_found ->
         let waiter, u = Lwt.wait () in
-        T.add table (W.W x) (WIP waiter) ;
-        f () >>= fun t ->
-        T.add table (W.W x) (Thread t) ;
-        Lwt.wakeup u t ;
-        t
+        T.add table (W.W x) (Thread waiter) ;
+        f () >>= fun () ->
+        T.remove table (W.W x) ;
+        Lwt.wakeup u () ;
+        Lwt.return ()
   end
 
 
 
   let rec build : type s. s workflow -> unit Lwt.t = fun w ->
-    BWT.find_or_add w (fun () ->
-        Lwt.return (
-          match w with
-          | Input (_, fn) -> build_input fn
+    CBW.find_or_add w (fun () ->
+        match w with
+        | Input (_, fn) -> build_input fn
 
-          | Extract (_, dir, path_in_dir) ->
-            build_extract (Db.cache_path db w) dir path_in_dir
+        | Extract (_, dir, path_in_dir) ->
+          build_extract (Db.cache_path db w) dir path_in_dir
 
-          | Path_workflow (_, term_w) ->
-            build_path_workflow w term_w
+        | Path_workflow (_, term_w) ->
+          build_path_workflow w term_w
 
-          | Value_workflow (_, term_w) ->
-            build_workflow w term_w
-        )
+        | Value_workflow (_, term_w) ->
+          build_workflow w term_w
       )
 
   and build_input fn =
