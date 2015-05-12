@@ -11,7 +11,6 @@
     evaluation uses cached values to avoid unncessary calculations.
 *)
 
-
 (** Abstract representation of a cached computation *)
 type 'a workflow
 
@@ -24,12 +23,9 @@ module Term : sig
   val prim :
     string ->
     ?version:int ->
-    ?np:int ->
-    ?mem:int ->
     'a -> 'a t
   val app : ?n:string -> ('a -> 'b) t -> 'a t -> 'b t
   val ( $ ) : ('a -> 'b) t -> 'a t -> 'b t
-  val arg : ?n:string -> ('a -> 'b t) -> 'a -> ('b -> 'c) t -> 'c t
 
   val string : string -> string t
   val int : int -> int t
@@ -42,7 +38,7 @@ end
 (** A collection of functions and values that are provided to a
     primitive and that can be used to execute shell command, log
     messages in proper locations. *)
-type env = {
+type env = private {
   sh : string -> unit ; (** Execute a shell command (with {v /bin/sh v}) *)
   shf : 'a. ('a,unit,string,unit) format4 -> 'a ;
   stdout : out_channel ;
@@ -50,8 +46,6 @@ type env = {
   out : 'a. ('a,out_channel,unit) format -> 'a ;
   err : 'a. ('a,out_channel,unit) format -> 'a ;
   with_temp_file : 'a. (string -> 'a) -> 'a ;
-  np : int ;
-  mem : int ; (** in MB *)
 }
 
 (** Workflow constructor *)
@@ -91,10 +85,10 @@ module Db : sig
       [path], which can be absolute or relative. The database is created
       on the file system unless a file/directory exists at the location
       [path]. In that case, the existing file/directory is inspected to
-      determine if it looks like a jinx database.
+      determine if it looks like a bistro database.
 
       @raise Invalid_argument if [path] is occupied with something else
-      than a jinx database. *)
+      than a bistro database. *)
 
   val cache_path : t -> _ workflow -> string
   (** Path where a workflow's result is stored. *)

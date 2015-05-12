@@ -131,16 +131,12 @@ type env = {
   out : 'a. ('a,out_channel,unit) format -> 'a ;
   err : 'a. ('a,out_channel,unit) format -> 'a ;
   with_temp_file : 'a. (string -> 'a) -> 'a ;
-  np : int ;
-  mem : int ; (** in MB *)
 }
 
 
 type primitive_info = {
   id : string ;
   version : int option ;
-  np : int ;
-  mem : int ;
 } with sexp
 
 type _ workflow =
@@ -159,21 +155,19 @@ and _ term =
   | Option : 'a term option -> 'a option term
   | List : 'a term list -> 'a list term
 
-let primitive_info id ?version ?(np = 1) ?(mem = 100) () = {
-  id ; version ; np ; mem ;
+let primitive_info id ?version () = {
+  id ; version ;
 }
 
 module Term = struct
   type 'a t = 'a term
 
-  let prim id ?version ?np ?mem x =
-    Prim (primitive_info id ?version ?np ?mem (), x)
+  let prim id ?version x =
+    Prim (primitive_info id ?version (), x)
 
   let app ?n f x = App (f, x, n)
 
   let ( $ ) f x = app f x
-
-  let arg ?n conv x f = app ?n f (conv x)
 
   let string s = String s
   let int i = Int i
@@ -419,7 +413,7 @@ module Engine(Conf : Configuration) = struct
     let stderr = open_out (sprintf "%s/%s" (Db.stderr_dir Conf.db_path) (id x)) in
     let stdout = open_out (sprintf "%s/%s" (Db.stdout_dir Conf.db_path) (id x)) in
     let env = {
-      stderr ; stdout ; np ; mem ;
+      stderr ; stdout ;
       out = (fun fmt -> fprintf stdout fmt) ;
       err = (fun fmt -> fprintf stderr fmt) ;
       shf = (fun fmt -> Utils.shf ~stdout ~stderr fmt) ;
@@ -431,9 +425,9 @@ module Engine(Conf : Configuration) = struct
         List.iter ~f:Out_channel.close [ stderr ; stdout ]
       )
 
-  let send_task ~np ~mem w deps t =
+  let send_task w deps (t : env -> [`Ok | `Error of string]) =
     deps >>= fun () ->
-    Pool.use resource_pool ~np ~mem ~f:(fun ~np ~mem ->
+    Pool.use resource_pool ~np:1 ~mem:100 ~f:(fun ~np ~mem ->
         let f () = with_env ~np ~mem w ~f:t in
         Nproc.submit worker_pool ~f () >>= function
         | Some `Ok -> Lwt.return ()
@@ -446,7 +440,7 @@ module Engine(Conf : Configuration) = struct
      - moving from build to cache and clearing tmp
        if the task succeeded
   *)
-  let create_task ~np ~mem x (f : env -> unit) =
+  let create_task x (f : env -> unit) =
     let stdout_path = Db.stdout_path db x in
     let stderr_path = Db.stderr_path db x in
     let tmp_path    = Db.tmp_path    db x in
@@ -500,36 +494,44 @@ module Engine(Conf : Configuration) = struct
 
     module T = Caml.Hashtbl.Make(W)
 
-    let table = T.create 253
+    type contents =
+      | WIP of unit Lwt.t Lwt.t
+      | Thread of unit Lwt.t
 
-    let find x =
+    let table : contents T.t = T.create 253
+
+
+    let find_or_add x f =
       match T.find table (W.W x) with
-      | t -> Some t
-      | exception Not_found -> None
-
-    let add x t = T.add table (W.W x) t
+      | Thread t -> t
+      | WIP waiter -> waiter >>= ident
+      | exception Not_found ->
+        let waiter, u = Lwt.wait () in
+        T.add table (W.W x) (WIP waiter) ;
+        f () >>= fun t ->
+        T.add table (W.W x) (Thread t) ;
+        Lwt.wakeup u t ;
+        t
   end
 
 
 
   let rec build : type s. s workflow -> unit Lwt.t = fun w ->
-    match BWT.find w with
-    | Some t -> t
-    | None ->
-      let t = match w with
-        | Input (_, fn) -> build_input fn
+    BWT.find_or_add w (fun () ->
+        Lwt.return (
+          match w with
+          | Input (_, fn) -> build_input fn
 
-        | Extract (_, dir, path_in_dir) ->
-          build_extract (Db.cache_path db w) dir path_in_dir
+          | Extract (_, dir, path_in_dir) ->
+            build_extract (Db.cache_path db w) dir path_in_dir
 
-        | Path_workflow (_, term_w) ->
-          build_path_workflow w term_w
+          | Path_workflow (_, term_w) ->
+            build_path_workflow w term_w
 
-        | Value_workflow (_, term_w) ->
-          build_workflow w term_w
-      in
-      BWT.add w t ;
-      t
+          | Value_workflow (_, term_w) ->
+            build_workflow w term_w
+        )
+      )
 
   and build_input fn =
     let f () =
@@ -567,11 +569,7 @@ module Engine(Conf : Configuration) = struct
         let thunk, deps = compile_term term_w in
         let build_path = Db.build_path db w in
         let f env = (thunk ()) build_path env in
-        let np, mem = match primitive_info_of_term term_w with
-          | Some pi -> pi.np, pi.mem
-          | None -> 1, 100
-        in
-        send_task ~np ~mem w deps (create_task ~np ~mem w f)
+        send_task w deps (create_task w f)
 
   and build_workflow : type s. s workflow -> (env -> s) Term.t -> unit Lwt.t =
     fun w term_w ->
@@ -587,11 +585,7 @@ module Engine(Conf : Configuration) = struct
           let y = (thunk ()) env in
           Utils.save_value build_path y
         in
-        let np, mem = match primitive_info_of_term term_w with
-          | Some pi -> pi.np, pi.mem
-          | None -> 1, 100
-        in
-        send_task ~np ~mem w deps (create_task ~np ~mem w f)
+        send_task w deps (create_task w f)
 
   and compile_term : type s. s term -> (unit -> s) * unit Lwt.t = function
     | Prim (_, v) -> const v, Lwt.return ()
@@ -637,7 +631,7 @@ module Engine(Conf : Configuration) = struct
     let path = Db.cache_path db w in
     let return_value : type s. s workflow -> s Lwt.t = function
       | Input (_, fn) -> Lwt.return (Path fn)
-      | Extract (_, dir, _) -> Lwt.return (Path path)
+      | Extract _ -> Lwt.return (Path path)
       | Path_workflow (_, t) -> Lwt.return (Path path)
       | Value_workflow (_, t) ->
         Lwt_io.(with_file ~mode:Input path read_value)
