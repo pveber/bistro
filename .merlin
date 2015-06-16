@@ -6,8 +6,10 @@ PKG camlp4.lib
 PKG compiler-libs.common
 PKG ppx_tools.metaquot
 PKG core
+PKG dbm
 PKG lwt
 PKG nproc
 PKG oUnit
+PKG pvem
 PKG react
 PKG shell

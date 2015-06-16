@@ -80,14 +80,14 @@ module Db : sig
   type t
   (** An abstract type for databases *)
 
-  val init : string -> t
+  val init : string -> [ `Ok of t | `Error of exn ]
   (** [init path] builds a value to represent a database located at path
       [path], which can be absolute or relative. The database is created
       on the file system unless a file/directory exists at the location
       [path]. In that case, the existing file/directory is inspected to
       determine if it looks like a bistro database.
 
-      @raise Invalid_argument if [path] is occupied with something else
+      Returns an [`Error] if [path] is occupied with something else
       than a bistro database. *)
 
   val cache_path : t -> _ workflow -> string
@@ -114,11 +114,6 @@ module Db : sig
   (** Returns a path where to store the stderr of the execution of a
       workflow *)
 
-  val history_path : t -> _ workflow -> string
-  (** Returns a path where to the usage history of a workflow is
-      stored *)
-
-  val log_dir : t -> string
   val cache_dir : t -> string
   val stdout_dir : t -> string
   val stderr_dir : t -> string
@@ -126,12 +121,12 @@ module Db : sig
   val tmp_dir : t -> string
 
   (** {5 History read/write} *)
-  val used : t -> _ workflow -> unit
-  val created : t -> _ workflow -> unit
-  val history : t -> _ workflow -> (Core.Time.t * [`created | `used]) list
+  (* val required : t -> _ workflow -> unit *)
+  (* val built : t -> _ workflow -> unit *)
+  (* val history : t -> _ workflow -> (Core.Time.t * [`created | `used]) list *)
 
   (** {5 Logging} *)
-  val log : t -> ('a, unit, string, unit) format4 -> 'a
+  (* val log : t -> ('a, unit, string, unit) format4 -> 'a *)
 end
 
 module type Configuration = sig

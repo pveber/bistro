@@ -1,5 +1,9 @@
 open Core.Std
 
+let ok = function
+  | `Ok x -> x
+  | `Error e -> raise e
+
 module Utils = struct
   let load_value fn =
     In_channel.with_file fn ~f:(Marshal.from_channel)
@@ -252,16 +256,16 @@ let id : type s. s workflow -> string = function
 
 module Db = struct
 
+  (* this type should stay marshalable, because it is passed around in
+     closures to workers. Not sure this can't be fixed, BTW*)
   type t = string
 
-  let cache_dir base = Filename.concat base "cache"
-  let build_dir base = Filename.concat base "build"
-  let tmp_dir base = Filename.concat base "tmp"
-  let stderr_dir base = Filename.concat base "stderr"
-  let stdout_dir base = Filename.concat base "stdout"
-  let log_dir base = Filename.concat base "logs"
-  let history_dir base = Filename.concat base "history"
-  let description_dir base = Filename.concat base "description"
+  let cache_dir db = Filename.concat db "cache"
+  let build_dir db = Filename.concat db "build"
+  let tmp_dir db = Filename.concat db "tmp"
+  let stderr_dir db = Filename.concat db "stderr"
+  let stdout_dir db = Filename.concat db "stdout"
+  let stats_path db = Filename.concat db "stats"
 
   let well_formed_db path =
     if Sys.file_exists_exn path then (
@@ -270,17 +274,32 @@ module Db = struct
       && Sys.file_exists_exn (tmp_dir path)
       && Sys.file_exists_exn (stderr_dir path)
       && Sys.file_exists_exn (stdout_dir path)
-      && Sys.file_exists_exn (log_dir path)
-      && Sys.file_exists_exn (history_dir path)
-      && Sys.file_exists_exn (description_dir path)
+      && Sys.file_exists_exn ((stats_path path) ^ ".pag")
+      && Sys.file_exists_exn ((stats_path path) ^ ".dir")
     )
     else false
 
+  let with_dbm db f =
+    let dbh = Dbm.(opendbm (stats_path db) [ Dbm_create ; Dbm_rdwr ] 0o700) in
+    let r = match f dbh with
+      | x -> `Ok x
+      | exception exn -> `Error exn
+    in
+    Dbm.close dbh ;
+    r
+
+  let with_dbm_exn db f = with_dbm db f |> ok
+
   let init base =
+    let open Pvem.Result in
     if Sys.file_exists_exn base
     then (
       if not (well_formed_db base)
-      then invalid_argf "Bistro_db.init: the path %s is not available for a bistro database" base ()
+      then (
+        let msg = sprintf "Bistro_db.init: the path %s is not available for a bistro database" base in
+        fail (Invalid_argument msg)
+      )
+      else return base
     )
     else (
       Unix.mkdir_p (tmp_dir base) ;
@@ -288,22 +307,17 @@ module Db = struct
       Unix.mkdir_p (cache_dir base) ;
       Unix.mkdir_p (stderr_dir base) ;
       Unix.mkdir_p (stdout_dir base) ;
-      Unix.mkdir_p (log_dir base) ;
-      Unix.mkdir_p (history_dir base) ;
-      Unix.mkdir_p (description_dir base)
-    ) ;
-    base
+      with_dbm base ignore >>= fun () ->
+      return base
+    )
 
   let aux_path f db w =
     Filename.concat (f db) (id w)
 
-  let log_path db w = aux_path log_dir db w
   let build_path db w = aux_path build_dir db w
   let tmp_path db w = aux_path tmp_dir db w
   let stdout_path db w = aux_path stdout_dir db w
   let stderr_path db w = aux_path stderr_dir db w
-  let history_path db w = aux_path history_dir db w
-  let description_path db w = aux_path description_dir db w
 
   let rec cache_path : type s. t -> s workflow -> string = fun db -> function
     | Extract (_, dir, p) ->
@@ -311,58 +325,62 @@ module Db = struct
     | _ as w -> aux_path cache_dir db w
 
 
-  let used_tag = "U"
-  let created_tag = "C"
+  module Stats = struct
+    type t = {
+      description : Description.workflow ;
+      history : (Time.t * event) list ;
+      build_time : float option ;
+    }
+    and event = Built | Requested
+    with sexp
 
-  let history_tag_of_string x =
-    if x = used_tag then `used
-    else if x = created_tag then `created
-    else invalid_argf "Bistro.Db.history_tag_of_string: %s" x ()
+    let make u = {
+      description = workflow_description u ;
+      history = [] ;
+      build_time = None ;
+    }
 
-  let append_history ~db ~msg u =
-    Out_channel.with_file ~append:true (history_path db u) ~f:(fun oc ->
-        let time_stamp = Time.to_string_fix_proto `Local (Time.now ()) in
-        fprintf oc "%s: %s\n" time_stamp msg
+    let load db u =
+      match Dbm.find db (id u) with
+      | sexp -> Some (t_of_sexp (Sexp.of_string sexp))
+      | exception Not_found -> None
+
+    let save db u s =
+      Dbm.replace db (id u) (Sexp.to_string (sexp_of_t s))
+  end
+
+  let update_stats db u f =
+    with_dbm_exn db (fun dbh ->
+        let stat =
+          match Stats.load dbh u with
+          | Some s -> s
+          | None -> Stats.make u
+        in
+        Stats.save dbh u (f stat)
+      )
+  let append_history ~db u evt =
+    update_stats db u (fun stat ->
+        { stat with
+          Stats.history = (Time.now (), evt) :: stat.Stats.history }
       )
 
-  let rec used : type s. t -> s workflow -> unit = fun db -> function
-      | Extract (_, u, _) -> used db u
-      | _ as w -> append_history ~db ~msg:used_tag w
+  let rec requested : type s. t -> s workflow -> unit = fun db -> function
+      | Extract (_, u, _) -> requested db u
+      | _ as w -> append_history ~db w Stats.Requested
 
-  let created : type s. t -> s workflow -> unit = fun db -> function
-      | Extract _ -> assert false
-      | _ as u -> append_history ~db ~msg:created_tag u
+  let built : type s. t -> s workflow -> unit =
+    fun db u -> append_history ~db u Stats.Built
 
-  let parse_history_line l =
-    let stamp, tag = String.lsplit2_exn l ~on:':' in
-    Time.of_string_fix_proto `Local stamp,
-    history_tag_of_string (String.lstrip tag)
-
-  let rec history : type s. t -> s workflow -> (Core.Time.t * [`created | `used]) list = fun db -> function
-      | Extract (_, dir, _) -> history db dir
-      | _ as u ->
-        let p_u = history_path db u in
-        if Sys.file_exists_exn p_u then
-          List.map (In_channel.read_lines p_u) ~f:parse_history_line
-        else
-          []
-
-  let echo ~path msg =
-    Out_channel.with_file ~append:true path ~f:(fun oc ->
-        output_string oc msg ;
-        output_string oc "\n"
-      )
-
-  let log db fmt =
-    let f msg =
-      let path =
-        Filename.concat
-          (log_dir db)
-          (Time.format (Time.now ()) "%Y-%m-%d.log")
-      in
-      echo ~path msg
-    in
-    Printf.ksprintf f fmt
+  (* let log db fmt = *)
+  (*   let f msg = *)
+  (*     let path = *)
+  (*       Filename.concat *)
+  (*         (log_dir db) *)
+  (*         (Time.format (Time.now ()) "%Y-%m-%d.log") *)
+  (*     in *)
+  (*     echo ~path msg *)
+  (*   in *)
+  (*   Printf.ksprintf f fmt *)
 end
 
 (* type 'a iterator = { f : 'b. 'a -> 'b workflow -> 'a } *)
@@ -403,7 +421,7 @@ end
 module Engine(Conf : Configuration) = struct
   open Lwt
 
-  let db = Db.init Conf.db_path
+  let db = Db.init Conf.db_path |> ok
 
   let worker_pool =
     if !Sys.interactive then None
@@ -425,15 +443,15 @@ module Engine(Conf : Configuration) = struct
   let resource_pool = Pool.create ~np ~mem
 
   let with_env ~np ~mem x ~f =
-    let stderr = open_out (sprintf "%s/%s" (Db.stderr_dir Conf.db_path) (id x)) in
-    let stdout = open_out (sprintf "%s/%s" (Db.stdout_dir Conf.db_path) (id x)) in
+    let stderr = open_out (sprintf "%s/%s" (Db.stderr_dir db) (id x)) in
+    let stdout = open_out (sprintf "%s/%s" (Db.stdout_dir db) (id x)) in
     let env = {
       stderr ; stdout ;
       out = (fun fmt -> fprintf stdout fmt) ;
       err = (fun fmt -> fprintf stderr fmt) ;
       shf = (fun fmt -> Utils.shf ~stdout ~stderr fmt) ;
       sh = Utils.sh ~stdout ~stderr ;
-      with_temp_file = fun f -> Utils.with_temp_file ~in_dir:(Db.tmp_dir Conf.db_path) ~f
+      with_temp_file = fun f -> Utils.with_temp_file ~in_dir:(Db.tmp_dir db) ~f
     }
     in
     protect ~f:(fun () -> f env) ~finally:(fun () ->
@@ -466,9 +484,6 @@ module Engine(Conf : Configuration) = struct
       remove_if_exists stderr_path ;
       remove_if_exists build_path  ;
       remove_if_exists tmp_path    ;
-      Out_channel.with_file (Db.description_path db x) ~f:(fun oc ->
-          Sexplib.Sexp.output_hum_indent 2 oc (sexp_of_workflow x)
-        ) ;
       Unix.mkdir tmp_path ;
       let outcome = try f env ; `Ok with exn -> `Error exn in
       match outcome, Sys.file_exists_exn build_path with
@@ -524,6 +539,7 @@ module Engine(Conf : Configuration) = struct
 
 
   let rec build : type s. s workflow -> unit Lwt.t = fun w ->
+    Db.requested db w ;
     CBW.find_or_add w (fun () ->
         match w with
         | Input (_, fn) -> build_input fn
@@ -557,19 +573,13 @@ module Engine(Conf : Configuration) = struct
         )
         else Lwt.return ()
       in
-      if Sys.file_exists_exn dir_path then (
-        Db.used db dir ;
-        check_in_dir ()
-      )
+      if Sys.file_exists_exn dir_path then check_in_dir ()
       else build dir >>= check_in_dir
 
   and build_path_workflow : type s. s workflow -> (string -> env -> unit) Term.t -> unit Lwt.t =
     fun w term_w ->
       let cache_path = Db.cache_path db w in
-      if Sys.file_exists_exn cache_path then (
-        Db.used db w ;
-        Lwt.return ()
-      )
+      if Sys.file_exists_exn cache_path then Lwt.return ()
       else
         let thunk, deps = compile_term term_w in
         let build_path = Db.build_path db w in
@@ -579,10 +589,7 @@ module Engine(Conf : Configuration) = struct
   and build_workflow : type s. s workflow -> (env -> s) Term.t -> unit Lwt.t =
     fun w term_w ->
       let cache_path = Db.cache_path db w in
-      if Sys.file_exists_exn cache_path then (
-        Db.used db w ;
-        Lwt.return ()
-      )
+      if Sys.file_exists_exn cache_path then Lwt.return ()
       else
         let thunk, deps = compile_term term_w in
         let build_path = Db.build_path db w in
