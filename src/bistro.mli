@@ -1,74 +1,123 @@
-(** A library to build scientific workflows.
+(** A library to build scientific workflows. *)
 
-    When performing computations that last days or weeks, it is
-    necessary to introduce "backup" points the program can resume
-    from in case some failure happens and stops the execution.
-    The {! Bistro} module provides {i cached computations} a.k.a {!
-    Bistro.workflow : type}: instead of directly computing a value, we
-    build a workflow using a simple OCaml function and other
-    workflows. The workflow is evaluated only when needed, and the
-    result is cached on disk. If the program fails, workflow
-    evaluation uses cached values to avoid unncessary calculations.
-*)
+type path = string list
 
-(** Abstract representation of a cached computation *)
-type 'a workflow
+type interpreter = [
+  | `bash
+  | `ocaml of string list
+  | `perl
+  | `python
+  | `R
+  | `sh
+]
 
-(** A {! Term.t} represents the way a function is wrapped to build a
-    workflow. A wrapped function (here called {i primitive}) can be
-    applied to a constant argument or some workflow.
-*)
-module Term : sig
-  type 'a t
-  val prim :
-    string ->
-    ?version:int ->
-    'a -> 'a t
-  val app : ?n:string -> ('a -> 'b) t -> 'a t -> 'b t
-  val ( $ ) : ('a -> 'b) t -> 'a t -> 'b t
+module Std : sig
+  type 'a workflow
 
-  val string : string -> string t
-  val int : int -> int t
-  val bool : bool -> bool t
-  val workflow : 'a workflow -> 'a t
-  val option : ('a -> 'b t) -> 'a option -> 'b option t
-  val list : ('a -> 'b t) -> 'a list -> 'b list t
+  class type ['a,'b] file = object
+    method format : 'a
+    method encoding : [< `text | `binary] as 'b
+  end
+
+  type 'a directory = [`directory of 'a]
+  type package = [`package] directory
+
+  type 'a zip = ([`zip of 'a], [`binary]) file
+  type 'a gz = ([`gz of 'a], [`binary]) file constraint 'a = (_,_) #file
+  type 'a tgz = ([`tgz of 'a],[`binary]) file
+  type pdf = ([`pdf],[`text]) file
+  type html = ([`html], [`text]) file
+  type bash_script = ([`bash_script], [`text]) file
+
+  class type ['a] tabular = object ('a)
+    constraint 'a = < columns : 'b ; header : ([< `yes | `no] as 'c) ;
+                      sep : 'd ; comment : 'e ; .. >
+    inherit [[`tabular], [`text]] file
+    method columns : 'b
+    method header : 'c
+    method sep : 'd
+    method comment : 'e
+  end
+
+  class type ['a] tsv = object
+    inherit [ < sep : [`tab] ; .. > as 'a ] tabular
+  end
+
+  module Script : sig
+    type t
+
+    module Shell : sig
+      type expr
+      type cmd
+
+      val script : cmd list -> t
+
+      val program :
+        ?path:package workflow list ->
+        ?pythonpath:package workflow list ->
+        string ->
+        ?stdin:expr -> ?stdout:expr -> ?stderr:expr ->
+        expr list -> cmd
+
+      val bash :
+        ?path:package workflow list ->
+        bash_script workflow ->
+        ?stdin:expr -> ?stdout:expr -> ?stderr:expr ->
+        expr list -> cmd
+
+      val dest : expr
+      val tmp : expr
+      val string : string -> expr
+      val int : int -> expr
+      val float : float -> expr
+      val path : path -> expr
+      val dep : _ workflow -> expr
+      val option : ('a -> expr) -> 'a option -> expr
+      val list : ('a -> expr) -> ?sep:string -> 'a list -> expr
+      val seq : ?sep:string -> expr list -> expr
+      val enum : ('a * string) list -> 'a -> expr
+      val opt : string -> ('a -> expr) -> 'a -> expr
+      val opt' : string -> ('a -> expr) -> 'a -> expr
+      val flag : ('a -> expr) -> 'a -> bool -> expr
+
+      val ( // ) : expr -> string -> expr
+
+      val or_list : cmd list -> cmd
+      val and_list : cmd list -> cmd
+      val pipe : cmd list -> cmd
+
+      val with_env : (string * expr) list -> cmd -> cmd
+
+      val mkdir : expr -> cmd
+      val mkdir_p : expr -> cmd
+      val wget : string -> ?dest:expr -> unit -> cmd
+      val cd : expr -> cmd
+      val rm_rf : expr -> cmd
+      val mv : expr -> expr -> cmd
+    end
+  end
+
+  module Workflow : sig
+    type 'a t = 'a workflow
+
+    val input : ?may_change:bool -> string -> 'a t
+
+    val make :
+      ?descr:string ->
+      ?interpreter:interpreter ->
+      ?mem:int ->
+      ?np:int ->
+      ?timeout:int ->
+      ?version:int ->
+      Script.t -> 'a t
+
+    val extract : _ directory t -> path -> 'a t
+
+
+  end
 end
 
-(** A collection of functions and values that are provided to a
-    primitive and that can be used to execute shell command, log
-    messages in proper locations. *)
-type env = private {
-  sh : string -> unit ; (** Execute a shell command (with {v /bin/sh v}) *)
-  shf : 'a. ('a,unit,string,unit) format4 -> 'a ;
-  stdout : out_channel ;
-  stderr : out_channel ;
-  out : 'a. ('a,out_channel,unit) format -> 'a ;
-  err : 'a. ('a,out_channel,unit) format -> 'a ;
-  with_temp_file : 'a. (string -> 'a) -> 'a ;
-}
-
-(** Workflow constructor *)
-val workflow : (env -> 'a) Term.t -> 'a workflow
-
-
-(** {5 Path workflows}
-
-    A computation that produces a file/directory as a side effect
-    instead of a value should be wrapped as a {i path workflow}. In
-    that case, the primitive receives the path where to produce its
-    output.
-*)
-
-(** Phantom-typed path. The type variable is meant to carry
-    information on the file/directory format. *)
-type 'a path = private Path of string
-
-val path_workflow : (string -> env -> unit) Term.t -> 'a path workflow
-
-val extract : [`directory of 'a] path workflow -> string list -> 'b path workflow
-
-val input : string -> 'a path workflow
+type 'a workflow = 'a Std.workflow
 
 (**
    A database to cache workflow result and execution traces
@@ -80,7 +129,9 @@ module Db : sig
   type t
   (** An abstract type for databases *)
 
-  val init : string -> [ `Ok of t | `Error of exn ]
+  val init : string -> [ `Ok of t
+                       | `Error of [ `Corrupted_dbm
+                                   | `Malformed_db of string ] ]
   (** [init path] builds a value to represent a database located at path
       [path], which can be absolute or relative. The database is created
       on the file system unless a file/directory exists at the location
@@ -90,43 +141,11 @@ module Db : sig
       Returns an [`Error] if [path] is occupied with something else
       than a bistro database. *)
 
-  val cache_path : t -> _ workflow -> string
+  val init_exn : string -> t
+
+  val workflow_path : t -> _ workflow -> string
   (** Path where a workflow's result is stored. *)
 
-
-  (** {5 Access for build engines} *)
-
-  val build_path   : t -> _ workflow -> string
-  (** Returns the path where a workflow is supposed to build its
-      result. It should be deleted after the execution of a workflow,
-      except if the execution failed. *)
-
-  val tmp_path   : t -> _ workflow -> string
-  (** Provides a temporary location that a workflow may use during its
-      execution. It should be deleted after the execution of a
-      workflow, except if the execution failed. *)
-
-  val stdout_path : t -> _ workflow -> string
-  (** Returns a path where to store the stdout of the execution of a
-      workflow *)
-
-  val stderr_path : t -> _ workflow -> string
-  (** Returns a path where to store the stderr of the execution of a
-      workflow *)
-
-  val cache_dir : t -> string
-  val stdout_dir : t -> string
-  val stderr_dir : t -> string
-  val build_dir : t -> string
-  val tmp_dir : t -> string
-
-  (** {5 History read/write} *)
-  (* val required : t -> _ workflow -> unit *)
-  (* val built : t -> _ workflow -> unit *)
-  (* val history : t -> _ workflow -> (Core.Time.t * [`created | `used]) list *)
-
-  (** {5 Logging} *)
-  (* val log : t -> ('a, unit, string, unit) format4 -> 'a *)
 end
 
 module type Configuration = sig
@@ -136,5 +155,5 @@ module type Configuration = sig
 end
 
 module Engine(C : Configuration) : sig
-  val eval : 'a workflow -> 'a Lwt.t
+  (* val eval : 'a workflow -> 'a Lwt.t *)
 end
