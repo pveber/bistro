@@ -11,9 +11,10 @@ type interpreter = [
   | `sh
 ]
 
-module Std : sig
-  type 'a workflow
+type 'a workflow
+type some_workflow = Workflow : _ workflow -> some_workflow
 
+module T : sig
   class type ['a,'b] file = object
     method format : 'a
     method encoding : [< `text | `binary] as 'b
@@ -42,82 +43,80 @@ module Std : sig
   class type ['a] tsv = object
     inherit [ < sep : [`tab] ; .. > as 'a ] tabular
   end
+end
 
-  module Script : sig
-    type t
+open T
 
-    module Shell : sig
-      type expr
-      type cmd
+module Script : sig
+  type t
 
-      val script : cmd list -> t
+  module Shell : sig
+    type expr
+    type cmd
 
-      val program :
-        ?path:package workflow list ->
-        ?pythonpath:package workflow list ->
-        string ->
-        ?stdin:expr -> ?stdout:expr -> ?stderr:expr ->
-        expr list -> cmd
+    val script : cmd list -> t
 
-      val bash :
-        ?path:package workflow list ->
-        bash_script workflow ->
-        ?stdin:expr -> ?stdout:expr -> ?stderr:expr ->
-        expr list -> cmd
+    val program :
+      ?path:package workflow list ->
+      ?pythonpath:package workflow list ->
+      string ->
+      ?stdin:expr -> ?stdout:expr -> ?stderr:expr ->
+      expr list -> cmd
 
-      val dest : expr
-      val tmp : expr
-      val string : string -> expr
-      val int : int -> expr
-      val float : float -> expr
-      val path : path -> expr
-      val dep : _ workflow -> expr
-      val option : ('a -> expr) -> 'a option -> expr
-      val list : ('a -> expr) -> ?sep:string -> 'a list -> expr
-      val seq : ?sep:string -> expr list -> expr
-      val enum : ('a * string) list -> 'a -> expr
-      val opt : string -> ('a -> expr) -> 'a -> expr
-      val opt' : string -> ('a -> expr) -> 'a -> expr
-      val flag : ('a -> expr) -> 'a -> bool -> expr
+    val bash :
+      ?path:package workflow list ->
+      bash_script workflow ->
+      ?stdin:expr -> ?stdout:expr -> ?stderr:expr ->
+      expr list -> cmd
 
-      val ( // ) : expr -> string -> expr
+    val dest : expr
+    val tmp : expr
+    val string : string -> expr
+    val int : int -> expr
+    val float : float -> expr
+    val path : path -> expr
+    val dep : _ workflow -> expr
+    val option : ('a -> expr) -> 'a option -> expr
+    val list : ('a -> expr) -> ?sep:string -> 'a list -> expr
+    val seq : ?sep:string -> expr list -> expr
+    val enum : ('a * string) list -> 'a -> expr
+    val opt : string -> ('a -> expr) -> 'a -> expr
+    val opt' : string -> ('a -> expr) -> 'a -> expr
+    val flag : ('a -> expr) -> 'a -> bool -> expr
 
-      val or_list : cmd list -> cmd
-      val and_list : cmd list -> cmd
-      val pipe : cmd list -> cmd
+    val ( // ) : expr -> string -> expr
 
-      val with_env : (string * expr) list -> cmd -> cmd
+    val or_list : cmd list -> cmd
+    val and_list : cmd list -> cmd
+    val pipe : cmd list -> cmd
 
-      val mkdir : expr -> cmd
-      val mkdir_p : expr -> cmd
-      val wget : string -> ?dest:expr -> unit -> cmd
-      val cd : expr -> cmd
-      val rm_rf : expr -> cmd
-      val mv : expr -> expr -> cmd
-    end
-  end
+    val with_env : (string * expr) list -> cmd -> cmd
 
-  module Workflow : sig
-    type 'a t = 'a workflow
-
-    val input : ?may_change:bool -> string -> 'a t
-
-    val make :
-      ?descr:string ->
-      ?interpreter:interpreter ->
-      ?mem:int ->
-      ?np:int ->
-      ?timeout:int ->
-      ?version:int ->
-      Script.t -> 'a t
-
-    val extract : _ directory t -> path -> 'a t
-
-
+    val mkdir : expr -> cmd
+    val mkdir_p : expr -> cmd
+    val wget : string -> ?dest:expr -> unit -> cmd
+    val cd : expr -> cmd
+    val rm_rf : expr -> cmd
+    val mv : expr -> expr -> cmd
   end
 end
 
-type 'a workflow = 'a Std.workflow
+module Workflow : sig
+  type 'a t = 'a workflow
+
+  val input : ?may_change:bool -> string -> 'a t
+
+  val make :
+    ?descr:string ->
+    ?interpreter:interpreter ->
+    ?mem:int ->
+    ?np:int ->
+    ?timeout:int ->
+    ?version:int ->
+    Script.t -> 'a t
+
+  val extract : _ directory t -> path -> 'a t
+end
 
 (**
    A database to cache workflow result and execution traces
@@ -148,13 +147,10 @@ module Db : sig
 
 end
 
-module type Configuration = sig
-  val db_path : string
-  val np : int
-  val mem : int
-end
-
-module Engine(C : Configuration) : sig
-  val build : _ workflow -> unit Lwt.t
-  val shutdown : unit -> unit Lwt.t
+module Engine : sig
+  type t
+  val make : np:int -> mem:int -> Db.t -> t
+  val build : t -> _ workflow -> [ `Ok of unit
+                                 | `Error of (some_workflow * string) list] Lwt.t
+  val shutdown : t -> unit Lwt.t
 end

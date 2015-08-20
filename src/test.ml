@@ -1,15 +1,11 @@
 open OUnit
 open Core.Std
+open Bistro_std
 
-module Config = struct
-  let db_path = "_bistro"
-  let np = 2
-  let mem = 1024
-end
+let db = Db.init_exn "_bistro"
+let engine = Engine.make ~np:2 ~mem:1024 db
 
-module E = Bistro.Engine(Config)
-
-(* let eval x = Lwt_unix.run (E.eval x) *)
+let build x = Lwt_unix.run (Engine.build engine x)
 
 (* let add x y = *)
 (*   let open Bistro.Term in *)

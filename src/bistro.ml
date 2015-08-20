@@ -71,9 +71,10 @@ and interpreter = [
 
 with sexp
 
-module Types = struct
-  type 'a workflow = u
+type 'a workflow = u
+type some_workflow = Workflow : _ workflow -> some_workflow
 
+module T = struct
   class type ['a,'b] file = object
     method format : 'a
     method encoding : [< `text | `binary] as 'b
@@ -103,6 +104,8 @@ module Types = struct
     inherit [ < sep : [`tab] ; .. > as 'a ] tabular
   end
 end
+
+open T
 
 module Script = struct
   type t = script
@@ -302,15 +305,6 @@ module Workflow = struct
     let id = digest ("extract", id u, path) in
     Extract (id, u, path)
 end
-
-
-module Std = struct
-  include Types
-  module Script = Script
-  module Workflow = Workflow
-end
-
-type 'a workflow = 'a Std.workflow
 
 module Db = struct
 
@@ -598,62 +592,84 @@ struct
     )
 end
 
+type build_result = [`Ok of unit | `Error of (u * string) list]
 
-module Engine(Conf : Configuration) = struct
-  (* Currently Building Steps
+(* Currently Building Steps
 
-       If two threads try to concurrently execute a step, we don't want
-       the build procedure to be executed twice. So when the first
-       thread tries to eval the workflow, we store the build thread in a
-       hash table. When the second thread tries to eval, we give the
-       build thread in the hash table, which prevents the workflow from
-       being built twice concurrently.
+     If two threads try to concurrently execute a step, we don't want
+     the build procedure to be executed twice. So when the first
+     thread tries to eval the workflow, we store the build thread in a
+     hash table. When the second thread tries to eval, we give the
+     build thread in the hash table, which prevents the workflow from
+     being built twice concurrently.
 
-  *)
-  module CBS = struct
-    module S = struct
-      type t = step
-      let equal x y = x.id = y.id
-      let hash x = String.hash x.id
-    end
-
-    module T = Caml.Hashtbl.Make(S)
-
-    type contents =
-      | Thread of [`Ok of unit | `Error of (u * string) list] Lwt.t
-
-    let table : contents T.t = T.create 253
-
-
-    let find_or_add x f =
-      let open Lwt in
-      match T.find table x with
-      | Thread t -> t
-      | exception Not_found ->
-        let waiter, u = Lwt.wait () in
-        T.add table x (Thread waiter) ;
-        Lwt.async (fun () ->
-            f () >>= fun res ->
-            T.remove table x ;
-            Lwt.wakeup u res ;
-            Lwt.return ()
-          ) ;
-        waiter
-
-    let join () =
-      let f _ (Thread t) accu = (Lwt.map ignore t) :: accu in
-      T.fold f table []
-      |> Lwt.join
+*)
+module CBST :
+sig
+  type t
+  val create : unit -> t
+  val find_or_add : t -> step -> (unit -> build_result Lwt.t) -> build_result Lwt.t
+  val join : t -> unit Lwt.t
+end
+=
+struct
+  module S = struct
+    type t = step
+    let equal x y = x.id = y.id
+    let hash x = String.hash x.id
   end
+
+  module T = Caml.Hashtbl.Make(S)
+
+  type contents =
+    | Thread of build_result Lwt.t
+
+  type t = contents T.t
+
+  let create () = T.create 253
+
+
+  let find_or_add table x f =
+    let open Lwt in
+    match T.find table x with
+    | Thread t -> t
+    | exception Not_found ->
+      let waiter, u = Lwt.wait () in
+      T.add table x (Thread waiter) ;
+      Lwt.async (fun () ->
+          f () >>= fun res ->
+          T.remove table x ;
+          Lwt.wakeup u res ;
+          Lwt.return ()
+        ) ;
+      waiter
+
+  let join table =
+    let f _ (Thread t) accu = (Lwt.map ignore t) :: accu in
+    T.fold f table []
+    |> Lwt.join
+end
+
+module Engine = struct
 
   open Lwt
   let ( >>=? ) x f = x >>= function
     | `Ok x -> f x
     | `Error _ as e -> return e
 
-  let db = Db.init_exn Conf.db_path
+  type t = {
+    db : Db.t ;
+    pool : Pool.t ;
+    cbs : CBST.t ;
+    mutable on : bool ;
+  }
 
-  let pool = Pool.create ~np:Conf.np ~mem:Conf.mem
+  let make ~np ~mem db = {
+    db ;
+    pool = Pool.create ~np ~mem ;
+    cbs = CBST.create () ;
+    on = true ;
+  }
 
   let remove_if_exists fn =
     if Sys.file_exists fn = `Yes then
@@ -665,8 +681,8 @@ module Engine(Conf : Configuration) = struct
     Lwt_unix.openfile filename Unix.([O_APPEND ; O_CREAT ; O_WRONLY]) 0o640 >>= fun fd ->
     Lwt.return (`FD_move (Lwt_unix.unix_file_descr fd))
 
-  let submit_script ~np ~mem ~timeout ~stdout ~stderr ~interpreter script =
-    Pool.use pool ~np ~mem ~f:(fun ~np ~mem ->
+  let submit_script e ~np ~mem ~timeout ~stdout ~stderr ~interpreter script =
+    Pool.use e.pool ~np ~mem ~f:(fun ~np ~mem ->
         match interpreter with
         | `sh ->
           let script_file = Filename.temp_file "guizmin" ".sh" in
@@ -698,32 +714,33 @@ module Engine(Conf : Configuration) = struct
     Lwt_list.fold_left_s f (`Ok ()) xs
 
 
-  let rec build_workflow = function
-    | Input _ as i -> build_input i
-    | Extract (_,dir,p) as x -> build_extract x dir p
+  let rec build_workflow e = function
+    | Input _ as i -> build_input e i
+    | Extract (_,dir,p) as x -> build_extract e x dir p
     | Step step as w ->
-      Db.requested db step ;
-      let dest = Db.workflow_path db w in
+      Db.requested e.db step ;
+      let dest = Db.workflow_path e.db w in
       if Sys.file_exists dest = `Yes then
         Lwt.return (`Ok ())
       else
-        CBS.find_or_add step (fun () ->
-            let dep_threads = List.map step.deps ~f:build_workflow in
-            build_step step dep_threads
+        CBST.find_or_add e.cbs step (fun () ->
+            let dep_threads = List.map step.deps ~f:(build_workflow e) in
+            build_step e step dep_threads
           )
 
   and build_step
+      e
       ({ np ; mem ; timeout ; script ; interpreter} as step)
       dep_threads =
 
     join_results dep_threads >>=? fun () ->
     (
-      let stdout = Db.stdout_path db step in
-      let stderr = Db.stderr_path db step in
-      let dest = Db.build_path db step in
-      let tmp = Db.tmp_path db step in
+      let stdout = Db.stdout_path e.db step in
+      let stderr = Db.stderr_path e.db step in
+      let dest = Db.build_path e.db step in
+      let tmp = Db.tmp_path e.db step in
       let script =
-        Script.to_string ~string_of_workflow:(Db.workflow_path db) ~dest ~tmp script
+        Script.to_string ~string_of_workflow:(Db.workflow_path e.db) ~dest ~tmp script
       in
       remove_if_exists stdout >>= fun () ->
       remove_if_exists stderr >>= fun () ->
@@ -731,12 +748,12 @@ module Engine(Conf : Configuration) = struct
       remove_if_exists tmp >>= fun () ->
       Lwt_unix.mkdir tmp 0o750 >>= fun () ->
       submit_script
-        ~np ~mem ~timeout ~stdout ~stderr ~interpreter script >>= fun response ->
+        e ~np ~mem ~timeout ~stdout ~stderr ~interpreter script >>= fun response ->
       match response, Sys.file_exists_exn dest with
       | `Ok, true ->
         remove_if_exists tmp >>= fun () ->
-        Db.built db step ;
-        Lwt_unix.rename dest (Db.cache_path db step) >>= fun () ->
+        Db.built e.db step ;
+        Lwt_unix.rename dest (Db.cache_path e.db step) >>= fun () ->
         Lwt.return (`Ok ())
       | `Ok, false ->
         let msg =
@@ -755,9 +772,9 @@ module Engine(Conf : Configuration) = struct
         return (`Error [ Step step, msg])
   )
 
-  and build_input i =
+  and build_input e i =
     Lwt.wrap (fun () ->
-        let p = Db.workflow_path db i in
+        let p = Db.workflow_path e.db i in
         if Sys.file_exists p <> `Yes then
           let msg =
             sprintf
@@ -769,11 +786,11 @@ module Engine(Conf : Configuration) = struct
           `Ok ()
       )
 
-  and build_extract x dir p =
+  and build_extract e x dir p =
     let p = string_of_path p in
-    let dir_path = Db.workflow_path db dir in
+    let dir_path = Db.workflow_path e.db dir in
     let check_in_dir () =
-      if Sys.file_exists (Db.workflow_path db x) <> `Yes
+      if Sys.file_exists (Db.workflow_path e.db x) <> `Yes
       then (
         let msg =
           sprintf "No file or directory named %s in directory workflow %s."
@@ -789,26 +806,28 @@ module Engine(Conf : Configuration) = struct
       let () = match dir with
         | Input _ -> ()
         | Extract _ -> assert false
-        | Step s -> Db.requested db s
+        | Step s -> Db.requested e.db s
       in
       return (`Ok ())
     )
     else (
-      let dir_thread = build_workflow dir in
+      let dir_thread = build_workflow e dir in
       dir_thread >>=? check_in_dir
     )
 
 
-  let on = ref true
+  let build e w =
+    (
+      if e.on then
+        build_workflow e w
+      else
+        Lwt.return (`Error [w, "Engine_halted"])
+    )
+    >>= fun e ->
+    return (e >>=& (List.map ~f:(fun (w, s) -> Workflow w, s)))
 
-  let build w =
-    if !on then
-      build_workflow w
-    else
-      Lwt.return (`Error [w, "Engine_halted"])
-
-  let shutdown () =
-    on := false ;
-    CBS.join ()
+  let shutdown e =
+    e.on <- false ;
+    CBST.join e.cbs
 
 end
