@@ -155,5 +155,6 @@ module type Configuration = sig
 end
 
 module Engine(C : Configuration) : sig
-  (* val eval : 'a workflow -> 'a Lwt.t *)
+  val build : _ workflow -> unit Lwt.t
+  val shutdown : unit -> unit Lwt.t
 end

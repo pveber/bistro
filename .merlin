@@ -7,7 +7,7 @@ PKG compiler-libs.common
 PKG ppx_tools.metaquot
 PKG core
 PKG dbm
-PKG lwt
+PKG lwt.unix
 PKG nproc
 PKG oUnit
 PKG pvem
