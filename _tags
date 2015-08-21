@@ -1,4 +1,4 @@
 # OASIS_START
 # OASIS_STOP
 true: annot, debug
-"src/bistro.ml": syntax(camlp4o), package(sexplib.syntax)
+"lib/bistro.ml": syntax(camlp4o), package(sexplib.syntax)

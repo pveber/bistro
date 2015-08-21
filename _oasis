@@ -8,14 +8,14 @@ Plugins:      META (0.4), DevFiles (0.4)
 BuildTools:   ocamlbuild
 Homepage:     https://github.com/pveber/bistro
 OCamlVersion: >= 4.02
-FilesAB:      src/META.ab
+FilesAB:      etc/META.ab
 AlphaFeatures: no_automatic_syntax
 
-PreInstallCommand:   $ocamlfind install ppx_bistro src/META
+PreInstallCommand:   $ocamlfind install ppx_bistro etc/META
 PreUninstallCommand: $ocamlfind remove ppx_bistro
 
 Library bistro
-  Path:             src
+  Path:             lib
   Modules:          Bistro, Bistro_std
   FindlibName:      bistro
   BuildDepends:     core, dbm, lwt.preemptive, lwt.unix,
@@ -31,15 +31,15 @@ Executable "ppx_bistro"
   CompiledObject:   best
 
 Test test_ppx_bistro
-  Command: ocamlbuild -use-ocamlfind -I src \
+  Command: ocamlbuild -use-ocamlfind -I lib \
                       -cflags '-ppx $ppx_bistro' \
                       -cflags 'bistro.cma' \
-                      src/test_ppx_bistro.byte
+                      test/test_ppx_bistro.byte
   TestTools:      ppx_bistro
 
 
 Executable test
-  Path:             src
+  Path:             test
   MainIs:           test.ml
   BuildDepends:     bistro, oUnit
   CompiledObject:   byte

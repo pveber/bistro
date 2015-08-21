@@ -4,3 +4,4 @@ setup.data
 _build
 _bistro
 *.byte
+*.native
