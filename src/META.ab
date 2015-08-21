@@ -1,0 +1,2 @@
+version = "$(pkg_version)"
+ppx = "ppx_bistro"

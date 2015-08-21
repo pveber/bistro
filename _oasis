@@ -7,13 +7,21 @@ License:      GPL-3.0
 Plugins:      META (0.4), DevFiles (0.4)
 BuildTools:   ocamlbuild
 Homepage:     https://github.com/pveber/bistro
+OCamlVersion: >= 4.02
+FilesAB:      src/META.ab
+AlphaFeatures: no_automatic_syntax
+
+PreInstallCommand:   $ocamlfind install ppx_bistro src/META
+PreUninstallCommand: $ocamlfind remove ppx_bistro
 
 Library bistro
   Path:             src
   Modules:          Bistro, Bistro_std
   FindlibName:      bistro
-  BuildDepends:     core, dbm, lwt.preemptive, lwt.unix, netstring, nproc, pvem, sexplib.syntax, shell, threads
-  XMETARequires:    core, dbm, lwt.preemptive, lwt.unix, netstring, nproc, pvem, shell, threads
+  BuildDepends:     core, dbm, lwt.preemptive, lwt.unix,
+                    netstring, pvem, shell, threads
+  XMETARequires:    core, dbm, lwt.preemptive, lwt.unix,
+                    netstring, pvem, shell, threads
   XMETADescription: FIXME
 
 Executable "ppx_bistro"
@@ -22,10 +30,18 @@ Executable "ppx_bistro"
   BuildDepends:     compiler-libs.common, ppx_tools.metaquot
   CompiledObject:   best
 
+Test test_ppx_bistro
+  Command: ocamlbuild -use-ocamlfind -I src \
+                      -cflags '-ppx $ppx_bistro' \
+                      -cflags 'bistro.cma' \
+                      src/test_ppx_bistro.byte
+  TestTools:      ppx_bistro
+
+
 Executable test
   Path:             src
   MainIs:           test.ml
-  BuildDepends:     bistro
+  BuildDepends:     bistro, oUnit
   CompiledObject:   byte
   
 Document API
