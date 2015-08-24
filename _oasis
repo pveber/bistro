@@ -27,7 +27,7 @@ Library bistro
 Executable "ppx_bistro"
   Path:             ppx
   MainIs:           ppx_bistro.ml
-  BuildDepends:     compiler-libs.common, ppx_tools.metaquot
+  BuildDepends:     compiler-libs.common, ppx_tools.metaquot, str
   CompiledObject:   best
 
 Test test_ppx_bistro

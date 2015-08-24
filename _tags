@@ -1,4 +1,4 @@
 # OASIS_START
 # OASIS_STOP
-true: annot, debug
+true: annot, debug, use_menhir
 "lib/bistro.ml": syntax(camlp4o), package(sexplib.syntax)

@@ -2,16 +2,15 @@ B _build/src
 B _build/src
 S src/lib
 S src/test
-PKG camlp4.lib
 PKG compiler-libs.common
 PKG ppx_tools.metaquot
 PKG core
 PKG dbm
 PKG ppx_deriving_yojson
 PKG lwt.unix
-PKG nproc
 PKG oUnit
 PKG pvem
 PKG react
 PKG shell
+PKG str
 PKG yojson

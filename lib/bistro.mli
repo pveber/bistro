@@ -4,7 +4,8 @@ type path = string list
 
 type interpreter = [
   | `bash
-  | `ocaml of string list
+  | `ocaml
+  | `ocamlscript
   | `perl
   | `python
   | `R
@@ -50,56 +51,62 @@ open T
 module Script : sig
   type t
 
-  module Shell : sig
-    type expr
-    type cmd
+  type expr
 
-    val script : cmd list -> t
+  val make : interpreter -> expr list -> t
 
-    val program :
-      ?path:package workflow list ->
-      ?pythonpath:package workflow list ->
-      string ->
-      ?stdin:expr -> ?stdout:expr -> ?stderr:expr ->
-      expr list -> cmd
+  val dest : expr
+  val tmp : expr
+  val string : string -> expr
+  val int : int -> expr
+  val float : float -> expr
+  val path : path -> expr
+  val dep : _ workflow -> expr
+  val option : ('a -> expr) -> 'a option -> expr
+  val list : ('a -> expr) -> ?sep:string -> 'a list -> expr
+  val seq : ?sep:string -> expr list -> expr
+  val enum : ('a * string) list -> 'a -> expr
 
-    val bash :
-      ?path:package workflow list ->
-      bash_script workflow ->
-      ?stdin:expr -> ?stdout:expr -> ?stderr:expr ->
-      expr list -> cmd
-
-    val dest : expr
-    val tmp : expr
-    val string : string -> expr
-    val int : int -> expr
-    val float : float -> expr
-    val path : path -> expr
-    val dep : _ workflow -> expr
-    val option : ('a -> expr) -> 'a option -> expr
-    val list : ('a -> expr) -> ?sep:string -> 'a list -> expr
-    val seq : ?sep:string -> expr list -> expr
-    val enum : ('a * string) list -> 'a -> expr
-    val opt : string -> ('a -> expr) -> 'a -> expr
-    val opt' : string -> ('a -> expr) -> 'a -> expr
-    val flag : ('a -> expr) -> 'a -> bool -> expr
-
-    val ( // ) : expr -> string -> expr
-
-    val or_list : cmd list -> cmd
-    val and_list : cmd list -> cmd
-    val pipe : cmd list -> cmd
-
-    val with_env : (string * expr) list -> cmd -> cmd
-
-    val mkdir : expr -> cmd
-    val mkdir_p : expr -> cmd
-    val wget : string -> ?dest:expr -> unit -> cmd
-    val cd : expr -> cmd
-    val rm_rf : expr -> cmd
-    val mv : expr -> expr -> cmd
-  end
 end
+
+module Shell_script : sig
+  include module type of Script with type t = Script.t
+  type cmd
+
+  val script : cmd list -> t
+
+  val program :
+    ?path:package workflow list ->
+    ?pythonpath:package workflow list ->
+    string ->
+    ?stdin:expr -> ?stdout:expr -> ?stderr:expr ->
+    expr list -> cmd
+
+  val bash :
+    ?path:package workflow list ->
+    bash_script workflow ->
+    ?stdin:expr -> ?stdout:expr -> ?stderr:expr ->
+    expr list -> cmd
+
+  val ( // ) : expr -> string -> expr
+  val opt : string -> ('a -> expr) -> 'a -> expr
+  val opt' : string -> ('a -> expr) -> 'a -> expr
+  val flag : ('a -> expr) -> 'a -> bool -> expr
+
+  val or_list : cmd list -> cmd
+  val and_list : cmd list -> cmd
+  val pipe : cmd list -> cmd
+
+  val with_env : (string * expr) list -> cmd -> cmd
+
+  val mkdir : expr -> cmd
+  val mkdir_p : expr -> cmd
+  val wget : string -> ?dest:expr -> unit -> cmd
+  val cd : expr -> cmd
+  val rm_rf : expr -> cmd
+  val mv : expr -> expr -> cmd
+end
+
 
 module Workflow : sig
   type 'a t = 'a workflow

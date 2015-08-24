@@ -42,7 +42,6 @@ type u =
 
 and step = {
   id : string ;
-  interpreter : interpreter ;
   descr : string ;
   deps : u list ;
   script : script ;
@@ -52,7 +51,10 @@ and step = {
   version : int option ; (** Version number of the wrapper *)
 }
 
-and script = token list
+and script = {
+  interpreter : interpreter ;
+  tokens : token list ;
+}
 
 and token =
   | S of string
@@ -62,7 +64,8 @@ and token =
 
 and interpreter = [
   | `bash
-  | `ocaml of string list
+  | `ocaml
+  | `ocamlscript
   | `perl
   | `python
   | `R
@@ -109,9 +112,15 @@ open T
 
 module Script = struct
   type t = script
+  type expr = token list
 
-  let deps l =
-    List.filter_map l ~f:(function
+  let make interpreter xs = {
+    interpreter ;
+    tokens = List.concat xs
+  }
+
+  let deps s =
+    List.filter_map s.tokens ~f:(function
         | D r -> Some (r :> u)
         | S _ | DEST | TMP -> None
       )
@@ -124,143 +133,148 @@ module Script = struct
     | TMP -> tmp
 
   let to_string ~string_of_workflow ~tmp ~dest script =
-    List.map script ~f:(string_of_token ~string_of_workflow ~tmp ~dest)
+    List.map script.tokens ~f:(string_of_token ~string_of_workflow ~tmp ~dest)
     |> String.concat
 
-  module Shell = struct
-    type expr = token list
-    type cmd = token list
+  let dest = [ DEST ]
+  let tmp = [ TMP ]
+  let string s = [ S s ]
+  let int i = [ S (string_of_int i) ]
+  let float f = [ S (Float.to_string f) ]
+  let path p = [ S (string_of_path p) ]
+  let dep w = [ D w ]
 
-    let script cmds =
-      List.intersperse ~sep:[S "\n"] cmds
-      |> List.concat
+  let option f = function
+    | None -> []
+    | Some x -> f x
 
-    let program ?path ?pythonpath p ?stdin ?stdout ?stderr args =
-      let add_path =
-        match path with
-        | None | Some [] -> ident
-        | Some pkgs ->
-          fun cmd ->
-            S "(export PATH="
-            :: (
-              List.map pkgs ~f:(fun p -> [ D p ; S "/bin" ])
-              |> List.intersperse ~sep:[S ":"]
-              |> List.concat
-            )
-            @ [ S ":$PATH ; " ]
-            @ cmd
-            @ [ S ")" ]
-      in
-      let add_pythonpath = match pythonpath with
-        | None | Some [] -> ident
-        | Some pkgs ->
-          fun cmd ->
-            S "(export PYTHONPATH="
-            :: (
-              List.map pkgs ~f:(fun p -> [ D p ; S "/lib/python2.7/site-packages" ])
-              (* FIXME: this won't work with other versions of python
-                 than 2.7 ; we should introduce execution-time variables
-                 -- here PYTHON_VERSION -- and the corresponding
-                 constructor in the API *)
-              |> List.intersperse ~sep:[S ":"]
-              |> List.concat
-            )
-            @ [ S ":$PYTHONPATH ; " ]
-            @ cmd
-            @ [ S ")" ]
-      in
-      let prog_expr = [ S p ] in
-      let stdout_expr =
-        match stdout with
-        | None -> []
-        | Some e -> S " > " :: e
-      in
-      let stdin_expr =
-        match stdin with
-        | None -> []
-        | Some e -> S " < " :: e
-      in
-      let stderr_expr =
-        match stderr with
-        | None -> []
-        | Some e -> S " 2> " :: e
-      in
-      [ prog_expr ] @ args @ [ stdin_expr ; stdout_expr ; stderr_expr ]
-      |> List.filter ~f:(( <> ) [])
-      |> List.intersperse ~sep:[S " "]
-      |> List.concat
-      |> add_pythonpath
-      |> add_path
+  let list f ?(sep = ",") l =
+    List.map l ~f
+    |> List.intersperse ~sep:[ S sep ]
+    |> List.concat
 
-    let dest = [ DEST ]
-    let tmp = [ TMP ]
-    let string s = [ S s ]
-    let int i = [ S (string_of_int i) ]
-    let float f = [ S (Float.to_string f) ]
-    let path p = [ S (string_of_path p) ]
-    let dep w = [ D w ]
+  let seq ?(sep = "") xs = List.concat (List.intersperse ~sep:(string sep) xs)
 
-    let option f = function
-      | None -> []
-      | Some x -> f x
+  let enum dic x = [ S (List.Assoc.find_exn dic x) ]
 
-    let list f ?(sep = ",") l =
-      List.map l ~f
-      |> List.intersperse ~sep:[ S sep ]
-      |> List.concat
-
-    let seq ?(sep = "") xs = List.concat (List.intersperse ~sep:(string sep) xs)
-
-    let enum dic x = [ S (List.Assoc.find_exn dic x) ]
-
-    let opt o f x = S o :: S " " :: f x
-
-    let opt' o f x = S o :: S "=" :: f x
-
-    let flag f x b = if b then f x else []
-
-    let mkdir d = program "mkdir" [ d ]
-
-    let mkdir_p d = program "mkdir" [ string "-p" ; d ]
-
-    let cd p = program "cd" [ p ]
-
-    let rm_rf x = program "rm" [ string "-rf" ; x ]
-
-    let mv x y = program "mv" [ x ; y ]
-
-    let wget url ?dest () = program "wget" [
-        option (opt "-O" ident) dest ;
-        string url
-      ]
-
-    let bash ?path script ?stdin ?stdout ?stderr args =
-      program "bash" ?path ?stdin ?stdout ?stderr (dep script :: args)
-
-    let ( // ) x y = x @ [ S "/" ; S y ]
-
-    let par cmd =
-      S "( " :: (cmd @ [ S " )" ])
-
-    let cmd_list op cmds =
-      List.intersperse ~sep:[ S " " ; S op ; S " " ] cmds
-      |> List.concat
-      |> par
-
-    let or_list = cmd_list "||"
-    let and_list = cmd_list "&&"
-    let pipe = cmd_list "|"
-
-    let with_env vars cmd =
-      (
-        List.map vars ~f:(fun (var, value) -> [ S var ; S "=" ] @ value)
-        |> List.intersperse ~sep:[ S " " ]
-        |> List.concat
-      )
-      @ (S " " :: cmd)
-  end
 
 end
+
+module Shell_script = struct
+  include Script
+
+  type cmd = token list
+
+  let script cmds =
+    Script.make
+      `sh
+      (List.intersperse ~sep:[S "\n"] cmds)
+
+  let program ?path ?pythonpath p ?stdin ?stdout ?stderr args =
+    let add_path =
+      match path with
+      | None | Some [] -> ident
+      | Some pkgs ->
+        fun cmd ->
+          S "(export PATH="
+          :: (
+            List.map pkgs ~f:(fun p -> [ D p ; S "/bin" ])
+            |> List.intersperse ~sep:[S ":"]
+            |> List.concat
+          )
+          @ [ S ":$PATH ; " ]
+          @ cmd
+          @ [ S ")" ]
+    in
+    let add_pythonpath = match pythonpath with
+      | None | Some [] -> ident
+      | Some pkgs ->
+        fun cmd ->
+          S "(export PYTHONPATH="
+          :: (
+            List.map pkgs ~f:(fun p -> [ D p ; S "/lib/python2.7/site-packages" ])
+            (* FIXME: this won't work with other versions of python
+               than 2.7 ; we should introduce execution-time variables
+               -- here PYTHON_VERSION -- and the corresponding
+               constructor in the API *)
+            |> List.intersperse ~sep:[S ":"]
+            |> List.concat
+          )
+          @ [ S ":$PYTHONPATH ; " ]
+          @ cmd
+          @ [ S ")" ]
+    in
+    let prog_expr = [ S p ] in
+    let stdout_expr =
+      match stdout with
+      | None -> []
+      | Some e -> S " > " :: e
+    in
+    let stdin_expr =
+      match stdin with
+      | None -> []
+      | Some e -> S " < " :: e
+    in
+    let stderr_expr =
+      match stderr with
+      | None -> []
+      | Some e -> S " 2> " :: e
+    in
+    [ prog_expr ] @ args @ [ stdin_expr ; stdout_expr ; stderr_expr ]
+    |> List.filter ~f:(( <> ) [])
+    |> List.intersperse ~sep:[S " "]
+    |> List.concat
+    |> add_pythonpath
+    |> add_path
+
+
+  let opt o f x = S o :: S " " :: f x
+
+  let opt' o f x = S o :: S "=" :: f x
+
+  let flag f x b = if b then f x else []
+
+  let mkdir d = program "mkdir" [ d ]
+
+  let mkdir_p d = program "mkdir" [ string "-p" ; d ]
+
+  let cd p = program "cd" [ p ]
+
+  let rm_rf x = program "rm" [ string "-rf" ; x ]
+
+  let mv x y = program "mv" [ x ; y ]
+
+  let wget url ?dest () = program "wget" [
+      option (opt "-O" ident) dest ;
+      string url
+    ]
+
+  let bash ?path script ?stdin ?stdout ?stderr args =
+    program "bash" ?path ?stdin ?stdout ?stderr (dep script :: args)
+
+  let ( // ) x y = x @ [ S "/" ; S y ]
+
+  let par cmd =
+    S "( " :: (cmd @ [ S " )" ])
+
+  let cmd_list op cmds =
+    List.intersperse ~sep:[ S " " ; S op ; S " " ] cmds
+    |> List.concat
+    |> par
+
+  let or_list = cmd_list "||"
+  let and_list = cmd_list "&&"
+  let pipe = cmd_list "|"
+
+  let with_env vars cmd =
+    (
+      List.map vars ~f:(fun (var, value) -> [ S var ; S "=" ] @ value)
+      |> List.intersperse ~sep:[ S " " ]
+      |> List.concat
+    )
+    @ (S " " :: cmd)
+end
+
 
 module Workflow = struct
   type 'a t = u
@@ -294,7 +308,7 @@ module Workflow = struct
                        ~tmp:"TMP"
                        ~dest:"DEST"
                        script) in
-    Step { descr ; interpreter ; deps ; script ; np ; mem ; timeout ; version ; id }
+    Step { descr ; deps ; script ; np ; mem ; timeout ; version ; id }
 
   let extract u path =
     let u, path =
@@ -730,7 +744,7 @@ module Engine = struct
 
   and build_step
       e
-      ({ np ; mem ; timeout ; script ; interpreter} as step)
+      ({ np ; mem ; timeout ; script } as step)
       dep_threads =
 
     join_results dep_threads >>=? fun () ->
@@ -739,7 +753,7 @@ module Engine = struct
       let stderr = Db.stderr_path e.db step in
       let dest = Db.build_path e.db step in
       let tmp = Db.tmp_path e.db step in
-      let script =
+      let script_text =
         Script.to_string ~string_of_workflow:(Db.workflow_path e.db) ~dest ~tmp script
       in
       remove_if_exists stdout >>= fun () ->
@@ -748,7 +762,8 @@ module Engine = struct
       remove_if_exists tmp >>= fun () ->
       Lwt_unix.mkdir tmp 0o750 >>= fun () ->
       submit_script
-        e ~np ~mem ~timeout ~stdout ~stderr ~interpreter script >>= fun response ->
+        e ~np ~mem ~timeout ~stdout ~stderr
+        ~interpreter:script.interpreter script_text >>= fun response ->
       match response, Sys.file_exists_exn dest with
       | `Ok, true ->
         remove_if_exists tmp >>= fun () ->
