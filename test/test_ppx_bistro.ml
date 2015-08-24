@@ -2,7 +2,7 @@ open Bistro_std
 
 let a = 1
 
-let s = Workflow.make ~interpreter:`ocaml [%bistro.ocaml {|
+let s = Workflow.make [%bistro.ocaml {|
 let a = {{ int a }}
 
 let f x = x + 1
