@@ -1,7 +1,9 @@
-B _build/src
-B _build/src
+#B _build/lib
+#B _build/ppx
 S src/lib
 S src/test
+PKG bistro
+PKG ppx_bistro
 PKG compiler-libs.common
 PKG ppx_tools.metaquot
 PKG core
