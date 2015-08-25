@@ -1,15 +1,23 @@
 opam-version: "1.2"
 name: "bistro"
-version: "0.0"
+version: "dev"
 maintainer: "pveber <philippe.veber@gmail.com>"
 authors: "pveber <philippe.veber@gmail.com>"
-homepage: ""
-bug-reports: ""
-license: ""
+homepage: "https://github.com/pveber/bistro/"
+dev-repo: "https://github.com/pveber/bistro.git"
+license: "GPL"
 build: [
   ["./configure" "--prefix=%{prefix}%"]
   [make]
 ]
 install: [make "install"]
 remove: ["ocamlfind" "remove" "bistro"]
-depends: "ocamlfind" {build}
+depends: [
+  "ocamlfind" {build}
+  "core"
+  "dbm"
+  "lwt"
+  "oasis"
+  "ocamlnet"
+  "pvem"
+]
