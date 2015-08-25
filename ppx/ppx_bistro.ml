@@ -20,14 +20,11 @@ let parse =
     Str.full_split re s
     |> List.map f
 
-let def_loc txt =
-  { txt; loc = !Ast_helper.default_loc }
-
 let script_of_ast ast =
   let f = function
-    | Text s -> [%expr Bistro.Script.string [%e Ast_convenience.str s] ]
-    | Antiquot "DEST" -> [%expr Bistro.Script.dest ]
-    | Antiquot "TMP" -> [%expr Bistro.Script.tmp ]
+    | Text s -> [%expr string [%e Ast_convenience.str s] ]
+    | Antiquot "DEST" -> [%expr dest ]
+    | Antiquot "TMP" -> [%expr tmp ]
     | Antiquot e -> Parse.expression (Lexing.from_string e)
   in
   Ast_convenience.list (List.map f ast)
@@ -57,7 +54,8 @@ let bistro_mapper argv =
           match pstr with
           | PStr [{ pstr_desc = Pstr_eval ({ pexp_loc  = loc;
                                              pexp_desc = Pexp_constant (Const_string (sym, _))}, _)}] ->
-            [%expr Bistro.Script.make [%e interpreter_of_ext ext_name ] [%e script_of_ast (parse sym)] ]
+            Ast_helper.default_loc := loc ;
+            [%expr let open Bistro.Script in make [%e interpreter_of_ext ext_name ] [%e script_of_ast (parse sym)] ]
           | _ ->
             raise (Location.Error (
                 Location.error ~loc "[%bistro] only accepts a string"))
