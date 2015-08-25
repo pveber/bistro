@@ -11,7 +11,10 @@ build: [
   [make]
 ]
 install: [make "install"]
-remove: ["ocamlfind" "remove" "bistro"]
+remove: [
+  ["ocamlfind" "remove" "bistro"]
+  ["ocamlfind" "remove" "ppx_bistro"]
+]
 depends: [
   "ocamlfind" {build}
   "core"
