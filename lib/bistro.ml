@@ -838,8 +838,18 @@ module Engine = struct
       else
         Lwt.return (`Error [w, "Engine_halted"])
     )
-    >>= fun e ->
-    return (e >>=& (List.map ~f:(fun (w, s) -> Workflow w, s)))
+    >>= function
+    | `Ok () -> Lwt.return (`Ok (Db.workflow_path e.db w))
+    | `Error xs ->
+      Lwt.return (`Error (List.map xs ~f:(fun (w, s) -> Workflow w, s)))
+
+  let build_exn e w =
+    build e w >>= function
+    | `Ok s -> Lwt.return s
+    | `Error xs ->
+      let msgs = List.map ~f:snd xs in
+      let msg = sprintf "Some build(s) failed: %s\n\t" (String.concat ~sep:"\n\t" msgs) in
+      Lwt.fail (Failure msg)
 
   let shutdown e =
     e.on <- false ;

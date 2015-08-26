@@ -157,7 +157,8 @@ end
 module Engine : sig
   type t
   val make : np:int -> mem:int -> Db.t -> t
-  val build : t -> _ workflow -> [ `Ok of unit
+  val build : t -> _ workflow -> [ `Ok of string
                                  | `Error of (some_workflow * string) list] Lwt.t
+  val build_exn : t -> _ workflow -> string Lwt.t
   val shutdown : t -> unit Lwt.t
 end

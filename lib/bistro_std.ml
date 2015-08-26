@@ -1,3 +1,4 @@
+type 'a workflow = 'a Bistro.workflow
 include Bistro.T
 module Script = Bistro.Script
 module Workflow = Bistro.Workflow
