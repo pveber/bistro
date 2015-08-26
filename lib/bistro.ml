@@ -776,9 +776,7 @@ module Engine = struct
         in
         Lwt.return (`Error [ Step step, msg ])
       | `Error `Script_failure, _ ->
-        let msg =
-          "Script failed."
-        in
+        let msg = "Script failed" in
         return (`Error [ Step step, msg ])
       | `Error `Unsupported_interpreter, _ ->
         let msg =
@@ -847,8 +845,8 @@ module Engine = struct
     build e w >>= function
     | `Ok s -> Lwt.return s
     | `Error xs ->
-      let msgs = List.map ~f:snd xs in
-      let msg = sprintf "Some build(s) failed: %s\n\t" (String.concat ~sep:"\n\t" msgs) in
+      let msgs = List.map ~f:(fun (Workflow w, msg) -> Workflow.id w ^ "\t" ^ msg) xs in
+      let msg = sprintf "Some build(s) failed:\n\t%s\n" (String.concat ~sep:"\n\t" msgs) in
       Lwt.fail (Failure msg)
 
   let shutdown e =
