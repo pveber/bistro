@@ -6,19 +6,21 @@ type txt = ([`txt],[`text]) file
 
 let a : txt workflow = Workflow.make [%bistro.sh {|
 date > {{DEST}}
-sleep 2
+sleep 3
 |}]
 
 let b : txt workflow = Workflow.make [%bistro.sh {|
 echo This is b > {{DEST}}
 cat {{dep a}} >> {{DEST}}
 date >> {{DEST}}
+sleep 2
 |}]
 
 let c : txt workflow = Workflow.make [%bistro.sh {|
 echo This is c > {{DEST}}
 cat {{dep a}} >> {{DEST}}
 date >> {{DEST}}
+sleep 1
 |}]
 
 let d : txt workflow = Workflow.make [%bistro.sh {|
@@ -26,7 +28,7 @@ cat {{dep b}} {{dep c}} > {{DEST}}
 |}]
 
 let db = Db.init_exn "_bistro"
-let e = Engine.make ~np:1 ~mem:1024 db
+let e = Engine.make ~np:2 ~mem:1024 db
 
 let main () =
   Engine.build_exn e d >>= fun s ->
