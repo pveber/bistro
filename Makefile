@@ -39,3 +39,9 @@ configure:
 .PHONY: build doc test all install uninstall reinstall clean distclean configure
 
 # OASIS_STOP
+
+%.byte: examples/%.ml
+	ocamlbuild -use-ocamlfind -tag thread -pkgs core,lwt.unix,dbm,pvem\
+                   -cflags "-I lib -ppx ../ppx_bistro.native"\
+                   -lflags "-I lib bistro.cma"\
+                   examples/$@
