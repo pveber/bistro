@@ -29,6 +29,7 @@ class type ['a] tsv = object
 end
 
 module Script = Bistro.Script
+module Shell_script = Bistro.Shell_script
 module Workflow = Bistro.Workflow
 module Db = Bistro.Db
 module Engine = Bistro.Engine
