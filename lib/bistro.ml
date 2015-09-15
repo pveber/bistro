@@ -354,6 +354,12 @@ module Db = struct
 
   let init base =
     let open Pvem.Result in
+    let base =
+      if Filename.is_relative base then
+        Filename.concat (Sys.getcwd ()) base
+      else
+        base
+    in
     if Sys.file_exists_exn base
     then (
       well_formed_db base >>= fun () ->
