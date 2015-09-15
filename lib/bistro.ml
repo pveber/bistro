@@ -125,6 +125,8 @@ module Script = struct
   let seq ?(sep = "") xs = List.concat (List.intersperse ~sep:(string sep) xs)
 
   let enum dic x = [ S (List.Assoc.find_exn dic x) ]
+
+  let use s = s.tokens
 end
 
 module Shell_script = struct

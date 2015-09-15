@@ -36,6 +36,7 @@ module Script : sig
   val list : ('a -> expr) -> ?sep:string -> 'a list -> expr
   val seq : ?sep:string -> expr list -> expr
   val enum : ('a * string) list -> 'a -> expr
+  val use : t -> expr
 end
 
 module Shell_script : sig
