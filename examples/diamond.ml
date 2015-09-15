@@ -2,32 +2,28 @@ open Core.Std
 open Lwt
 open Bistro_std
 
-module Workflow = Bistro.Workflow
-module Engine = Bistro.Engine
-module Db = Bistro.Db
-
 type txt = ([`txt],[`text]) file
 
-let a : txt workflow = Workflow.make [%bistro.sh {|
+let a : txt workflow = Workflow.make [%sh{|
 date > {{DEST}}
 sleep 3
 |}]
 
-let b : txt workflow = Workflow.make [%bistro.sh {|
+let b : txt workflow = Workflow.make [%sh{|
 echo This is b > {{DEST}}
 cat {{dep a}} >> {{DEST}}
 date >> {{DEST}}
 sleep 2
 |}]
 
-let c : txt workflow = Workflow.make [%bistro.sh {|
+let c : txt workflow = Workflow.make [%sh{|
 echo This is c > {{DEST}}
 cat {{dep a}} >> {{DEST}}
 date >> {{DEST}}
 sleep 1
 |}]
 
-let d : txt workflow = Workflow.make [%bistro.sh {|
+let d : txt workflow = Workflow.make [%sh{|
 cat {{dep b}} {{dep c}} > {{DEST}}
 |}]
 

@@ -27,3 +27,7 @@ end
 class type ['a] tsv = object
   inherit [ < sep : [`tab] ; .. > as 'a ] tabular
 end
+
+module Workflow = Bistro.Workflow
+module Engine = Bistro.Engine
+module Db = Bistro.Db

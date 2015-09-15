@@ -5,22 +5,22 @@
       '((bistro-sh
          :submode sh-mode
          :face mmm-declaration-submode-face
-         :front "bistro\.sh[ \t\n]+{|"
+         :front "[%sh[ \t\n]+{|"
          :back "|}")
         (bistro-ocaml
          :submode tuareg-mode
          :face mmm-declaration-submode-face
-         :front "bistro\.ocaml[ \t\n]+{|"
+         :front "[%ocaml[ \t\n]+{|"
          :back "|}")
         (bistro-ocamlscript
          :submode tuareg-mode
          :face mmm-declaration-submode-face
-         :front "bistro\.ocamlscript[ \t\n]+{|"
+         :front "[%ocamlscript[ \t\n]+{|"
          :back "|}")
         (bistro-python
          :submode python-mode
          :face mmm-declaration-submode-face
-         :front "bistro\.python[ \t\n]+{|"
+         :front "[%python[ \t\n]+{|"
          :back "|}")))
 
 (mmm-add-mode-ext-class 'tuareg-mode nil 'bistro-sh)

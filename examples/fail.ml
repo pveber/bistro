@@ -7,7 +7,7 @@ module Db = Bistro.Db
 
 type failure
 
-let fail : failure workflow = Workflow.make [%bistro.sh {|
+let fail : failure workflow = Workflow.make [%sh{|
 false
 |}]
 
