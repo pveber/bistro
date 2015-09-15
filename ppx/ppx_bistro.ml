@@ -57,10 +57,10 @@ let bistro_mapper argv =
           | PStr [{ pstr_desc = Pstr_eval ({ pexp_loc  = loc;
                                              pexp_desc = Pexp_constant (Const_string (sym, _))}, _)}] ->
             Ast_helper.default_loc := loc ;
-            [%expr let open Bistro.Script in make [%e interpreter_of_ext ext_name ] [%e script_of_ast loc (parse sym)] ]
+            [%expr let open Bistro.DSL in Bistro.Script.make [%e interpreter_of_ext ext_name ] [%e script_of_ast loc (parse sym)] ]
           | _ ->
             raise (Location.Error (
-                Location.error ~loc "[%bistro] only accepts a string"))
+                Location.error ~loc ("Extension " ^ ext_name ^ " only accepts a string")))
         end
       | x -> default_mapper.expr mapper x;
   }

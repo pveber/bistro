@@ -40,7 +40,7 @@ configure:
 
 # OASIS_STOP
 
-%.byte: examples/%.ml
+%.byte: examples/%.ml _build/ppx/ppx_bistro.native _build/lib/bistro.cma
 	ocamlbuild -use-ocamlfind -tag thread -pkgs core,lwt.unix,dbm,pvem\
                    -cflags "-I lib -ppx ../ppx_bistro.native"\
                    -lflags "-I lib bistro.cma"\

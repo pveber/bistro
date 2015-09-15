@@ -12,18 +12,26 @@ type interpreter = [
   | `sh
 ]
 
+type script
+
 type 'a workflow
+
 type some_workflow = Workflow : _ workflow -> some_workflow
 
 type 'a directory = [`directory of 'a]
 type package = [`package] directory
 
-module Script : sig
-  type t
-
+module EDSL : sig
   type expr
 
-  val make : interpreter -> expr list -> t
+  val workflow :
+    ?descr:string ->
+    ?mem:int ->
+    ?np:int ->
+    ?timeout:int ->
+    ?version:int ->
+    ?interpreter:interpreter ->
+    expr list -> 'a workflow
 
   val dest : expr
   val tmp : expr
@@ -36,16 +44,24 @@ module Script : sig
   val list : ('a -> expr) -> ?sep:string -> 'a list -> expr
   val seq : ?sep:string -> expr list -> expr
   val enum : ('a * string) list -> 'a -> expr
-  val use : t -> expr
+  val use : script -> expr
 end
 
-module Shell_script : sig
-  include module type of Script with type t = Script.t
+
+module EDSL_sh : sig
+  include module type of EDSL with type expr = EDSL.expr
+
   type cmd
 
-  val script : cmd list -> t
+  val workflow :
+    ?descr:string ->
+    ?mem:int ->
+    ?np:int ->
+    ?timeout:int ->
+    ?version:int ->
+    cmd list -> 'a workflow
 
-  val program :
+  val cmd :
     ?path:package workflow list ->
     ?pythonpath:package workflow list ->
     string ->
@@ -69,6 +85,11 @@ module Shell_script : sig
   val cd : expr -> cmd
   val rm_rf : expr -> cmd
   val mv : expr -> expr -> cmd
+end
+
+module Script : sig
+  type t = script
+  val make : interpreter -> EDSL.expr list -> t
 end
 
 

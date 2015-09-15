@@ -79,9 +79,9 @@ type some_workflow = Workflow : _ workflow -> some_workflow
 type 'a directory = [`directory of 'a]
 type package = [`package] directory
 
+
 module Script = struct
   type t = script
-  type expr = token list
 
   let make interpreter xs = {
     interpreter ;
@@ -104,6 +104,57 @@ module Script = struct
   let to_string ~string_of_workflow ~tmp ~dest script =
     List.map script.tokens ~f:(string_of_token ~string_of_workflow ~tmp ~dest)
     |> String.concat
+end
+
+
+module Workflow = struct
+  type 'a t = u
+
+  let id = function
+    | Input (id, _)
+    | Extract (id, _, _)
+    | Step { id } -> id
+
+  let input ?(may_change = false) target =
+    if not (Sys.file_exists_exn ~follow_symlinks:true target)
+    then invalid_argf "Bistro.Worflow.input: path %s does not exist" target () ;
+    let hash = if may_change then Some (Digest.file target) else None in
+    let id = digest ("input", target, hash) in
+    Input (id, path_of_string target)
+
+
+  let make
+      ?(descr = "")
+      ?(mem = 100)
+      ?(np = 1)
+      ?(timeout = 24)
+      ?version
+      script =
+    let deps = Script.deps script in
+    let id = digest ("step",
+                     version,
+                     Script.to_string
+                       ~string_of_workflow:id
+                       ~tmp:"TMP"
+                       ~dest:"DEST"
+                       script) in
+    Step { descr ; deps ; script ; np ; mem ; timeout ; version ; id }
+
+  let extract u path =
+    let u, path =
+      match u with
+      | Extract (_, v, p) -> v, p @ path
+      | Input _ | Step _ -> u, path
+    in
+    let id = digest ("extract", id u, path) in
+    Extract (id, u, path)
+end
+
+module EDSL = struct
+  type expr = token list
+
+  let workflow ?descr ?mem ?np ?timeout ?version ?(interpreter = `sh) expr =
+    Workflow.make ?descr ?mem ?timeout ?version (Script.make interpreter expr)
 
   let dest = [ DEST ]
   let tmp = [ TMP ]
@@ -129,8 +180,8 @@ module Script = struct
   let use s = s.tokens
 end
 
-module Shell_script = struct
-  include Script
+module EDSL_sh = struct
+  include EDSL
 
   type cmd = token list
 
@@ -139,7 +190,11 @@ module Shell_script = struct
       `sh
       (List.intersperse ~sep:[S "\n"] cmds)
 
-  let program ?path ?pythonpath p ?stdin ?stdout ?stderr args =
+  let workflow ?descr ?mem ?np ?timeout ?version cmds =
+    Workflow.make ?descr ?mem ?timeout ?version (script cmds)
+
+
+  let cmd ?path ?pythonpath p ?stdin ?stdout ?stderr args =
     let add_path =
       match path with
       | None | Some [] -> ident
@@ -203,17 +258,17 @@ module Shell_script = struct
 
   let flag f x b = if b then f x else []
 
-  let mkdir d = program "mkdir" [ d ]
+  let mkdir d = cmd "mkdir" [ d ]
 
-  let mkdir_p d = program "mkdir" [ string "-p" ; d ]
+  let mkdir_p d = cmd "mkdir" [ string "-p" ; d ]
 
-  let cd p = program "cd" [ p ]
+  let cd p = cmd "cd" [ p ]
 
-  let rm_rf x = program "rm" [ string "-rf" ; x ]
+  let rm_rf x = cmd "rm" [ string "-rf" ; x ]
 
-  let mv x y = program "mv" [ x ; y ]
+  let mv x y = cmd "mv" [ x ; y ]
 
-  let wget url ?dest () = program "wget" [
+  let wget url ?dest () = cmd "wget" [
       option (opt "-O" ident) dest ;
       string url
     ]
@@ -241,48 +296,6 @@ module Shell_script = struct
     @ (S " " :: cmd)
 end
 
-
-module Workflow = struct
-  type 'a t = u
-
-  let id = function
-    | Input (id, _)
-    | Extract (id, _, _)
-    | Step { id } -> id
-
-  let input ?(may_change = false) target =
-    if not (Sys.file_exists_exn ~follow_symlinks:true target)
-    then invalid_argf "Bistro.Worflow.input: path %s does not exist" target () ;
-    let hash = if may_change then Some (Digest.file target) else None in
-    let id = digest ("input", target, hash) in
-    Input (id, path_of_string target)
-
-  let make
-      ?(descr = "")
-      ?(mem = 100)
-      ?(np = 1)
-      ?(timeout = 24)
-      ?version
-      script =
-    let deps = Script.deps script in
-    let id = digest ("step",
-                     version,
-                     Script.to_string
-                       ~string_of_workflow:id
-                       ~tmp:"TMP"
-                       ~dest:"DEST"
-                       script) in
-    Step { descr ; deps ; script ; np ; mem ; timeout ; version ; id }
-
-  let extract u path =
-    let u, path =
-      match u with
-      | Extract (_, v, p) -> v, p @ path
-      | Input _ | Step _ -> u, path
-    in
-    let id = digest ("extract", id u, path) in
-    Extract (id, u, path)
-end
 
 module Db = struct
 

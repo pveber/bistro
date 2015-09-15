@@ -2,6 +2,10 @@ open OUnit
 open Core.Std
 open Bistro_std
 
+module Workflow = Bistro.Workflow
+module Engine = Bistro.Engine
+module Db = Bistro.Db
+
 let db = Db.init_exn "_bistro"
 let engine = Engine.make ~np:2 ~mem:1024 db
 

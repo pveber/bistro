@@ -1,6 +1,10 @@
 open Bistro_std
 open Lwt
 
+module Workflow = Bistro.Workflow
+module Engine = Bistro.Engine
+module Db = Bistro.Db
+
 type failure
 
 let fail : failure workflow = Workflow.make [%bistro.sh {|

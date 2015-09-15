@@ -2,6 +2,10 @@ open Core.Std
 open Lwt
 open Bistro_std
 
+module Workflow = Bistro.Workflow
+module Engine = Bistro.Engine
+module Db = Bistro.Db
+
 type txt = ([`txt],[`text]) file
 
 let a : txt workflow = Workflow.make [%bistro.sh {|
