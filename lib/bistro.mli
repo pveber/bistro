@@ -15,38 +15,8 @@ type interpreter = [
 type 'a workflow
 type some_workflow = Workflow : _ workflow -> some_workflow
 
-module T : sig
-  class type ['a,'b] file = object
-    method format : 'a
-    method encoding : [< `text | `binary] as 'b
-  end
-
-  type 'a directory = [`directory of 'a]
-  type package = [`package] directory
-
-  type 'a zip = ([`zip of 'a], [`binary]) file
-  type 'a gz = ([`gz of 'a], [`binary]) file constraint 'a = (_,_) #file
-  type 'a tgz = ([`tgz of 'a],[`binary]) file
-  type pdf = ([`pdf],[`text]) file
-  type html = ([`html], [`text]) file
-  type bash_script = ([`bash_script], [`text]) file
-
-  class type ['a] tabular = object ('a)
-    constraint 'a = < columns : 'b ; header : ([< `yes | `no] as 'c) ;
-                      sep : 'd ; comment : 'e ; .. >
-    inherit [[`tabular], [`text]] file
-    method columns : 'b
-    method header : 'c
-    method sep : 'd
-    method comment : 'e
-  end
-
-  class type ['a] tsv = object
-    inherit [ < sep : [`tab] ; .. > as 'a ] tabular
-  end
-end
-
-open T
+type 'a directory = [`directory of 'a]
+type package = [`package] directory
 
 module Script : sig
   type t
@@ -79,12 +49,6 @@ module Shell_script : sig
     ?path:package workflow list ->
     ?pythonpath:package workflow list ->
     string ->
-    ?stdin:expr -> ?stdout:expr -> ?stderr:expr ->
-    expr list -> cmd
-
-  val bash :
-    ?path:package workflow list ->
-    bash_script workflow ->
     ?stdin:expr -> ?stdout:expr -> ?stderr:expr ->
     expr list -> cmd
 
