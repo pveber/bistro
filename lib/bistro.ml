@@ -125,8 +125,6 @@ module Script = struct
   let seq ?(sep = "") xs = List.concat (List.intersperse ~sep:(string sep) xs)
 
   let enum dic x = [ S (List.Assoc.find_exn dic x) ]
-
-
 end
 
 module Shell_script = struct
@@ -259,7 +257,6 @@ module Workflow = struct
 
   let make
       ?(descr = "")
-      ?(interpreter = `bash)
       ?(mem = 100)
       ?(np = 1)
       ?(timeout = 24)
@@ -267,7 +264,6 @@ module Workflow = struct
       script =
     let deps = Script.deps script in
     let id = digest ("step",
-                     interpreter,
                      version,
                      Script.to_string
                        ~string_of_workflow:id

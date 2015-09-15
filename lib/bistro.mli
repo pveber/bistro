@@ -36,7 +36,6 @@ module Script : sig
   val list : ('a -> expr) -> ?sep:string -> 'a list -> expr
   val seq : ?sep:string -> expr list -> expr
   val enum : ('a * string) list -> 'a -> expr
-
 end
 
 module Shell_script : sig
@@ -79,7 +78,6 @@ module Workflow : sig
 
   val make :
     ?descr:string ->
-    ?interpreter:interpreter ->
     ?mem:int ->
     ?np:int ->
     ?timeout:int ->
