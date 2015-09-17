@@ -16,14 +16,14 @@ date >> {{DEST}}
 sleep 2
 |}]
 
-let c : txt workflow = Workflow.make [%sh{|
+let c : txt workflow = Workflow.make ~descr:"C" [%sh{|
 echo This is c > {{DEST}}
 cat {{dep a}} >> {{DEST}}
 date >> {{DEST}}
 sleep 1
 |}]
 
-let d : txt workflow = Workflow.make [%sh{|
+let d : txt workflow = Workflow.make ~descr:"D" [%sh{|
 cat {{dep b}} {{dep c}} > {{DEST}}
 |}]
 
@@ -45,4 +45,4 @@ let main () =
   print_endline (In_channel.read_all (Db.workflow_path db d)) ;
   Lwt.return ()
 
-let () = Lwt_unix.run (main ())
+let () = Workflow.to_dot d stdout

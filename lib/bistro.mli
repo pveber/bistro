@@ -107,6 +107,8 @@ module Workflow : sig
     Script.t -> 'a t
 
   val extract : _ directory t -> path -> 'a t
+
+  val to_dot : _ t -> out_channel -> unit
 end
 
 (**

@@ -148,6 +148,35 @@ module Workflow = struct
     in
     let id = digest ("extract", id u, path) in
     Extract (id, u, path)
+
+  let rec collect accu u =
+    let accu' = List.Assoc.add accu (id u) u in
+    match u with
+    | Input _ -> accu'
+    | Extract (_, v, _) -> collect accu' v
+    | Step { deps } ->
+      List.fold deps ~init:accu' ~f:collect
+
+  let descr = function
+    | Input (_,p) -> (string_of_path p)
+    | Extract (_, _, p) -> (string_of_path p)
+    | Step { descr } -> descr
+
+  let to_dot u oc =
+    let nodes = collect [] u in
+    fprintf oc "digraph workflow {\n" ;
+    List.iter nodes ~f:(fun (id_n, n) ->
+        fprintf oc "n%s [label = \"%s\"];\n" id_n (descr n) ;
+        match n with
+        | Step { deps } ->
+          List.iter deps ~f:(fun m ->
+              fprintf oc "n%s -> n%s;\n" id_n (id m)
+            )
+        | Extract (_,m,_) ->
+          fprintf oc "n%s -> n%s;\n" id_n (id m)
+        | Input _ -> ()
+      ) ;
+    fprintf oc "}\n"
 end
 
 module EDSL = struct
