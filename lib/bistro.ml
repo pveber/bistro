@@ -166,15 +166,17 @@ module Workflow = struct
     let nodes = collect [] u in
     fprintf oc "digraph workflow {\n" ;
     List.iter nodes ~f:(fun (id_n, n) ->
-        fprintf oc "n%s [label = \"%s\"];\n" id_n (descr n) ;
         match n with
         | Step { deps } ->
+          fprintf oc "n%s [shape=box,label = \"%s\"];\n" id_n (descr n) ;
           List.iter deps ~f:(fun m ->
               fprintf oc "n%s -> n%s;\n" id_n (id m)
             )
         | Extract (_,m,_) ->
-          fprintf oc "n%s -> n%s;\n" id_n (id m)
-        | Input _ -> ()
+          fprintf oc "n%s [shape=box,label = \"%s\",shape=plaintext];\n" id_n (descr n) ;
+          fprintf oc "n%s -> n%s [style=dotted];\n" id_n (id m)
+        | Input _ ->
+          fprintf oc "n%s [label = \"%s\"];\n" id_n (descr n)
       ) ;
     fprintf oc "}\n"
 end
