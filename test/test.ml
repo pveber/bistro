@@ -1,15 +1,14 @@
 open OUnit
 open Core.Std
-open Bistro_std
+open Bistro
 
-module Workflow = Bistro.Workflow
-module Engine = Bistro.Engine
-module Db = Bistro.Db
+module Scheduler = Bistro_engine.Scheduler
+module Db = Bistro_engine.Db
 
 let db = Db.init_exn "_bistro"
-let engine = Engine.make ~np:2 ~mem:1024 db
+let scheduler = Scheduler.make ~np:2 ~mem:1024 db
 
-let build x = Lwt_unix.run (Engine.build engine x)
+let build x = Lwt_unix.run (Scheduler.build scheduler x)
 
 (* let add x y = *)
 (*   let open Bistro.Term in *)

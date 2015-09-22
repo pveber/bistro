@@ -1,6 +1,8 @@
 open Core.Std
 open Lwt
-open Bistro_std
+open Bistro
+open Bistro_std.Types
+open Bistro_engine
 
 type txt = ([`txt],[`text]) file
 
@@ -28,10 +30,10 @@ cat {{dep b}} {{dep c}} > {{DEST}}
 |}]
 
 let db = Db.init_exn "_bistro"
-let e = Engine.make ~np:2 ~mem:1024 db
+let e = Scheduler.make ~np:2 ~mem:1024 db
 
 let main () =
-  Engine.build_exn e d >>= fun s ->
+  Scheduler.build_exn e d >>= fun s ->
   print_endline "Contents of a:" ;
   print_endline (In_channel.read_all (Db.workflow_path db a)) ;
   print_newline () ;
@@ -45,4 +47,4 @@ let main () =
   print_endline (In_channel.read_all (Db.workflow_path db d)) ;
   Lwt.return ()
 
-let () = Workflow.to_dot d stdout
+let () = Lwt_unix.run (main ())

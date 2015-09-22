@@ -12,14 +12,48 @@ type interpreter = [
   | `sh
 ]
 
-type script
-
-type 'a workflow
-
-type some_workflow = Workflow : _ workflow -> some_workflow
-
 type 'a directory = [`directory of 'a]
 type package = [`package] directory
+
+module Workflow : sig
+  type u =
+    | Input of string * path
+    | Extract of string * u * path
+    | Step of step
+
+  and step = {
+    id : string ;
+    descr : string ;
+    deps : u list ;
+    script : script ;
+    np : int ; (** Required number of processors *)
+    mem : int ; (** Required memory in MB *)
+    timeout : int ; (** Maximum allowed running time in hours *)
+    version : int option ; (** Version number of the wrapper *)
+  }
+
+  and script
+  with sexp
+
+  type 'a t = private u
+
+  val id : _ t -> string
+  val id' : u -> string
+
+  val input : ?may_change:bool -> string -> 'a t
+
+  val make :
+    ?descr:string ->
+    ?mem:int ->
+    ?np:int ->
+    ?timeout:int ->
+    ?version:int ->
+    script -> 'a t
+
+  val extract : _ directory t -> path -> 'a t
+
+  val u : _ t -> u
+end
 
 module EDSL : sig
   type expr
@@ -31,7 +65,7 @@ module EDSL : sig
     ?timeout:int ->
     ?version:int ->
     ?interpreter:interpreter ->
-    expr list -> 'a workflow
+    expr list -> 'a Workflow.t
 
   val dest : expr
   val tmp : expr
@@ -39,12 +73,12 @@ module EDSL : sig
   val int : int -> expr
   val float : float -> expr
   val path : path -> expr
-  val dep : _ workflow -> expr
+  val dep : _ Workflow.t -> expr
   val option : ('a -> expr) -> 'a option -> expr
   val list : ('a -> expr) -> ?sep:string -> 'a list -> expr
   val seq : ?sep:string -> expr list -> expr
   val enum : ('a * string) list -> 'a -> expr
-  val use : script -> expr
+  val use : Workflow.script -> expr
 end
 
 
@@ -59,11 +93,11 @@ module EDSL_sh : sig
     ?np:int ->
     ?timeout:int ->
     ?version:int ->
-    cmd list -> 'a workflow
+    cmd list -> 'a Workflow.t
 
   val cmd :
-    ?path:package workflow list ->
-    ?pythonpath:package workflow list ->
+    ?path:package Workflow.t list ->
+    ?pythonpath:package Workflow.t list ->
     string ->
     ?stdin:expr -> ?stdout:expr -> ?stderr:expr ->
     expr list -> cmd
@@ -88,63 +122,13 @@ module EDSL_sh : sig
 end
 
 module Script : sig
-  type t = script
+  type t = Workflow.script
   val make : interpreter -> EDSL.expr list -> t
+  val interpreter : t -> interpreter
+  val to_string :
+    string_of_workflow:(Workflow.u -> string) ->
+    tmp:string ->
+    dest:string ->
+    t -> string
 end
 
-
-module Workflow : sig
-  type 'a t = 'a workflow
-
-  val input : ?may_change:bool -> string -> 'a t
-
-  val make :
-    ?descr:string ->
-    ?mem:int ->
-    ?np:int ->
-    ?timeout:int ->
-    ?version:int ->
-    Script.t -> 'a t
-
-  val extract : _ directory t -> path -> 'a t
-
-  val to_dot : _ t -> out_channel -> unit
-end
-
-(**
-   A database to cache workflow result and execution traces
-
-   It is implemented as a directory in the file system.
-*)
-module Db : sig
-
-  type t
-  (** An abstract type for databases *)
-
-  val init : string -> [ `Ok of t
-                       | `Error of [ `Corrupted_dbm
-                                   | `Malformed_db of string ] ]
-  (** [init path] builds a value to represent a database located at path
-      [path], which can be absolute or relative. The database is created
-      on the file system unless a file/directory exists at the location
-      [path]. In that case, the existing file/directory is inspected to
-      determine if it looks like a bistro database.
-
-      Returns an [`Error] if [path] is occupied with something else
-      than a bistro database. *)
-
-  val init_exn : string -> t
-
-  val workflow_path : t -> _ workflow -> string
-  (** Path where a workflow's result is stored. *)
-
-end
-
-module Engine : sig
-  type t
-  val make : np:int -> mem:int -> Db.t -> t
-  val build : t -> _ workflow -> [ `Ok of string
-                                 | `Error of (some_workflow * string) list] Lwt.t
-  val build_exn : t -> _ workflow -> string Lwt.t
-  val shutdown : t -> unit Lwt.t
-end

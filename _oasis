@@ -16,11 +16,50 @@ PreUninstallCommand: $ocamlfind remove ppx_bistro
 
 Library bistro
   Path:             lib
-  Modules:          Bistro, Bistro_std
+  Modules:          Bistro
   FindlibName:      bistro
-  BuildDepends:     core, dbm, lwt.preemptive, lwt.unix,
+  BuildDepends:     core_kernel
+  XMETARequires:    core_kernel
+  XMETADescription: FIXME
+
+Library bistro_std
+  Path:             std
+  Pack:             true
+  Modules:          Bed,
+                    Bowtie,
+                    Bowtie2,
+                    Bedtools,
+                    Deseq2,
+                    Ensembl,
+                    FastQC,
+                    Fastq,
+                    Htseq,
+                    Jaspar,
+                    Macs,
+                    Macs2,
+                    Meme_suite,
+                    Misc,
+                    Samtools,
+                    Sra,
+                    Tophat,
+                    Types,
+                    Ucsc_gb,
+                    Unix_utils
+  FindlibName:      std
+  FindlibParent:    bistro
+  BuildDepends:     bistro
+  XMETARequires:    bistro
+  XMETADescription: FIXME
+
+Library bistro_engine
+  Path:             engine
+  Pack:             true
+  Modules:          Db, Scheduler
+  FindlibName:      engine
+  FindlibParent:    bistro
+  BuildDepends:     bistro, core, dbm, lwt.preemptive, lwt.unix,
                     netstring, pvem, shell, threads
-  XMETARequires:    core, dbm, lwt.preemptive, lwt.unix,
+  XMETARequires:    bistro, core, dbm, lwt.preemptive, lwt.unix,
                     netstring, pvem, shell, threads
   XMETADescription: FIXME
 
@@ -38,10 +77,21 @@ Test test_ppx_bistro
   TestTools:      ppx_bistro
 
 
+# +-------------------------------------------------------------------+
+# | Examples                                                          |
+# +-------------------------------------------------------------------+
+
+Executable diamond
+  Path:             examples
+  MainIs:           diamond.ml
+  BuildDepends:     bistro.engine, bistro.std
+  CompiledObject:   byte
+
+
 Executable test
   Path:             test
   MainIs:           test.ml
-  BuildDepends:     bistro, oUnit
+  BuildDepends:     bistro.engine, oUnit
   CompiledObject:   byte
   
 Document API

@@ -1,6 +1,11 @@
-#B _build/lib
-#B _build/ppx
+B _build/lib
+B _build/std
+B _build/engine
+B _build/ppx
 S src/lib
+S src/std
+S src/engine
+S src/ppx
 S src/test
 PKG bistro
 PKG ppx_bistro
