@@ -33,13 +33,21 @@ let script_of_ast loc ast =
 
 let expr_of_interpreter = function
   | `sh -> [%expr `sh]
+  | `bash -> [%expr `bash]
   | `ocaml -> [%expr `ocaml]
   | `ocamlscript -> [%expr `ocamlscript]
+  | `python -> [%expr `python]
+  | `R -> [%expr `R]
+  | `perl -> [%expr `perl]
 
 let interpreter_of_string = function
   | "sh" -> Some `sh
+  | "bash" -> Some `bash
   | "ocaml" -> Some `ocaml
   | "ocamlscript" -> Some `ocamlscript
+  | "R" -> Some `R
+  | "python" -> Some `python
+  | "perl" -> Some `perl
   | _ -> None
 
 let bistro_mapper argv =
