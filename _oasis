@@ -41,6 +41,7 @@ Library bistro_std
                     Misc,
                     Samtools,
                     Sra,
+                    Sra_toolkit,
                     Tophat,
                     Types,
                     Ucsc_gb,
@@ -84,6 +85,12 @@ Test test_ppx_bistro
 Executable diamond
   Path:             examples
   MainIs:           diamond.ml
+  BuildDepends:     bistro.engine, bistro.std
+  CompiledObject:   byte
+
+Executable sacCer2_pho4
+  Path:             examples
+  MainIs:           sacCer2_pho4.ml
   BuildDepends:     bistro.engine, bistro.std
   CompiledObject:   byte
 

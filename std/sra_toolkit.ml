@@ -2,10 +2,10 @@ open Core_kernel.Std
 open Bistro
 open Bistro.EDSL_sh
 
-let toolkit_package =
+let package =
   Workflow.make
     ~descr:"sra_toolkit.package"
-    [%sh{|
+    [%bash{|
 PREFIX={{DEST}}
 TMP={{TMP}}
 
@@ -28,19 +28,19 @@ cd ${PACKAGE}
 rm -rf USAGE README help
 
 mkdir -p ${PREFIX}/bin
-cp bin/* ${PREFIX}/bin
+cp -r bin/* ${PREFIX}/bin
 |}]
 
 let fastq_dump sra =
   workflow ~descr:"sratoolkit.fastq_dump" [
-    cmd "fastq-dump" ~path:[toolkit_package] [ string "-Z" ; dep sra ] ~stdout:dest
+    cmd "fastq-dump" ~path:[package] [ string "-Z" ; dep sra ] ~stdout:dest
   ]
 
 let fastq_dump_pe sra =
   let dir =
     workflow ~descr:"sratoolkit.fastq_dump" [
       mkdir_p dest ;
-      cmd "fastq-dump" ~path:[toolkit_package] [
+      cmd "fastq-dump" ~path:[package] [
         opt "-O" ident dest ;
         string "--split-files" ;
         dep sra

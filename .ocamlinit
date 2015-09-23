@@ -1,6 +1,7 @@
 #require "shell";;
 #require "core";;
 #require "lwt.unix";;
-#directory "_build/src/lib";;
+#directory "_build/lib";;
+#directory "_build/std";;
 #load "bistro.cma";;
-#load "bistro_lwt.cma";;
+#load "bistro_std.cma";;
