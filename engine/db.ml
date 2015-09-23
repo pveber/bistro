@@ -165,6 +165,32 @@ let rec workflow_path' db = function
 
 let workflow_path db w = workflow_path' db (Workflow.u w)
 
+let output_report_step db step oc =
+  let dest = build_path db step in
+  let tmp = tmp_path db step in
+  let script = Script.to_string ~string_of_workflow:(workflow_path' db) ~dest ~tmp step.script in
+  fprintf oc "################################################################################\n" ;
+  fprintf oc "###\n" ;
+  fprintf oc "##    Report on %s \n" step.id ;
+  fprintf oc "#\n" ;
+  fprintf oc "+------------------------------------------------------------------------------+\n" ;
+  fprintf oc "| Script                                                                       |\n" ;
+  fprintf oc "+------------------------------------------------------------------------------+\n" ;
+  fprintf oc "%s" script ;
+  fprintf oc "+------------------------------------------------------------------------------+\n" ;
+  fprintf oc "| STDOUT                                                                       |\n" ;
+  fprintf oc "+------------------------------------------------------------------------------+\n" ;
+  fprintf oc "%s" (In_channel.read_all (stdout_path db step)) ;
+  fprintf oc "+------------------------------------------------------------------------------+\n" ;
+  fprintf oc "| STDERR                                                                       |\n" ;
+  fprintf oc "+------------------------------------------------------------------------------+\n" ;
+  fprintf oc "%s" (In_channel.read_all (stderr_path db step))
+
+let output_report db u oc = match u with
+  | Input _ -> ()
+  | Extract _ -> ()
+  | Step step -> output_report_step db step oc
+
 (* let log db fmt = *)
 (*   let f msg = *)
 (*     let path = *)

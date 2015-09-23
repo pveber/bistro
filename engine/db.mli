@@ -22,11 +22,28 @@ val init : string -> [ `Ok of t
 
 val init_exn : string -> t
 
-val stdout_path : t -> Workflow.step -> string
-val stderr_path : t -> Workflow.step -> string
+(** {5 Access for build engines} *)
+
 val build_path : t -> Workflow.step -> string
+(** Returns the path where a step workflow is supposed to build its
+    result. It should be deleted after the execution of a workflow,
+    except if the execution failed. *)
+
 val tmp_path : t -> Workflow.step -> string
+(** Provides a temporary location that a workflow may use during its
+    execution. It should be deleted after the execution of a
+    workflow, except if the execution failed. *)
+
+val stdout_path : t -> Workflow.step -> string
+(** Returns a path where to store the stdout of the execution of a
+    workflow *)
+
+val stderr_path : t -> Workflow.step -> string
+(** Returns a path where to store the stderr of the execution of a
+    workflow *)
+
 val cache_path : t -> Workflow.step -> string
+(** Path where a step workflow's result is stored. *)
 
 val workflow_path : t -> _ Workflow.t -> string
 (** Path where a workflow's result is stored. *)
@@ -35,3 +52,5 @@ val workflow_path' : t -> Workflow.u -> string
 
 val requested : t -> Workflow.step -> unit
 val built : t -> Workflow.step -> unit
+
+val output_report : t -> Workflow.u -> out_channel -> unit
