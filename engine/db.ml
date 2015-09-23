@@ -159,7 +159,7 @@ let built db step =
 
 let rec workflow_path' db = function
   | Extract (_, dir, p) ->
-    List.fold (workflow_path' db dir :: p) ~init:"" ~f:Filename.concat
+    Filename.concat (workflow_path' db dir) (string_of_path p)
   | Input (_, p) -> string_of_path p
   | Step step -> cache_path db step
 
