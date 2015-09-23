@@ -21,6 +21,8 @@ let () =
 
              flag
                ["ocaml"; "compile"; "ppx_bistro"] & S [A "-ppx"; A ("ppx/ppx_bistro." ^ native_suffix)] ;
+             flag
+               ["ocaml"; "ocamldep"; "ppx_bistro"] & S [A "-ppx"; A ("ppx/ppx_bistro." ^ native_suffix)] ;
              dep ["ocaml"; "ocamldep"; "ppx_bistro"] ["ppx/ppx_bistro." ^ native_suffix]
 
 
