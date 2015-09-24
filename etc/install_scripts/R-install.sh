@@ -45,5 +45,5 @@ echo install-pc
 cd src/unix
 make install-pc
 cd -
-echo "install.packages(c('R2HTML'),repos='http://cran.univ-lyon1.fr')" | R --vanilla
+echo "install.packages(c('R2HTML','optparse'),repos='http://cran.univ-lyon1.fr')" | R --vanilla
 echo "source('http://bioconductor.org/biocLite.R') ; biocLite(c('DESeq2'))" | R --vanilla
