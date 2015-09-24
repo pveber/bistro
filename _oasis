@@ -94,6 +94,11 @@ Executable sacCer2_pho4
   BuildDepends:     bistro.engine, bistro.std
   CompiledObject:   byte
 
+Executable rnaseq
+  Path:             examples
+  MainIs:           rnaseq.ml
+  BuildDepends:     bistro.engine, bistro.std
+  CompiledObject:   byte
 
 Executable test
   Path:             test
