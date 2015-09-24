@@ -322,8 +322,7 @@ and build_extract e x dir p =
   )
 
 
-let build e w =
-  let u = Workflow.u w in
+let build' e u =
   (
     if e.on then
       build_workflow e u
@@ -331,17 +330,21 @@ let build e w =
       Lwt.return (`Error [u, "Engine_halted"])
   )
   >>= function
-  | `Ok () -> Lwt.return (`Ok (Db.workflow_path e.db w))
+  | `Ok () -> Lwt.return (`Ok (Db.workflow_path' e.db u))
   | `Error xs ->
     Lwt.return (`Error xs)
 
-let build_exn e w =
-  build e w >>= function
+let build_exn' e w =
+  build' e w >>= function
   | `Ok s -> Lwt.return s
   | `Error xs ->
     let msgs = List.map ~f:(fun (w, msg) -> Workflow.id' w ^ "\t" ^ msg) xs in
     let msg = sprintf "Some build(s) failed:\n\t%s\n" (String.concat ~sep:"\n\t" msgs) in
     Lwt.fail (Failure msg)
+
+let build e w = build' e (Workflow.u w)
+
+let build_exn e w = build_exn' e (Workflow.u w)
 
 let shutdown e =
   e.on <- false ;
