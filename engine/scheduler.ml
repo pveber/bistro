@@ -170,24 +170,33 @@ let redirection filename =
   Lwt_unix.openfile filename Unix.([O_APPEND ; O_CREAT ; O_WRONLY]) 0o640 >>= fun fd ->
   Lwt.return (`FD_move (Lwt_unix.unix_file_descr fd))
 
-let interpreter_program = function
-  | `bash -> "bash"
-  | `ocaml -> "ocaml"
-  | `ocamlscript -> "ocamlscript"
-  | `python -> "python"
-  | `perl -> "perl"
+let interpreter_cmd script = function
+  | `bash -> "", [| "bash" ; script |]
+  | `ocaml -> "", [| "ocaml" ; script |]
+  | `ocamlscript -> "", [| "ocamlscript" ; script |]
+  | `python -> "", [| "python" ; script |]
+  | `perl -> "", [| "perl" ; script |]
+  | `R -> "", [| "Rscript" ; script |]
+  | `sh -> "", [| "sh" ; script |]
+
+let extension_of_interpreter = function
+  | `bash -> "sh"
+  | `ocaml -> "ml"
+  | `ocamlscript -> "ml"
+  | `python -> "py"
+  | `perl -> "pl"
   | `R -> "R"
   | `sh -> "sh"
 
 let submit_script e ~np ~mem ~timeout ~stdout ~stderr ~interpreter script =
   Pool.use e.pool ~np ~mem ~f:(fun ~np ~mem ->
       match interpreter with
-      | `sh | `bash ->
-        let script_file = Filename.temp_file "guizmin" ".sh" in
+      | `sh | `bash | `R ->
+        let script_file = Filename.temp_file "guizmin" ("." ^ extension_of_interpreter interpreter) in
         Lwt_io.(with_file ~mode:output script_file (fun oc -> write oc script)) >>= fun () ->
         redirection stdout >>= fun stdout ->
         redirection stderr >>= fun stderr ->
-        let cmd = ("", [| interpreter_program interpreter ; script_file |]) in
+        let cmd = interpreter_cmd script_file interpreter in
         Lwt_process.exec ~stdout ~stderr cmd >>=
         begin
           function
