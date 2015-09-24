@@ -3,6 +3,7 @@
 
    It is implemented as a directory in the file system.
 *)
+open Core.Std
 open Bistro
 
 type t
@@ -52,5 +53,20 @@ val workflow_path' : t -> Workflow.u -> string
 
 val requested : t -> Workflow.step -> unit
 val built : t -> Workflow.step -> unit
+
+
+(** {5 Traversal} *)
+
+module Stats : sig
+  type t = private {
+    workflow : Workflow.step ;
+    history : (Time.t * event) list ;
+    build_time : float option ;
+  }
+  and event = Built | Requested
+
+end
+
+val fold : t -> init:'a -> f:('a -> Stats.t-> 'a) -> 'a
 
 val output_report : t -> Workflow.u -> out_channel -> unit

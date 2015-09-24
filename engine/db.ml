@@ -28,8 +28,8 @@ let stats_path db = Filename.concat db "stats"
 
 exception Corrupted_dbm
 
-let with_dbm db f =
-  match Dbm.(opendbm (stats_path db) [ Dbm_create ; Dbm_rdwr ] 0o700) with
+let with_dbm ?(mode = Dbm.[ Dbm_create ; Dbm_rdwr ]) db f =
+  match Dbm.opendbm (stats_path db) mode 0o700 with
   | dbh ->
     let r = match f dbh with
       | x -> `Ok x
@@ -39,8 +39,8 @@ let with_dbm db f =
     r
   | exception exn -> `Error `Corrupted_dbm
 
-let with_dbm_exn db f =
-  match with_dbm db f with
+let with_dbm_exn ?mode db f =
+  match with_dbm ?mode db f with
   | `Ok () -> ()
   | `Error `Corrupted_dbm ->
     failwithf "Corrupted db at %s (corrupted dbm records)" db ()
@@ -134,7 +134,17 @@ module Stats = struct
 
   let save db step stats =
     Dbm.replace db step.id (Sexp.to_string (sexp_of_t stats))
+
 end
+
+let fold db ~init ~f =
+  let res = ref init in
+  let f key data =
+    res := f !res (Stats.t_of_sexp (Sexp.of_string data))
+  in
+  with_dbm_exn ~mode:[Dbm.Dbm_rdonly] db (Dbm.iter f) ;
+  !res
+
 
 let update_stats db step f =
   with_dbm_exn db (fun dbh ->
@@ -145,6 +155,7 @@ let update_stats db step f =
       in
       Stats.save dbh step (f stat)
     )
+
 let append_history ~db u evt =
   update_stats db u (fun stat ->
       { stat with
