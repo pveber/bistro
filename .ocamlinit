@@ -1,7 +1,21 @@
 #require "shell";;
-#require "core";;
+#require "core.top";;
 #require "lwt.unix";;
+#require "dbm"
+#require "pvem"
+
 #directory "_build/lib";;
 #directory "_build/std";;
+#directory "_build/engine";;
 #load "bistro.cma";;
 #load "bistro_std.cma";;
+#load "bistro_engine.cma";;
+
+open Bistro
+open Bistro_std.Types
+open Bistro_engine
+
+let db = Db.init_exn "_bistro"
+let scheduler = Scheduler.make ~np:4 ~mem:(10 * 1024) db
+
+let eval x = Scheduler.build_exn scheduler x 
