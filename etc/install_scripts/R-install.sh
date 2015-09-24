@@ -45,5 +45,5 @@ echo install-pc
 cd src/unix
 make install-pc
 cd -
-#echo "install.packages(c('gridExtra', 'dplyr', 'coda', 'ggplot2', 'rjags', 'fitdistrplus', 'actuar', 'stringr', 'knitr', 'roxygen2'),repos='http://cran.univ-lyon1.fr')" | R --vanilla
+echo "install.packages(c('R2HTML'),repos='http://cran.univ-lyon1.fr')" | R --vanilla
 echo "source('https://bioconductor.org/biocLite.R') ; biocLite(c('DESeq2'))" | R --vanilla
