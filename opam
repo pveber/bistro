@@ -23,4 +23,5 @@ depends: [
   "oasis"
   "ocamlnet"
   "pvem"
+  "ppx_tools"
 ]
