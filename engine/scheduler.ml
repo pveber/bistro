@@ -162,7 +162,7 @@ let make ~np ~mem db = {
 
 let remove_if_exists fn =
   if Sys.file_exists fn = `Yes then
-    Lwt_process.exec ("", [| "rm" ; "-r" ; fn |]) >|= ignore
+    Lwt_process.exec ("", [| "rm" ; "-rf" ; fn |]) >|= ignore
   else
     Lwt.return ()
 
