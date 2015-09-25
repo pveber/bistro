@@ -37,32 +37,34 @@ let package = Workflow.make
     [%sh{|\
 PREFIX={{ dest }}
 URL=git://genome-source.cse.ucsc.edu/kent.git
+TAG=v322_base
 
 set -e
 
 mkdir -p $PREFIX/src
 cd $PREFIX/src
-git clone ${URL}
-git checkout v322_base
+git clone ${URL} kent
+cd kent
+git checkout $TAG
 BINDIR=${PREFIX}/bin
-MACHTYPE=`echo ${MACHTYPE} | cut -d '-' -f 1`
+MACHTYPE=`uname -m`
 MYSQLLIBS=`mysql_config --libs`
 MYSQLINC=`mysql_config --include | sed -e 's/-I//g'`
-sed -i -e 's/-Werror//g' kent/src/inc/common.mk
-sed -i -e 's/\\$A: \\$O \\${MYLIBS}/\\$A: \\$O/g' kent/src/hg/pslCDnaFilter/makefile
-make -C kent/src userApps \
+sed -i -e 's/-Werror//g' src/inc/common.mk
+sed -i -e 's/\\$A: \\$O \\${MYLIBS}/\\$A: \\$O/g' src/hg/pslCDnaFilter/makefile
+make -C src userApps \
     BINDIR="${BINDIR}" \
     SCRIPTS="${BINDIR}" \
     MACHTYPE="${MACHTYPE}" \
     MYSQLLIBS="${MYSQLLIBS} -lz" \
     MYSQLINC="${MYSQLINC}"
-make -C kent/src/hg/genePredToGtf \
+make -C src/hg/genePredToGtf \
     BINDIR="${BINDIR}" \
     SCRIPTS="${BINDIR}" \
     MACHTYPE="${MACHTYPE}" \
     MYSQLLIBS="${MYSQLLIBS} -lz" \
     MYSQLINC="${MYSQLINC}"
-make -C kent/src/hg/gpToGtf \
+make -C src/hg/gpToGtf \
     BINDIR="${BINDIR}" \
     SCRIPTS="${BINDIR}" \
     MACHTYPE="${MACHTYPE}" \
