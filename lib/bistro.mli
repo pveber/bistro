@@ -74,11 +74,14 @@ module EDSL : sig
   val float : float -> expr
   val path : path -> expr
   val dep : _ Workflow.t -> expr
+  val quote : ?using:char -> expr -> expr
   val option : ('a -> expr) -> 'a option -> expr
   val list : ('a -> expr) -> ?sep:string -> 'a list -> expr
   val seq : ?sep:string -> expr list -> expr
   val enum : ('a * string) list -> 'a -> expr
   val use : Workflow.script -> expr
+
+  val ( % ) : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c
 end
 
 

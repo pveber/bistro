@@ -197,6 +197,10 @@ module EDSL = struct
   let path p = [ S (string_of_path p) ]
   let dep w = [ D w ]
 
+  let quote ?(using = '"') e =
+    let quote_symbol = Char.to_string using in
+    S quote_symbol :: e @ [ S quote_symbol ]
+
   let option f = function
     | None -> []
     | Some x -> f x
@@ -211,6 +215,8 @@ module EDSL = struct
   let enum dic x = [ S (List.Assoc.find_exn dic x) ]
 
   let use s = s.tokens
+
+  let ( % ) f g x = g (f x)
 end
 
 module EDSL_sh = struct
