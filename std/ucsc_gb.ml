@@ -42,12 +42,12 @@ set -e
 
 mkdir -p $PREFIX/src
 cd $PREFIX/src
-git clone ${URL} || die 'Failed to git kent repository'
-git checkout v306_branch
+git clone ${URL}
+git checkout v322_base
 BINDIR=${PREFIX}/bin
 MACHTYPE=`echo ${MACHTYPE} | cut -d '-' -f 1`
-MYSQLLIBS=`mysql_config --libs` || die 'improper mysql install'
-MYSQLINC=`mysql_config --include | sed -e 's/-I//g'` || die 'improper mysql install'
+MYSQLLIBS=`mysql_config --libs`
+MYSQLINC=`mysql_config --include | sed -e 's/-I//g'`
 sed -i -e 's/-Werror//g' kent/src/inc/common.mk
 sed -i -e 's/\\$A: \\$O \\${MYLIBS}/\\$A: \\$O/g' kent/src/hg/pslCDnaFilter/makefile
 make -C kent/src userApps \
