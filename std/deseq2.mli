@@ -1,6 +1,20 @@
 open Types
 
-type output = [`deseq2_output] directory
+class type table = object
+  inherit [ < header : [`yes] ; .. > ] tsv
+end
 
-val wrapper : string list -> (string list * Htseq.count_tsv workflow) list -> output workflow
-val index_of_wrapper_output : output workflow -> html workflow
+type output =
+  <
+    comparison_summary : table workflow ;
+    comparisons : ((string * string * string) * table workflow) list ;
+    effect_table : table workflow ;
+    normalized_counts : table workflow ;
+    sample_clustering : svg workflow ;
+    sample_pca : svg workflow ;
+  >
+
+val main_effects :
+  string list ->
+  (string list * Htseq.count_tsv workflow) list ->
+  output

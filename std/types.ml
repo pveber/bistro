@@ -15,6 +15,7 @@ type html = ([`html], [`text]) file
 type bash_script = ([`bash_script], [`text]) file
 
 type png = ([`png],[`binary]) file
+type svg = ([`png],[`text]) file
 
 class type ['a] tabular = object ('a)
   constraint 'a = < header : 'b ; sep : 'c ; comment : 'd ; .. >
