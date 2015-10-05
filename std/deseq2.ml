@@ -72,7 +72,7 @@ loadIds <- function(samples_files) {
 differentialAnalysis <- function(counts, description) {
     DESeq(DESeqDataSetFromMatrix(countData=counts,
                                  colData=description,
-                                 design=as.formula(paste("~", paste(colnames(description),sep=" + ")))),
+                                 design=as.formula(paste("~", paste(colnames(description),collapse=" + ")))),
           fitType='local')
 }
 
