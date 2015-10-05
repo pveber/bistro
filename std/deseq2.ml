@@ -103,7 +103,7 @@ outputForAllComparisons <- function(ids, dds) {
             for(j in if(i+1 > length(l)) c() else (i + 1):length(l)) {
                 label <- paste0(f,"_",l[i],"_",l[j])
 
-                res <- results(dds,contrast=c(f,l[i],l[j]))
+                res <- results(dds,contrast=c(f,as.character(l[i]),as.character(l[j])))
 
                 fn <- paste0(outdir,"/results_",label,".tsv")
                 write.table(cbind(data.frame(id = ids), res),file=fn,row.names=F,sep='\t',quote=F)
