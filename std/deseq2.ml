@@ -51,7 +51,7 @@ description <- as.data.frame(
                  matrix(
                    c({{ list (fst % list (string % quote ~using:'"') ~sep:",") ~sep:"," samples }}),
                    ncol = {{ int (List.length factors) }},
-                   byrow = F))
+                   byrow = T))
 colnames(description) <- factor_names
 rownames(description) <- NULL
 
