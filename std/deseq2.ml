@@ -98,7 +98,7 @@ outputForAllComparisons <- function(ids, dds) {
                         filt = integer(0),
                         outlier = integer(0), stringsAsFactors=F)
     for(f in factor_names) {
-        l <- levels(description[,f])
+        l <- unique(description[,f])
         for(i in 1:length(l))
             for(j in if(i+1 > length(l)) c() else (i + 1):length(l)) {
                 label <- paste0(f,"_",l[i],"_",l[j])
