@@ -22,23 +22,36 @@ cp -r * ${PREFIX}/local/fastqc
 chmod 755 ${PREFIX}/local/fastqc/fastqc
 
 mkdir -p $PREFIX/bin
-ln -s ${PREFIX}/local/fastqc/fastqc ${PREFIX}/bin/fastqc
+cd $PREFIX/bin
+ln -s ../local/fastqc/fastqc .
 
 rm -rf $TMP
 |}]
 
 type report = [`fastQC_report] directory
 
-let run fq = workflow [
-    mkdir_p dest ;
-    cmd "fastqc" ~path:[package] [
-      seq [string "--outdir=" ; dest] ;
-      dep fq ;
-    ] ;
-    rm_rf (dest // "*.zip") ;
-    mv (dest // "*_fastqc/*") (dest) ;
-    rm_rf (dest // "*_fastqc") ;
-  ]
+let run fq = Workflow.make ~descr:"fastQC" [%bash{|
+DEST={{ dest }}
+mkdir $DEST
+
+set -e
+export PATH={{ dep package }}/bin:$PATH
+fastqc --outdir=$DEST {{ dep fq }}
+rm -rf $DEST/*.zip
+mv $DEST/*_fastqc/* $DEST
+rm -rf $DEST/*_fastqc
+|}]
+
+(* [ *)
+(*     mkdir_p dest ; *)
+(*     cmd "fastqc" ~path:[package] [ *)
+(*       seq [string "--outdir=" ; dest] ; *)
+(*       dep fq ; *)
+(*     ] ; *)
+(*     rm_rf (dest // "*.zip") ; *)
+(*     mv (dest // "*_fastqc/*") (dest) ; *)
+(*     rm_rf (dest // "*_fastqc") ; *)
+(*   ] *)
 
 
 let html_report =
