@@ -33,7 +33,7 @@ end
 module T = struct
   type u =
     | Input of string * path
-    | Extract of string * u * path
+    | Select of string * u * path
     | Step of step
 
   and step = {
@@ -104,10 +104,11 @@ end
 module Workflow = struct
   include T
   type 'a t = u
+  type ('a, 'b) selector = Selector of path
 
   let id = function
     | Input (id, _)
-    | Extract (id, _, _)
+    | Select (id, _, _)
     | Step { id } -> id
 
   let id' = id
@@ -135,26 +136,26 @@ module Workflow = struct
                        script) in
     Step { descr ; deps ; script ; np ; mem ; timeout ; version ; id }
 
-  let extract u path =
+  let select u (Selector path) =
     let u, path =
       match u with
-      | Extract (_, v, p) -> v, p @ path
+      | Select (_, v, p) -> v, p @ path
       | Input _ | Step _ -> u, path
     in
-    let id = digest ("extract", id u, path) in
-    Extract (id, u, path)
+    let id = digest ("select", id u, path) in
+    Select (id, u, path)
 
   let rec collect accu u =
     let accu' = List.Assoc.add accu (id u) u in
     match u with
     | Input _ -> accu'
-    | Extract (_, v, _) -> collect accu' v
+    | Select (_, v, _) -> collect accu' v
     | Step { deps } ->
       List.fold deps ~init:accu' ~f:collect
 
   let descr = function
     | Input (_,p) -> (string_of_path p)
-    | Extract (_, _, p) -> (string_of_path p)
+    | Select (_, _, p) -> (string_of_path p)
     | Step { descr } -> descr
 
 
@@ -170,7 +171,7 @@ module Workflow = struct
           List.iter deps ~f:(fun m ->
               fprintf oc "n%s -> n%s;\n" id_n (id m)
             )
-        | Extract (_,m,_) ->
+        | Select (_,m,_) ->
           fprintf oc "n%s [shape=box,label = \"%s\",shape=plaintext];\n" id_n (descr n) ;
           fprintf oc "n%s -> n%s [style=dotted];\n" id_n (id m)
         | Input _ ->
@@ -188,6 +189,9 @@ module EDSL = struct
 
   let workflow ?descr ?mem ?np ?timeout ?version ?(interpreter = `sh) expr =
     Workflow.make ?descr ?mem ?timeout ?version (Script.make interpreter expr)
+
+  let selector x = Workflow.Selector x
+  let ( / ) = Workflow.select
 
   let dest = [ DEST ]
   let tmp = [ TMP ]

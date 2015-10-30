@@ -41,12 +41,12 @@ let run fq = workflow [
   ]
 
 
-let html_report dir =
-  Workflow.extract dir ["fastqc_report.html"]
+let html_report =
+  selector ["fastqc_report.html"]
 
-let per_base_quality dir =
-  Workflow.extract dir ["Images" ; "per_base_quality.png"]
+let per_base_quality =
+  selector ["Images" ; "per_base_quality.png"]
 
-let per_base_sequence_content dir =
-  Workflow.extract dir ["Images" ; "per_base_sequence_content.png"]
+let per_base_sequence_content =
+  selector ["Images" ; "per_base_sequence_content.png"]
 

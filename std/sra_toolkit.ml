@@ -49,5 +49,5 @@ let fastq_dump_pe sra =
       mv (dest // "*_2.fastq") (dest // "reads_2.fastq") ;
     ]
   in
-  Workflow.extract dir ["reads_1.fastq"],
-  Workflow.extract dir ["reads_2.fastq"]
+  dir / selector ["reads_1.fastq"],
+  dir / selector ["reads_2.fastq"]

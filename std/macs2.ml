@@ -75,7 +75,7 @@ class type peaks_xls = object
   method f9 : float
 end
 
-let peaks_xls o = Workflow.extract o [ name ^ "_peaks.xls" ]
+let peaks_xls = selector [ name ^ "_peaks.xls" ]
 
 class type narrow_peaks = object
   inherit bed5
@@ -86,5 +86,5 @@ class type narrow_peaks = object
   method f10 : int
 end
 
-let narrow_peaks o =
-  Workflow.extract o [ name ^ "_peaks.narrowPeak" ]
+let narrow_peaks =
+  selector [ name ^ "_peaks.narrowPeak" ]

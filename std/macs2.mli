@@ -31,7 +31,7 @@ class type peaks_xls = object
 end
 
 val peaks_xls :
-  [`macs2_callpeak_output] directory workflow -> peaks_xls workflow
+  ([`macs2_callpeak_output] directory, peaks_xls) selector
 
 class type narrow_peaks = object
   inherit bed5
@@ -44,5 +44,5 @@ end
 
 
 val narrow_peaks :
-  [`macs2_callpeak_output] directory workflow -> narrow_peaks workflow
+  ([`macs2_callpeak_output] directory, narrow_peaks) selector
 

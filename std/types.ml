@@ -1,4 +1,5 @@
 type 'a workflow = 'a Bistro.Workflow.t
+type ('a, 'b) selector = ('a, 'b) Bistro.Workflow.selector
 
 class type ['a,'b] file = object
   method format : 'a

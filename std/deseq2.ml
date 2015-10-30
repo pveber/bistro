@@ -196,19 +196,20 @@ let comparisons factor_names conditions =
     )
   |> List.concat
 
+
 let main_effects factors samples =
   let o = wrapper factors samples in
-  let extract = Bistro.Workflow.extract in
+  let sel p = o / selector p in
   object
-    method sample_clustering = extract o [ "sample_clustering.svg" ]
-    method sample_pca = extract o [ "sample_pca.svg" ]
-    method normalized_counts = extract o [ "normalized_counts.tsv" ]
-    method comparison_summary = extract o [ "summary.tsv" ]
-    method effect_table = extract o [ "recap.tsv" ]
+    method sample_clustering = sel [ "sample_clustering.svg" ]
+    method sample_pca = sel [ "sample_pca.svg" ]
+    method normalized_counts = sel [ "normalized_counts.tsv" ]
+    method comparison_summary = sel [ "summary.tsv" ]
+    method effect_table = sel [ "recap.tsv" ]
     method comparisons =
       let conditions = List.map samples ~f:fst in
       List.map (comparisons factors conditions) ~f:(fun ((name, l1, l2) as comp) ->
-          comp, extract o [ sprintf "results_%s_%s_%s.tsv" name l1 l2 ]
+          comp, sel [ sprintf "results_%s_%s_%s.tsv" name l1 l2 ]
         )
   end
 

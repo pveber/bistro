@@ -76,5 +76,5 @@ let indexed_bam_of_bam bam =
     samtools "index" [ dest // "reads.bam" ] ;
   ]
 
-let bam_of_indexed_bam ibam =
-  Workflow.extract ibam ["reads.bam"]
+let indexed_bam_to_bam =
+  selector ["reads.bam"]

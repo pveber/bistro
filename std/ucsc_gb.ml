@@ -109,7 +109,7 @@ let genome_2bit_sequence_dir org =
   ]
 
 let genome_2bit_sequence org =
-  Workflow.extract (genome_2bit_sequence_dir org) [ (string_of_genome org) ^ ".2bit" ]
+  (genome_2bit_sequence_dir org) / selector [ (string_of_genome org) ^ ".2bit" ]
 
 (* (\* let wg_encode_crg_mappability n org = *\) *)
 (* (\*   let url = sp "ftp://hgdownload.cse.ucsc.edu/gbdb/%s/bbi/wgEncodeCrgMapabilityAlign%dmer.bigWig" (string_of_genome org) n in *\) *)

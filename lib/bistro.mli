@@ -18,7 +18,7 @@ type package = [`package] directory
 module Workflow : sig
   type u =
     | Input of string * path
-    | Extract of string * u * path
+    | Select of string * u * path
     | Step of step
 
   and step = {
@@ -36,6 +36,7 @@ module Workflow : sig
   with sexp
 
   type 'a t = private u
+  type ('a, 'b) selector = Selector of path
 
   val id : _ t -> string
   val id' : u -> string
@@ -50,7 +51,7 @@ module Workflow : sig
     ?version:int ->
     script -> 'a t
 
-  val extract : _ directory t -> path -> 'a t
+  val select : (_ directory as 'a) t -> ('a, 'b) selector -> 'b t
 
   val u : _ t -> u
 end
@@ -66,6 +67,9 @@ module EDSL : sig
     ?version:int ->
     ?interpreter:interpreter ->
     expr list -> 'a Workflow.t
+
+  val selector : path -> ('a, 'b) Workflow.selector
+  val ( / ) : 'a Workflow.t -> ('a, 'b) Workflow.selector -> 'b Workflow.t
 
   val dest : expr
   val tmp : expr

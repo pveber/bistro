@@ -169,7 +169,7 @@ let built db step =
   append_history ~db step Stats.Built
 
 let rec workflow_path' db = function
-  | Extract (_, dir, p) ->
+  | Select (_, dir, p) ->
     Filename.concat (workflow_path' db dir) (string_of_path p)
   | Input (_, p) -> string_of_path p
   | Step step -> cache_path db step
@@ -199,7 +199,7 @@ let output_report_step db step oc =
 
 let output_report db u oc = match u with
   | Input _ -> ()
-  | Extract _ -> ()
+  | Select _ -> ()
   | Step step -> output_report_step db step oc
 
 (* let log db fmt = *)

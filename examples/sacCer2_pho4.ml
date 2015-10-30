@@ -1,6 +1,7 @@
 (** {:{http://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE29506}GEO Series GSE29506} *)
 
 open Core.Std
+open Bistro.EDSL
 open Bistro_std
 open Bistro_std.Types
 
@@ -14,7 +15,7 @@ let chIP_pho4_noPi_fq = List.map chIP_pho4_noPi ~f:Sra_toolkit.fastq_dump
 (* MAPPING *)
 let bowtie_index = Bowtie.bowtie_build genome
 let chIP_pho4_noPi_sam = Bowtie.bowtie ~v:2 bowtie_index (`single_end chIP_pho4_noPi_fq)
-let chIP_pho4_noPi_bam = Samtools.bam_of_indexed_bam (Samtools.indexed_bam_of_sam chIP_pho4_noPi_sam)
+let chIP_pho4_noPi_bam = Samtools.(indexed_bam_of_sam chIP_pho4_noPi_sam / indexed_bam_to_bam)
 
 let chIP_pho4_noPi_macs2 = Macs2.callpeak chIP_pho4_noPi_bam
 

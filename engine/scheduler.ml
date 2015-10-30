@@ -223,7 +223,7 @@ let join_results xs =
 
 let rec build_workflow e = function
   | Input _ as i -> build_input e i
-  | Extract (_,dir,p) as x -> build_extract e x dir p
+  | Select (_,dir,p) as x -> build_select e x dir p
   | Step step as u ->
     Db.requested e.db step ;
     let dest = Db.workflow_path' e.db u in
@@ -292,7 +292,7 @@ and build_input e i =
         `Ok ()
     )
 
-and build_extract e x dir p =
+and build_select e x dir p =
   let p = string_of_path p in
   let dir_path = Db.workflow_path' e.db dir in
   let check_in_dir () =
@@ -311,7 +311,7 @@ and build_extract e x dir p =
     check_in_dir () >>=? fun () ->
     let () = match dir with
       | Input _ -> ()
-      | Extract _ -> assert false
+      | Select _ -> assert false
       | Step s -> Db.requested e.db s
     in
     return (`Ok ())
