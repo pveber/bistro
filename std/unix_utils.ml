@@ -20,6 +20,11 @@ let gunzip gz =
     cmd "gunzip" [ opt "-c" dep gz ] ~stdout:dest
   ]
 
+let bunzip2 bz2 =
+  workflow ~descr:"utils.bunzip2" [
+    cmd "bunzip2" [ opt "-c" dep bz2 ] ~stdout:dest
+  ]
+
 let tar_xfz tgz =
   workflow ~descr:"utils.tar_xfz" [
     mkdir_p dest ;
