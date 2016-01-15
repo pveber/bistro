@@ -25,3 +25,20 @@ let () =
       [ "output" ; "chIP_pho4_noPi_macs2.peaks" ] %> chIP_pho4_noPi_macs2
     ]
   )
+
+(*
+    Scheduler.pbs_backend ~queue
+
+let spec =
+  let open Command.Spec in
+  empty
+  +> flag "--pbs" (optional string) ~doc:"Name of a PBS queue"
+
+let command =
+  Command.basic
+    ~summary:"Runs echo on a PBS cluster"
+    spec
+    main
+
+let () = Command.run ~version:"0.0" command
+*)
