@@ -8,7 +8,7 @@ open Bistro_engine
 open Lwt
 
 let db = Db.init_exn "_bistro"
-let scheduler = Scheduler.make ~np:4 ~mem:(10 * 1024) db
+let scheduler = Scheduler.(make (local_backend ~np:4 ~mem:(10 * 1024)) db)
 
 
 let main goal =

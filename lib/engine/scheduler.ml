@@ -7,6 +7,12 @@ let string_of_path = function
   | "" :: _ -> failwith "string_of_path: wrong path"
   | p -> List.reduce_exn p ~f:Filename.concat
 
+let ( >>= ) = Lwt.( >>= )
+let ( >>| ) = Lwt.( >|= )
+let ( >>=? ) x f = x >>= function
+  | `Ok x -> f x
+  | `Error _ as e -> Lwt.return e
+
 module Pool : sig
   type t
 
@@ -14,7 +20,6 @@ module Pool : sig
   val use : t -> np:int -> mem:int -> f:(np:int -> mem:int -> 'a Lwt.t) -> 'a Lwt.t
 end =
 struct
-  let ( >>= ) = Lwt.( >>= )
 
   type t = {
     np : int ;
@@ -83,7 +88,77 @@ struct
     )
 end
 
-type build_result = [`Ok of unit | `Error of (Workflow.u * string) list]
+type ('a, 'b) result = [
+  | `Ok of 'a
+  | `Error of 'b
+]
+
+type error = (Workflow.u * string) list
+
+type backend_error = [
+  | `Script_failure
+  | `Unsupported_interpreter
+]
+
+
+type backend =
+    Backend of (
+      np:int ->
+      mem:int ->
+      timeout:int ->
+      stdout:string ->
+      stderr:string ->
+      interpreter:interpreter ->
+      script:string ->
+      (unit, backend_error) result Lwt.t
+    )
+
+let redirection filename =
+  Lwt_unix.openfile filename Unix.([O_APPEND ; O_CREAT ; O_WRONLY]) 0o640 >>= fun fd ->
+  Lwt.return (`FD_move (Lwt_unix.unix_file_descr fd))
+
+let interpreter_cmd script = function
+  | `bash -> "", [| "bash" ; script |]
+  | `ocaml -> "", [| "ocaml" ; script |]
+  | `ocamlscript -> "", [| "ocamlscript" ; script |]
+  | `python -> "", [| "python" ; script |]
+  | `perl -> "", [| "perl" ; script |]
+  | `R -> "", [| "Rscript" ; script |]
+  | `sh -> "", [| "sh" ; script |]
+
+let extension_of_interpreter = function
+  | `bash -> "sh"
+  | `ocaml -> "ml"
+  | `ocamlscript -> "ml"
+  | `python -> "py"
+  | `perl -> "pl"
+  | `R -> "R"
+  | `sh -> "sh"
+
+let local_backend ~np ~mem =
+  let pool = Pool.create ~np ~mem in
+  Backend (
+    fun ~np ~mem ~timeout ~stdout ~stderr ~interpreter ~script ->
+      Pool.use pool ~np ~mem ~f:(fun ~np ~mem ->
+          match interpreter with
+          | `sh | `bash | `R ->
+            let script_file = Filename.temp_file "guizmin" ("." ^ extension_of_interpreter interpreter) in
+            Lwt_io.(with_file ~mode:output script_file (fun oc -> write oc script)) >>= fun () ->
+            redirection stdout >>= fun stdout ->
+            redirection stderr >>= fun stderr ->
+            let cmd = interpreter_cmd script_file interpreter in
+            Lwt_process.exec ~stdout ~stderr cmd >>=
+            begin
+              function
+              | Caml.Unix.WEXITED 0 ->
+                Lwt_unix.unlink script_file >>= fun () ->
+                Lwt.return (`Ok ())
+              | _ ->
+                Lwt.return (`Error `Script_failure)
+            end
+          | _ -> Lwt.return (`Error `Unsupported_interpreter)
+        )
+  )
 
 (* Currently Building Steps
 
@@ -99,7 +174,7 @@ module CBST :
 sig
   type t
   val create : unit -> t
-  val find_or_add : t -> step -> (unit -> build_result Lwt.t) -> build_result Lwt.t
+  val find_or_add : t -> step -> (unit -> (unit, error) result Lwt.t) -> (unit, error) result Lwt.t
   val join : t -> unit Lwt.t
 end
 =
@@ -113,7 +188,7 @@ struct
   module T = Caml.Hashtbl.Make(S)
 
   type contents =
-    | Thread of build_result Lwt.t
+    | Thread of (unit, error) result Lwt.t
 
   type t = contents T.t
 
@@ -141,82 +216,35 @@ struct
     |> Lwt.join
 end
 
-open Lwt
-let ( >>=? ) x f = x >>= function
-  | `Ok x -> f x
-  | `Error _ as e -> return e
 
 type t = {
   db : Db.t ;
-  pool : Pool.t ;
+  backend : backend ;
   cbs : CBST.t ;
   mutable on : bool ;
 }
 
-let make ~np ~mem db = {
+let make backend db = {
   db ;
-  pool = Pool.create ~np ~mem ;
+  backend = backend ;
   cbs = CBST.create () ;
   on = true ;
 }
 
 let remove_if_exists fn =
   if Sys.file_exists fn = `Yes then
-    Lwt_process.exec ("", [| "rm" ; "-rf" ; fn |]) >|= ignore
+    Lwt_process.exec ("", [| "rm" ; "-rf" ; fn |]) >>| ignore
   else
     Lwt.return ()
-
-let redirection filename =
-  Lwt_unix.openfile filename Unix.([O_APPEND ; O_CREAT ; O_WRONLY]) 0o640 >>= fun fd ->
-  Lwt.return (`FD_move (Lwt_unix.unix_file_descr fd))
-
-let interpreter_cmd script = function
-  | `bash -> "", [| "bash" ; script |]
-  | `ocaml -> "", [| "ocaml" ; script |]
-  | `ocamlscript -> "", [| "ocamlscript" ; script |]
-  | `python -> "", [| "python" ; script |]
-  | `perl -> "", [| "perl" ; script |]
-  | `R -> "", [| "Rscript" ; script |]
-  | `sh -> "", [| "sh" ; script |]
-
-let extension_of_interpreter = function
-  | `bash -> "sh"
-  | `ocaml -> "ml"
-  | `ocamlscript -> "ml"
-  | `python -> "py"
-  | `perl -> "pl"
-  | `R -> "R"
-  | `sh -> "sh"
-
-let submit_script e ~np ~mem ~timeout ~stdout ~stderr ~interpreter script =
-  Pool.use e.pool ~np ~mem ~f:(fun ~np ~mem ->
-      match interpreter with
-      | `sh | `bash | `R ->
-        let script_file = Filename.temp_file "guizmin" ("." ^ extension_of_interpreter interpreter) in
-        Lwt_io.(with_file ~mode:output script_file (fun oc -> write oc script)) >>= fun () ->
-        redirection stdout >>= fun stdout ->
-        redirection stderr >>= fun stderr ->
-        let cmd = interpreter_cmd script_file interpreter in
-        Lwt_process.exec ~stdout ~stderr cmd >>=
-        begin
-          function
-          | Caml.Unix.WEXITED 0 ->
-            Lwt_unix.unlink script_file >>= fun () ->
-            Lwt.return `Ok
-          | _ ->
-            Lwt.return (`Error `Script_failure)
-        end
-      | _ -> Lwt.return (`Error `Unsupported_interpreter)
-    )
 
 let join_results xs =
   let f accu x =
     x >>= function
-    | `Ok () -> return accu
+    | `Ok () -> Lwt.return accu
     | `Error errors as e ->
       match accu with
-      | `Ok _ -> return e
-      | `Error errors' -> return (`Error (errors @ errors'))
+      | `Ok _ -> Lwt.return e
+      | `Error errors' -> Lwt.return (`Error (errors @ errors'))
   in
   Lwt_list.fold_left_s f (`Ok ()) xs
 
@@ -236,7 +264,7 @@ let rec build_workflow e = function
         )
 
 and build_step
-    e
+    ({ backend = Backend backend } as e)
     ({ np ; mem ; timeout ; script } as step)
     dep_threads =
 
@@ -254,28 +282,29 @@ and build_step
     remove_if_exists dest >>= fun () ->
     remove_if_exists tmp >>= fun () ->
     Lwt_unix.mkdir tmp 0o750 >>= fun () ->
-    submit_script
-      e ~np ~mem ~timeout ~stdout ~stderr
-      ~interpreter:(Script.interpreter script) script_text >>= fun response ->
+    backend
+      ~np ~mem ~timeout ~stdout ~stderr
+      ~interpreter:(Script.interpreter script)
+      ~script:script_text >>= fun response ->
     match response, Sys.file_exists_exn dest with
-    | `Ok, true ->
+    | `Ok (), true ->
       remove_if_exists tmp >>= fun () ->
       Db.built e.db step ;
       Lwt_unix.rename dest (Db.cache_path e.db step) >>= fun () ->
       Lwt.return (`Ok ())
-    | `Ok, false ->
+    | `Ok (), false ->
       let msg =
         "Workflow failed to produce its output at the prescribed location."
       in
       Lwt.return (`Error [ Step step, msg ])
     | `Error `Script_failure, _ ->
       let msg = "Script failed" in
-      return (`Error [ Step step, msg ])
+      Lwt.return (`Error [ Step step, msg ])
     | `Error `Unsupported_interpreter, _ ->
       let msg =
         "Unsupported interpreter"
       in
-      return (`Error [ Step step, msg])
+      Lwt.return (`Error [ Step step, msg])
   )
 
 and build_input e i =
@@ -303,9 +332,9 @@ and build_select e x dir p =
           p
           dir_path
       in
-      return (`Error [ x, msg ])
+      Lwt.return (`Error [ x, msg ])
     )
-    else return (`Ok ())
+    else Lwt.return (`Ok ())
   in
   if Sys.file_exists dir_path = `Yes then (
     check_in_dir () >>=? fun () ->
@@ -314,7 +343,7 @@ and build_select e x dir p =
       | Select _ -> assert false
       | Step s -> Db.requested e.db s
     in
-    return (`Ok ())
+    Lwt.return (`Ok ())
   )
   else (
     let dir_thread = build_workflow e dir in

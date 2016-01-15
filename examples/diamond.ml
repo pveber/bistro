@@ -31,7 +31,7 @@ cat {{dep b}} {{dep c}} > {{DEST}}
 |}]
 
 let db = Db.init_exn "_bistro"
-let e = Scheduler.make ~np:2 ~mem:1024 db
+let e = Scheduler.(make (local_backend ~np:2 ~mem:1024) db)
 
 let main () =
   Scheduler.build_exn e d >>= fun s ->
