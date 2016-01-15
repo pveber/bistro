@@ -23,6 +23,7 @@ depends: [
   "lwt"
   "oasis"
   "ocamlnet"
-  "pvem"
+  "pbs"
   "ppx_tools"
+  "pvem"
 ]

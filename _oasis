@@ -73,6 +73,15 @@ Library bistro_utils
   XMETARequires:    bistro.engine
   XMETADescription: Utility functions for bistro
 
+Library bistro_pbs
+  Path:             lib/pbs
+  Modules:          Bistro_pbs
+  FindlibName:      pbs
+  FindlibParent:    bistro
+  BuildDepends:     lwt.unix, pbs
+  XMETARequires:    lwt.unix, pbs
+  XMETADescription: FIXME
+
 Executable "ppx_bistro"
   Path:             ppx
   MainIs:           ppx_bistro.ml
