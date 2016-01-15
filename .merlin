@@ -2,13 +2,15 @@ B _build/lib
 B _build/lib/bioinfo
 B _build/lib/engine
 B _build/lib/utils
+B _build/lib/pbs
 B _build/ppx
 S lib
 S lib/bioinfo
 S lib/engine
 S lib/utils
-S src/ppx
-S src/test
+S lib/pbs
+S ppx
+S test
 PKG bistro
 PKG ppx_bistro
 PKG compiler-libs.common

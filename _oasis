@@ -58,9 +58,10 @@ Library bistro_engine
   Modules:          Db, Scheduler
   FindlibName:      engine
   FindlibParent:    bistro
-  BuildDepends:     bistro, core, dbm, lwt.preemptive, lwt.unix,
+  BuildDepends:     bistro, bistro.pbs, core, dbm,
+                    lwt.preemptive, lwt.unix,
                     netstring, pvem, shell, threads
-  XMETARequires:    bistro, core, dbm, lwt.preemptive, lwt.unix,
+  XMETARequires:    bistro, bistro.pbs, core, dbm, lwt.preemptive, lwt.unix,
                     netstring, pvem, shell, threads
   XMETADescription: Execution engine for bistro workflows
 

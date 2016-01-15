@@ -102,29 +102,30 @@ type backend_error = [
 
 
 type backend =
-    Backend of (
-      np:int ->
-      mem:int ->
-      timeout:int ->
-      stdout:string ->
-      stderr:string ->
-      interpreter:interpreter ->
-      script:string ->
-      (unit, backend_error) result Lwt.t
-    )
+  np:int ->
+  mem:int ->
+  timeout:int ->
+  stdout:string ->
+  stderr:string ->
+  interpreter:interpreter ->
+  script:string ->
+  (unit, backend_error) result Lwt.t
 
 let redirection filename =
   Lwt_unix.openfile filename Unix.([O_APPEND ; O_CREAT ; O_WRONLY]) 0o640 >>= fun fd ->
   Lwt.return (`FD_move (Lwt_unix.unix_file_descr fd))
 
-let interpreter_cmd script = function
-  | `bash -> "", [| "bash" ; script |]
-  | `ocaml -> "", [| "ocaml" ; script |]
-  | `ocamlscript -> "", [| "ocamlscript" ; script |]
-  | `python -> "", [| "python" ; script |]
-  | `perl -> "", [| "perl" ; script |]
-  | `R -> "", [| "Rscript" ; script |]
-  | `sh -> "", [| "sh" ; script |]
+let interpreter_cmd path_to_script = function
+  | `bash -> [ "bash" ; path_to_script ]
+  | `ocaml -> [ "ocaml" ; path_to_script ]
+  | `ocamlscript -> [ "ocamlscript" ; path_to_script ]
+  | `python -> [ "python" ; path_to_script ]
+  | `perl -> [ "perl" ; path_to_script ]
+  | `R -> [ "Rscript" ; path_to_script ]
+  | `sh -> [ "sh" ; path_to_script ]
+
+let interpreter_cmd path_to_script interpreter =
+  "", Array.of_list (interpreter_cmd path_to_script interpreter)
 
 let extension_of_interpreter = function
   | `bash -> "sh"
@@ -137,28 +138,55 @@ let extension_of_interpreter = function
 
 let local_backend ~np ~mem =
   let pool = Pool.create ~np ~mem in
-  Backend (
-    fun ~np ~mem ~timeout ~stdout ~stderr ~interpreter ~script ->
-      Pool.use pool ~np ~mem ~f:(fun ~np ~mem ->
-          match interpreter with
-          | `sh | `bash | `R ->
-            let script_file = Filename.temp_file "guizmin" ("." ^ extension_of_interpreter interpreter) in
-            Lwt_io.(with_file ~mode:output script_file (fun oc -> write oc script)) >>= fun () ->
-            redirection stdout >>= fun stdout ->
-            redirection stderr >>= fun stderr ->
-            let cmd = interpreter_cmd script_file interpreter in
-            Lwt_process.exec ~stdout ~stderr cmd >>=
-            begin
-              function
-              | Caml.Unix.WEXITED 0 ->
-                Lwt_unix.unlink script_file >>= fun () ->
-                Lwt.return (`Ok ())
-              | _ ->
-                Lwt.return (`Error `Script_failure)
-            end
-          | _ -> Lwt.return (`Error `Unsupported_interpreter)
-        )
-  )
+  fun ~np ~mem ~timeout ~stdout ~stderr ~interpreter ~script ->
+    Pool.use pool ~np ~mem ~f:(fun ~np ~mem ->
+        match interpreter with
+        | `sh | `bash | `R ->
+          let script_file = Filename.temp_file "guizmin" ("." ^ extension_of_interpreter interpreter) in
+          Lwt_io.(with_file ~mode:output script_file (fun oc -> write oc script)) >>= fun () ->
+          redirection stdout >>= fun stdout ->
+          redirection stderr >>= fun stderr ->
+          let cmd = interpreter_cmd script_file interpreter in
+          Lwt_process.exec ~stdout ~stderr cmd >>=
+          begin
+            function
+            | Caml.Unix.WEXITED 0 ->
+              Lwt_unix.unlink script_file >>= fun () ->
+              Lwt.return (`Ok ())
+            | _ ->
+              Lwt.return (`Error `Script_failure)
+          end
+        | _ -> Lwt.return (`Error `Unsupported_interpreter)
+      )
+
+let pbs_backend ~queue : backend =
+  fun ~np ~mem ~timeout ~stdout ~stderr ~interpreter ~script ->
+    match interpreter with
+    | `sh | `bash | `R -> (
+        let path_to_script = Filename.temp_file "guizmin" ("." ^ extension_of_interpreter interpreter) in
+        Lwt_io.(with_file ~mode:output path_to_script (fun oc -> write oc script)) >>= fun () ->
+        let pbs_script =
+          Pbs.Script.raw
+            ~queue
+            ~stderr_path:stderr
+            ~stdout_path:stdout
+            script
+        in
+        Bistro_pbs.submit ~queue pbs_script >>= function
+        | `Error (`Failure msg) -> Lwt.fail (Failure ("PBS FAILURE: " ^ msg))
+        | `Error (`Qsub_failure (msg, _)) -> Lwt.fail (Failure ("QSUB FAILURE: " ^ msg))
+        | `Error (`Qstat_failure (msg, _)) -> Lwt.fail (Failure ("QSTAT FAILURE: " ^ msg))
+        | `Error (`Qstat_wrong_output msg) -> Lwt.fail (Failure ("QSTAT WRONG OUTPUT: " ^ msg))
+        | `Ok qstat -> (
+            match Pbs.Qstat.raw_field qstat "exit_status" with
+            | None -> Lwt.fail (Failure "missing exit status")
+            | Some code ->
+              if int_of_string code = 0 then Lwt.return (`Ok ())
+              else Lwt.return (`Error `Script_failure)
+          )
+      )
+    | _ -> Lwt.return (`Error `Unsupported_interpreter)
+
 
 (* Currently Building Steps
 
@@ -264,7 +292,7 @@ let rec build_workflow e = function
         )
 
 and build_step
-    ({ backend = Backend backend } as e)
+    e
     ({ np ; mem ; timeout ; script } as step)
     dep_threads =
 
@@ -282,7 +310,7 @@ and build_step
     remove_if_exists dest >>= fun () ->
     remove_if_exists tmp >>= fun () ->
     Lwt_unix.mkdir tmp 0o750 >>= fun () ->
-    backend
+    e.backend
       ~np ~mem ~timeout ~stdout ~stderr
       ~interpreter:(Script.interpreter script)
       ~script:script_text >>= fun response ->

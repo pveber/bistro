@@ -13,18 +13,19 @@ type backend_error = [
 ]
 
 type backend =
-    Backend of (
-      np:int ->
-      mem:int ->
-      timeout:int ->
-      stdout:string ->
-      stderr:string ->
-      interpreter:interpreter ->
-      script:string ->
-      (unit, backend_error) result Lwt.t
-    )
+  np:int ->
+  mem:int ->
+  timeout:int ->
+  stdout:string ->
+  stderr:string ->
+  interpreter:interpreter ->
+  script:string ->
+  (unit, backend_error) result Lwt.t
 
 val local_backend : np:int -> mem:int -> backend
+
+val pbs_backend : queue:string -> backend
+
 
 type t
 
