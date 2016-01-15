@@ -1,6 +1,6 @@
 # OASIS_START
 # OASIS_STOP
 true: annot, debug, use_menhir
-<lib/bistro.ml*> or "engine/db.ml": syntax(camlp4o), package(sexplib.syntax)
-<std/*.ml>: ppx_bistro
+<lib/bistro.ml*> or "lib/engine/db.ml": syntax(camlp4o), package(sexplib.syntax)
+<lib/std/*.ml>: ppx_bistro
 <examples/*.ml>: ppx_bistro

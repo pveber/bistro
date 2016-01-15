@@ -23,7 +23,7 @@ Library bistro
   XMETADescription: FIXME
 
 Library bistro_std
-  Path:             std
+  Path:             lib/std
   Pack:             true
   Modules:          Bed,
                     Bowtie,
@@ -53,7 +53,7 @@ Library bistro_std
   XMETADescription: FIXME
 
 Library bistro_engine
-  Path:             engine
+  Path:             lib/engine
   Pack:             true
   Modules:          Db, Scheduler
   FindlibName:      engine
