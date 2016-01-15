@@ -168,6 +168,7 @@ let pbs_backend ~queue : backend =
         let pbs_script =
           Pbs.Script.raw
             ~queue
+            ~walltime:(`Hours 0.1)
             ~stderr_path:stderr
             ~stdout_path:stdout
             script
