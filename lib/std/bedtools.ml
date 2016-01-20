@@ -1,7 +1,9 @@
-open Types
+open Bistro.Std
 open Bistro.EDSL_sh
+open Types
 
-let package_script = Unix_utils.wget "https://raw.githubusercontent.com/pveber/compbio-scripts/master/bedtools-install/2.11.2/bedtools-install.sh"
+
+let package_script = Unix_tools.wget "https://raw.githubusercontent.com/pveber/compbio-scripts/master/bedtools-install/2.11.2/bedtools-install.sh"
 
 let package =
   Bistro.Workflow.make ~descr:"bedtools.package" [%sh{|

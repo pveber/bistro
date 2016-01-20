@@ -338,3 +338,76 @@ module EDSL_sh = struct
     )
     @ (S " " :: cmd)
 end
+
+module Std = struct
+  type 'a workflow = 'a Workflow.t
+  type ('a, 'b) selector = ('a, 'b) Workflow.selector
+
+  class type ['a,'b] file = object
+    method format : 'a
+    method encoding : [< `text | `binary] as 'b
+  end
+
+  type 'a directory = [`directory of 'a]
+  type package = [`package] directory
+  type 'a zip = ([`zip of 'a], [`binary]) file
+  type 'a gz = ([`gz of 'a], [`binary]) file constraint 'a = (_,_) #file
+  type 'a bz2 = ([`bz2 of 'a], [`binary]) file constraint 'a = (_,_) #file
+  type 'a tar'gz = ([`tar'gz of 'a],[`binary]) file
+  type pdf = ([`pdf],[`text]) file
+  type html = ([`html], [`text]) file
+  type bash_script = ([`bash_script], [`text]) file
+
+  type png = ([`png],[`binary]) file
+  type svg = ([`png],[`text]) file
+
+  class type ['a] tabular = object ('a)
+    constraint 'a = < header : 'b ; sep : 'c ; comment : 'd ; .. >
+    inherit [[`tabular], [`text]] file
+    method header : 'b
+    method sep : 'c
+    method comment : 'd
+  end
+
+  class type ['a] tsv = object
+    inherit [ < sep : [`tab] ; comment : [`sharp] ; .. > as 'a ] tabular
+  end
+
+  module Unix_tools = struct
+    open EDSL_sh
+
+    let wget ?descr_url ?no_check_certificate url =
+      let info = match descr_url with None -> "" | Some i -> sprintf "(%s)" i in
+      workflow ~descr:("utils.wget" ^ info) [
+        cmd "wget" [
+          option (flag string "--no-check-certificate") no_check_certificate ;
+          opt "-O" ident dest ; string url ]
+      ]
+
+    let unzip zip =
+      workflow ~descr:"utils.unzip" [
+        cmd "unzip" [ opt "-d" ident dest ; dep zip ]
+      ]
+
+    let gunzip gz =
+      workflow ~descr:"utils.gunzip" [
+        cmd "gunzip" [ opt "-c" dep gz ] ~stdout:dest
+      ]
+
+    let bunzip2 bz2 =
+      workflow ~descr:"utils.bunzip2" [
+        cmd "bunzip2" [ opt "-c" dep bz2 ] ~stdout:dest
+      ]
+
+    let tar_xfz tgz =
+      workflow ~descr:"utils.tar_xfz" [
+        mkdir_p dest ;
+        cmd "tar" [ string "xfz" ; dep tgz ; opt "-C" ident dest ] ;
+      ]
+
+    let crlf2lf f =
+      workflow ~descr:"utils.crlf2lf" [
+        cmd "tr" [ opt "-d" string "'\r'"] ~stdin:(dep f) ~stdout:dest
+      ]
+  end
+end

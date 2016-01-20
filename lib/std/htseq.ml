@@ -1,6 +1,7 @@
 open Core_kernel.Std
-open Types
+open Bistro.Std
 open Bistro.EDSL_sh
+open Types
 open Misc.Infix
 
 let pysam_package = Bistro.Workflow.make [%sh{|

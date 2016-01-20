@@ -1,36 +1,4 @@
-type 'a workflow = 'a Bistro.Workflow.t
-type ('a, 'b) selector = ('a, 'b) Bistro.Workflow.selector
-
-class type ['a,'b] file = object
-  method format : 'a
-  method encoding : [< `text | `binary] as 'b
-end
-
-type 'a directory = [`directory of 'a]
-type package = [`package] directory
-type 'a zip = ([`zip of 'a], [`binary]) file
-type 'a gz = ([`gz of 'a], [`binary]) file constraint 'a = (_,_) #file
-type 'a bz2 = ([`bz2 of 'a], [`binary]) file constraint 'a = (_,_) #file
-type 'a tgz = ([`tgz of 'a],[`binary]) file
-type pdf = ([`pdf],[`text]) file
-type html = ([`html], [`text]) file
-type bash_script = ([`bash_script], [`text]) file
-
-type png = ([`png],[`binary]) file
-type svg = ([`png],[`text]) file
-
-class type ['a] tabular = object ('a)
-  constraint 'a = < header : 'b ; sep : 'c ; comment : 'd ; .. >
-  inherit [[`tabular], [`text]] file
-  method header : 'b
-  method sep : 'c
-  method comment : 'd
-end
-
-class type ['a] tsv = object
-  inherit [ < sep : [`tab] ; comment : [`sharp] ; .. > as 'a ] tabular
-end
-
+open Bistro.Std
 
 type bam = ([`bam],[`binary]) file
 

@@ -1,3 +1,4 @@
+open Bistro.Std
 open Types
 
 type twobit = ([`twobit], [`binary]) file

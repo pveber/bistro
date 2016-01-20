@@ -1,9 +1,10 @@
 open Core_kernel.Std
 open Bistro
+open Bistro.Std
 open Bistro.EDSL_sh
 open Types
 
-let package_script = Unix_utils.wget "https://raw.githubusercontent.com/pveber/compbio-scripts/master/macs2-install/2.1.0.20140616/macs2-install.sh"
+let package_script = Unix_tools.wget "https://raw.githubusercontent.com/pveber/compbio-scripts/master/macs2-install/2.1.0.20140616/macs2-install.sh"
 
 let package = Workflow.make ~descr:"macs2.package" [%sh{|
 PREFIX={{ dest }}

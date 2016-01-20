@@ -139,3 +139,49 @@ module Script : sig
     t -> string
 end
 
+module Std : sig
+  type 'a workflow = 'a Workflow.t
+  type ('a, 'b) selector = ('a, 'b) Workflow.selector
+
+  class type ['a,'b] file = object
+    method format : 'a
+    method encoding : [< `text | `binary] as 'b
+  end
+
+  type 'a directory = [`directory of 'a]
+  type package = [`package] directory
+  type 'a zip = ([`zip of 'a], [`binary]) file
+  type 'a gz = ([`gz of 'a], [`binary]) file constraint 'a = (_,_) #file
+  type 'a bz2 = ([`bz2 of 'a], [`binary]) file constraint 'a = (_,_) #file
+  type 'a tar'gz = ([`tar'gz of 'a],[`binary]) file
+  type pdf = ([`pdf],[`text]) file
+  type html = ([`html], [`text]) file
+  type bash_script = ([`bash_script], [`text]) file
+
+  type png = ([`png],[`binary]) file
+  type svg = ([`png],[`text]) file
+
+  class type ['a] tabular = object ('a)
+    constraint 'a = < header : 'b ; sep : 'c ; comment : 'd ; .. >
+    inherit [[`tabular], [`text]] file
+    method header : 'b
+    method sep : 'c
+    method comment : 'd
+  end
+
+  class type ['a] tsv = object
+    inherit [ < sep : [`tab] ; comment : [`sharp] ; .. > as 'a ] tabular
+  end
+
+  module Unix_tools : sig
+    val wget :
+      ?descr_url:string ->
+      ?no_check_certificate:bool ->
+      string -> (_,_) #file workflow
+    val gunzip : 'a gz workflow -> 'a workflow
+    val bunzip2 : 'a bz2 workflow -> 'a workflow
+    val unzip : 'a zip workflow -> 'a workflow
+    val tar_xfz : 'a tar'gz workflow -> 'a workflow
+    val crlf2lf : (_,[`text]) file workflow -> (_,[`text]) file workflow
+  end
+end

@@ -1,4 +1,4 @@
-(* open Bistro_workflow.Types *)
+open Bistro.Std(* open Bistro_workflow.Types *)
 
 (* val package : package workflow *)
 

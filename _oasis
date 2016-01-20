@@ -44,8 +44,7 @@ Library bistro_std
                     Sra_toolkit,
                     Tophat,
                     Types,
-                    Ucsc_gb,
-                    Unix_utils
+                    Ucsc_gb
   FindlibName:      std
   FindlibParent:    bistro
   BuildDepends:     bistro

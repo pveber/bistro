@@ -1,5 +1,4 @@
 open Printf
-open Types
 open Bistro.EDSL_sh
 
 let keep ~n bed =

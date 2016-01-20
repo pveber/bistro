@@ -1,4 +1,4 @@
-type t = statement list
+open Bistro.Stdtype t = statement list
 and statement =
 | Factor of factor
 | sam le of sample

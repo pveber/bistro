@@ -1,3 +1,4 @@
+open Bistro.Std
 open Types
 
 val meme_chip :

@@ -1,3 +1,4 @@
+open Bistro.Std
 open Types
 
 type index = [`bowtie_index] directory

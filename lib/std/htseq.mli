@@ -1,3 +1,4 @@
+open Bistro.Std
 open Types
 
 class type count_tsv = object

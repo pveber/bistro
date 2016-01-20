@@ -1,6 +1,7 @@
 open Core_kernel.Std
-open Types
+open Bistro.Std
 open Bistro.EDSL_sh
+open Types
 
 type species = [
   | `homo_sapiens
@@ -41,7 +42,7 @@ let gff ?(chr_name = `ensembl) ~release ~species =
       (String.capitalize (string_of_species species))
       (lab_label_of_genome (ucsc_reference_genome ~release ~species)) release
   in
-  let gff = Unix_utils.(gunzip (wget url)) in
+  let gff = Unix_tools.(gunzip (wget url)) in
   match chr_name with
   | `ensembl -> gff
   | `ucsc -> ucsc_chr_names_gtf gff

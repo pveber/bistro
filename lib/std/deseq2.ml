@@ -1,4 +1,5 @@
 open Core_kernel.Std
+open Bistro.Std
 open Types
 open Bistro.EDSL_sh
 

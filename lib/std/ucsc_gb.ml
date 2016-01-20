@@ -1,7 +1,8 @@
 open Core_kernel.Std
-open Types
 open Bistro
+open Bistro.Std
 open Bistro.EDSL_sh
+open Types
 
 type genome = [ `dm3 | `hg18 | `hg19 | `mm8 | `mm9 | `mm10 | `sacCer2 ]
 

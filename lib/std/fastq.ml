@@ -1,3 +1,4 @@
+open Bistro.Std
 open Bistro
 open Types
 
