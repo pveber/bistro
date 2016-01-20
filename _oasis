@@ -22,8 +22,8 @@ Library bistro
   XMETARequires:    core_kernel
   XMETADescription: FIXME
 
-Library bistro_std
-  Path:             lib/std
+Library bistro_bioinfo
+  Path:             lib/bioinfo
   Pack:             true
   Modules:          Bed,
                     Bowtie,
@@ -42,10 +42,11 @@ Library bistro_std
                     Samtools,
                     Sra,
                     Sra_toolkit,
+                    Std,
                     Tophat,
                     Types,
                     Ucsc_gb
-  FindlibName:      std
+  FindlibName:      bioinfo
   FindlibParent:    bistro
   BuildDepends:     bistro
   XMETARequires:    bistro
@@ -84,19 +85,19 @@ Test test_ppx_bistro
 Executable diamond
   Path:             examples
   MainIs:           diamond.ml
-  BuildDepends:     bistro.engine, bistro.std
+  BuildDepends:     bistro.engine
   CompiledObject:   byte
 
 Executable sacCer2_pho4
   Path:             examples
   MainIs:           sacCer2_pho4.ml
-  BuildDepends:     bistro.engine, bistro.std
+  BuildDepends:     bistro.engine, bistro.bioinfo
   CompiledObject:   byte
 
 Executable rnaseq
   Path:             examples
   MainIs:           rnaseq.ml
-  BuildDepends:     bistro.engine, bistro.std
+  BuildDepends:     bistro.engine, bistro.bioinfo
   CompiledObject:   byte
 
 Executable test

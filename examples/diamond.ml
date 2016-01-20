@@ -1,7 +1,6 @@
 open Core.Std
 open Lwt
 open Bistro.Std
-open Bistro_std.Types
 open Bistro_engine
 
 module Workflow = Bistro.Workflow

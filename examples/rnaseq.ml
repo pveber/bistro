@@ -1,6 +1,5 @@
 open Core.Std
-open Bistro_std
-open Bistro_std.Types
+open Bistro_bioinfo.Std
 
 
 

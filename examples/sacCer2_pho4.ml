@@ -2,8 +2,8 @@
 
 open Core.Std
 open Bistro.EDSL
-open Bistro_std
-open Bistro_std.Types
+open Bistro_bioinfo.Std
+
 
 let chIP_pho4_noPi = List.map ~f:Sra.fetch_srr [ "SRR217304" ; "SRR217305" ]
 
