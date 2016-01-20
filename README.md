@@ -1,4 +1,4 @@
-# bistro: build and run distributed scientific workflows
+# bistro: build and run distributed workflows
 
 `bistro` is an [OCaml](http://ocaml.org) library to build and run
 computations represented by a collection of interdependent scripts, as
@@ -23,4 +23,18 @@ mostly related to computational biology and unix for now).
 
 Questions, suggestions or contributions are welcome, please file an
 [issue](https://github.com/pveber/bistro/issues) as needed.
+
+## Installation
+
+I recommend installing `bistro` using
+[opam](http://opam.ocaml.org/) (see
+[installation instructions](http://opam.ocaml.org/doc/Install.html)). You
+need a recent (at least 4.02.0) installation of OCaml. Once this is
+done, simply type
+
+```
+opam install bistro
+```
+
+to install the library.
 
