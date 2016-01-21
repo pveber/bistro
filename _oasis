@@ -1,6 +1,6 @@
 OASISFormat:  0.4
 Name:         bistro
-Version:      0.0
+Version:      0.0.0
 Synopsis:     A library to build scientific workflows
 Authors:      Philippe Veber
 License:      GPL-3.0
