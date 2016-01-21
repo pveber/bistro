@@ -3,7 +3,7 @@
 `bistro` is an [OCaml](http://ocaml.org) library to build and run
 computations represented by a collection of interdependent scripts, as
 is often found in applied research (especially computational
-biology). 
+biology).
 
 **Features**:
 - build complex and composable workflows declaratively
@@ -38,3 +38,36 @@ opam install bistro
 
 to install the library.
 
+## Usage
+
+Here is an example of how we could write a typical workflow for
+ChIP-seq data:
+
+```ocaml
+open Bistro.Std;;
+open Bistro_bioinfo.Std;;
+
+(* Fetch a sample from the SRA database *)
+let sample = Sra.fetch_srr "SRR217304";;
+
+(* Convert it to FASTQ format *)
+let sample_fq = Sra_toolkit.fastq_dump sample
+
+(* Fetch a reference genome *)
+let genome = Ucsc_gb.genome_sequence `sacCer2
+
+(* Build a Bowtie2 index from it *)
+let bowtie2_index = Bowtie2.bowtie2_build genome
+
+(* Map the reads on the reference genome *)
+let sample_sam = Bowtie2.bowtie2 bowtie2_index (`single_end [ sample_fq ])
+
+(* Convert SAM file to BAM format *)
+let sample_bam =
+  Samtools.(indexed_bam_of_sam sample_sam / indexed_bam_to_bam)
+
+(* Call peaks on mapped reads *)
+let sample_peaks = Macs2.callpeak sample_bam
+
+Bistro_app.simple [ "sample_peaks", sample_peaks ]
+```
