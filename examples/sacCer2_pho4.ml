@@ -19,24 +19,9 @@ let chIP_pho4_noPi_bam = Samtools.(indexed_bam_of_sam chIP_pho4_noPi_sam / index
 
 let chIP_pho4_noPi_macs2 = Macs2.callpeak chIP_pho4_noPi_bam
 
-
-
-
-open Bistro_engine
-open Lwt
-
-let db = Db.init_exn "_bistro"
-let scheduler = Scheduler.make ~np:4 ~mem:(10 * 1024) db
-
-
-let main () =
-  Scheduler.build scheduler chIP_pho4_noPi_macs2 >|= function
-  | `Ok p -> print_endline p
-  | `Error xs ->
-    fprintf stderr "Some workflow(s) failed:\n" ;
-    List.iter xs ~f:(fun (u, msg) ->
-        fprintf stderr "\t%s\t%s\n" (Bistro.Workflow.id' u) msg
-      ) ;
-    List.iter xs ~f:(fun (u, _) -> Db.output_report db u stderr)
-
-let () = Lwt_unix.run (main ())
+let () =
+  Bistro_app.(
+    simple ~np:4 ~mem:(10 * 1024) [
+      [ "output" ; "chIP_pho4_noPi_macs2.peaks" ] %> chIP_pho4_noPi_macs2
+    ]
+  )
