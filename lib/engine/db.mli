@@ -69,4 +69,7 @@ end
 
 val fold : t -> init:'a -> f:('a -> Stats.t-> 'a) -> 'a
 
+(** {5 Reporting } *)
+
+val report : t -> Workflow.u -> string
 val output_report : t -> Workflow.u -> out_channel -> unit
