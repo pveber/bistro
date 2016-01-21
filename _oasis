@@ -20,7 +20,7 @@ Library bistro
   FindlibName:      bistro
   BuildDepends:     core_kernel
   XMETARequires:    core_kernel
-  XMETADescription: FIXME
+  XMETADescription: Core bistro library
 
 Library bistro_bioinfo
   Path:             lib/bioinfo
@@ -50,7 +50,7 @@ Library bistro_bioinfo
   FindlibParent:    bistro
   BuildDepends:     bistro
   XMETARequires:    bistro
-  XMETADescription: FIXME
+  XMETADescription: Workflow library for computational biology
 
 Library bistro_engine
   Path:             lib/engine
@@ -62,7 +62,7 @@ Library bistro_engine
                     netstring, pvem, shell, threads
   XMETARequires:    bistro, core, dbm, lwt.preemptive, lwt.unix,
                     netstring, pvem, shell, threads
-  XMETADescription: FIXME
+  XMETADescription: Execution engine for bistro workflows
 
 Library bistro_utils
   Path:             lib/utils
@@ -71,7 +71,7 @@ Library bistro_utils
   FindlibParent:    bistro
   BuildDepends:     bistro.engine
   XMETARequires:    bistro.engine
-  XMETADescription: FIXME
+  XMETADescription: Utility functions for bistro
 
 Executable "ppx_bistro"
   Path:             ppx
