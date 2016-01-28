@@ -1,4 +1,8 @@
+Features:
 - Initial support for job distribution on PBS clusters
+
+Bug fixes:
+- bistro execution hangs on utop (f4f932f)
 
 v0.0.0 2016-01-21 Lyon
 ----------------------
