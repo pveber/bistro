@@ -1,10 +1,11 @@
 opam-version: "1.2"
 name: "bistro"
 version: "0.0.0"
-maintainer: "pveber <philippe.veber@gmail.com>"
-authors: "pveber <philippe.veber@gmail.com>"
+maintainer: "Philippe Veber <philippe.veber@gmail.com>"
+authors: "Philippe Veber <philippe.veber@gmail.com>"
 homepage: "https://github.com/pveber/bistro/"
 dev-repo: "https://github.com/pveber/bistro.git"
+bug-reports: "https://github.com/pveber/bistro/issues"
 license: "GPL"
 build: [
   ["./configure" "--prefix=%{prefix}%"]
