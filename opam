@@ -17,12 +17,11 @@ remove: [
   ["ocamlfind" "remove" "ppx_bistro"]
 ]
 depends: [
+  "oasis" {build}
   "ocamlfind" {build}
   "core"
   "dbm"
   "lwt"
-  "oasis"
-  "ocamlnet"
   "pbs"
   "ppx_tools"
   "pvem"
