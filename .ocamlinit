@@ -1,21 +1,18 @@
-#require "shell";;
 #require "core.top";;
 #require "lwt.unix";;
 #require "dbm"
-#require "pvem"
+#require "pbs"
 
 #directory "_build/lib";;
-#directory "_build/std";;
-#directory "_build/engine";;
+#directory "_build/lib/bioinfo";;
+#directory "_build/lib/pbs";;
+#directory "_build/lib/engine";;
+#directory "_build/lib/utils";;
 #load "bistro.cma";;
-#load "bistro_std.cma";;
+#load "bistro_bioinfo.cma";;
+#load "bistro_pbs.cma";;
 #load "bistro_engine.cma";;
+#load "bistro_utils.cma";;
 
-open Bistro
-open Bistro_std.Types
-open Bistro_engine
-
-let db = Db.init_exn "_bistro"
-let scheduler = Scheduler.make ~np:4 ~mem:(10 * 1024) db
-
-let eval x = Scheduler.build_exn scheduler x 
+open Bistro.Std
+open Bistro_bioinfo.Std
