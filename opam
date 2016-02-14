@@ -25,4 +25,5 @@ depends: [
   "pbs"
   "ppx_tools"
   "pvem"
+  "rresult"
 ]

@@ -23,6 +23,6 @@ PKG oUnit
 PKG pbs
 PKG pvem
 PKG react
-PKG shell
+PKG rresult
 PKG str
 PKG yojson

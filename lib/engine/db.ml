@@ -1,4 +1,5 @@
 open Core.Std
+open Rresult
 open Lwt
 open Bistro
 open Bistro.Workflow
@@ -9,6 +10,9 @@ let string_of_path = function
   | p -> List.reduce_exn p ~f:Filename.concat
 
 let path_of_string s = String.split ~on:'/' s
+
+
+type 'a result = ('a, R.msg) Rresult.result
 
 
 type t = {
@@ -25,108 +29,118 @@ let stats_prefix base = Filename.concat base "stats"
 
 let open_dbm ?(mode = Dbm.[ Dbm_create ; Dbm_rdwr ]) path =
   match Dbm.opendbm path mode 0o700 with
-  | dbh -> `Ok dbh
-  | exception exn -> `Error `Corrupted_dbm
+  | dbh -> Ok dbh
+  | exception exn ->
+    R.error_msgf "Cannot read DBM database at %s" path
 
 let with_dbm ?mode path f =
   match open_dbm ?mode path with
-  | `Ok dbh -> (
-    let r = match f dbh with
-      | x -> `Ok x
-      | exception exn -> `Error exn
-    in
-    Dbm.close dbh ;
-    match r with
-    | `Ok x -> `Ok x
-    | `Error exn -> raise exn
+  | Ok dbh ->
+    Exn.protectx dbh ~f ~finally:Dbm.close
+    |> R.ok
+  | Error _ as e -> e
+
+let no_such_path_error path =
+  R.error_msgf "Path %s doesn't exist, is not readable or writable" path
+
+let check_path (p, sort) =
+  if Sys.file_exists p = `Yes then
+    match sort with
+    | `Dir ->
+      if Sys.is_directory p = `Yes then Ok ()
+      else R.error_msgf "Path %s should be a directory" p
+    | `File ->
+      if Sys.is_file p = `Yes then Ok ()
+      else R.error_msgf "Path %s should be a file" p
+  else
+    no_such_path_error p
+
+let check_dbm_open path =
+  with_dbm path (const ())
+
+let check_paths_of_db_exist path =
+  let paths = [
+      path, `Dir ;
+      cache_dir path, `Dir ;
+      build_dir path, `Dir ;
+      tmp_dir path, `Dir ;
+      stderr_dir path, `Dir ;
+      stdout_dir path, `Dir ;
+      (stats_prefix path) ^ ".pag", `File ;
+      (stats_prefix path) ^ ".dir", `File ;
+    ]
+  in
+  let msgs = List.filter_map paths ~f:(fun p ->
+      match check_path p with
+      | Ok () -> None
+      | Error msg -> Some msg
     )
-  | `Error _ as e -> e
-
-let with_dbm_exn ?mode db f =
-  match with_dbm ?mode db f with
-  | `Ok () -> ()
-  | `Error `Corrupted_dbm ->
-    failwithf "Corrupted db at %s (corrupted dbm records)" db ()
-
-let assert_no_exn = function
-  | `Exn _ -> assert false
-  | `Malformed_db s -> `Malformed_db s
-  | `Corrupted_dbm -> `Corrupted_dbm
+  in
+  if msgs = [] then Ok ()
+  else
+    let format_msgs fmt =
+      List.map msgs ~f:(fun (`Msg msg) -> "\t" ^ msg)
+      |> String.concat ~sep:"\n"
+      |> Format.pp_print_string fmt
+    in
+    R.error_msgf "Malformed database at %s:\n%t" path format_msgs
 
 let well_formed_db path =
-  let open Pvem.Result in
-  let check path =
-    if Sys.file_exists_exn path then `Ok ()
-    else `Error (`Malformed_db (path ^" doesn't exist"))
-  in
-  check path >>= fun () ->
-  check (cache_dir path) >>= fun () ->
-  check (build_dir path) >>= fun () ->
-  check (tmp_dir path) >>= fun () ->
-  check (stderr_dir path) >>= fun () ->
-  check (stdout_dir path) >>= fun () ->
-  check ((stats_prefix path) ^ ".pag") >>= fun () ->
-  check ((stats_prefix path) ^ ".dir") >>= fun () ->
-  with_dbm path ignore
+  let open Rresult in
+  check_paths_of_db_exist path >>= fun () ->
+  check_dbm_open path
 
-let check_path path =
-  match Sys.file_exists path with
-  | `Yes ->
-    well_formed_db path
-  | `No ->
-    Unix.mkdir_p (tmp_dir path) ;
-    Unix.mkdir_p (build_dir path) ;
-    Unix.mkdir_p (cache_dir path) ;
-    Unix.mkdir_p (stderr_dir path) ;
-    Unix.mkdir_p (stdout_dir path) ;
-    with_dbm path ignore
-  | `Unknown -> `Error `Path_is_not_reachable
+let ensure_path_has_db path =
+  R.reword_error_msg
+    (fun _ -> R.msg "Failed to obtain a valid bistro database")
+    (
+      match Sys.file_exists path with
+      | `Yes ->
+        well_formed_db path
+      | `No ->
+        Unix.mkdir_p (tmp_dir path) ;
+        Unix.mkdir_p (build_dir path) ;
+        Unix.mkdir_p (cache_dir path) ;
+        Unix.mkdir_p (stderr_dir path) ;
+        Unix.mkdir_p (stdout_dir path) ;
+        check_dbm_open path
+      | `Unknown ->
+        no_such_path_error path
+    )
 
 let open_ path =
-  let open Pvem.Result in
+  let open Rresult in
   let path =
     if Filename.is_relative path then
       Filename.concat (Sys.getcwd ()) path
     else
       path
   in
-  check_path path
+  ensure_path_has_db path
   >>= fun () -> open_dbm path
   >>| fun dbh -> { path ; dbh }
 
-let raise_error path e =
-  let explanation = match e with
-    | `Path_is_not_reachable -> "unreadable path"
-    | `Corrupted_dbm -> "corrupted dbm"
-    | `Malformed_db s -> s
-  in
-  failwithf
-    "Path %s is not available for a bistro database or has been corrupted (%s)"
-    path explanation ()
 
-let to_exn f x =
-  match f x with
-  | `Ok y -> y
-  | `Error e -> raise_error x e
+let ok_exn = function
+  | Ok x -> x
+  | Error (`Msg msg) -> failwith msg
 
-let open_exn path = to_exn open_ path
+let open_exn path = ok_exn (open_ path)
 
 let close db = Dbm.close db.dbh
 
 let with_open path f =
   let open Lwt in
   match open_ path with
-  | `Ok db ->
+  | Ok db ->
     finalize
-      (fun () -> f db >|= fun x -> `Ok x)
+      (fun () -> f db >|= fun x -> Ok x)
       (fun () -> close db ; return ())
-  | `Error e -> return (`Error e)
+  | Error e -> return (Error e)
 
 let with_open_exn path f =
   let open Lwt in
-  with_open path f >|= function
-  | `Ok x -> x
-  | `Error e -> raise_error path e
+  with_open path f >|= ok_exn
 
 let aux_path f db step =
   Filename.concat (f db.path) step.id

@@ -60,9 +60,9 @@ Library bistro_engine
   FindlibParent:    bistro
   BuildDepends:     bistro, bistro.pbs, core, dbm,
                     lwt.preemptive, lwt.unix,
-                    pvem, threads
+                    pvem, rresult, threads
   XMETARequires:    bistro, bistro.pbs, core, dbm, lwt.preemptive, lwt.unix,
-                    pvem, threads
+                    pvem, rresult, threads
   XMETADescription: Execution engine for bistro workflows
 
 Library bistro_utils
