@@ -30,10 +30,7 @@ let d : txt workflow = Workflow.make ~descr:"D" [%sh{|
 cat {{dep b}} {{dep c}} > {{DEST}}
 |}]
 
-let db = Db.init_exn "_bistro"
-let e = Scheduler.(make (local_backend ~np:2 ~mem:1024) db)
-
-let main () =
+let main db e =
   Scheduler.build_exn e d >>= fun s ->
   print_endline "Contents of a:" ;
   print_endline (In_channel.read_all (Db.workflow_path db a)) ;
@@ -48,4 +45,9 @@ let main () =
   print_endline (In_channel.read_all (Db.workflow_path db d)) ;
   Lwt.return ()
 
-let () = Lwt_unix.run (main ())
+let () = Lwt_unix.run (
+    Db.with_open_exn "_bistro" (fun db ->
+        let e = Scheduler.(make (local_backend ~np:2 ~mem:1024) db) in
+        main db e
+      )
+  )

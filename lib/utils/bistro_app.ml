@@ -45,11 +45,11 @@ let error_report = function
       )
 
 let simple ?(np = 1) ?(mem = 1024) targets =
-  let db = Db.init_exn "_bistro" in
-  let backend = Scheduler.local_backend ~np ~mem in
-  let scheduler = Scheduler.make backend db in
-  let results =
-    Lwt_list.map_p (foreach_target db scheduler) targets
-    |> Lwt_unix.run
-  in
-  List.iter results ~f:error_report
+  Db.with_open_exn "_bistro" (fun db ->
+      let backend = Scheduler.local_backend ~np ~mem in
+      let scheduler = Scheduler.make backend db in
+      Lwt_list.map_p (foreach_target db scheduler) targets >>= fun results ->
+      List.iter results ~f:error_report ;
+      return ()
+    )
+  |> Lwt_unix.run

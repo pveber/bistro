@@ -9,19 +9,18 @@ open Bistro
 type t
 (** An abstract type for databases *)
 
-val init : string -> [ `Ok of t
-                     | `Error of [ `Corrupted_dbm
-                                 | `Malformed_db of string ] ]
-(** [init path] builds a value to represent a database located at path
-    [path], which can be absolute or relative. The database is created
-    on the file system unless a file/directory exists at the location
-    [path]. In that case, the existing file/directory is inspected to
-    determine if it looks like a bistro database.
+val open_exn : string -> t
+(** [open_exn path] opens a database located at path [path], which can
+    be absolute or relative. If the path does not exist, the function
+    creates a fresh database on the filesystem; if it does, it is
+    inspected to see if it looks like a bistro database.
 
-    Returns an [`Error] if [path] is occupied with something else
-    than a bistro database. *)
+    @raise Failure if [path] is occupied with something else than a
+    bistro database. *)
 
-val init_exn : string -> t
+val close : t -> unit
+
+val with_open_exn : string -> (t -> 'a Lwt.t) -> 'a Lwt.t
 
 (** {5 Access for build engines} *)
 

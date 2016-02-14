@@ -5,10 +5,10 @@ open Bistro
 module Scheduler = Bistro_engine.Scheduler
 module Db = Bistro_engine.Db
 
-let db = Db.init_exn "_bistro"
-let scheduler = Scheduler.(make (local_backend ~np:2 ~mem:1024) db)
+(* let db = Db.init_exn "_bistro" *)
+(* let scheduler = Scheduler.(make (local_backend ~np:2 ~mem:1024) db) *)
 
-let build x = Lwt_unix.run (Scheduler.build scheduler x)
+(* let build x = Lwt_unix.run (Scheduler.build scheduler x) *)
 
 (* let add x y = *)
 (*   let open Bistro.Term in *)
