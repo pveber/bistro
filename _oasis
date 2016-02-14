@@ -112,18 +112,6 @@ Executable sacCer2_pho4
   MainIs:           sacCer2_pho4.ml
   BuildDepends:     bistro.utils, bistro.bioinfo
   CompiledObject:   byte
-
-Executable rnaseq
-  Path:             examples
-  MainIs:           rnaseq.ml
-  BuildDepends:     bistro.engine, bistro.bioinfo
-  CompiledObject:   byte
-
-Executable test
-  Path:             test
-  MainIs:           test.ml
-  BuildDepends:     bistro.engine, oUnit
-  CompiledObject:   byte
   
 Document API
   Title:                API reference for Bistro
