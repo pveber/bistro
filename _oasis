@@ -99,7 +99,7 @@ Test test_ppx_bistro
 Executable bistro_server
   Path:             app
   MainIs:           bistro_server.ml
-  BuildDepends:     bistro.engine, cohttp.lwt
+  BuildDepends:     bistro.engine, cohttp.lwt, core
   CompiledObject:   byte
 
 # +-------------------------------------------------------------------+
