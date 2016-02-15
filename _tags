@@ -3,4 +3,5 @@
 true: annot, debug, use_menhir
 <lib/bistro.ml*> or "lib/engine/db.ml": syntax(camlp4o), package(sexplib.syntax)
 <lib/bioinfo/*.ml>: ppx_bistro
-<examples/*.ml>: ppx_bistro
+<app/*.ml>: ppx_bistro
+<test/*.ml>: ppx_bistro

@@ -102,13 +102,13 @@ Test test_ppx_bistro
 # +-------------------------------------------------------------------+
 
 Executable diamond
-  Path:             examples
+  Path:             test
   MainIs:           diamond.ml
   BuildDepends:     bistro.engine
   CompiledObject:   byte
 
 Executable sacCer2_pho4
-  Path:             examples
+  Path:             app
   MainIs:           sacCer2_pho4.ml
   BuildDepends:     bistro.utils, bistro.bioinfo
   CompiledObject:   byte
