@@ -79,6 +79,10 @@ module Wave : sig
     description : string ;
     targets : Workflow.u list ;
   }
+  with sexp
+
+  val to_string : t -> string
+  val of_string : string -> t
 end
 
 module Wave_table : sig
