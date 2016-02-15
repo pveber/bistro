@@ -121,6 +121,12 @@ Executable diamond
   BuildDepends:     bistro.engine
   CompiledObject:   byte
 
+Executable fail
+  Path:             test
+  MainIs:           fail.ml
+  BuildDepends:     bistro.utils
+  CompiledObject:   byte
+
 Executable sacCer2_pho4
   Path:             app
   MainIs:           sacCer2_pho4.ml
