@@ -224,13 +224,16 @@ let check_paths_of_db_exist path =
   in
   match filter_errors checks with
   | [] -> Ok ()
-  | msgs ->
-    let format_msgs fmt =
-      List.map msgs ~f:(fun (`Msg msg) -> "\t" ^ msg)
-      |> String.concat ~sep:"\n"
-      |> Format.pp_print_string fmt
-    in
-    R.error_msgf "Malformed database at %s:\n%t" path format_msgs
+  | h :: t ->
+    R.reword_error_msg
+      (fun _ -> `Msg (sprintf "Malformed database at %s" path))
+      (Error (
+          List.fold t ~init:h ~f:(fun (`Msg accu) (`Msg msg) ->
+              `Msg (accu ^ "\n" ^ msg)
+            )
+        )
+      )
+
 
 let well_formed_db path =
   let open Rresult in
