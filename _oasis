@@ -83,6 +83,15 @@ Library bistro_pbs
   XMETARequires:    lwt.unix, pbs
   XMETADescription: FIXME
 
+Library bistro_rest
+  Path:             lib/rest
+  Modules:          Bistro_rest
+  FindlibName:      rest
+  FindlibParent:    bistro
+  BuildDepends:     bistro.engine, cohttp.lwt
+  XMETARequires:    bistro.engine, cohttp.lwt
+  XMETADescription: FIXME
+
 Executable "ppx_bistro"
   Path:             ppx
   MainIs:           ppx_bistro.ml
