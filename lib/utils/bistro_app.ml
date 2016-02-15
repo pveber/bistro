@@ -40,7 +40,15 @@ let foreach_target db scheduler (dest, u) =
 let error_report = function
   | `Ok () -> ()
   | `Error xs ->
-    List.iter xs ~f:(fun (_,_,report) ->
+    List.iter xs ~f:(fun (wid, msg, report) ->
+        fprintf stderr "################################################################################\n" ;
+        fprintf stderr "#                                                                              #\n" ;
+        fprintf stderr "#  Workflow %s failed\n" wid ;
+        fprintf stderr "#                                                                               \n" ;
+        fprintf stderr "#------------------------------------------------------------------------------#\n" ;
+        fprintf stderr "#                                                                               \n" ;
+        fprintf stderr "# %s\n" msg ;
+        fprintf stderr "#                                                                              #\n" ;
         prerr_endline report
       )
 
