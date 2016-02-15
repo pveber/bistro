@@ -102,8 +102,12 @@ struct
     check_path `File (p ^ ".pag") >>= fun () ->
     check_path `File (p ^ ".dir")
 
+  let m = Mutex.create ()
+
   let with_dbm db f =
-    with_dbm (prefix db) f
+    Mutex.critical_section m ~f:(fun () ->
+        with_dbm (prefix db) f
+      )
 
   let create db =
     with_dbm db (const ())
