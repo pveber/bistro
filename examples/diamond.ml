@@ -46,8 +46,7 @@ let main db e =
   Lwt.return ()
 
 let () = Lwt_unix.run (
-    Db.with_open_exn "_bistro" (fun db ->
-        let e = Scheduler.(make (local_backend ~np:2 ~mem:1024) db) in
-        main db e
-      )
+    let db = Db.init_exn "_bistro" in
+    let e = Scheduler.(make (local_backend ~np:2 ~mem:1024) db) in
+    main db e
   )

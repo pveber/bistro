@@ -12,21 +12,19 @@ type 'a result = ('a, R.msg) Rresult.result
 type t
 (** An abstract type for databases *)
 
-val open_ : string -> t result
-(** [open_exn path] opens a database located at path [path], which can
-    be absolute or relative. If the path does not exist, the function
-    creates a fresh database on the filesystem; if it does, it is
-    inspected to see if it looks like a bistro database.
+type db = t
+
+val init : string -> t result
+(** [init path] creates a database located at path [path], which can
+    be absolute or relative. If the path already exists, its contents
+    is inspected to see if it looks like a bistro database; if not, a
+    fresh database is created on the filesystem.
 
     Returns an error message if [path] is occupied with something else
     than a bistro database. *)
 
-val open_exn : string -> t
+val init_exn : string -> t
 (** @raise Failure*)
-
-val close : t -> unit
-
-val with_open_exn : string -> (t -> 'a Lwt.t) -> 'a Lwt.t
 
 (** {5 Access for build engines} *)
 
@@ -69,10 +67,12 @@ module Stats : sig
     build_time : float option ;
   }
   and event = Built | Requested
-
 end
 
-val fold : t -> init:'a -> f:('a -> Stats.t-> 'a) -> 'a
+module Stats_table : sig
+  val fold : db -> init:'a -> f:('a -> Stats.t-> 'a) -> 'a
+end
+
 
 (** {5 Reporting } *)
 

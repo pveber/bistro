@@ -4,6 +4,22 @@ open Lwt
 open Bistro
 open Bistro.Workflow
 
+
+
+type 'a result = ('a, R.msg) Rresult.result
+
+let ok_exn = function
+  | Ok x -> x
+  | Error (`Msg msg) -> failwith msg
+
+let filter_errors xs =
+  List.filter_map xs ~f:(function
+      | Ok _ -> None
+      | Error e -> Some e
+    )
+
+let ( / ) = Filename.concat
+
 let string_of_path = function
   | []
   | "" :: _ -> failwith "string_of_path: wrong path"
@@ -11,21 +27,32 @@ let string_of_path = function
 
 let path_of_string s = String.split ~on:'/' s
 
+let no_such_path_error path =
+  R.error_msgf "Path %s doesn't exist, is not readable or writable" path
 
-type 'a result = ('a, R.msg) Rresult.result
+(* [check_path sort p] checks that [p] exists and is of the right
+   sort *)
+let check_path sort p =
+  if Sys.file_exists p = `Yes then
+    match sort with
+    | `Dir ->
+      if Sys.is_directory p = `Yes then Ok ()
+      else R.error_msgf "Path %s should be a directory" p
+    | `File ->
+      if Sys.is_file p = `Yes then Ok ()
+      else R.error_msgf "Path %s should be a file" p
+  else
+    no_such_path_error p
 
 
-type t = {
-  path : string ;
-  dbh : Dbm.t ; (* DBM handler *)
-}
 
-let cache_dir base = Filename.concat base "cache"
-let build_dir base = Filename.concat base "build"
-let tmp_dir base = Filename.concat base "tmp"
-let stderr_dir base = Filename.concat base "stderr"
-let stdout_dir base = Filename.concat base "stdout"
-let stats_prefix base = Filename.concat base "stats"
+type t = string
+type db = t
+
+
+
+
+(* Implementation of tables *)
 
 let open_dbm ?(mode = Dbm.[ Dbm_create ; Dbm_rdwr ]) path =
   match Dbm.opendbm path mode 0o700 with
@@ -40,44 +67,142 @@ let with_dbm ?mode path f =
     |> R.ok
   | Error _ as e -> e
 
-let no_such_path_error path =
-  R.error_msgf "Path %s doesn't exist, is not readable or writable" path
 
-let check_path (p, sort) =
-  if Sys.file_exists p = `Yes then
-    match sort with
-    | `Dir ->
-      if Sys.is_directory p = `Yes then Ok ()
-      else R.error_msgf "Path %s should be a directory" p
-    | `File ->
-      if Sys.is_file p = `Yes then Ok ()
-      else R.error_msgf "Path %s should be a file" p
-  else
-    no_such_path_error p
+module type Key = sig
+  type t
+  val to_string : t -> string
+end
+
+module type Value = sig
+  type t
+  val id : string
+  val to_string : t -> string
+  val of_string : string -> t
+end
+
+module Table(K : Key)(V : Value) :
+sig
+  val check : db -> unit result
+  val get : db -> K.t -> V.t option
+  val set : db -> K.t -> V.t -> unit
+  val fold :
+    db ->
+    init:'a ->
+    f:('a -> V.t -> 'a) ->
+    'a
+end
+=
+struct
+  let prefix db =
+    Filename.concat db V.id
+
+  let check db =
+    let open R in
+    let p = prefix db in
+    check_path `File (p ^ ".pag") >>= fun () ->
+    check_path `File (p ^ ".dir")
+
+  let with_dbm db f =
+    with_dbm (prefix db) f
+
+  let create db =
+    with_dbm db (const ())
+
+  let get db key =
+    with_dbm db (fun dbh ->
+        match Dbm.find dbh (K.to_string key) with
+        | value -> Some (V.of_string value)
+        | exception Not_found -> None
+      )
+    |> ok_exn
+
+  let set db key value =
+    with_dbm db (fun dbh ->
+        Dbm.replace dbh (K.to_string key) (V.to_string value)
+      )
+    |> ok_exn
+
+  let fold db ~init ~f =
+    with_dbm db (fun dbh ->
+        let res = ref init in
+        let f key data =
+          res := f !res (V.of_string data)
+        in
+        Dbm.iter f dbh ;
+        !res
+      )
+    |> ok_exn
+end
+
+
+
+
+
+module Stats = struct
+  type t = {
+    workflow : step ;
+    history : (Time.t * event) list ;
+    build_time : float option ;
+  }
+  and event = Built | Requested
+  with sexp
+
+  let to_string x =
+    Sexp.to_string (sexp_of_t x)
+
+  let of_string x =
+    t_of_sexp (Sexp.of_string x)
+
+  let id = "stats"
+
+  let make s = {
+    workflow = s ;
+    history = [] ;
+    build_time = None ;
+  }
+end
+
+module Step = struct
+  type t = step
+  let to_string s = s.id
+end
+
+module Stats_table = Table(Step)(Stats)
+
+
+
+
+
+(* Database initialization and check *)
+
+
+let cache_dir base = Filename.concat base "cache"
+let build_dir base = Filename.concat base "build"
+let tmp_dir base = Filename.concat base "tmp"
+let stderr_dir base = Filename.concat base "stderr"
+let stdout_dir base = Filename.concat base "stdout"
+
 
 let check_dbm_open path =
   with_dbm path (const ())
 
 let check_paths_of_db_exist path =
-  let paths = [
-      path, `Dir ;
-      cache_dir path, `Dir ;
-      build_dir path, `Dir ;
-      tmp_dir path, `Dir ;
-      stderr_dir path, `Dir ;
-      stdout_dir path, `Dir ;
-      (stats_prefix path) ^ ".pag", `File ;
-      (stats_prefix path) ^ ".dir", `File ;
-    ]
+  let dir_paths = [
+    path ;
+    cache_dir path ;
+    build_dir path ;
+    tmp_dir path ;
+    stderr_dir path ;
+    stdout_dir path ;
+  ]
   in
-  let msgs = List.filter_map paths ~f:(fun p ->
-      match check_path p with
-      | Ok () -> None
-      | Error msg -> Some msg
-    )
+  let checks =
+    Stats_table.check path ::
+    List.map dir_paths ~f:(check_path `Dir)
   in
-  if msgs = [] then Ok ()
-  else
+  match filter_errors checks with
+  | [] -> Ok ()
+  | msgs ->
     let format_msgs fmt =
       List.map msgs ~f:(fun (`Msg msg) -> "\t" ^ msg)
       |> String.concat ~sep:"\n"
@@ -108,7 +233,7 @@ let ensure_path_has_db path =
         no_such_path_error path
     )
 
-let open_ path =
+let init path =
   let open Rresult in
   let path =
     if Filename.is_relative path then
@@ -117,33 +242,13 @@ let open_ path =
       path
   in
   ensure_path_has_db path
-  >>= fun () -> open_dbm path
-  >>| fun dbh -> { path ; dbh }
+  >>| fun () -> path
 
 
-let ok_exn = function
-  | Ok x -> x
-  | Error (`Msg msg) -> failwith msg
-
-let open_exn path = ok_exn (open_ path)
-
-let close db = Dbm.close db.dbh
-
-let with_open path f =
-  let open Lwt in
-  match open_ path with
-  | Ok db ->
-    finalize
-      (fun () -> f db >|= fun x -> Ok x)
-      (fun () -> close db ; return ())
-  | Error e -> return (Error e)
-
-let with_open_exn path f =
-  let open Lwt in
-  with_open path f >|= ok_exn
+let init_exn path = ok_exn (init path)
 
 let aux_path f db step =
-  Filename.concat (f db.path) step.id
+  Filename.concat (f db) step.id
 
 let cache_path = aux_path cache_dir
 let build_path = aux_path build_dir
@@ -151,47 +256,13 @@ let tmp_path = aux_path tmp_dir
 let stdout_path = aux_path stdout_dir
 let stderr_path = aux_path stderr_dir
 
-module Stats = struct
-  type t = {
-    workflow : step ;
-    history : (Time.t * event) list ;
-    build_time : float option ;
-  }
-  and event = Built | Requested
-  with sexp
-
-  let make s = {
-    workflow = s ;
-    history = [] ;
-    build_time = None ;
-  }
-
-  let load db step =
-    match Dbm.find db step.id with
-    | sexp -> Some (t_of_sexp (Sexp.of_string sexp))
-    | exception Not_found -> None
-
-  let save db step stats =
-    Dbm.replace db step.id (Sexp.to_string (sexp_of_t stats))
-
-end
-
-let fold db ~init ~f =
-  let res = ref init in
-  let f key data =
-    res := f !res (Stats.t_of_sexp (Sexp.of_string data))
-  in
-  Dbm.iter f db.dbh ;
-  !res
-
-
 let update_stats db step f =
   let stat =
-    match Stats.load db.dbh step with
+    match Stats_table.get db step with
     | Some s -> s
     | None -> Stats.make step
   in
-  Stats.save db.dbh step (f stat)
+  Stats_table.set db step (f stat)
 
 
 let append_history ~db u evt =
