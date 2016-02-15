@@ -83,6 +83,7 @@ end
 module Table(K : Key)(V : Value) :
 sig
   val check : db -> unit result
+  val create : db -> unit result
   val get : db -> K.t -> V.t option
   val set : db -> K.t -> V.t -> unit
   val fold :
@@ -204,10 +205,7 @@ let stderr_dir base = Filename.concat base "stderr"
 let stdout_dir base = Filename.concat base "stdout"
 
 
-let check_dbm_open path =
-  with_dbm path (const ())
-
-let check_paths_of_db_exist path =
+let check_dirs_of_db_exist path =
   let dir_paths = [
     path ;
     cache_dir path ;
@@ -237,10 +235,12 @@ let check_paths_of_db_exist path =
 
 let well_formed_db path =
   let open Rresult in
-  check_paths_of_db_exist path >>= fun () ->
-  check_dbm_open path
+  check_dirs_of_db_exist path >>= fun () ->
+  Stats_table.check path >>= fun () ->
+  Wave_table.check path
 
 let ensure_path_has_db path =
+  let open R in
   R.reword_error_msg
     (fun _ -> R.msg "Failed to obtain a valid bistro database")
     (
@@ -253,7 +253,8 @@ let ensure_path_has_db path =
         Unix.mkdir_p (cache_dir path) ;
         Unix.mkdir_p (stderr_dir path) ;
         Unix.mkdir_p (stdout_dir path) ;
-        check_dbm_open path
+        Stats_table.create path >>= fun () ->
+        Wave_table.create path
       | `Unknown ->
         no_such_path_error path
     )
