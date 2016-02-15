@@ -16,6 +16,7 @@ PKG ppx_bistro
 PKG compiler-libs.common
 PKG ppx_tools.metaquot
 PKG core
+PKG cohttp.lwt
 PKG dbm
 PKG ppx_deriving_yojson
 PKG lwt.unix
