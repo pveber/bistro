@@ -73,6 +73,18 @@ module Stats_table : sig
   val fold : db -> init:'a -> f:('a -> Stats.t-> 'a) -> 'a
 end
 
+module Wave : sig
+  type t = {
+    name : string ;
+    description : string ;
+    targets : Workflow.u list ;
+  }
+end
+
+module Wave_table : sig
+  val set : db -> string -> Wave.t -> unit
+  val fold : db -> init:'a -> f:('a -> Wave.t-> 'a) -> 'a
+end
 
 (** {5 Reporting } *)
 

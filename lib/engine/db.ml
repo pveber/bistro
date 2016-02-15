@@ -174,7 +174,24 @@ end
 module Stats_table = Table(Step)(Stats)
 
 
+module Wave = struct
+  type t = {
+    name : string ;
+    description : string ;
+    targets : Workflow.u list ;
+  }
+  with sexp
 
+  let to_string x =
+    Sexp.to_string (sexp_of_t x)
+
+  let of_string x =
+    t_of_sexp (Sexp.of_string x)
+
+  let id = "waves"
+end
+
+module Wave_table = Table(String)(Wave)
 
 
 (* Database initialization and check *)
@@ -202,6 +219,7 @@ let check_paths_of_db_exist path =
   in
   let checks =
     Stats_table.check path ::
+    Wave_table.check path ::
     List.map dir_paths ~f:(check_path `Dir)
   in
   match filter_errors checks with
