@@ -323,15 +323,15 @@ let report_step db step =
   bprintf buf "+------------------------------------------------------------------------------+\n" ;
   bprintf buf "| Script                                                                       |\n" ;
   bprintf buf "+------------------------------------------------------------------------------+\n" ;
-  bprintf buf "%s" script ;
+  bprintf buf "%s\n" script ;
   bprintf buf "+------------------------------------------------------------------------------+\n" ;
   bprintf buf "| STDOUT                                                                       |\n" ;
   bprintf buf "+------------------------------------------------------------------------------+\n" ;
-  bprintf buf "%s" (In_channel.read_all (stdout_path db step)) ;
+  bprintf buf "%s\n" (In_channel.read_all (stdout_path db step)) ;
   bprintf buf "+------------------------------------------------------------------------------+\n" ;
   bprintf buf "| STDERR                                                                       |\n" ;
   bprintf buf "+------------------------------------------------------------------------------+\n" ;
-  bprintf buf "%s" (In_channel.read_all (stderr_path db step)) ;
+  bprintf buf "%s\n" (In_channel.read_all (stderr_path db step)) ;
   Buffer.contents buf
 
 let report db = function
