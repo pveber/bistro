@@ -21,7 +21,7 @@ make clean
 |}]
 
 let meme_chip ?meme_nmotifs ?meme_minw ?meme_maxw ?meme_p fa =
-  workflow [
+  workflow ~descr:"meme_chip" [
     cmd ~path:[package] "meme_chip" [
       option (opt "-meme-nmotifs" int) meme_nmotifs ;
       option (opt "-meme-minw" int) meme_minw ;
