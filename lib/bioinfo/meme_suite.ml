@@ -1,7 +1,7 @@
 open Types
 open Bistro.EDSL_sh
 
-let package = Bistro.Workflow.make [%sh{|
+let package = Bistro.Workflow.make ~descr:"meme_suite.package" [%sh{|
 PREFIX={{ dest }}
 
 URL=ftp://ftp.ebi.edu.au/pub/software/MEME/4.9.1/meme_4.9.1.tar.gz
