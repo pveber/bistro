@@ -78,7 +78,7 @@ make -C src/hg/gpToGtf \
 
 let chromosome_sequences org =
   let org = string_of_genome org in
-  workflow ~descr:"ucsc_gb.chromosome_sequence" [
+  workflow ~descr:(sprintf "ucsc_gb.chromosome_sequence(%s)" org) [
     mkdir_p dest ;
     cd dest ;
     wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/chromosomes/*" org) () ;
@@ -88,7 +88,7 @@ let chromosome_sequences org =
 let genome_sequence org =
   let chr_seqs = chromosome_sequences org in
   let open Workflow in
-  workflow ~descr:"ucsc_db.genome_sequence" [
+  workflow ~descr:"ucsc_gb.genome_sequence" [
     cmd "bash" [
       opt "-c" string "'shopt -s nullglob ; cat $0/{chr?.fa,chr??.fa,chr???.fa,chr????.fa} > $1'" ;
       dep chr_seqs ;
@@ -101,7 +101,7 @@ let genome_sequence org =
    to create first a directory and then to select the unique file in it...*)
 let genome_2bit_sequence_dir org =
   let org = string_of_genome org in
-  workflow [
+  workflow ~descr:(sprintf "ucsc_gb.2bit_sequence(%s)" org) [
     mkdir dest ;
     and_list [
       cd dest ;
@@ -123,7 +123,7 @@ let genome_2bit_sequence org =
 (* (\* let wg_encode_crg_mappability_100 org = wg_encode_crg_mappability 100 org *\) *)
 
 let twoBitToFa bed twobits =
-  workflow [
+  workflow ~descr:"ucsc_gb.twoBitToFa" [
     cmd ~path:[package] "twoBitToFa" [
       opt' "-bed" dep bed ;
       dep twobits ;
@@ -163,7 +163,7 @@ let twoBitToFa bed twobits =
 (** {5 Chromosome size and clipping} *)
 
 let fetchChromSizes org =
-  workflow [
+  workflow ~descr:"ucsc_gb.fetchChromSizes" [
     cmd "fetchChromSizes" ~path:[package] ~stdout:dest [
       string (string_of_genome org) ;
     ]
@@ -203,7 +203,7 @@ let fetchChromSizes org =
 
 let bedGraphToBigWig org bg =
   let tmp = seq [ tmp ; string "/sorted.bedGraph" ] in
-  workflow [
+  workflow ~descr:"bedGraphToBigWig" [
     cmd "sort" ~stdout:tmp [
       string "-k1,1" ;
       string "-k2,2n" ;
@@ -233,7 +233,11 @@ let bedToBigBed_command org bed =
   and_list [ sort ; bedToBigBed ]
 
 let bedToBigBed org =
-  let f bed = workflow [ bedToBigBed_command org bed ] in
+  let f bed =
+    workflow
+      ~descr:"ucsc_gb.bedToBigBed"
+      [ bedToBigBed_command org bed ]
+  in
   function
   | `bed3 bed -> f bed
   | `bed5 bed -> f bed
