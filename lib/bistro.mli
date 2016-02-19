@@ -54,6 +54,8 @@ module Workflow : sig
   val select : (_ directory as 'a) t -> ('a, 'b) selector -> 'b t
 
   val u : _ t -> u
+
+  val to_dot : u -> out_channel -> unit
 end
 
 module EDSL : sig
