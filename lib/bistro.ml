@@ -337,6 +337,15 @@ module EDSL_sh = struct
       |> List.concat
     )
     @ (S " " :: cmd)
+
+  let heredoc ~dest contents =
+    List.concat [
+      [ S "cat > " ] ;
+      dest ;
+      [ S " <<__HEREDOC__\n" ] ;
+      contents ;
+      [ S "\n__HEREDOC__" ]
+    ]
 end
 
 module Std = struct

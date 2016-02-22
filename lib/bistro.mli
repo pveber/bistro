@@ -128,6 +128,7 @@ module EDSL_sh : sig
   val cd : expr -> cmd
   val rm_rf : expr -> cmd
   val mv : expr -> expr -> cmd
+  val heredoc : dest:expr -> expr -> cmd
 end
 
 module Script : sig
