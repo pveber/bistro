@@ -90,6 +90,12 @@ module Wave_table : sig
   val fold : db -> init:'a -> f:('a -> Wave.t-> 'a) -> 'a
 end
 
+
+module Submitted_script_table : sig
+  val get : db -> Workflow.step -> string option
+  val set : db -> Workflow.step -> string -> unit
+end
+
 (** {5 Reporting } *)
 
 val report : t -> Workflow.u -> string

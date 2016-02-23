@@ -195,6 +195,15 @@ end
 module Wave_table = Table(String)(Wave)
 
 
+module Submitted_script = struct
+  type t = string
+  let to_string x = x
+  let of_string x = x
+  let id = "scripts"
+end
+
+module Submitted_script_table = Table(Step)(Submitted_script)
+
 (* Database initialization and check *)
 
 
@@ -218,6 +227,7 @@ let check_dirs_of_db_exist path =
   let checks =
     Stats_table.check path ::
     Wave_table.check path ::
+    Submitted_script_table.check path ::
     List.map dir_paths ~f:(check_path `Dir)
   in
   match filter_errors checks with
@@ -313,17 +323,17 @@ let workflow_path db w = workflow_path' db (Workflow.u w)
 
 let report_step db step =
   let buf = Buffer.create 251 in
-  let dest = build_path db step in
-  let tmp = tmp_path db step in
-  let script = Script.to_string ~string_of_workflow:(workflow_path' db) ~dest ~tmp step.script in
+  let script = Submitted_script_table.get db step in
   bprintf buf "################################################################################\n" ;
   bprintf buf "###\n" ;
   bprintf buf "##    Report on %s \n" step.id ;
   bprintf buf "#\n" ;
-  bprintf buf "+------------------------------------------------------------------------------+\n" ;
-  bprintf buf "| Script                                                                       |\n" ;
-  bprintf buf "+------------------------------------------------------------------------------+\n" ;
-  bprintf buf "%s\n" script ;
+  Option.iter script ~f:(fun script ->
+      bprintf buf "+------------------------------------------------------------------------------+\n" ;
+      bprintf buf "| Submitted script                                                             |\n" ;
+      bprintf buf "+------------------------------------------------------------------------------+\n" ;
+      bprintf buf "%s\n" script
+    ) ;
   bprintf buf "+------------------------------------------------------------------------------+\n" ;
   bprintf buf "| STDOUT                                                                       |\n" ;
   bprintf buf "+------------------------------------------------------------------------------+\n" ;
