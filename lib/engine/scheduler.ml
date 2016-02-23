@@ -304,7 +304,7 @@ and build_step
     let dest = Db.build_path e.db step in
     let tmp = Db.tmp_path e.db step in
     let script_text =
-      Script.to_string ~string_of_workflow:(Db.workflow_path' e.db) ~dest ~tmp script
+      Script.to_string ~string_of_workflow:(Db.workflow_path' e.db) ~dest ~tmp ~np ~mem script
     in
     Db.Submitted_script_table.set e.db step script_text ;
     remove_if_exists stdout >>= fun () ->

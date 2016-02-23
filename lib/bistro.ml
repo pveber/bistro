@@ -57,6 +57,8 @@ module T = struct
     | D of u
     | DEST
     | TMP
+    | NP
+    | MEM
 
   and interpreter = [
     | `bash
@@ -86,18 +88,21 @@ module Script = struct
   let deps s =
     List.filter_map s.tokens ~f:(function
         | D r -> Some (r :> u)
-        | S _ | DEST | TMP -> None
+        | S _ | DEST | TMP | NP | MEM -> None
       )
     |> List.dedup
 
-  let string_of_token ~string_of_workflow ~tmp ~dest = function
+  let string_of_token ~string_of_workflow ~tmp ~dest ~np ~mem = function
     | S s -> s
     | D w -> string_of_workflow (w :> u)
     | DEST -> dest
     | TMP -> tmp
+    | NP -> string_of_int np
+    | MEM -> string_of_int mem
 
-  let to_string ~string_of_workflow ~tmp ~dest script =
-    List.map script.tokens ~f:(string_of_token ~string_of_workflow ~tmp ~dest)
+  let to_string ~string_of_workflow ~tmp ~dest ~np ~mem script =
+    let f = string_of_token ~string_of_workflow ~tmp ~dest ~np ~mem in
+    List.map script.tokens ~f
     |> String.concat
 end
 
@@ -195,6 +200,9 @@ module EDSL = struct
 
   let dest = [ DEST ]
   let tmp = [ TMP ]
+  let np = [ NP ]
+  let mem = [ MEM ]
+
   let string s = [ S s ]
   let int i = [ S (string_of_int i) ]
   let float f = [ S (Float.to_string f) ]

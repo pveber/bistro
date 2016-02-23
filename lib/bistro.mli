@@ -75,6 +75,8 @@ module EDSL : sig
 
   val dest : expr
   val tmp : expr
+  val np : expr
+  val mem : expr
   val string : string -> expr
   val int : int -> expr
   val float : float -> expr
@@ -139,6 +141,8 @@ module Script : sig
     string_of_workflow:(Workflow.u -> string) ->
     tmp:string ->
     dest:string ->
+    np:int ->
+    mem:int ->
     t -> string
 end
 
