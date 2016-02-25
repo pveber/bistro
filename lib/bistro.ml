@@ -136,6 +136,8 @@ module Workflow = struct
                      version,
                      Script.to_string
                        ~string_of_workflow:id
+                       ~np:1
+                       ~mem:1024
                        ~tmp:"TMP"
                        ~dest:"DEST"
                        script) in
