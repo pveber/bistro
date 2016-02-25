@@ -16,15 +16,17 @@ type backend =
   np:int ->
   mem:int ->
   timeout:int ->
-  stdout:string ->
-  stderr:string ->
-  interpreter:interpreter ->
-  script:string ->
+  stdout:string -> (* path where stdout of the job is expected *)
+  stderr:string -> (* path where stderr of the job is expected *)
+  dest:string ->   (* path where the result of the job is expected *)
+  tmp:string ->    (* path that can be used for temp files *)
+  workflow_path:(Workflow.u -> string) ->
+  script:Workflow.script ->
   (unit, backend_error) result Lwt.t
 
 val local_backend : np:int -> mem:int -> backend
 
-val pbs_backend : queue:string -> backend
+val pbs_backend : workdir:string -> queue:string -> backend
 
 
 type t

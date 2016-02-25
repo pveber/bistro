@@ -100,15 +100,16 @@ type backend_error = [
   | `Unsupported_interpreter
 ]
 
-
 type backend =
   np:int ->
   mem:int ->
   timeout:int ->
-  stdout:string ->
-  stderr:string ->
-  interpreter:interpreter ->
-  script:string ->
+  stdout:string -> (* path where stdout of the job is expected *)
+  stderr:string -> (* path where stderr of the job is expected *)
+  dest:string ->   (* path where the result of the job is expected *)
+  tmp:string ->    (* path that can be used for temp files *)
+  workflow_path:(Workflow.u -> string) ->
+  script:Workflow.script ->
   (unit, backend_error) result Lwt.t
 
 let redirection filename =
@@ -136,14 +137,26 @@ let extension_of_interpreter = function
   | `R -> "R"
   | `sh -> "sh"
 
-let local_backend ~np ~mem =
+let local_backend ~np ~mem : backend =
   let pool = Pool.create ~np ~mem in
-  fun ~np ~mem ~timeout ~stdout ~stderr ~interpreter ~script ->
+  fun
+    ~np ~mem ~timeout
+    ~stdout ~stderr ~dest ~tmp ~workflow_path
+    ~script ->
     Pool.use pool ~np ~mem ~f:(fun ~np ~mem ->
+        let interpreter = Script.interpreter script in
         match interpreter with
         | `sh | `bash | `R ->
-          let script_file = Filename.temp_file "guizmin" ("." ^ extension_of_interpreter interpreter) in
-          Lwt_io.(with_file ~mode:output script_file (fun oc -> write oc script)) >>= fun () ->
+          let script_extension = extension_of_interpreter interpreter in
+          let script_file =
+            Filename.temp_file "guizmin" ("." ^ script_extension) in
+          let script_text =
+            Script.to_string
+              ~string_of_workflow:workflow_path
+              ~np ~mem ~dest ~tmp script in
+          Lwt_io.(with_file
+                    ~mode:output script_file
+                    (fun oc -> write oc script_text)) >>= fun () ->
           redirection stdout >>= fun stdout ->
           redirection stderr >>= fun stderr ->
           let cmd = interpreter_cmd script_file interpreter in
@@ -159,25 +172,63 @@ let local_backend ~np ~mem =
         | _ -> Lwt.return (`Error `Unsupported_interpreter)
       )
 
-let pbs_backend ~queue : backend =
-  fun ~np ~mem ~timeout ~stdout ~stderr ~interpreter ~script ->
+let pbs_backend ~workdir ~queue : backend =
+  let new_id =
+    let id = ref 0 in
+    fun () -> incr id ; !id
+  in
+  fun
+    ~np ~mem ~timeout
+    ~stdout ~stderr ~dest ~tmp ~workflow_path
+    ~script ->
+    let interpreter = Script.interpreter script in
     match interpreter with
-    | `sh | `bash | `R -> (
-        let path_to_script = Filename.temp_file "guizmin" ("." ^ extension_of_interpreter interpreter) in
-        Lwt_io.(with_file ~mode:output path_to_script (fun oc -> write oc script)) >>= fun () ->
+    | `sh | `bash -> (
+        let id = new_id () in
+        let workdir = sprintf "%s/%06d" workdir id in
+        let node_dest   = Filename.concat workdir "dest"   in
+        let node_tmp    = Filename.concat workdir "tmp"    in
+        let node_stdout = Filename.concat workdir "stdout" in
+        let node_stderr = Filename.concat workdir "stderr" in
+        let script_text =
+          Script.to_string
+            ~string_of_workflow:workflow_path
+            ~np ~mem ~dest:node_dest ~tmp:node_tmp script in
+        let ext = extension_of_interpreter interpreter in
+        let script_file = Filename.concat tmp ("script." ^ ext) in
+        Lwt_io.(with_file
+                  ~mode:output script_file
+                  (fun oc -> write oc script_text)) >>= fun () ->
+        let pbs_script_body =
+          [
+            sprintf "mkdir -p %s" node_tmp ;
+            sprintf "bash %s > %s 2> %s" script_file node_stdout node_stderr ;
+            "ECODE=$?" ;
+            sprintf "cp %s %s" node_stdout stdout ;
+            sprintf "cp %s %s" node_stderr stderr ;
+            sprintf "if [ $ECODE -eq 0 ]; then cp %s %s; fi" node_dest dest ;
+            sprintf "rm -rf %s" workdir ;
+            "exit $ECODE" ;
+          ]
+          |> String.concat ~sep:"\n"
+        in
         let pbs_script =
           Pbs.Script.raw
             ~queue
             ~walltime:(`Hours 0.1)
-            ~stderr_path:stderr
-            ~stdout_path:stdout
-            script
+            ~stderr_path:"/dev/null"
+            ~stdout_path:"/dev/null"
+            pbs_script_body
         in
         Bistro_pbs.submit ~queue pbs_script >>= function
-        | `Error (`Failure msg) -> Lwt.fail (Failure ("PBS FAILURE: " ^ msg))
-        | `Error (`Qsub_failure (msg, _)) -> Lwt.fail (Failure ("QSUB FAILURE: " ^ msg))
-        | `Error (`Qstat_failure (msg, _)) -> Lwt.fail (Failure ("QSTAT FAILURE: " ^ msg))
-        | `Error (`Qstat_wrong_output msg) -> Lwt.fail (Failure ("QSTAT WRONG OUTPUT: " ^ msg))
+        | `Error (`Failure msg) ->
+          Lwt.fail (Failure ("PBS FAILURE: " ^ msg))
+        | `Error (`Qsub_failure (msg, _)) ->
+          Lwt.fail (Failure ("QSUB FAILURE: " ^ msg))
+        | `Error (`Qstat_failure (msg, _)) ->
+          Lwt.fail (Failure ("QSTAT FAILURE: " ^ msg))
+        | `Error (`Qstat_wrong_output msg) ->
+          Lwt.fail (Failure ("QSTAT WRONG OUTPUT: " ^ msg))
         | `Ok qstat -> (
             match Pbs.Qstat.raw_field qstat "exit_status" with
             | None -> Lwt.fail (Failure "missing exit status")
@@ -303,8 +354,10 @@ and build_step
     let stderr = Db.stderr_path e.db step in
     let dest = Db.build_path e.db step in
     let tmp = Db.tmp_path e.db step in
+    let workflow_path = Db.workflow_path' e.db in
     let script_text =
-      Script.to_string ~string_of_workflow:(Db.workflow_path' e.db) ~dest ~tmp ~np ~mem script
+      Script.to_string
+        ~string_of_workflow:workflow_path ~dest ~tmp ~np ~mem script
     in
     Db.Submitted_script_table.set e.db step script_text ;
     remove_if_exists stdout >>= fun () ->
@@ -313,9 +366,9 @@ and build_step
     remove_if_exists tmp >>= fun () ->
     Lwt_unix.mkdir tmp 0o750 >>= fun () ->
     e.backend
-      ~np ~mem ~timeout ~stdout ~stderr
-      ~interpreter:(Script.interpreter script)
-      ~script:script_text >>= fun response ->
+      ~np ~mem ~timeout
+      ~stdout ~stderr ~dest ~tmp ~workflow_path
+      ~script:script >>= fun response ->
     match response, Sys.file_exists_exn dest with
     | `Ok (), true ->
       remove_if_exists tmp >>= fun () ->
