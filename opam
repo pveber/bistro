@@ -19,6 +19,7 @@ remove: [
 depends: [
   "oasis" {build}
   "ocamlfind" {build}
+  "cohttp"
   "core"
   "dbm"
   "lwt"
