@@ -42,7 +42,7 @@ let make_task
       "ECODE=$?" ;
       sprintf "cp %s %s" node_stdout stdout ;
       sprintf "cp %s %s" node_stderr stderr ;
-      sprintf "if [ $ECODE -eq 0 ]; then cp %s %s; fi" node_dest dest ;
+      sprintf "if [ $ECODE -eq 0 ]; then if [ -e %s ]; then cp %s %s; fi fi" node_dest node_dest dest ;
       sprintf "rm -rf %s" workdir ;
       "exit $ECODE" ;
     ]
@@ -51,7 +51,7 @@ let make_task
   let pbs_script =
     Pbs.Script.raw
       ~queue
-      ~walltime:(`Hours 0.1)
+      ~walltime:(`Hours (float timeout))
       ~stderr_path:"/dev/null"
       ~stdout_path:"/dev/null"
       pbs_script_body
