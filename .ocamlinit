@@ -1,3 +1,6 @@
+#use "topfind";;
+#thread;;
+
 #require "core.top lwt.unix dbm pbs rresult cohttp.lwt";;
 
 #directory "_build/lib";;

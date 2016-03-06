@@ -26,8 +26,6 @@ type backend =
 
 val local_backend : np:int -> mem:int -> backend
 
-val pbs_backend : workdir:string -> queue:string -> backend
-
 
 type t
 

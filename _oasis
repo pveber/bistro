@@ -58,10 +58,10 @@ Library bistro_engine
   Modules:          Db, Scheduler
   FindlibName:      engine
   FindlibParent:    bistro
-  BuildDepends:     bistro, bistro.pbs, core, dbm,
+  BuildDepends:     bistro, core, dbm,
                     lwt.preemptive, lwt.unix,
                     pvem, rresult, threads
-  XMETARequires:    bistro, bistro.pbs, core, dbm, lwt.preemptive, lwt.unix,
+  XMETARequires:    bistro, core, dbm, lwt.preemptive, lwt.unix,
                     pvem, rresult, threads
   XMETADescription: Execution engine for bistro workflows
 
@@ -76,11 +76,12 @@ Library bistro_utils
 
 Library bistro_pbs
   Path:             lib/pbs
-  Modules:          Bistro_pbs
+  Pack:             true
+  Modules:          Backend, Client
   FindlibName:      pbs
   FindlibParent:    bistro
-  BuildDepends:     lwt.unix, pbs
-  XMETARequires:    lwt.unix, pbs
+  BuildDepends:     bistro.engine, lwt.unix, pbs
+  XMETARequires:    bistro.engine, lwt.unix, pbs
   XMETADescription: FIXME
 
 Library bistro_rest

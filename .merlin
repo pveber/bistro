@@ -11,8 +11,6 @@ S lib/utils
 S lib/pbs
 S ppx
 S test
-PKG bistro
-PKG ppx_bistro
 PKG compiler-libs.common
 PKG ppx_tools.metaquot
 PKG core
