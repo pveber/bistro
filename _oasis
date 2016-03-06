@@ -128,6 +128,12 @@ Executable fail
   BuildDepends:     bistro.utils
   CompiledObject:   byte
 
+Executable pbs_test
+  Path:             test
+  MainIs:           pbs_test.ml
+  BuildDepends:     bistro.engine, bistro.pbs
+  CompiledObject:   byte
+
 Executable sacCer2_pho4
   Path:             app
   MainIs:           sacCer2_pho4.ml
