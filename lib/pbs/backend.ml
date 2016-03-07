@@ -20,7 +20,7 @@ let extension_of_interpreter = function
 
 let make_task
     ~workdir ~queue
-    ~np ~mem ~timeout
+    ~np ~mem ?timeout
     ~stdout ~stderr ~dest ~tmp ~workflow_path
     ~script =
 
@@ -51,7 +51,7 @@ let make_task
   let pbs_script =
     Pbs.Script.raw
       ~queue
-      ~walltime:(`Hours (float timeout))
+      ?walltime:(Option.map timeout ~f:(fun x -> `Hours (float x)))
       ~stderr_path:"/dev/null"
       ~stdout_path:"/dev/null"
       pbs_script_body
@@ -74,7 +74,7 @@ let make ~workdir ~queue : Scheduler.backend =
       let workdir = sprintf "%s/%06d" workdir id in
       let task =
         make_task
-          ~np ~mem ~timeout
+          ~np ~mem ?timeout
           ~stdout ~stderr ~dest ~tmp ~workflow_path
           ~script ~workdir ~queue
       in

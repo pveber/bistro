@@ -28,7 +28,7 @@ module Workflow : sig
     script : script ;
     np : int ; (** Required number of processors *)
     mem : int ; (** Required memory in MB *)
-    timeout : int ; (** Maximum allowed running time in hours *)
+    timeout : int option ; (** Maximum allowed running time in hours *)
     version : int option ; (** Version number of the wrapper *)
   }
 

@@ -103,7 +103,7 @@ type backend_error = [
 type backend =
   np:int ->
   mem:int ->
-  timeout:int ->
+  timeout:int option ->
   stdout:string -> (* path where stdout of the job is expected *)
   stderr:string -> (* path where stderr of the job is expected *)
   dest:string ->   (* path where the result of the job is expected *)

@@ -43,7 +43,7 @@ module T = struct
     script : script ;
     np : int ; (** Required number of processors *)
     mem : int ; (** Required memory in MB *)
-    timeout : int ; (** Maximum allowed running time in hours *)
+    timeout : int option ; (** Maximum allowed running time in hours *)
     version : int option ; (** Version number of the wrapper *)
   }
 
@@ -128,7 +128,7 @@ module Workflow = struct
       ?(descr = "")
       ?(mem = 100)
       ?(np = 1)
-      ?(timeout = 24)
+      ?timeout
       ?version
       script =
     let deps = Script.deps script in
