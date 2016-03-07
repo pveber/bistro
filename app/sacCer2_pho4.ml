@@ -21,7 +21,7 @@ let chIP_pho4_noPi_macs2 = Macs2.callpeak chIP_pho4_noPi_bam
 
 let () =
   Bistro_app.(
-    simple ~np:4 ~mem:(10 * 1024) [
+    local ~np:4 ~mem:(10 * 1024) [
       [ "output" ; "chIP_pho4_noPi_macs2.peaks" ] %> chIP_pho4_noPi_macs2
     ]
   )

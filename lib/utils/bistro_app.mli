@@ -5,7 +5,7 @@ type target
 
 val ( %> ) : string list -> _ workflow -> target
 
-val simple :
+val local :
   ?np:int ->
   ?mem:int ->
   target list -> unit

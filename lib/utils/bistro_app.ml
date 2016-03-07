@@ -62,5 +62,5 @@ let with_backend backend targets =
   in
   Lwt_unix.run main
 
-let simple ?(np = 1) ?(mem = 1024) targets =
+let local ?(np = 1) ?(mem = 1024) targets =
   with_backend (Scheduler.local_backend ~np ~mem) targets
