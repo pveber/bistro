@@ -19,26 +19,32 @@ let chIP_pho4_noPi_bam = Samtools.(indexed_bam_of_sam chIP_pho4_noPi_sam / index
 
 let chIP_pho4_noPi_macs2 = Macs2.callpeak chIP_pho4_noPi_bam
 
-let () =
+let np = 4
+let mem = 10 * 1024
+
+let main queue workdir () =
+  let backend = match queue with
+    | None -> Bistro_engine.Scheduler.local_backend ~np ~mem
+    | Some queue ->
+      let workdir = Option.value ~default:(Sys.getcwd ()) workdir in
+      Bistro_pbs.Backend.make ~queue ~workdir
+  in
   Bistro_app.(
-    local ~np:4 ~mem:(10 * 1024) [
+    with_backend backend [
       [ "output" ; "chIP_pho4_noPi_macs2.peaks" ] %> chIP_pho4_noPi_macs2
     ]
   )
 
-(*
-    Scheduler.pbs_backend ~queue
-
 let spec =
   let open Command.Spec in
   empty
-  +> flag "--pbs" (optional string) ~doc:"Name of a PBS queue"
+  +> flag "--pbsqueue" (optional string) ~doc:"QUEUE Name of a PBS queue"
+  +> flag "--nodedir"  (optional string) ~doc:"DIR (Preferably local) scratch directory on worker nodes"
 
 let command =
   Command.basic
-    ~summary:"Runs echo on a PBS cluster"
+    ~summary:"Analysis of a ChIP-seq dataset"
     spec
     main
 
-let () = Command.run ~version:"0.0" command
-*)
+let () = Command.run ~version:"0.1" command

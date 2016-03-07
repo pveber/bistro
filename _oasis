@@ -137,7 +137,7 @@ Executable pbs_test
 Executable sacCer2_pho4
   Path:             app
   MainIs:           sacCer2_pho4.ml
-  BuildDepends:     bistro.utils, bistro.bioinfo
+  BuildDepends:     bistro.utils, bistro.bioinfo, bistro.pbs
   CompiledObject:   byte
   
 Document API
