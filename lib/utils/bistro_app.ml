@@ -52,13 +52,15 @@ let error_report = function
         prerr_endline report
       )
 
-let simple ?(np = 1) ?(mem = 1024) targets =
+let with_backend backend targets =
   let main =
     let db = Db.init_exn "_bistro" in
-    let backend = Scheduler.local_backend ~np ~mem in
     let scheduler = Scheduler.make backend db in
     Lwt_list.map_p (foreach_target db scheduler) targets >>= fun results ->
     List.iter results ~f:error_report ;
     return ()
   in
   Lwt_unix.run main
+
+let simple ?(np = 1) ?(mem = 1024) targets =
+  with_backend (Scheduler.local_backend ~np ~mem) targets
