@@ -19,7 +19,7 @@ mv bowtie-1.0.1 bin
 
 (* memory bound correspond to storing a human index in memory, following bowtie manual *)
 let bowtie_build ?packed ?color fa =
-  workflow ~descr:"bowtie_build" ~mem:(3 * 1024) ~timeout:24 [
+  workflow ~descr:"bowtie_build" ~mem:(3 * 1024) [
     mkdir_p dest ;
     cmd "bowtie-build" ~path:[package] [
       option (flag string "-a -p") packed ;
@@ -44,7 +44,7 @@ let bowtie ?l ?e ?m ?fastq_format ?n ?v ?p ?maxins index fastq_files =
         opt "-2" (list dep ~sep:",") fqs2
       ]
   in
-  workflow ~descr:"bowtie" ~mem:(3 * 1024) ~timeout:24 ?np:p [
+  workflow ~descr:"bowtie" ~mem:(3 * 1024) ?np:p [
     cmd "bowtie" ~path:[package] [
       string "-S" ;
       option (opt "-n" int) n ;

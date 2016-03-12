@@ -138,12 +138,16 @@ let local_backend ~np ~mem : backend =
           let tmp = Db.tmp_path db step in
           let string_of_workflow = Db.workflow_path' db in
           let script_extension = extension_of_interpreter interpreter in
+          let pkgvar _ var =
+            let dir = Bistro.string_of_package_variable var in
+            Filename.concat "/usr" dir
+          in
           let script_file =
             Filename.temp_file "guizmin" ("." ^ script_extension) in
           let script_text =
             Script.to_string
               ~string_of_workflow
-              ~np ~mem ~dest ~tmp script in
+              ~np ~mem ~dest ~pkgvar ~tmp script in
           Lwt_io.(with_file
                     ~mode:output script_file
                     (fun oc -> write oc script_text)) >>= fun () ->

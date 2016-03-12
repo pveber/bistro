@@ -55,6 +55,7 @@ module T = struct
   and token =
     | S of string
     | D of u
+    | PKGVAR of package * package_variable
     | DEST
     | TMP
     | NP
@@ -70,7 +71,20 @@ module T = struct
     | `sh
   ]
 
+  and package = {
+    pkg_name : string ;
+    pkg_version : string ;
+  }
+
+  and package_variable = [ `bin | `inc | `lib | `share ]
+
   with sexp
+
+  let string_of_package_variable = function
+    | `bin -> "bin"
+    | `lib -> "lib"
+    | `inc -> "include"
+    | `share -> "share"
 end
 
 include T
@@ -88,20 +102,21 @@ module Script = struct
   let deps s =
     List.filter_map s.tokens ~f:(function
         | D r -> Some (r :> u)
-        | S _ | DEST | TMP | NP | MEM -> None
+        | S _ | DEST | TMP | NP | MEM | PKGVAR _ -> None
       )
     |> List.dedup
 
-  let string_of_token ~string_of_workflow ~tmp ~dest ~np ~mem = function
+  let string_of_token ~string_of_workflow ~tmp ~dest ~pkgvar ~np ~mem = function
     | S s -> s
     | D w -> string_of_workflow (w :> u)
     | DEST -> dest
     | TMP -> tmp
     | NP -> string_of_int np
     | MEM -> string_of_int mem
+    | PKGVAR (pkg, var) -> pkgvar pkg var
 
-  let to_string ~string_of_workflow ~tmp ~dest ~np ~mem script =
-    let f = string_of_token ~string_of_workflow ~tmp ~dest ~np ~mem in
+  let to_string ~string_of_workflow ~tmp ~dest ~pkgvar ~np ~mem script =
+    let f = string_of_token ~string_of_workflow ~tmp ~dest ~pkgvar ~np ~mem in
     List.map script.tokens ~f
     |> String.concat
 end
@@ -188,8 +203,6 @@ module Workflow = struct
 end
 
 type 'a directory = [`directory of 'a]
-type package = [`package] directory
-
 
 module EDSL = struct
   type expr = token list
@@ -210,6 +223,7 @@ module EDSL = struct
   let float f = [ S (Float.to_string f) ]
   let path p = [ S (string_of_path p) ]
   let dep w = [ D w ]
+  let pkgvar pkg var = [ PKGVAR (pkg, var) ]
 
   let quote ?(using = '"') e =
     let quote_symbol = Char.to_string using in
@@ -368,7 +382,6 @@ module Std = struct
   end
 
   type 'a directory = [`directory of 'a]
-  type package = [`package] directory
   type 'a zip = ([`zip of 'a], [`binary]) file
   type 'a gz = ([`gz of 'a], [`binary]) file constraint 'a = (_,_) #file
   type 'a bz2 = ([`bz2 of 'a], [`binary]) file constraint 'a = (_,_) #file

@@ -34,7 +34,7 @@ let tophat1 ?num_threads ?color index fqs =
         list dep ~sep:"," fqs2
       ]
   in
-  workflow ?np:num_threads ~mem:(4 * 1024) ~timeout:24 [
+  workflow ?np:num_threads ~mem:(4 * 1024) [
     cmd ~path:[package ; Bowtie.package ; Samtools.package] "tophat" [
       option (opt "--num-threads" int) num_threads ;
       option (flag string "--color") color ;
@@ -54,7 +54,7 @@ let tophat2 ?num_threads index fqs =
         list dep ~sep:"," fqs2
       ]
   in
-  workflow ?np:num_threads ~mem:(4 * 1024) ~timeout:24 [
+  workflow ?np:num_threads ~mem:(4 * 1024) [
     cmd ~path:[package ; Bowtie2.package ; Samtools.package] "tophat2" [
       option (opt "--num-threads" int) num_threads ;
       opt "--output-dir" ident dest ;

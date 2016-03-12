@@ -18,7 +18,7 @@ mv bowtie2-2.2.4 bin
 
 (* memory bound correspond to storing a human index in memory, following bowtie manual *)
 let bowtie2_build ?large_index ?noauto ?packed ?bmax ?bmaxdivn ?dcv ?nodc ?noref ?justref ?offrate ?ftabchars ?seed ?cutoff fa =
-  workflow ~descr:"bowtie2_build" ~mem:(3 * 1024) ~timeout:24 [
+  workflow ~descr:"bowtie2_build" ~mem:(3 * 1024) [
     mkdir_p dest ;
     cmd "bowtie2-build" ~path:[package] [
       option (flag string "--large-index") large_index ;
@@ -82,7 +82,7 @@ let bowtie2
         opt "-2" (list dep ~sep:",") fqs2
       ]
   in
-  workflow ~descr:"bowtie2" ~mem:(3 * 1024) ~timeout:24 ?np:threads [
+  workflow ~descr:"bowtie2" ~mem:(3 * 1024) ?np:threads [
     cmd "bowtie2" ~path:[package] [
       option (opt "--skip" int) skip ;
       option (opt "--qupto" int) qupto ;

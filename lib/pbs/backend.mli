@@ -17,6 +17,7 @@ val make_task :
   dest:string ->   (* path where the result of the job is expected *)
   tmp:string ->    (* path that can be used for temp files *)
   string_of_workflow:(Workflow.u -> string) ->
+  pkgvar:(package -> package_variable -> string) ->
   Workflow.script -> task
 
 val make : workdir:string -> queue:string -> Scheduler.backend

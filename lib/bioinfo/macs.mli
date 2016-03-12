@@ -1,6 +1,6 @@
 open Bistro.Std(* open Bistro_workflow.Types *)
 
-(* val package : package workflow *)
+(* val package : [`package] workflow *)
 
 (* module Xls : sig *)
 (*   type 'a header = (string * (int * (int * (int * (int * (int * (float * (float * 'a)))))))) *)

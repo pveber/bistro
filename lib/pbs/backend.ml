@@ -21,7 +21,7 @@ let extension_of_interpreter = function
 let make_task
     ~workdir ~queue
     ~np ~mem ?timeout
-    ~stdout ~stderr ~dest ~tmp ~string_of_workflow
+    ~stdout ~stderr ~dest ~tmp ~string_of_workflow ~pkgvar
     script =
 
   let interpreter = Script.interpreter script in
@@ -31,7 +31,7 @@ let make_task
   let node_stderr = Filename.concat workdir "stderr" in
   let script_text =
     Script.to_string
-      ~string_of_workflow
+      ~string_of_workflow ~pkgvar
       ~np ~mem ~dest:node_dest ~tmp:node_tmp script in
   let ext = extension_of_interpreter interpreter in
   let script_path = Filename.concat tmp ("script." ^ ext) in
@@ -74,11 +74,15 @@ let make ~workdir ~queue : Scheduler.backend =
     let string_of_workflow = Db.workflow_path' db in
     let id = new_id () in
     let workdir = sprintf "%s/%06d" workdir id in
+    let pkgvar _ var =
+      let dir = Bistro.string_of_package_variable var in
+      Filename.concat "/usr" dir
+    in
     let task =
       make_task
         ~np ~mem
         ~stdout ~stderr ~dest ~tmp ~string_of_workflow
-        ~workdir ~queue script
+        ~workdir ~queue ~pkgvar script
     in
     Lwt_io.(with_file
               ~mode:output task.script_path
