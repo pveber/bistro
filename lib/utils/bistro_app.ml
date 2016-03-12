@@ -25,11 +25,11 @@ let link p p_u =
 
 let foreach_target db scheduler (dest, u) =
   Scheduler.build' scheduler u >|= function
-  | `Ok cache_path ->
+  | Ok cache_path ->
     link dest cache_path ;
-    `Ok ()
-  | `Error xs ->
-    `Error (
+    Ok ()
+  | Error xs ->
+    Error (
       List.map xs ~f:(fun (u, msg) ->
           Bistro.Workflow.id' u,
           msg,
@@ -38,8 +38,8 @@ let foreach_target db scheduler (dest, u) =
     )
 
 let error_report = function
-  | `Ok () -> ()
-  | `Error xs ->
+  | Ok () -> ()
+  | Error xs ->
     List.iter xs ~f:(fun (wid, msg, report) ->
         fprintf stderr "################################################################################\n" ;
         fprintf stderr "#                                                                              #\n" ;

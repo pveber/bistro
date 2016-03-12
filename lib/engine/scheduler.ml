@@ -10,8 +10,8 @@ let string_of_path = function
 let ( >>= ) = Lwt.( >>= )
 let ( >>| ) = Lwt.( >|= )
 let ( >>=? ) x f = x >>= function
-  | `Ok x -> f x
-  | `Error _ as e -> Lwt.return e
+  | Ok x -> f x
+  | Error _ as e -> Lwt.return e
 
 module Pool : sig
   type t
@@ -88,29 +88,17 @@ struct
     )
 end
 
-type ('a, 'b) result = [
-  | `Ok of 'a
-  | `Error of 'b
-]
 
 type error = (Workflow.u * string) list
+type 'a result = ('a, error) Result.t
 
-type backend_error = [
-  | `Script_failure
-  | `Unsupported_interpreter
-]
+type execution_report = {
+  script : string ;
+  exit_status : int ;
+}
 
 type backend =
-  np:int ->
-  mem:int ->
-  timeout:int option ->
-  stdout:string -> (* path where stdout of the job is expected *)
-  stderr:string -> (* path where stderr of the job is expected *)
-  dest:string ->   (* path where the result of the job is expected *)
-  tmp:string ->    (* path that can be used for temp files *)
-  workflow_path:(Workflow.u -> string) ->
-  script:Workflow.script ->
-  (unit, backend_error) result Lwt.t
+  Db.t -> Workflow.step -> execution_report Lwt.t
 
 let redirection filename =
   Lwt_unix.openfile filename Unix.([O_APPEND ; O_CREAT ; O_WRONLY]) 0o640 >>= fun fd ->
@@ -139,20 +127,22 @@ let extension_of_interpreter = function
 
 let local_backend ~np ~mem : backend =
   let pool = Pool.create ~np ~mem in
-  fun
-    ~np ~mem ~timeout
-    ~stdout ~stderr ~dest ~tmp ~workflow_path
-    ~script ->
+  fun db ({ script ; } as step) ->
     Pool.use pool ~np ~mem ~f:(fun ~np ~mem ->
         let interpreter = Script.interpreter script in
         match interpreter with
         | `sh | `bash | `R ->
+          let stdout = Db.stdout_path db step in
+          let stderr = Db.stderr_path db step in
+          let dest = Db.build_path db step in
+          let tmp = Db.tmp_path db step in
+          let string_of_workflow = Db.workflow_path' db in
           let script_extension = extension_of_interpreter interpreter in
           let script_file =
             Filename.temp_file "guizmin" ("." ^ script_extension) in
           let script_text =
             Script.to_string
-              ~string_of_workflow:workflow_path
+              ~string_of_workflow
               ~np ~mem ~dest ~tmp script in
           Lwt_io.(with_file
                     ~mode:output script_file
@@ -160,16 +150,19 @@ let local_backend ~np ~mem : backend =
           redirection stdout >>= fun stdout ->
           redirection stderr >>= fun stderr ->
           let cmd = interpreter_cmd script_file interpreter in
-          Lwt_process.exec ~stdout ~stderr cmd >>=
-          begin
-            function
-            | Caml.Unix.WEXITED 0 ->
-              Lwt_unix.unlink script_file >>= fun () ->
-              Lwt.return (`Ok ())
-            | _ ->
-              Lwt.return (`Error `Script_failure)
-          end
-        | _ -> Lwt.return (`Error `Unsupported_interpreter)
+          Lwt_process.exec ~stdout ~stderr cmd >>= fun status ->
+          let exit_status = Caml.Unix.(match status with
+              | WEXITED code
+              | WSIGNALED code
+              | WSTOPPED code -> code
+            )
+          in
+          Lwt_unix.unlink script_file >>= fun () ->
+          Lwt.return {
+            script = script_text ;
+            exit_status ;
+          }
+        | _ -> Lwt.fail (Failure ("Unsupported_interpreter: " ^ (extension_of_interpreter interpreter)))
       )
 
 
@@ -187,7 +180,7 @@ module CBST :
 sig
   type t
   val create : unit -> t
-  val find_or_add : t -> step -> (unit -> (unit, error) result Lwt.t) -> (unit, error) result Lwt.t
+  val find_or_add : t -> step -> (unit -> unit result Lwt.t) -> unit result Lwt.t
   val join : t -> unit Lwt.t
 end
 =
@@ -201,7 +194,7 @@ struct
   module T = Caml.Hashtbl.Make(S)
 
   type contents =
-    | Thread of (unit, error) result Lwt.t
+    | Thread of unit result Lwt.t
 
   type t = contents T.t
 
@@ -253,13 +246,13 @@ let remove_if_exists fn =
 let join_results xs =
   let f accu x =
     x >>= function
-    | `Ok () -> Lwt.return accu
-    | `Error errors as e ->
+    | Ok () -> Lwt.return accu
+    | Error errors as e ->
       match accu with
-      | `Ok _ -> Lwt.return e
-      | `Error errors' -> Lwt.return (`Error (errors @ errors'))
+      | Ok _ -> Lwt.return e
+      | Error errors' -> Lwt.return (Error (errors @ errors'))
   in
-  Lwt_list.fold_left_s f (`Ok ()) xs
+  Lwt_list.fold_left_s f (Ok ()) xs
 
 
 let rec build_workflow e = function
@@ -269,7 +262,7 @@ let rec build_workflow e = function
     Db.requested e.db step ;
     let dest = Db.workflow_path' e.db u in
     if Sys.file_exists dest = `Yes then
-      Lwt.return (`Ok ())
+      Lwt.return (Ok ())
     else
       CBST.find_or_add e.cbs step (fun () ->
           let dep_threads = List.map step.deps ~f:(build_workflow e) in
@@ -287,40 +280,27 @@ and build_step
     let stderr = Db.stderr_path e.db step in
     let dest = Db.build_path e.db step in
     let tmp = Db.tmp_path e.db step in
-    let workflow_path = Db.workflow_path' e.db in
-    let script_text =
-      Script.to_string
-        ~string_of_workflow:workflow_path ~dest ~tmp ~np ~mem script
-    in
-    Db.Submitted_script_table.set e.db step script_text ;
     remove_if_exists stdout >>= fun () ->
     remove_if_exists stderr >>= fun () ->
     remove_if_exists dest >>= fun () ->
     remove_if_exists tmp >>= fun () ->
     Lwt_unix.mkdir tmp 0o750 >>= fun () ->
-    e.backend
-      ~np ~mem ~timeout
-      ~stdout ~stderr ~dest ~tmp ~workflow_path
-      ~script:script >>= fun response ->
-    match response, Sys.file_exists_exn dest with
-    | `Ok (), true ->
+    e.backend e.db step >>= fun { script ; exit_status } ->
+    Db.Submitted_script_table.set e.db step script ;
+    match exit_status, Sys.file_exists_exn dest with
+    | 0, true ->
       remove_if_exists tmp >>= fun () ->
       Db.built e.db step ;
       Lwt_unix.rename dest (Db.cache_path e.db step) >>= fun () ->
-      Lwt.return (`Ok ())
-    | `Ok (), false ->
+      Lwt.return (Ok ())
+    | 0, false ->
       let msg =
         "Workflow failed to produce its output at the prescribed location."
       in
-      Lwt.return (`Error [ Step step, msg ])
-    | `Error `Script_failure, _ ->
-      let msg = "Script failed" in
-      Lwt.return (`Error [ Step step, msg ])
-    | `Error `Unsupported_interpreter, _ ->
-      let msg =
-        "Unsupported interpreter"
-      in
-      Lwt.return (`Error [ Step step, msg])
+      Lwt.return (Error [ Step step, msg ])
+    | error_code, _ ->
+      let msg = sprintf "Script exited with code %d" error_code in
+      Lwt.return (Error [ Step step, msg ])
   )
 
 and build_input e i =
@@ -332,9 +312,9 @@ and build_input e i =
             "File %s is declared as an input of a workflow but does not exist."
             p
         in
-        `Error [ i, msg ]
+        Error [ i, msg ]
       else
-        `Ok ()
+        Ok ()
     )
 
 and build_select e x dir p =
@@ -348,9 +328,9 @@ and build_select e x dir p =
           p
           dir_path
       in
-      Lwt.return (`Error [ x, msg ])
+      Lwt.return (Error [ x, msg ])
     )
-    else Lwt.return (`Ok ())
+    else Lwt.return (Ok ())
   in
   if Sys.file_exists dir_path = `Yes then (
     check_in_dir () >>=? fun () ->
@@ -359,7 +339,7 @@ and build_select e x dir p =
       | Select _ -> assert false
       | Step s -> Db.requested e.db s
     in
-    Lwt.return (`Ok ())
+    Lwt.return (Ok ())
   )
   else (
     let dir_thread = build_workflow e dir in
@@ -372,17 +352,17 @@ let build' e u =
     if e.on then
       build_workflow e u
     else
-      Lwt.return (`Error [u, "Engine_halted"])
+      Lwt.return (Error [u, "Engine_halted"])
   )
   >>= function
-  | `Ok () -> Lwt.return (`Ok (Db.workflow_path' e.db u))
-  | `Error xs ->
-    Lwt.return (`Error xs)
+  | Ok () -> Lwt.return (Ok (Db.workflow_path' e.db u))
+  | Error xs ->
+    Lwt.return (Error xs)
 
 let build_exn' e w =
   build' e w >>= function
-  | `Ok s -> Lwt.return s
-  | `Error xs ->
+  | Ok s -> Lwt.return s
+  | Error xs ->
     let msgs = List.map ~f:(fun (w, msg) -> Workflow.id' w ^ "\t" ^ msg) xs in
     let msg = sprintf "Some build(s) failed:\n\t%s\n" (String.concat ~sep:"\n\t" msgs) in
     Lwt.fail (Failure msg)

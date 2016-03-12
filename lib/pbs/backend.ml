@@ -21,8 +21,8 @@ let extension_of_interpreter = function
 let make_task
     ~workdir ~queue
     ~np ~mem ?timeout
-    ~stdout ~stderr ~dest ~tmp ~workflow_path
-    ~script =
+    ~stdout ~stderr ~dest ~tmp ~string_of_workflow
+    script =
 
   let interpreter = Script.interpreter script in
   let node_dest   = Filename.concat workdir "dest"   in
@@ -31,7 +31,7 @@ let make_task
   let node_stderr = Filename.concat workdir "stderr" in
   let script_text =
     Script.to_string
-      ~string_of_workflow:workflow_path
+      ~string_of_workflow
       ~np ~mem ~dest:node_dest ~tmp:node_tmp script in
   let ext = extension_of_interpreter interpreter in
   let script_path = Filename.concat tmp ("script." ^ ext) in
@@ -66,34 +66,39 @@ let make ~workdir ~queue : Scheduler.backend =
     let id = ref 0 in
     fun () -> incr id ; !id
   in
-  fun
-    ~np ~mem ~timeout
-    ~stdout ~stderr ~dest ~tmp ~workflow_path
-    ~script ->
-      let id = new_id () in
-      let workdir = sprintf "%s/%06d" workdir id in
-      let task =
-        make_task
-          ~np ~mem ?timeout
-          ~stdout ~stderr ~dest ~tmp ~workflow_path
-          ~script ~workdir ~queue
-      in
-      Lwt_io.(with_file
-                ~mode:output task.script_path
-                (fun oc -> write oc task.script)) >>= fun () ->
-      Client.submit ~queue task.pbs_script >>= function
-      | `Error (`Failure msg) ->
-        Lwt.fail (Failure ("PBS FAILURE: " ^ msg))
-      | `Error (`Qsub_failure (msg, _)) ->
-        Lwt.fail (Failure ("QSUB FAILURE: " ^ msg))
-      | `Error (`Qstat_failure (msg, _)) ->
-        Lwt.fail (Failure ("QSTAT FAILURE: " ^ msg))
-      | `Error (`Qstat_wrong_output msg) ->
-        Lwt.fail (Failure ("QSTAT WRONG OUTPUT: " ^ msg))
-      | `Ok qstat -> (
-          match Pbs.Qstat.raw_field qstat "exit_status" with
-          | None -> Lwt.fail (Failure "missing exit status")
-          | Some code ->
-            if int_of_string code = 0 then Lwt.return (`Ok ())
-            else Lwt.return (`Error `Script_failure)
-        )
+  fun db ({ Workflow.np ; mem ; script } as step) ->
+    let stdout = Db.stdout_path db step in
+    let stderr = Db.stderr_path db step in
+    let dest = Db.build_path db step in
+    let tmp = Db.tmp_path db step in
+    let string_of_workflow = Db.workflow_path' db in
+    let id = new_id () in
+    let workdir = sprintf "%s/%06d" workdir id in
+    let task =
+      make_task
+        ~np ~mem
+        ~stdout ~stderr ~dest ~tmp ~string_of_workflow
+        ~workdir ~queue script
+    in
+    Lwt_io.(with_file
+              ~mode:output task.script_path
+              (fun oc -> write oc task.script)) >>= fun () ->
+    Client.submit ~queue task.pbs_script >>= function
+    | `Error (`Failure msg) ->
+      Lwt.fail (Failure ("PBS FAILURE: " ^ msg))
+    | `Error (`Qsub_failure (msg, _)) ->
+      Lwt.fail (Failure ("QSUB FAILURE: " ^ msg))
+    | `Error (`Qstat_failure (msg, _)) ->
+      Lwt.fail (Failure ("QSTAT FAILURE: " ^ msg))
+    | `Error (`Qstat_wrong_output msg) ->
+      Lwt.fail (Failure ("QSTAT WRONG OUTPUT: " ^ msg))
+    | `Ok qstat -> (
+        match Pbs.Qstat.raw_field qstat "exit_status" with
+        | None -> Lwt.fail (Failure "missing exit status")
+        | Some code ->
+          let exit_status = int_of_string code in
+          Lwt.return {
+            Scheduler.script = task.script ;
+            exit_status ;
+          }
+      )
