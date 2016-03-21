@@ -147,15 +147,22 @@ module Workflow = struct
       ?version
       script =
     let deps = Script.deps script in
-    let id = digest ("step",
-                     version,
-                     Script.to_string
-                       ~string_of_workflow:id
-                       ~np:1
-                       ~mem:1024
-                       ~tmp:"TMP"
-                       ~dest:"DEST"
-                       script) in
+    let script_as_string : string =
+      Script.to_string
+        ~string_of_workflow:id
+        ~pkgvar:(fun { pkg_name ; pkg_version } var ->
+            sprintf "%s:%s:%s"
+              pkg_name
+              pkg_version
+              (string_of_package_variable var)
+          )
+        ~np:1
+        ~mem:1024
+        ~tmp:"TMP"
+        ~dest:"DEST"
+        script
+    in
+    let id = digest ("step", version, script_as_string) in
     Step { descr ; deps ; script ; np ; mem ; timeout ; version ; id }
 
   let select u (Selector path) =
