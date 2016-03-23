@@ -30,6 +30,12 @@ module Utils = struct
     r
 end
 
+type package = {
+  pkg_name : string ;
+  pkg_version : string ;
+}
+with sexp
+
 module T = struct
   type u =
     | Input of string * path
@@ -40,6 +46,7 @@ module T = struct
     id : string ;
     descr : string ;
     deps : u list ;
+    pkgs : package list ;
     script : script ;
     np : int ; (** Required number of processors *)
     mem : int ; (** Required memory in MB *)
@@ -55,7 +62,6 @@ module T = struct
   and token =
     | S of string
     | D of u
-    | PKGVAR of package * package_variable
     | DEST
     | TMP
     | NP
@@ -71,20 +77,8 @@ module T = struct
     | `sh
   ]
 
-  and package = {
-    pkg_name : string ;
-    pkg_version : string ;
-  }
-
-  and package_variable = [ `bin | `inc | `lib | `share ]
-
   with sexp
 
-  let string_of_package_variable = function
-    | `bin -> "bin"
-    | `lib -> "lib"
-    | `inc -> "include"
-    | `share -> "share"
 end
 
 include T
@@ -102,21 +96,20 @@ module Script = struct
   let deps s =
     List.filter_map s.tokens ~f:(function
         | D r -> Some (r :> u)
-        | S _ | DEST | TMP | NP | MEM | PKGVAR _ -> None
+        | S _ | DEST | TMP | NP | MEM -> None
       )
     |> List.dedup
 
-  let string_of_token ~string_of_workflow ~tmp ~dest ~pkgvar ~np ~mem = function
+  let string_of_token ~string_of_workflow ~tmp ~dest ~np ~mem = function
     | S s -> s
     | D w -> string_of_workflow (w :> u)
     | DEST -> dest
     | TMP -> tmp
     | NP -> string_of_int np
     | MEM -> string_of_int mem
-    | PKGVAR (pkg, var) -> pkgvar pkg var
 
-  let to_string ~string_of_workflow ~tmp ~dest ~pkgvar ~np ~mem script =
-    let f = string_of_token ~string_of_workflow ~tmp ~dest ~pkgvar ~np ~mem in
+  let to_string ~string_of_workflow ~tmp ~dest ~np ~mem script =
+    let f = string_of_token ~string_of_workflow ~tmp ~dest ~np ~mem in
     List.map script.tokens ~f
     |> String.concat
 end
@@ -145,17 +138,12 @@ module Workflow = struct
       ?(np = 1)
       ?timeout
       ?version
+      ?(pkgs = [])
       script =
     let deps = Script.deps script in
     let script_as_string : string =
       Script.to_string
         ~string_of_workflow:id
-        ~pkgvar:(fun { pkg_name ; pkg_version } var ->
-            sprintf "%s:%s:%s"
-              pkg_name
-              pkg_version
-              (string_of_package_variable var)
-          )
         ~np:1
         ~mem:1024
         ~tmp:"TMP"
@@ -163,7 +151,7 @@ module Workflow = struct
         script
     in
     let id = digest ("step", version, script_as_string) in
-    Step { descr ; deps ; script ; np ; mem ; timeout ; version ; id }
+    Step { descr ; deps ; pkgs ; script ; np ; mem ; timeout ; version ; id }
 
   let select u (Selector path) =
     let u, path =
@@ -214,8 +202,8 @@ type 'a directory = [`directory of 'a]
 module EDSL = struct
   type expr = token list
 
-  let workflow ?descr ?mem ?np ?timeout ?version ?(interpreter = `sh) expr =
-    Workflow.make ?descr ?mem ?timeout ?version (Script.make interpreter expr)
+  let workflow ?descr ?mem ?np ?timeout ?version ?pkgs ?(interpreter = `sh) expr =
+    Workflow.make ?descr ?mem ?np ?timeout ?version ?pkgs (Script.make interpreter expr)
 
   let selector x = Workflow.Selector x
   let ( / ) = Workflow.select
@@ -230,7 +218,6 @@ module EDSL = struct
   let float f = [ S (Float.to_string f) ]
   let path p = [ S (string_of_path p) ]
   let dep w = [ D w ]
-  let pkgvar pkg var = [ PKGVAR (pkg, var) ]
 
   let quote ?(using = '"') e =
     let quote_symbol = Char.to_string using in
@@ -264,44 +251,11 @@ module EDSL_sh = struct
       `sh
       (List.intersperse ~sep:[S "\n"] cmds)
 
-  let workflow ?descr ?mem ?np ?timeout ?version cmds =
-    Workflow.make ?descr ?mem ?timeout ?version (script cmds)
+  let workflow ?descr ?mem ?np ?timeout ?version ?pkgs cmds =
+    Workflow.make ?descr ?mem ?np ?timeout ?version ?pkgs (script cmds)
 
 
-  let cmd ?path ?pythonpath p ?stdin ?stdout ?stderr args =
-    let add_path =
-      match path with
-      | None | Some [] -> ident
-      | Some pkgs ->
-        fun cmd ->
-          S "(export PATH="
-          :: (
-            List.map pkgs ~f:(fun p -> [ D p ; S "/bin" ])
-            |> List.intersperse ~sep:[S ":"]
-            |> List.concat
-          )
-          @ [ S ":$PATH ; " ]
-          @ cmd
-          @ [ S ")" ]
-    in
-    let add_pythonpath = match pythonpath with
-      | None | Some [] -> ident
-      | Some pkgs ->
-        fun cmd ->
-          S "(export PYTHONPATH="
-          :: (
-            List.map pkgs ~f:(fun p -> [ D p ; S "/lib/python2.7/site-packages" ])
-            (* FIXME: this won't work with other versions of python
-               than 2.7 ; we should introduce execution-time variables
-               -- here PYTHON_VERSION -- and the corresponding
-               constructor in the API *)
-            |> List.intersperse ~sep:[S ":"]
-            |> List.concat
-          )
-          @ [ S ":$PYTHONPATH ; " ]
-          @ cmd
-          @ [ S ")" ]
-    in
+  let cmd p ?stdin ?stdout ?stderr args =
     let prog_expr = [ S p ] in
     let stdout_expr =
       match stdout with
@@ -322,9 +276,6 @@ module EDSL_sh = struct
     |> List.filter ~f:(( <> ) [])
     |> List.intersperse ~sep:[S " "]
     |> List.concat
-    |> add_pythonpath
-    |> add_path
-
 
   let opt o f x = S o :: S " " :: f x
 
@@ -382,6 +333,8 @@ end
 module Std = struct
   type 'a workflow = 'a Workflow.t
   type ('a, 'b) selector = ('a, 'b) Workflow.selector
+
+  type nonrec package = package
 
   class type ['a,'b] file = object
     method format : 'a

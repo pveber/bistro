@@ -36,7 +36,9 @@ let wrapper factors samples =
   in
   let outdir = opt "--outdir" ident dest in
   workflow [
-    cmd ~path:[wrapper_package] "deseq2-wrapper.R" (outdir :: factors :: samples) ;
+    with_env
+      [ "PATH", seq ~sep:"/" [ dep wrapper_package ; string "bin" ] ]
+      (cmd "deseq2-wrapper.R" (outdir :: factors :: samples)) ;
   ]
 
 let wrapper factors samples =

@@ -3,7 +3,7 @@ open Types
 
 type index = [`bowtie_index] directory
 
-val package : [`package] workflow
+val package : package
 
 val bowtie_build :
   ?packed:bool ->

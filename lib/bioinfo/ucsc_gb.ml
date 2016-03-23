@@ -124,11 +124,14 @@ let genome_2bit_sequence org =
 
 let twoBitToFa bed twobits =
   workflow ~descr:"ucsc_gb.twoBitToFa" [
-    cmd ~path:[package] "twoBitToFa" [
+    cmd "twoBitToFa" [
       opt' "-bed" dep bed ;
       dep twobits ;
       dest
     ]
+    |> with_env
+      [ "PATH", seq ~sep:"/" [ dep package ; string "bin" ] ]
+
   ]
 
 (* let fasta_of_bed org bed = *)
@@ -164,9 +167,11 @@ let twoBitToFa bed twobits =
 
 let fetchChromSizes org =
   workflow ~descr:"ucsc_gb.fetchChromSizes" [
-    cmd "fetchChromSizes" ~path:[package] ~stdout:dest [
+    cmd "fetchChromSizes" ~stdout:dest [
       string (string_of_genome org) ;
     ]
+    |> with_env
+      [ "PATH", seq ~sep:"/" [ dep package ; string "bin" ] ]
   ]
 
 (* (\* let bedClip org bed = *\) *)
@@ -209,11 +214,14 @@ let bedGraphToBigWig org bg =
       string "-k2,2n" ;
       dep bg ;
     ] ;
-    cmd "bedGraphToBigWig" ~path:[package] [
+    cmd "bedGraphToBigWig" [
       tmp ;
       dep (fetchChromSizes org) ;
       dest ;
     ]
+    |> with_env
+      [ "PATH", seq ~sep:"/" [ dep package ; string "bin" ] ]
+
   ]
 
 let bedToBigBed_command org bed =
@@ -225,11 +233,14 @@ let bedToBigBed_command org bed =
       dep bed ;
     ] in
   let bedToBigBed =
-    cmd "bedToBigBed" ~path:[package] [
+    cmd "bedToBigBed" [
       tmp ;
       dep (fetchChromSizes org) ;
       dest ;
-    ] in
+    ]
+    |> with_env
+      [ "PATH", seq ~sep:"/" [ dep package ; string "bin" ] ]
+  in
   and_list [ sort ; bedToBigBed ]
 
 let bedToBigBed org =

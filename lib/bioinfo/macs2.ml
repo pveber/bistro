@@ -23,7 +23,10 @@ python setup.py install --prefix ${PREFIX}
 |}]
 
 let macs2 subcmd opts =
-  cmd "macs2" ~path:[package] ~pythonpath:[package] (string subcmd :: opts)
+  cmd "macs2" (string subcmd :: opts)
+  |> with_env
+    [ "PATH", seq ~sep:"/" [ dep package ; string "bin" ] ]
+
 
 let pileup ?extsize ?both_direction bam =
   workflow ~descr:"macs2.pileup" [

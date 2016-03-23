@@ -30,7 +30,10 @@ cp libbam.a ${PREFIX}/lib
 make clean
 |}]
 
-let samtools subcmd args = cmd "samtools" ~path:[package] (string subcmd :: args)
+let samtools subcmd args =
+  cmd "samtools" (string subcmd :: args)
+  |> with_env
+    [ "PATH", seq ~sep:"/" [ dep package ; string "bin" ] ]
 
 let sam_of_bam bam =
   workflow ~descr:"samtools.sam_of_bam" [

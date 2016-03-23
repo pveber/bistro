@@ -31,20 +31,25 @@ mkdir -p ${PREFIX}/bin
 cp -r bin/* ${PREFIX}/bin
 |}]
 
+
 let fastq_dump sra =
   workflow ~descr:"sratoolkit.fastq_dump" [
-    cmd "fastq-dump" ~path:[package] [ string "-Z" ; dep sra ] ~stdout:dest
+    cmd "fastq-dump" [ string "-Z" ; dep sra ] ~stdout:dest
+    |> with_env
+      [ "PATH", seq ~sep:"/" [ dep package ; string "bin" ] ]
   ]
 
 let fastq_dump_pe sra =
   let dir =
     workflow ~descr:"sratoolkit.fastq_dump" [
       mkdir_p dest ;
-      cmd "fastq-dump" ~path:[package] [
+      cmd "fastq-dump" [
         opt "-O" ident dest ;
         string "--split-files" ;
         dep sra
-      ] ;
+      ]
+      |> with_env
+        [ "PATH", seq ~sep:"/" [ dep package ; string "bin" ] ] ;
       mv (dest // "*_1.fastq") (dest // "reads_1.fastq") ;
       mv (dest // "*_2.fastq") (dest // "reads_2.fastq") ;
     ]

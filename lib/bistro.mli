@@ -19,10 +19,7 @@ type package = {
   pkg_name : string ;
   pkg_version : string ;
 }
-
-type package_variable = [ `bin | `inc | `lib | `share ]
-
-val string_of_package_variable : package_variable -> string
+with sexp
 
 module Workflow : sig
   type u =
@@ -34,6 +31,7 @@ module Workflow : sig
     id : string ;
     descr : string ;
     deps : u list ;
+    pkgs : package list ;
     script : script ;
     np : int ; (** Required number of processors *)
     mem : int ; (** Required memory in MB *)
@@ -58,6 +56,7 @@ module Workflow : sig
     ?np:int ->
     ?timeout:int ->
     ?version:int ->
+    ?pkgs:package list ->
     script -> 'a t
 
   val select : (_ directory as 'a) t -> ('a, 'b) selector -> 'b t
@@ -76,6 +75,7 @@ module EDSL : sig
     ?np:int ->
     ?timeout:int ->
     ?version:int ->
+    ?pkgs:package list ->
     ?interpreter:interpreter ->
     expr list -> 'a Workflow.t
 
@@ -91,7 +91,6 @@ module EDSL : sig
   val float : float -> expr
   val path : path -> expr
   val dep : _ Workflow.t -> expr
-  val pkgvar : package -> package_variable -> expr
   val quote : ?using:char -> expr -> expr
   val option : ('a -> expr) -> 'a option -> expr
   val list : ('a -> expr) -> ?sep:string -> 'a list -> expr
@@ -114,11 +113,10 @@ module EDSL_sh : sig
     ?np:int ->
     ?timeout:int ->
     ?version:int ->
+    ?pkgs:package list ->
     cmd list -> 'a Workflow.t
 
   val cmd :
-    ?path:[`package] Workflow.t list ->
-    ?pythonpath:[`package] Workflow.t list ->
     string ->
     ?stdin:expr -> ?stdout:expr -> ?stderr:expr ->
     expr list -> cmd
@@ -151,7 +149,6 @@ module Script : sig
     string_of_workflow:(Workflow.u -> string) ->
     tmp:string ->
     dest:string ->
-    pkgvar:(package -> package_variable -> string) ->
     np:int ->
     mem:int ->
     t -> string
@@ -160,6 +157,7 @@ end
 module Std : sig
   type 'a workflow = 'a Workflow.t
   type ('a, 'b) selector = ('a, 'b) Workflow.selector
+  type nonrec package = package
 
   class type ['a,'b] file = object
     method format : 'a

@@ -5,22 +5,16 @@ open Bistro.EDSL_sh
 
 type index = [`bowtie2_index] directory
 
-let package = Bistro.Workflow.make ~descr:"bowtie2.package" [%sh{|
-PREFIX={{ dest }}
-
-mkdir -p $PREFIX
-cd $PREFIX
-wget -O bowtie2.zip "http://downloads.sourceforge.net/project/bowtie-bio/bowtie2/2.2.4/bowtie2-2.2.4-linux-x86_64.zip?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Fbowtie-bio%2Ffiles%2Fbowtie2%2F2.2.4%2F&ts=1417768070&use_mirror=freefr" || die "failed to download archive"
-unzip bowtie2.zip
-rm bowtie2.zip
-mv bowtie2-2.2.4 bin
-|}]
+let package = {
+  Bistro.pkg_name = "bowtie2" ;
+  pkg_version = "2.2.8" ;
+}
 
 (* memory bound correspond to storing a human index in memory, following bowtie manual *)
 let bowtie2_build ?large_index ?noauto ?packed ?bmax ?bmaxdivn ?dcv ?nodc ?noref ?justref ?offrate ?ftabchars ?seed ?cutoff fa =
-  workflow ~descr:"bowtie2_build" ~mem:(3 * 1024) [
+  workflow ~descr:"bowtie2_build" ~mem:(3 * 1024) ~pkgs:[package] [
     mkdir_p dest ;
-    cmd "bowtie2-build" ~path:[package] [
+    cmd "bowtie2-build" [
       option (flag string "--large-index") large_index ;
       option (flag string "--no-auto") noauto ;
       option (flag string "--packed") packed ;
@@ -82,8 +76,8 @@ let bowtie2
         opt "-2" (list dep ~sep:",") fqs2
       ]
   in
-  workflow ~descr:"bowtie2" ~mem:(3 * 1024) ?np:threads [
-    cmd "bowtie2" ~path:[package] [
+  workflow ~descr:"bowtie2" ~mem:(3 * 1024) ?np:threads ~pkgs:[package] [
+    cmd "bowtie2" [
       option (opt "--skip" int) skip ;
       option (opt "--qupto" int) qupto ;
       option (opt "--trim5" int) trim5 ;
