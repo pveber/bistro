@@ -28,7 +28,6 @@ Library bistro_bioinfo
   Modules:          Bed,
                     Bowtie,
                     Bowtie2,
-                    Bedtools,
                     Deseq2,
                     Ensembl,
                     FastQC,
