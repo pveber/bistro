@@ -6,30 +6,16 @@ open Types
 
 let package_script = Unix_tools.wget "https://raw.githubusercontent.com/pveber/compbio-scripts/master/macs2-install/2.1.0.20140616/macs2-install.sh"
 
-let package = Workflow.make ~descr:"macs2.package" [%sh{|
-PREFIX={{ dest }}
-
-URL=https://pypi.python.org/packages/source/M/MACS2/MACS2-2.1.0.20140616.tar.gz
-ARCHIVE=`basename ${URL}`
-PACKAGE=MACS2
-
-mkdir -p $PREFIX/src
-cd $PREFIX/src
-wget ${URL}
-tar xvfz ${ARCHIVE}
-rm $ARCHIVE
-cd ${ARCHIVE%\.tar.gz}
-python setup.py install --prefix ${PREFIX}
-|}]
+let package = {
+  pkg_name = "macs2" ;
+  pkg_version = "2.1.0" ;
+}
 
 let macs2 subcmd opts =
   cmd "macs2" (string subcmd :: opts)
-  |> with_env
-    [ "PATH", seq ~sep:"/" [ dep package ; string "bin" ] ]
-
 
 let pileup ?extsize ?both_direction bam =
-  workflow ~descr:"macs2.pileup" [
+  workflow ~descr:"macs2.pileup" ~pkgs:[package] [
     macs2 "pileup" [
       opt "-i" dep bam ;
       opt "-o" ident dest ;
@@ -52,7 +38,7 @@ let name = "macs2"
 
 let callpeak ?pvalue ?qvalue ?gsize ?call_summits
              ?fix_bimodal ?extsize ?control treatment =
-  workflow ~descr:"macs2.callpeak" [
+  workflow ~pkgs:[package] ~descr:"macs2.callpeak" [
     macs2 "callpeak" [
       opt "--outdir" ident dest ;
       opt "--name" string name ;
