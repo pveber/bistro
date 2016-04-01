@@ -3,40 +3,16 @@ open Bistro
 open Types
 open Bistro.EDSL_sh
 
-let package = Bistro.Workflow.make ~descr:"samtools.package" [%sh{|
-PREFIX={{ dest }}
-
-URL=http://sourceforge.net/projects/samtools/files/samtools/0.1.17/samtools-0.1.17.tar.bz2/download
-ARCHIVE=`basename ${URL%\/download}`
-PACKAGE=${ARCHIVE%\.tar.bz2}
-
-mkdir -p $PREFIX/src
-cd $PREFIX/src
-wget -O ${ARCHIVE} ${URL}
-tar xvfj ${ARCHIVE}
-rm $ARCHIVE
-cd ${PACKAGE}
-make
-
-mkdir -p $PREFIX/bin
-cp samtools ${PREFIX}/bin
-
-mkdir -p ${PREFIX}/include/bam
-cp *.h ${PREFIX}/include/bam
-
-mkdir -p ${PREFIX}/lib
-cp libbam.a ${PREFIX}/lib
-
-make clean
-|}]
+let package = {
+  pkg_name = "samtools" ;
+  pkg_version = "0.1.19" ;
+}
 
 let samtools subcmd args =
   cmd "samtools" (string subcmd :: args)
-  |> with_env
-    [ "PATH", seq ~sep:"/" [ dep package ; string "bin" ] ]
 
 let sam_of_bam bam =
-  workflow ~descr:"samtools.sam_of_bam" [
+  workflow ~pkgs:[package] ~descr:"samtools.sam_of_bam" [
     samtools "view" [
       opt "-o" ident dest ;
       dep bam ;
@@ -44,7 +20,7 @@ let sam_of_bam bam =
   ]
 
 let indexed_bam_of_sam sam =
-  workflow ~descr:"samtools.indexed_bam_of_sam" [
+  workflow ~pkgs:[package] ~descr:"samtools.indexed_bam_of_sam" [
     mkdir_p dest ;
     samtools "view" [
       string "-S -b" ;
@@ -60,7 +36,7 @@ let indexed_bam_of_sam sam =
   ]
 
 let sort ?on:order bam =
-  workflow ~descr:"samtools.sort" [
+  workflow ~pkgs:[package] ~descr:"samtools.sort" [
     samtools "sort" [
       option (fun o -> flag string "-n" (o = `name)) order ;
       dep bam ;
@@ -70,7 +46,7 @@ let sort ?on:order bam =
   ]
 
 let indexed_bam_of_bam bam =
-  workflow [
+  workflow  ~pkgs:[package] ~descr:"samtools.indexed_bam_of_bam" [
     mkdir_p dest ;
     samtools "sort" [
       dep bam ;
