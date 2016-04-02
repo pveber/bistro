@@ -1,7 +1,7 @@
 open Bistro.Std
 open Types
 
-val package : [`package] workflow
+val package : package
 
 val fastq_dump : sra workflow -> [`sanger] fastq workflow
 
