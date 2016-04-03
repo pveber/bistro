@@ -63,7 +63,7 @@ let bowtie2
     ?_N ?_L ?ignore_quals ?(mode = `end_to_end)
     ?a ?k ?_D ?_R ?minins ?maxins ?orientation
     ?no_mixed ?no_discordant ?dovetail ?no_contain ?no_overlap
-    ?threads ?seed
+    ?seed
     ?fastq_format index fqs =
 
   let args = match fqs with
@@ -76,7 +76,7 @@ let bowtie2
         opt "-2" (list dep ~sep:",") fqs2
       ]
   in
-  workflow ~descr:"bowtie2" ~mem:(3 * 1024) ?np:threads ~pkgs:[package] [
+  workflow ~descr:"bowtie2" ~mem:(3 * 1024) ~np:8 ~pkgs:[package] [
     cmd "bowtie2" [
       option (opt "--skip" int) skip ;
       option (opt "--qupto" int) qupto ;
@@ -99,7 +99,7 @@ let bowtie2
       option (flag string "--dovetail") dovetail ;
       option (flag string "--no-contain") no_contain ;
       option (flag string "--no-overlap") no_overlap ;
-      option (opt "--threads" int) threads ;
+      opt "--threads" ident np ;
       option (opt "--seed" int) seed ;
       option (opt "-q" (qual_option % string)) fastq_format ;
       opt "-x" (fun index -> seq [dep index ; string "/index"]) index ;

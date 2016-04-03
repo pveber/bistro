@@ -1,3 +1,4 @@
+open Core.Std
 open Bistro.Std
 open Misc.Infix
 open Bistro.EDSL_sh
@@ -26,7 +27,7 @@ let qual_option (type s) x = match (x : s Fastq.format) with
   | Fastq.Sanger -> "--phred33-quals"
   | Fastq.Phred64 -> "--phred64-quals"
 
-let bowtie ?l ?e ?m ?fastq_format ?n ?v ?p ?maxins index fastq_files =
+let bowtie ?l ?e ?m ?fastq_format ?n ?v ?maxins index fastq_files =
   let args = match fastq_files with
     | `single_end fqs -> list dep ~sep:"," fqs
     | `paired_end (fqs1, fqs2) ->
@@ -36,7 +37,7 @@ let bowtie ?l ?e ?m ?fastq_format ?n ?v ?p ?maxins index fastq_files =
         opt "-2" (list dep ~sep:",") fqs2
       ]
   in
-  workflow ~descr:"bowtie" ~mem:(3 * 1024) ~pkgs:[package] ?np:p [
+  workflow ~descr:"bowtie" ~mem:(3 * 1024) ~pkgs:[package] ~np:8 [
     cmd "bowtie" [
       string "-S" ;
       option (opt "-n" int) n ;
@@ -45,7 +46,7 @@ let bowtie ?l ?e ?m ?fastq_format ?n ?v ?p ?maxins index fastq_files =
       option (opt "-m" int) m ;
       option (opt "-v" int) v ;
       option (opt "-q" (qual_option % string)) fastq_format ;
-      option (opt "-p" int) p ;
+      opt "-p" ident np ;
       option (opt "--maxins" int) maxins ;
       seq [dep index ; string "/index"] ;
       args ;

@@ -13,7 +13,7 @@ val bowtie_build :
 val bowtie :
   ?l:int -> ?e:int -> ?m:int ->
   ?fastq_format:'a Fastq.format ->
-  ?n:int -> ?v:int -> ?p:int ->
+  ?n:int -> ?v:int ->
   ?maxins:int ->
   index workflow ->
   [ `single_end of 'a fastq workflow list

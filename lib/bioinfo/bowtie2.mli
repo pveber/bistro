@@ -44,7 +44,6 @@ val bowtie2 :
   ?dovetail:bool ->
   ?no_contain:bool ->
   ?no_overlap:bool ->
-  ?threads:int ->
   ?seed:int ->
   ?fastq_format:'a Fastq.format ->
   index workflow ->
