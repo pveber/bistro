@@ -32,46 +32,10 @@ type wig = ([`wig], [`text]) file
 
 type bigWig = ([`bigWig], [`binary]) file
 
-
-let package = Workflow.make
-    ~descr:"ucsc_gb.package"
-    [%sh{|\
-PREFIX={{ dest }}
-URL=git://genome-source.cse.ucsc.edu/kent.git
-TAG=v322_base
-
-set -e
-
-mkdir -p $PREFIX/src
-cd $PREFIX/src
-git clone ${URL} kent
-cd kent
-git checkout $TAG
-BINDIR=${PREFIX}/bin
-MACHTYPE=`uname -m`
-MYSQLLIBS=`mysql_config --libs`
-MYSQLINC=`mysql_config --include | sed -e 's/-I//g'`
-sed -i -e 's/-Werror//g' src/inc/common.mk
-sed -i -e 's/\\$A: \\$O \\${MYLIBS}/\\$A: \\$O/g' src/hg/pslCDnaFilter/makefile
-make -C src userApps \
-    BINDIR="${BINDIR}" \
-    SCRIPTS="${BINDIR}" \
-    MACHTYPE="${MACHTYPE}" \
-    MYSQLLIBS="${MYSQLLIBS} -lz" \
-    MYSQLINC="${MYSQLINC}"
-make -C src/hg/genePredToGtf \
-    BINDIR="${BINDIR}" \
-    SCRIPTS="${BINDIR}" \
-    MACHTYPE="${MACHTYPE}" \
-    MYSQLLIBS="${MYSQLLIBS} -lz" \
-    MYSQLINC="${MYSQLINC}"
-make -C src/hg/gpToGtf \
-    BINDIR="${BINDIR}" \
-    SCRIPTS="${BINDIR}" \
-    MACHTYPE="${MACHTYPE}" \
-    MYSQLLIBS="${MYSQLLIBS} -lz" \
-    MYSQLINC="${MYSQLINC}"
-|}]
+let package = {
+  pkg_name = "kent-tree" ;
+  pkg_version = "330" ;
+}
 
 
 (** {5 Dealing with genome sequences} *)
@@ -123,15 +87,12 @@ let genome_2bit_sequence org =
 (* (\* let wg_encode_crg_mappability_100 org = wg_encode_crg_mappability 100 org *\) *)
 
 let twoBitToFa bed twobits =
-  workflow ~descr:"ucsc_gb.twoBitToFa" [
+  workflow ~pkgs:[package] ~descr:"ucsc_gb.twoBitToFa" [
     cmd "twoBitToFa" [
       opt' "-bed" dep bed ;
       dep twobits ;
       dest
     ]
-    |> with_env
-      [ "PATH", seq ~sep:"/" [ dep package ; string "bin" ] ]
-
   ]
 
 (* let fasta_of_bed org bed = *)
@@ -166,12 +127,10 @@ let twoBitToFa bed twobits =
 (** {5 Chromosome size and clipping} *)
 
 let fetchChromSizes org =
-  workflow ~descr:"ucsc_gb.fetchChromSizes" [
+  workflow ~pkgs:[package] ~descr:"ucsc_gb.fetchChromSizes" [
     cmd "fetchChromSizes" ~stdout:dest [
       string (string_of_genome org) ;
     ]
-    |> with_env
-      [ "PATH", seq ~sep:"/" [ dep package ; string "bin" ] ]
   ]
 
 (* (\* let bedClip org bed = *\) *)
@@ -208,7 +167,7 @@ let fetchChromSizes org =
 
 let bedGraphToBigWig org bg =
   let tmp = seq [ tmp ; string "/sorted.bedGraph" ] in
-  workflow ~descr:"bedGraphToBigWig" [
+  workflow ~pkgs:[package] ~descr:"bedGraphToBigWig" [
     cmd "sort" ~stdout:tmp [
       string "-k1,1" ;
       string "-k2,2n" ;
@@ -219,9 +178,6 @@ let bedGraphToBigWig org bg =
       dep (fetchChromSizes org) ;
       dest ;
     ]
-    |> with_env
-      [ "PATH", seq ~sep:"/" [ dep package ; string "bin" ] ]
-
   ]
 
 let bedToBigBed_command org bed =
@@ -238,14 +194,13 @@ let bedToBigBed_command org bed =
       dep (fetchChromSizes org) ;
       dest ;
     ]
-    |> with_env
-      [ "PATH", seq ~sep:"/" [ dep package ; string "bin" ] ]
   in
   and_list [ sort ; bedToBigBed ]
 
 let bedToBigBed org =
   let f bed =
     workflow
+      ~pkgs:[package]
       ~descr:"ucsc_gb.bedToBigBed"
       [ bedToBigBed_command org bed ]
   in
@@ -266,7 +221,7 @@ let bedToBigBed_failsafe org =
         and_list [ test ; touch ] ;
         bedToBigBed_command org bed
       ] in
-    workflow [ cmd ]
+    workflow ~pkgs:[package] [ cmd ]
   in
   function
   | `bed3 bed -> f bed
