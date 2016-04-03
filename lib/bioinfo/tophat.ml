@@ -3,26 +3,10 @@ open Types
 open Bistro
 open Bistro.EDSL_sh
 
-let package = Workflow.make
-    ~descr:"tophat.package"
-    [%sh{|\
-PREFIX={{ dest }}
-TMP={{ tmp }}
-
-URL=http://ccb.jhu.edu/software/tophat/downloads/tophat-2.0.13.Linux_x86_64.tar.gz
-ARCHIVE=`basename ${URL}`
-PACKAGE=${ARCHIVE%\.tar.gz}
-
-cd $TMP
-wget ${URL} || die "failed to fetch ${PACKAGE}"
-tar xvfz ${ARCHIVE}
-cd ${PACKAGE}
-rm README AUTHORS COPYING
-
-mkdir -p $PREFIX/bin
-cp * ${PREFIX}/bin
-|}]
-
+let package = {
+  pkg_name = "tophat" ;
+  pkg_version = "2.1.1" ;
+}
 
 let tophat1 ?num_threads ?color index fqs =
   let args = match fqs with
@@ -34,7 +18,10 @@ let tophat1 ?num_threads ?color index fqs =
         list dep ~sep:"," fqs2
       ]
   in
-  workflow ?np:num_threads ~mem:(4 * 1024) ~pkgs:[Bowtie.package ; Samtools.package] [
+  workflow
+    ?np:num_threads
+    ~mem:(4 * 1024)
+    ~pkgs:[Bowtie.package ; Samtools.package ; package] [
     cmd "tophat" [
       option (opt "--num-threads" int) num_threads ;
       option (flag string "--color") color ;
@@ -42,12 +29,6 @@ let tophat1 ?num_threads ?color index fqs =
       seq [ dep index ; string "/index" ] ;
       args
     ]
-    |> with_env
-      [ "PATH",
-        seq ~sep:":" [
-          seq ~sep:"/" [ dep package ; string "bin" ] ;
-        ]
-      ]
   ]
 
 let tophat2 ?num_threads index fqs =
@@ -60,19 +41,16 @@ let tophat2 ?num_threads index fqs =
         list dep ~sep:"," fqs2
       ]
   in
-  workflow ?np:num_threads ~mem:(4 * 1024) ~pkgs:[Bowtie2.package ; Samtools.package] [
+  workflow
+    ?np:num_threads
+    ~mem:(4 * 1024)
+    ~pkgs:[Bowtie2.package ; Samtools.package ; package] [
     cmd "tophat2" [
       option (opt "--num-threads" int) num_threads ;
       opt "--output-dir" ident dest ;
       seq [ dep index ; string "/index" ] ;
       args
     ]
-    |> with_env
-      [ "PATH",
-        seq ~sep:":" [
-          seq ~sep:"/" [ dep package ; string "bin" ] ;
-        ]
-      ]
   ]
 
 let accepted_hits = selector ["accepted_hits.bam"]
