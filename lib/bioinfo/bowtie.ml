@@ -1,4 +1,4 @@
-open Core.Std
+open Core_kernel.Std
 open Bistro.Std
 open Misc.Infix
 open Bistro.EDSL_sh
