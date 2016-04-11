@@ -86,6 +86,12 @@ Test test_ppx_bistro
                       test/test_ppx_bistro.byte
   TestTools:      ppx_bistro
 
+Executable bistro
+  Path:             app
+  MainIs:           bistro_main.ml
+  BuildDepends:     bistro.engine, core
+  CompiledObject:   byte
+
 # +-------------------------------------------------------------------+
 # | Examples                                                          |
 # +-------------------------------------------------------------------+

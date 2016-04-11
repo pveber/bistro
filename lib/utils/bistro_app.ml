@@ -4,6 +4,19 @@ open Bistro_engine
 open Lwt
 
 type target = string list * Bistro.Workflow.u
+with sexp
+
+type plan = target list with sexp
+
+let load_plan fn =
+  In_channel.read_all fn
+  |> Sexp.of_string
+  |> plan_of_sexp
+
+let save_plan fn p =
+  sexp_of_plan p
+  |> Sexp.to_string_hum
+  |> fun data -> Out_channel.write_all fn ~data
 
 let ( %> ) path w = path, Bistro.Workflow.u w
 
