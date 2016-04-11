@@ -54,6 +54,9 @@ val workflow_path : t -> _ Workflow.t -> string
 
 val workflow_path' : t -> Workflow.u -> string
 
+val in_cache : t -> Workflow.u -> bool
+(** Tests if the result of [u]'s execution is in cache *)
+
 val requested : t -> Workflow.step -> unit
 val built : t -> Workflow.step -> unit
 

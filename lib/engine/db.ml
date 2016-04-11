@@ -321,6 +321,10 @@ let rec workflow_path' db = function
 
 let workflow_path db w = workflow_path' db (Workflow.u w)
 
+let in_cache db u =
+  let dest = workflow_path' db u in
+  Sys.file_exists dest = `Yes
+
 let report_step db step =
   let buf = Buffer.create 251 in
   let script = Submitted_script_table.get db step in

@@ -260,8 +260,7 @@ let rec build_workflow e = function
   | Select (_,dir,p) as x -> build_select e x dir p
   | Step step as u ->
     Db.requested e.db step ;
-    let dest = Db.workflow_path' e.db u in
-    if Sys.file_exists dest = `Yes then
+    if Db.in_cache e.db u then
       Lwt.return (Ok ())
     else
       CBST.find_or_add e.cbs step (fun () ->
