@@ -73,16 +73,6 @@ Library bistro_utils
   XMETARequires:    bistro.engine
   XMETADescription: Utility functions for bistro
 
-Library bistro_pbs
-  Path:             lib/pbs
-  Pack:             true
-  Modules:          Backend, Client
-  FindlibName:      pbs
-  FindlibParent:    bistro
-  BuildDepends:     bistro.engine, lwt.unix, pbs
-  XMETARequires:    bistro.engine, lwt.unix, pbs
-  XMETADescription: FIXME
-
 Executable "ppx_bistro"
   Path:             ppx
   MainIs:           ppx_bistro.ml
@@ -118,16 +108,10 @@ Executable fail
   BuildDepends:     bistro.utils
   CompiledObject:   byte
 
-Executable pbs_test
-  Path:             test
-  MainIs:           pbs_test.ml
-  BuildDepends:     bistro.engine, bistro.pbs
-  CompiledObject:   byte
-
 Executable sacCer2_pho4
   Path:             app
   MainIs:           sacCer2_pho4.ml
-  BuildDepends:     bistro.utils, bistro.bioinfo, bistro.pbs
+  BuildDepends:     bistro.utils, bistro.bioinfo
   CompiledObject:   byte
   
 Document API

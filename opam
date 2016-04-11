@@ -22,7 +22,6 @@ depends: [
   "core"
   "dbm"
   "lwt"
-  "pbs"
   "ppx_tools"
   "pvem"
   "rresult"
