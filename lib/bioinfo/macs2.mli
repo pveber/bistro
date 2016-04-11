@@ -16,6 +16,7 @@ val callpeak :
   ?gsize:gsize ->
   ?call_summits:bool ->
   ?fix_bimodal:bool ->
+  ?mfold:int * int ->
   ?extsize:int ->
   ?control:bam workflow ->
   bam workflow ->

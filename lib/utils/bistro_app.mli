@@ -12,10 +12,12 @@ val save_plan : string -> plan -> unit
 val local :
   ?np:int ->
   ?mem:int ->
-  ?workdir:string ->
+  ?tmpdir:string ->
+  outdir:string ->
   plan -> unit
 
 val with_backend :
   Scheduler.backend ->
+  outdir:string ->
   plan ->
   unit

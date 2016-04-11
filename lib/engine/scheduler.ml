@@ -131,20 +131,20 @@ let extension_of_interpreter = function
   | `R -> "R"
   | `sh -> "sh"
 
-let local_backend ?workdir ~np ~mem () : backend =
+let local_backend ?tmpdir ~np ~mem () : backend =
   let pool = Pool.create ~np ~mem in
   fun db ({ script ; } as step) ->
     Pool.use pool ~np ~mem ~f:(fun ~np ~mem ->
         let interpreter = Script.interpreter script in
         match interpreter with
         | `sh | `bash | `R ->
-          let workdir = match workdir with
+          let tmpdir = match tmpdir with
             | None -> Db.tmp_path db step
             | Some p -> Filename.concat p step.id in
           let stdout = Db.stdout_path db step in
           let stderr = Db.stderr_path db step in
-          let dest = Filename.concat workdir "dest" in
-          let tmp = Filename.concat workdir "tmp" in
+          let dest = Filename.concat tmpdir "dest" in
+          let tmp = Filename.concat tmpdir "tmp" in
           let string_of_workflow = Db.workflow_path' db in
           let script_extension = extension_of_interpreter interpreter in
           let script_file =
@@ -156,7 +156,7 @@ let local_backend ?workdir ~np ~mem () : backend =
           Lwt_io.(with_file
                     ~mode:output script_file
                     (fun oc -> write oc script_text)) >>= fun () ->
-          remove_if_exists workdir >>= fun () ->
+          remove_if_exists tmpdir >>= fun () ->
           Unix.mkdir_p tmp ;
           redirection stdout >>= fun stdout ->
           redirection stderr >>= fun stderr ->
@@ -175,7 +175,7 @@ let local_backend ?workdir ~np ~mem () : backend =
               Lwt.return ()
           ) >>= fun () ->
           Lwt_unix.unlink script_file >>= fun () ->
-          remove_if_exists workdir >>= fun () ->
+          remove_if_exists tmpdir >>= fun () ->
           Lwt.return {
             script = script_text ;
             exit_status ;

@@ -14,8 +14,8 @@ echo
 
 let () =
   Bistro_app.(
-    local [
-      [ "output" ; "fail1" ] %> fail1 ;
-      [ "output" ; "fail2" ] %> fail2 ;
+    local ~outdir:"output" [
+      [ "fail1" ] %> fail1 ;
+      [ "fail2" ] %> fail2 ;
     ]
   )

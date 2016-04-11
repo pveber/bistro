@@ -36,10 +36,10 @@ let link p p_u =
   let cmd = sprintf "rm -rf %s && ln -s %s %s" dst src dst in
   ignore (Sys.command cmd)
 
-let foreach_target db scheduler (dest, u) =
+let foreach_target db scheduler outdir (dest, u) =
   Scheduler.build' scheduler u >|= function
   | Ok cache_path ->
-    link dest cache_path ;
+    link (outdir :: dest) cache_path ;
     Ok ()
   | Error xs ->
     Error (
@@ -65,15 +65,15 @@ let error_report = function
         prerr_endline report
       )
 
-let with_backend backend targets =
+let with_backend backend ~outdir targets =
   let main =
     let db = Db.init_exn "_bistro" in
     let scheduler = Scheduler.make backend db in
-    Lwt_list.map_p (foreach_target db scheduler) targets >>= fun results ->
+    Lwt_list.map_p (foreach_target db scheduler outdir) targets >>= fun results ->
     List.iter results ~f:error_report ;
     return ()
   in
   Lwt_unix.run main
 
-let local ?(np = 1) ?(mem = 1024) ?workdir targets =
-  with_backend (Scheduler.local_backend ?workdir ~np ~mem ()) targets
+let local ?(np = 1) ?(mem = 1024) ?tmpdir ~outdir targets =
+  with_backend (Scheduler.local_backend ?tmpdir ~np ~mem ()) ~outdir targets
