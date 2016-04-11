@@ -47,6 +47,6 @@ let main db e =
 
 let () = Lwt_unix.run (
     let db = Db.init_exn "_bistro" in
-    let e = Scheduler.(make (local_backend ~np:2 ~mem:1024) db) in
+    let e = Scheduler.(make (local_backend ~np:2 ~mem:1024 ()) db) in
     main db e
   )

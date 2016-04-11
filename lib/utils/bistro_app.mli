@@ -8,6 +8,7 @@ val ( %> ) : string list -> _ workflow -> target
 val local :
   ?np:int ->
   ?mem:int ->
+  ?workdir:string ->
   target list -> unit
 
 val with_backend :

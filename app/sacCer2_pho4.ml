@@ -19,15 +19,9 @@ let chIP_pho4_noPi_bam = Samtools.(indexed_bam_of_sam chIP_pho4_noPi_sam / index
 
 let chIP_pho4_noPi_macs2 = Macs2.callpeak chIP_pho4_noPi_bam
 
-let np = 4
-let mem = 10 * 1024
-
-let main queue workdir () =
-  let backend = match queue with
-    | None -> Bistro_engine.Scheduler.local_backend ~np ~mem
-    | Some queue ->
-      let workdir = Option.value ~default:(Sys.getcwd ()) workdir in
-      Bistro_pbs.Backend.make ~queue ~workdir
+let main workdir np mem () =
+  let backend =
+    Bistro_engine.Scheduler.local_backend ?workdir ~np ~mem:(mem * 1024) ()
   in
   Bistro_app.(
     with_backend backend [
@@ -38,8 +32,9 @@ let main queue workdir () =
 let spec =
   let open Command.Spec in
   empty
-  +> flag "--pbsqueue" (optional string) ~doc:"QUEUE Name of a PBS queue"
-  +> flag "--nodedir"  (optional string) ~doc:"DIR (Preferably local) scratch directory on worker nodes"
+  +> flag "--workdir" (optional string) ~doc:"DIR (Preferably local) directory where to put temporary files"
+  +> flag "--np"      (optional_with_default 4 int) ~doc:"INT Number of processors"
+  +> flag "--mem"     (optional_with_default 4 int) ~doc:"INT Available memory (in GB)"
 
 let command =
   Command.basic

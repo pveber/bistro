@@ -13,6 +13,12 @@ let ( >>=? ) x f = x >>= function
   | Ok x -> f x
   | Error _ as e -> Lwt.return e
 
+let remove_if_exists fn =
+  if Sys.file_exists fn = `Yes then
+    Lwt_process.exec ("", [| "rm" ; "-rf" ; fn |]) >>| ignore
+  else
+    Lwt.return ()
+
 module Pool : sig
   type t
 
@@ -125,17 +131,20 @@ let extension_of_interpreter = function
   | `R -> "R"
   | `sh -> "sh"
 
-let local_backend ~np ~mem : backend =
+let local_backend ?workdir ~np ~mem () : backend =
   let pool = Pool.create ~np ~mem in
   fun db ({ script ; } as step) ->
     Pool.use pool ~np ~mem ~f:(fun ~np ~mem ->
         let interpreter = Script.interpreter script in
         match interpreter with
         | `sh | `bash | `R ->
+          let workdir = match workdir with
+            | None -> Db.tmp_path db step
+            | Some p -> Filename.concat p step.id in
           let stdout = Db.stdout_path db step in
           let stderr = Db.stderr_path db step in
-          let dest = Db.build_path db step in
-          let tmp = Db.tmp_path db step in
+          let dest = Filename.concat workdir "dest" in
+          let tmp = Filename.concat workdir "tmp" in
           let string_of_workflow = Db.workflow_path' db in
           let script_extension = extension_of_interpreter interpreter in
           let script_file =
@@ -147,6 +156,8 @@ let local_backend ~np ~mem : backend =
           Lwt_io.(with_file
                     ~mode:output script_file
                     (fun oc -> write oc script_text)) >>= fun () ->
+          remove_if_exists workdir >>= fun () ->
+          Unix.mkdir_p tmp ;
           redirection stdout >>= fun stdout ->
           redirection stderr >>= fun stderr ->
           let cmd = interpreter_cmd script_file interpreter in
@@ -157,7 +168,14 @@ let local_backend ~np ~mem : backend =
               | WSTOPPED code -> code
             )
           in
+          (
+            if Sys.file_exists dest = `Yes then
+              Lwt_unix.rename dest (Db.build_path db step)
+            else
+              Lwt.return ()
+          ) >>= fun () ->
           Lwt_unix.unlink script_file >>= fun () ->
+          remove_if_exists workdir >>= fun () ->
           Lwt.return {
             script = script_text ;
             exit_status ;
@@ -237,12 +255,6 @@ let make backend db = {
   on = true ;
 }
 
-let remove_if_exists fn =
-  if Sys.file_exists fn = `Yes then
-    Lwt_process.exec ("", [| "rm" ; "-rf" ; fn |]) >>| ignore
-  else
-    Lwt.return ()
-
 let join_results xs =
   let f accu x =
     x >>= function
@@ -277,20 +289,16 @@ and build_step
   (
     let stdout = Db.stdout_path e.db step in
     let stderr = Db.stderr_path e.db step in
-    let dest = Db.build_path e.db step in
-    let tmp = Db.tmp_path e.db step in
+    let build_path = Db.build_path e.db step in
     remove_if_exists stdout >>= fun () ->
     remove_if_exists stderr >>= fun () ->
-    remove_if_exists dest >>= fun () ->
-    remove_if_exists tmp >>= fun () ->
-    Lwt_unix.mkdir tmp 0o750 >>= fun () ->
+    remove_if_exists build_path >>= fun () ->
     e.backend e.db step >>= fun { script ; exit_status } ->
     Db.Submitted_script_table.set e.db step script ;
-    match exit_status, Sys.file_exists_exn dest with
+    match exit_status, Sys.file_exists build_path = `Yes with
     | 0, true ->
-      remove_if_exists tmp >>= fun () ->
       Db.built e.db step ;
-      Lwt_unix.rename dest (Db.cache_path e.db step) >>= fun () ->
+      Lwt_unix.rename build_path (Db.cache_path e.db step) >>= fun () ->
       Lwt.return (Ok ())
     | 0, false ->
       let msg =

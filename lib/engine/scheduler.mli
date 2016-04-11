@@ -12,7 +12,7 @@ type execution_report = {
 type backend =
   Db.t -> Workflow.step -> execution_report Lwt.t
 
-val local_backend : np:int -> mem:int -> backend
+val local_backend : ?workdir:string -> np:int -> mem:int -> unit -> backend
 
 
 type t

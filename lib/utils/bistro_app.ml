@@ -62,5 +62,5 @@ let with_backend backend targets =
   in
   Lwt_unix.run main
 
-let local ?(np = 1) ?(mem = 1024) targets =
-  with_backend (Scheduler.local_backend ~np ~mem) targets
+let local ?(np = 1) ?(mem = 1024) ?workdir targets =
+  with_backend (Scheduler.local_backend ?workdir ~np ~mem ()) targets
