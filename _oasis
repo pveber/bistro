@@ -86,12 +86,6 @@ Test test_ppx_bistro
                       test/test_ppx_bistro.byte
   TestTools:      ppx_bistro
 
-Executable bistro_server
-  Path:             app
-  MainIs:           bistro_server.ml
-  BuildDepends:     bistro.engine, cohttp.lwt, core
-  CompiledObject:   byte
-
 # +-------------------------------------------------------------------+
 # | Examples                                                          |
 # +-------------------------------------------------------------------+
