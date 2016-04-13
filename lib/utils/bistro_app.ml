@@ -8,15 +8,15 @@ with sexp
 
 type plan = target list with sexp
 
-let load_plan fn =
-  In_channel.read_all fn
+let plan_of_channel ic =
+  In_channel.input_all ic
   |> Sexp.of_string
   |> plan_of_sexp
 
-let save_plan fn p =
+let plan_to_channel p oc =
   sexp_of_plan p
   |> Sexp.to_string_hum
-  |> fun data -> Out_channel.write_all fn ~data
+  |> Out_channel.output_string oc
 
 let ( %> ) path w = path, Bistro.Workflow.u w
 

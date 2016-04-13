@@ -6,8 +6,8 @@ type plan = target list with sexp
 
 val ( %> ) : string list -> _ workflow -> target
 
-val load_plan : string -> plan
-val save_plan : string -> plan -> unit
+val plan_of_channel : in_channel -> plan
+val plan_to_channel : plan -> out_channel -> unit
 
 val local :
   ?np:int ->

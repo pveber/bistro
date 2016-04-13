@@ -1,7 +1,7 @@
 open Core.Std
 
 let main tmpdir outdir np mem fn () =
-  let plan = Bistro_app.load_plan fn in
+  let plan = In_channel.with_file fn ~f:Bistro_app.plan_of_channel in
   Bistro_app.local ?tmpdir ~outdir ~np ~mem:(mem * 1024) plan
 
 let spec =
