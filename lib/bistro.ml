@@ -330,6 +330,17 @@ module EDSL_sh = struct
     ]
 end
 
+module EDSL_bash = struct
+  include EDSL_sh
+  let script cmds =
+    Script.make
+      `bash
+      (List.intersperse ~sep:[S "\n"] cmds)
+
+  let workflow ?descr ?mem ?np ?timeout ?version ?pkgs cmds =
+    Workflow.make ?descr ?mem ?np ?timeout ?version ?pkgs (script cmds)
+end
+
 module Std = struct
   type 'a workflow = 'a Workflow.t
   type ('a, 'b) selector = ('a, 'b) Workflow.selector

@@ -141,6 +141,10 @@ module EDSL_sh : sig
   val heredoc : dest:expr -> expr -> cmd
 end
 
+module EDSL_bash : sig
+  include module type of EDSL_sh with type expr = EDSL.expr
+end
+
 module Script : sig
   type t = Workflow.script
   val make : interpreter -> EDSL.expr list -> t
