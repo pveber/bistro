@@ -13,6 +13,9 @@ let ( >>=? ) x f = x >>= function
   | Ok x -> f x
   | Error _ as e -> Lwt.return e
 
+let mv src dst =
+  Lwt_process.exec ("", [| "mv" ; src ; dst |]) >>| ignore
+
 let remove_if_exists fn =
   if Sys.file_exists fn = `Yes then
     Lwt_process.exec ("", [| "rm" ; "-rf" ; fn |]) >>| ignore
@@ -170,7 +173,7 @@ let local_backend ?tmpdir ~np ~mem () : backend =
           in
           (
             if Sys.file_exists dest = `Yes then
-              Lwt_unix.rename dest (Db.build_path db step)
+              mv dest (Db.build_path db step)
             else
               Lwt.return ()
           ) >>= fun () ->
@@ -298,7 +301,7 @@ and build_step
     match exit_status, Sys.file_exists build_path = `Yes with
     | 0, true ->
       Db.built e.db step ;
-      Lwt_unix.rename build_path (Db.cache_path e.db step) >>= fun () ->
+      mv build_path (Db.cache_path e.db step) >>= fun () ->
       Lwt.return (Ok ())
     | 0, false ->
       let msg =
