@@ -231,7 +231,6 @@ struct
       T.add table x (Thread waiter) ;
       Lwt.async (fun () ->
           f () >>= fun res ->
-          T.remove table x ;
           Lwt.wakeup u res ;
           Lwt.return ()
         ) ;
