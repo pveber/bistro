@@ -136,7 +136,7 @@ let extension_of_interpreter = function
 
 let local_backend ?tmpdir ~np ~mem () : backend =
   let pool = Pool.create ~np ~mem in
-  fun db ({ script ; } as step) ->
+  fun db ({ script ; np ; mem } as step) ->
     Pool.use pool ~np ~mem ~f:(fun ~np ~mem ->
         let interpreter = Script.interpreter script in
         match interpreter with
