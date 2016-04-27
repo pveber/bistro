@@ -224,12 +224,7 @@ let check_dirs_of_db_exist path =
     stdout_dir path ;
   ]
   in
-  let checks =
-    Stats_table.check path ::
-    Wave_table.check path ::
-    Submitted_script_table.check path ::
-    List.map dir_paths ~f:(check_path `Dir)
-  in
+  let checks = List.map dir_paths ~f:(check_path `Dir) in
   match filter_errors checks with
   | [] -> Ok ()
   | h :: t ->
@@ -247,6 +242,7 @@ let well_formed_db path =
   let open Rresult in
   check_dirs_of_db_exist path >>= fun () ->
   Stats_table.check path >>= fun () ->
+  Submitted_script_table.check path >>= fun () ->
   Wave_table.check path
 
 let ensure_path_has_db path =
