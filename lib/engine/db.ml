@@ -245,6 +245,20 @@ let well_formed_db path =
   Submitted_script_table.check path >>= fun () ->
   Wave_table.check path
 
+let create_db path =
+  let open R in
+  Unix.mkdir_p (tmp_dir path) ;
+  Unix.mkdir_p (build_dir path) ;
+  Unix.mkdir_p (cache_dir path) ;
+  Unix.mkdir_p (stderr_dir path) ;
+  Unix.mkdir_p (stdout_dir path) ;
+  Stats_table.create path >>= fun () ->
+  Submitted_script_table.create path >>= fun () ->
+  Wave_table.create path
+
+let dir_is_empty path =
+  Sys.readdir path = [||]
+
 let ensure_path_has_db path =
   let open R in
   R.reword_error_msg
@@ -252,15 +266,11 @@ let ensure_path_has_db path =
     (
       match Sys.file_exists path with
       | `Yes ->
-        well_formed_db path
-      | `No ->
-        Unix.mkdir_p (tmp_dir path) ;
-        Unix.mkdir_p (build_dir path) ;
-        Unix.mkdir_p (cache_dir path) ;
-        Unix.mkdir_p (stderr_dir path) ;
-        Unix.mkdir_p (stdout_dir path) ;
-        Stats_table.create path >>= fun () ->
-        Wave_table.create path
+        if dir_is_empty path then
+          create_db path
+        else
+          well_formed_db path
+      | `No -> create_db path
       | `Unknown ->
         no_such_path_error path
     )
