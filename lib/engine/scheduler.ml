@@ -79,9 +79,8 @@ struct
     p.waiters <- wake_guys_up p (List.sort (fun (x, _) (y,_) -> compare y x) p.waiters)
 
   let use p ~np ~mem ~f =
-    if np > p.np then
-      Lwt.fail (Invalid_argument "Bistro.Pool: asked more processors than there are in the pool")
-    else if mem > p.mem then
+    let np = min np p.np in
+    if mem > p.mem then
       Lwt.fail (Invalid_argument "Bistro.Pool: asked more memory than there is in the pool")
     else (
       acquire p ~np ~mem >>= fun () ->
