@@ -65,7 +65,7 @@ val built : t -> Workflow.step -> unit
 
 module Stats : sig
   type t = private {
-    workflow : Workflow.step ;
+    workflow_id : string ;
     history : (Time.t * event) list ;
     build_time : float option ;
   }

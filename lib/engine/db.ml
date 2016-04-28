@@ -145,7 +145,7 @@ end
 
 module Stats = struct
   type t = {
-    workflow : step ;
+    workflow_id : string ;
     history : (Time.t * event) list ;
     build_time : float option ;
   }
@@ -161,7 +161,7 @@ module Stats = struct
   let id = "stats"
 
   let make s = {
-    workflow = s ;
+    workflow_id = s.id ;
     history = [] ;
     build_time = None ;
   }
@@ -295,7 +295,6 @@ let update_stats db step f =
     | None -> Stats.make step
   in
   Stats_table.set db step (f stat)
-
 
 let append_history ~db u evt =
   update_stats db u (fun stat ->
