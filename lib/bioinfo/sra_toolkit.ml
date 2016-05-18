@@ -1,23 +1,18 @@
 open Core_kernel.Std
-open Bistro
-open Bistro.EDSL_sh
+open Bistro.EDSL
 
-let package = {
-  pkg_name = "sra-tools" ;
-  pkg_version = "2.5.7" ;
-}
-
+let env = Bistro.docker_image ~account:"pveber" ~name:"sra-toolkit" ()
 
 let fastq_dump sra =
-  workflow ~pkgs:[package] ~descr:"sratoolkit.fastq_dump" [
-    cmd "fastq-dump" [ string "-Z" ; dep sra ] ~stdout:dest
+  workflow ~descr:"sratoolkit.fastq_dump" [
+    cmd ~env "fastq-dump" [ string "-Z" ; dep sra ] ~stdout:dest
   ]
 
 let fastq_dump_pe sra =
   let dir =
-    workflow ~pkgs:[package] ~descr:"sratoolkit.fastq_dump" [
+    workflow ~descr:"sratoolkit.fastq_dump" [
       mkdir_p dest ;
-      cmd "fastq-dump" [
+      cmd ~env "fastq-dump" [
         opt "-O" ident dest ;
         string "--split-files" ;
         dep sra

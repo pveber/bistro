@@ -30,11 +30,20 @@ module Utils = struct
     r
 end
 
-type package = {
-  pkg_name : string ;
-  pkg_version : string ;
+type docker_image = {
+  dck_account : string ;
+  dck_name : string ;
+  dck_tag : string option ;
+  dck_registry : string option ;
 }
 with sexp
+
+let docker_image ?tag ?registry ~account ~name () = {
+  dck_account = account ;
+  dck_name = name ;
+  dck_tag = tag ;
+  dck_registry = registry ;
+}
 
 module T = struct
   type u =
@@ -46,7 +55,6 @@ module T = struct
     id : string ;
     descr : string ;
     deps : u list ;
-    pkgs : package list ;
     script : script ;
     np : int ; (** Required number of processors *)
     mem : int ; (** Required memory in MB *)
@@ -54,9 +62,11 @@ module T = struct
     version : int option ; (** Version number of the wrapper *)
   }
 
-  and script = {
-    interpreter : interpreter ;
+  and script = cmd list
+
+  and cmd = {
     tokens : token list ;
+    env : docker_image option ;
   }
 
   and token =
@@ -83,21 +93,26 @@ end
 
 include T
 
+let workflow_id = function
+  | Input (id, _)
+  | Select (id, _, _)
+  | Step { id } -> id
+
 module Script = struct
   type t = script
 
-  let make interpreter xs = {
-    interpreter ;
-    tokens = List.concat xs
-  }
+  let make xs = xs
 
-  let interpreter x = x.interpreter
-
-  let deps s =
-    List.filter_map s.tokens ~f:(function
+  let deps_of_cmd cmd =
+    List.filter_map cmd.tokens ~f:(function
         | D r -> Some (r :> u)
         | S _ | DEST | TMP | NP | MEM -> None
       )
+    |> List.dedup
+
+  let deps xs =
+    List.map xs ~f:deps_of_cmd
+    |> List.concat
     |> List.dedup
 
   let string_of_token ~string_of_workflow ~tmp ~dest ~np ~mem = function
@@ -108,9 +123,56 @@ module Script = struct
     | NP -> string_of_int np
     | MEM -> string_of_int mem
 
-  let to_string ~string_of_workflow ~tmp ~dest ~np ~mem script =
-    let f = string_of_token ~string_of_workflow ~tmp ~dest ~np ~mem in
-    List.map script.tokens ~f
+  let rec string_of_cmd ~use_docker ~string_of_workflow ~tmp ~dest ~np ~mem cmd =
+    match use_docker, cmd.env with
+    | true, Some image ->
+      let image_dest = "/bistro/dest" in
+      let image_tmp = "/bistro/tmp" in
+      let image_dep d = sprintf "/bistro/data/%s" (workflow_id d) in
+      let image_cmd =
+        string_of_cmd
+          ~use_docker:false
+          ~string_of_workflow:image_dep
+          ~tmp:image_tmp
+          ~dest:image_dest
+          ~np ~mem
+          cmd
+      in
+      let deps = deps_of_cmd cmd in
+      let deps_mount =
+        let f d =
+          sprintf
+            "-v %s:%s"
+            (string_of_workflow d)
+            (image_dep d)
+        in
+        List.map deps ~f
+        |> String.concat ~sep:" "
+      in
+      let tmp_mount = sprintf "-v %s:%s" tmp image_tmp in
+      let dest_mount = sprintf "-v %s:%s" Filename.(dirname dest) Filename.(dirname image_dest) in
+      let image =
+        sprintf "%s%s/%s%s"
+          (Option.value_map ~default:"" ~f:(sprintf "%s/") image.dck_registry)
+          image.dck_account
+          image.dck_name
+          (Option.value_map ~default:"" ~f:(sprintf ":%s")  image.dck_tag)
+      in
+      sprintf
+        "docker run %s %s %s -t %s sh -c \"%s\""
+        deps_mount
+        tmp_mount
+        dest_mount
+        image
+        image_cmd
+    | _ ->
+      let f = string_of_token ~string_of_workflow ~tmp ~dest ~np ~mem in
+      List.map cmd.tokens ~f
+      |> String.concat
+
+  let to_string ~use_docker ~string_of_workflow ~tmp ~dest ~np ~mem script =
+    let f = string_of_cmd ~use_docker ~string_of_workflow ~tmp ~dest ~np ~mem in
+    List.map script ~f
     |> String.concat
 end
 
@@ -119,12 +181,9 @@ module Workflow = struct
   type 'a t = u
   type ('a, 'b) selector = Selector of path
 
-  let id = function
-    | Input (id, _)
-    | Select (id, _, _)
-    | Step { id } -> id
+  let id = workflow_id
 
-  let id' = id
+  let id' = workflow_id
 
   let input ?(may_change = false) target =
     let hash = if may_change then Some (Digest.file target) else None in
@@ -138,11 +197,11 @@ module Workflow = struct
       ?(np = 1)
       ?timeout
       ?version
-      ?(pkgs = [])
       script =
     let deps = Script.deps script in
     let script_as_string : string =
       Script.to_string
+        ~use_docker:false
         ~string_of_workflow:id
         ~np:1
         ~mem:1024
@@ -151,7 +210,7 @@ module Workflow = struct
         script
     in
     let id = digest ("step", version, script_as_string) in
-    Step { descr ; deps ; pkgs ; script ; np ; mem ; timeout ; version ; id }
+    Step { descr ; deps ; script ; np ; mem ; timeout ; version ; id }
 
   let select u (Selector path) =
     let u, path =
@@ -199,14 +258,8 @@ end
 
 type 'a directory = [`directory of 'a]
 
-module EDSL = struct
-  type expr = token list
-
-  let workflow ?descr ?mem ?np ?timeout ?version ?pkgs ?(interpreter = `sh) expr =
-    Workflow.make ?descr ?mem ?np ?timeout ?version ?pkgs (Script.make interpreter expr)
-
-  let selector x = Workflow.Selector x
-  let ( / ) = Workflow.select
+module Expr = struct
+  type t = token list
 
   let dest = [ DEST ]
   let tmp = [ TMP ]
@@ -236,26 +289,22 @@ module EDSL = struct
 
   let enum dic x = [ S (List.Assoc.find_exn dic x) ]
 
-  let use s = s.tokens
-
-  let ( % ) f g x = g (f x)
+  (* FIXME: remove this?
+     let use s = s.tokens *)
 end
 
-module EDSL_sh = struct
-  include EDSL
+module EDSL = struct
+  include Expr
 
-  type cmd = token list
+  type cmd = T.cmd
 
-  let script cmds =
-    Script.make
-      `sh
-      (List.intersperse ~sep:[S "\n"] cmds)
+  let script = Script.make
 
-  let workflow ?descr ?mem ?np ?timeout ?version ?pkgs cmds =
-    Workflow.make ?descr ?mem ?np ?timeout ?version ?pkgs (script cmds)
+  let workflow ?descr ?mem ?np ?timeout ?version cmds =
+    Workflow.make ?descr ?mem ?np ?timeout ?version (script cmds)
 
 
-  let cmd p ?stdin ?stdout ?stderr args =
+  let cmd p ?env ?stdin ?stdout ?stderr args =
     let prog_expr = [ S p ] in
     let stdout_expr =
       match stdout with
@@ -272,10 +321,13 @@ module EDSL_sh = struct
       | None -> []
       | Some e -> S " 2> " :: e
     in
-    [ prog_expr ] @ args @ [ stdin_expr ; stdout_expr ; stderr_expr ]
-    |> List.filter ~f:(( <> ) [])
-    |> List.intersperse ~sep:[S " "]
-    |> List.concat
+    let tokens =
+      [ prog_expr ] @ args @ [ stdin_expr ; stdout_expr ; stderr_expr ]
+      |> List.filter ~f:(( <> ) [])
+      |> List.intersperse ~sep:[S " "]
+      |> List.concat
+    in
+    { tokens ; env }
 
   let opt o f x = S o :: S " " :: f x
 
@@ -320,33 +372,15 @@ module EDSL_sh = struct
     )
     @ (S " " :: cmd)
 
-  let heredoc ?(verbatim = false) ~dest contents =
-    let start_token = if verbatim then " <<'__HEREDOC__'\n" else " <<__HEREDOC__\n" in
-    List.concat [
-      [ S "cat > " ] ;
-      dest ;
-      [ S start_token ] ;
-      contents ;
-      [ S "\n__HEREDOC__" ]
-    ]
-end
+  let ( % ) f g x = g (f x)
 
-module EDSL_bash = struct
-  include EDSL_sh
-  let script cmds =
-    Script.make
-      `bash
-      (List.intersperse ~sep:[S "\n"] cmds)
-
-  let workflow ?descr ?mem ?np ?timeout ?version ?pkgs cmds =
-    Workflow.make ?descr ?mem ?np ?timeout ?version ?pkgs (script cmds)
+  let selector x = Workflow.Selector x
+  let ( / ) = Workflow.select
 end
 
 module Std = struct
   type 'a workflow = 'a Workflow.t
   type ('a, 'b) selector = ('a, 'b) Workflow.selector
-
-  type nonrec package = package
 
   class type ['a,'b] file = object
     method format : 'a
@@ -378,7 +412,7 @@ module Std = struct
   end
 
   module Unix_tools = struct
-    open EDSL_sh
+    open EDSL
 
     let wget ?descr_url ?no_check_certificate url =
       let info = match descr_url with None -> "" | Some i -> sprintf "(%s)" i in

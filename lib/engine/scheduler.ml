@@ -133,56 +133,57 @@ let extension_of_interpreter = function
   | `R -> "R"
   | `sh -> "sh"
 
-let local_backend ?tmpdir ~np ~mem () : backend =
+let local_backend ?tmpdir ?(use_docker = false) ~np ~mem () : backend =
   let pool = Pool.create ~np ~mem in
   fun db ({ script ; np ; mem } as step) ->
     Pool.use pool ~np ~mem ~f:(fun ~np ~mem ->
-        let interpreter = Script.interpreter script in
-        match interpreter with
-        | `sh | `bash | `R ->
-          let tmpdir = match tmpdir with
-            | None -> Db.tmp_path db step
-            | Some p -> Filename.concat p step.id in
-          let stdout = Db.stdout_path db step in
-          let stderr = Db.stderr_path db step in
-          let dest = Filename.concat tmpdir "dest" in
-          let tmp = Filename.concat tmpdir "tmp" in
-          let string_of_workflow = Db.workflow_path' db in
-          let script_extension = extension_of_interpreter interpreter in
-          let script_file =
-            Filename.temp_file "guizmin" ("." ^ script_extension) in
-          let script_text =
-            Script.to_string
-              ~string_of_workflow
-              ~np ~mem ~dest ~tmp script in
-          Lwt_io.(with_file
-                    ~mode:output script_file
-                    (fun oc -> write oc script_text)) >>= fun () ->
-          remove_if_exists tmpdir >>= fun () ->
-          Unix.mkdir_p tmp ;
-          redirection stdout >>= fun stdout ->
-          redirection stderr >>= fun stderr ->
-          let cmd = interpreter_cmd script_file interpreter in
-          Lwt_process.exec ~stdout ~stderr cmd >>= fun status ->
-          let exit_status = Caml.Unix.(match status with
-              | WEXITED code
-              | WSIGNALED code
-              | WSTOPPED code -> code
-            )
-          in
-          (
-            if Sys.file_exists dest = `Yes then
-              mv dest (Db.build_path db step)
-            else
-              Lwt.return ()
-          ) >>= fun () ->
-          Lwt_unix.unlink script_file >>= fun () ->
-          remove_if_exists tmpdir >>= fun () ->
-          Lwt.return {
-            script = script_text ;
-            exit_status ;
-          }
-        | _ -> Lwt.fail (Failure ("Unsupported_interpreter: " ^ (extension_of_interpreter interpreter)))
+        let tmpdir = match tmpdir with
+          | None -> Db.tmp_path db step
+          | Some p -> Filename.concat p step.id in
+        let stdout = Db.stdout_path db step in
+        let stderr = Db.stderr_path db step in
+        let dest = Filename.concat tmpdir "dest" in
+        let tmp = Filename.concat tmpdir "tmp" in
+        let string_of_workflow = Db.workflow_path' db in
+        let script_file =
+          Filename.temp_file "guizmin" ".sh" in
+        let script_text =
+          Script.to_string
+            ~use_docker
+            ~string_of_workflow
+            ~np ~mem ~dest ~tmp script in
+        Lwt_io.(with_file
+                  ~mode:output script_file
+                  (fun oc -> write oc script_text)) >>= fun () ->
+        remove_if_exists tmpdir >>= fun () ->
+        Unix.mkdir_p tmp ;
+        redirection stdout >>= fun stdout ->
+        redirection stderr >>= fun stderr ->
+        let cmd = interpreter_cmd script_file `sh in
+        Lwt_process.exec ~stdout ~stderr cmd >>= fun status ->
+        if use_docker then (
+          sprintf "docker run -v %s:/bistro -t busybox chown -R 1000 /bistro" tmpdir
+          |> Sys.command
+          |> ignore
+        ) ;
+        let exit_status = Caml.Unix.(match status with
+            | WEXITED code
+            | WSIGNALED code
+            | WSTOPPED code -> code
+          )
+        in
+        (
+          if Sys.file_exists dest = `Yes then
+            mv dest (Db.build_path db step)
+          else
+            Lwt.return ()
+        ) >>= fun () ->
+        Lwt_unix.unlink script_file >>= fun () ->
+        remove_if_exists tmpdir >>= fun () ->
+        Lwt.return {
+          script = script_text ;
+          exit_status ;
+        }
       )
 
 

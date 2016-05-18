@@ -25,26 +25,9 @@ Library bistro
 Library bistro_bioinfo
   Path:             lib/bioinfo
   Pack:             true
-  Modules:          Bed,
-                    Bowtie,
-                    Bowtie2,
-                    Deseq2,
-                    Ensembl,
-                    FastQC,
-                    Fastq,
-                    Htseq,
-                    Jaspar,
-                    Macs,
-                    Macs2,
-                    Meme_suite,
-                    Misc,
-                    Samtools,
-                    Sra,
-                    Sra_toolkit,
+  Modules:          Sra_toolkit,
                     Std,
-                    Tophat,
-                    Types,
-                    Ucsc_gb
+                    Types
   FindlibName:      bioinfo
   FindlibParent:    bistro
   BuildDepends:     bistro
@@ -89,24 +72,24 @@ Test test_ppx_bistro
 Executable bistro
   Path:             app
   MainIs:           bistro_main.ml
-  BuildDepends:     bistro.engine, core
+  BuildDepends:     bistro.utils, bistro.bioinfo, core
   CompiledObject:   byte
 
 # +-------------------------------------------------------------------+
 # | Examples                                                          |
 # +-------------------------------------------------------------------+
 
-Executable diamond
-  Path:             test
-  MainIs:           diamond.ml
-  BuildDepends:     bistro.engine
-  CompiledObject:   byte
+# Executable diamond
+#   Path:             test
+#   MainIs:           diamond.ml
+#   BuildDepends:     bistro.engine
+#   CompiledObject:   byte
 
-Executable fail
-  Path:             test
-  MainIs:           fail.ml
-  BuildDepends:     bistro.utils
-  CompiledObject:   byte
+# Executable fail
+#   Path:             test
+#   MainIs:           fail.ml
+#   BuildDepends:     bistro.utils
+#   CompiledObject:   byte
 
 Executable sacCer2_pho4
   Path:             app

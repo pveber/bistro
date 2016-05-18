@@ -2,24 +2,18 @@
 
 type path = string list
 
-type interpreter = [
-  | `bash
-  | `ocaml
-  | `ocamlscript
-  | `perl
-  | `python
-  | `R
-  | `sh
-]
-
 type 'a directory = [`directory of 'a]
 
 (** Name and version of an external dependency for a workflow *)
-type package = {
-  pkg_name : string ;
-  pkg_version : string ;
-}
+type docker_image
 with sexp
+
+val docker_image :
+  ?tag:string ->
+  ?registry:string ->
+  account:string ->
+  name:string ->
+  unit -> docker_image
 
 module Workflow : sig
   type u =
@@ -31,7 +25,6 @@ module Workflow : sig
     id : string ;
     descr : string ;
     deps : u list ;
-    pkgs : package list ;
     script : script ;
     np : int ; (** Required number of processors *)
     mem : int ; (** Required memory in MB *)
@@ -56,7 +49,6 @@ module Workflow : sig
     ?np:int ->
     ?timeout:int ->
     ?version:int ->
-    ?pkgs:package list ->
     script -> 'a t
 
   val select : (_ directory as 'a) t -> ('a, 'b) selector -> 'b t
@@ -66,46 +58,32 @@ module Workflow : sig
   val to_dot : u -> out_channel -> unit
 end
 
-module EDSL : sig
-  type expr
+module Expr : sig
+  type t
 
-  val workflow :
-    ?descr:string ->
-    ?mem:int ->
-    ?np:int ->
-    ?timeout:int ->
-    ?version:int ->
-    ?pkgs:package list ->
-    ?interpreter:interpreter ->
-    expr list -> 'a Workflow.t
-
-  val selector : path -> ('a, 'b) Workflow.selector
-  val ( / ) : 'a Workflow.t -> ('a, 'b) Workflow.selector -> 'b Workflow.t
-
-  val dest : expr
-  val tmp : expr
-  val np : expr
-  val mem : expr
-  val string : string -> expr
-  val int : int -> expr
-  val float : float -> expr
-  val path : path -> expr
-  val dep : _ Workflow.t -> expr
-  val quote : ?using:char -> expr -> expr
-  val option : ('a -> expr) -> 'a option -> expr
-  val list : ('a -> expr) -> ?sep:string -> 'a list -> expr
-  val seq : ?sep:string -> expr list -> expr
-  val enum : ('a * string) list -> 'a -> expr
-  val use : Workflow.script -> expr
-
-  val ( % ) : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c
+  val dest : t
+  val tmp : t
+  val np : t
+  val mem : t
+  val string : string -> t
+  val int : int -> t
+  val float : float -> t
+  val path : path -> t
+  val dep : _ Workflow.t -> t
+  val quote : ?using:char -> t -> t
+  val option : ('a -> t) -> 'a option -> t
+  val list : ('a -> t) -> ?sep:string -> 'a list -> t
+  val seq : ?sep:string -> t list -> t
+  val enum : ('a * string) list -> 'a -> t
 end
 
 
-module EDSL_sh : sig
-  include module type of EDSL with type expr = EDSL.expr
+module EDSL : sig
+  include module type of Expr with type t := Expr.t
 
   type cmd
+  val selector : path -> ('a, 'b) Workflow.selector
+  val ( / ) : 'a Workflow.t -> ('a, 'b) Workflow.selector -> 'b Workflow.t
 
   val workflow :
     ?descr:string ->
@@ -113,43 +91,41 @@ module EDSL_sh : sig
     ?np:int ->
     ?timeout:int ->
     ?version:int ->
-    ?pkgs:package list ->
     cmd list -> 'a Workflow.t
 
   val cmd :
     string ->
-    ?stdin:expr -> ?stdout:expr -> ?stderr:expr ->
-    expr list -> cmd
+    ?env:docker_image ->
+    ?stdin:Expr.t -> ?stdout:Expr.t -> ?stderr:Expr.t ->
+    Expr.t list -> cmd
 
-  val ( // ) : expr -> string -> expr
-  val opt : string -> ('a -> expr) -> 'a -> expr
-  val opt' : string -> ('a -> expr) -> 'a -> expr
-  val flag : ('a -> expr) -> 'a -> bool -> expr
+  val ( // ) : Expr.t -> string -> Expr.t
+  val opt : string -> ('a -> Expr.t) -> 'a -> Expr.t
+  val opt' : string -> ('a -> Expr.t) -> 'a -> Expr.t
+  val flag : ('a -> Expr.t) -> 'a -> bool -> Expr.t
 
-  val or_list : cmd list -> cmd
-  val and_list : cmd list -> cmd
-  val pipe : cmd list -> cmd
+  (* FIXME *)
+  (* val or_list : cmd list -> cmd *)
+  (* val and_list : cmd list -> cmd *)
+  (* val pipe : cmd list -> cmd *)
 
-  val with_env : (string * expr) list -> cmd -> cmd
+  (* val with_env : (string * Expr.t) list -> cmd -> cmd *)
 
-  val mkdir : expr -> cmd
-  val mkdir_p : expr -> cmd
-  val wget : string -> ?dest:expr -> unit -> cmd
-  val cd : expr -> cmd
-  val rm_rf : expr -> cmd
-  val mv : expr -> expr -> cmd
-  val heredoc : ?verbatim:bool -> dest:expr -> expr -> cmd
-end
+  val mkdir : Expr.t -> cmd
+  val mkdir_p : Expr.t -> cmd
+  val wget : string -> ?dest:Expr.t -> unit -> cmd
+  val cd : Expr.t -> cmd
+  val rm_rf : Expr.t -> cmd
+  val mv : Expr.t -> Expr.t -> cmd
 
-module EDSL_bash : sig
-  include module type of EDSL_sh with type expr = EDSL.expr
+  val ( % ) : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c
 end
 
 module Script : sig
   type t = Workflow.script
-  val make : interpreter -> EDSL.expr list -> t
-  val interpreter : t -> interpreter
+  val make : EDSL.cmd list -> t
   val to_string :
+    use_docker:bool ->
     string_of_workflow:(Workflow.u -> string) ->
     tmp:string ->
     dest:string ->
@@ -161,7 +137,6 @@ end
 module Std : sig
   type 'a workflow = 'a Workflow.t
   type ('a, 'b) selector = ('a, 'b) Workflow.selector
-  type nonrec package = package
 
   class type ['a,'b] file = object
     method format : 'a

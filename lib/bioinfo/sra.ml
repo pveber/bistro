@@ -1,6 +1,6 @@
 open Core_kernel.Std
 open Bistro
-open Bistro.EDSL_sh
+open Bistro.EDSL
 open Types
 
 let input x = Workflow.input x
