@@ -320,11 +320,12 @@ module EDSL_sh = struct
     )
     @ (S " " :: cmd)
 
-  let heredoc ~dest contents =
+  let heredoc ?(verbatim = false) ~dest contents =
+    let start_token = if verbatim then " <<'__HEREDOC__'\n" else " <<__HEREDOC__\n" in
     List.concat [
       [ S "cat > " ] ;
       dest ;
-      [ S " <<__HEREDOC__\n" ] ;
+      [ S start_token ] ;
       contents ;
       [ S "\n__HEREDOC__" ]
     ]
