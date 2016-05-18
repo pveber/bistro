@@ -21,7 +21,7 @@ ENV CAML_LD_LIBRARY_PATH "/root/.opam/4.02.3/lib/stublibs"
 RUN opam install -y cohttp
 
 RUN opam pin add sexplib 113.00.00
-RUN opam pin add bistro --dev-repo
+RUN opam pin add -k git bistro "https://github.com/pveber/bistro.git#6180f7700c4fb83e3f21d4db5de9ed0b693e8473"
 
 RUN wget https://raw.githubusercontent.com/pveber/compbio-scripts/master/fastool/0.1.4/fastool.0.1.4.sh -O - | bash -s /opt
 ENV PATH /opt/fastool/0.1.4/bin:$PATH
