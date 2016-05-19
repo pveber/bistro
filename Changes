@@ -1,8 +1,21 @@
+v0.1.0 2016-05-19 Lyon
+----------------------
+
+Many minor changes in API.
+
+Installation scripts for tools are no longer considered part of
+analysis workflow. Installing programs should be dealt with outside
+bistro.
+
 Features:
-- Initial support for job distribution on PBS clusters
+- heredoc for shell EDSL
+- new np and mem tokens for scripts, as a way to use only the
+  resources that were allocated to a run
 
 Bug fixes:
 - bistro execution hangs on utop (f4f932f)
+- don't save workflow in database statistics, just its id (issue #4)
+
 
 v0.0.0 2016-01-21 Lyon
 ----------------------
