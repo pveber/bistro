@@ -201,7 +201,7 @@ module Workflow = struct
     let deps = Script.deps script in
     let script_as_string : string =
       Script.to_string
-        ~use_docker:false
+        ~use_docker:true
         ~string_of_workflow:id
         ~np:1
         ~mem:1024
