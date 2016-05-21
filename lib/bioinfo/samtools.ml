@@ -1,18 +1,14 @@
 open Core_kernel.Std
-open Bistro
 open Types
-open Bistro.EDSL_sh
+open Bistro.EDSL
 
-let package = {
-  pkg_name = "samtools" ;
-  pkg_version = "0.1.19" ;
-}
+let env = Bistro.docker_image ~account:"pveber" ~name:"samtools" ~tag:"1.3.1" ()
 
 let samtools subcmd args =
-  cmd "samtools" (string subcmd :: args)
+  cmd "samtools" ~env (string subcmd :: args)
 
 let sam_of_bam bam =
-  workflow ~pkgs:[package] ~descr:"samtools.sam_of_bam" [
+  workflow ~descr:"samtools.sam_of_bam" [
     samtools "view" [
       opt "-o" ident dest ;
       dep bam ;
@@ -20,7 +16,7 @@ let sam_of_bam bam =
   ]
 
 let indexed_bam_of_sam sam =
-  workflow ~pkgs:[package] ~descr:"samtools.indexed_bam_of_sam" [
+  workflow ~descr:"samtools.indexed_bam_of_sam" [
     mkdir_p dest ;
     samtools "view" [
       string "-S -b" ;
@@ -29,14 +25,14 @@ let indexed_bam_of_sam sam =
     ] ;
     samtools "sort" [
       dest // "temp.bam" ;
-      dest // "reads" ;
+      opt "-o" ident (dest // "reads") ;
     ] ;
     samtools "index" [ dest // "reads.bam" ] ;
     rm_rf (dest // "temp.bam") ;
   ]
 
 let sort ?on:order bam =
-  workflow ~pkgs:[package] ~descr:"samtools.sort" [
+  workflow ~descr:"samtools.sort" [
     samtools "sort" [
       option (fun o -> flag string "-n" (o = `name)) order ;
       dep bam ;
@@ -46,7 +42,7 @@ let sort ?on:order bam =
   ]
 
 let indexed_bam_of_bam bam =
-  workflow  ~pkgs:[package] ~descr:"samtools.indexed_bam_of_bam" [
+  workflow ~descr:"samtools.indexed_bam_of_bam" [
     mkdir_p dest ;
     samtools "sort" [
       dep bam ;

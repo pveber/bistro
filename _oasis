@@ -27,6 +27,7 @@ Library bistro_bioinfo
   Pack:             true
   Modules:          Bowtie,
                     Fastq,
+                    Samtools,
                     Sra_toolkit,
                     Std,
                     Types,

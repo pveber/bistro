@@ -1,8 +1,6 @@
 open Bistro.Std
 open Types
 
-val package : package
-
 val sort :
   ?on:[`name | `position] ->
   bam workflow -> bam workflow
