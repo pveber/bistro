@@ -3,8 +3,6 @@ open Types
 
 type index = [`bowtie_index] directory
 
-val package : package
-
 val bowtie_build :
   ?packed:bool ->
   ?color:bool  ->

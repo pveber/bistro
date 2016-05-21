@@ -25,7 +25,9 @@ Library bistro
 Library bistro_bioinfo
   Path:             lib/bioinfo
   Pack:             true
-  Modules:          Sra_toolkit,
+  Modules:          Bowtie,
+                    Fastq,
+                    Sra_toolkit,
                     Std,
                     Types,
                     Ucsc_gb
