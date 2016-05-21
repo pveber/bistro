@@ -135,6 +135,7 @@ let extension_of_interpreter = function
 
 let local_backend ?tmpdir ?(use_docker = false) ~np ~mem () : backend =
   let pool = Pool.create ~np ~mem in
+  let uid = Unix.getuid () in
   fun db ({ cmd ; np ; mem } as step) ->
     Pool.use pool ~np ~mem ~f:(fun ~np ~mem ->
         let tmpdir = match tmpdir with
@@ -161,8 +162,8 @@ let local_backend ?tmpdir ?(use_docker = false) ~np ~mem () : backend =
         redirection stderr >>= fun stderr ->
         let cmd = interpreter_cmd script_file `sh in
         Lwt_process.exec ~stdout ~stderr cmd >>= fun status ->
-        if use_docker then (
-          sprintf "docker run -v %s:/bistro -t busybox chown -R 1000 /bistro" tmpdir
+        if use_docker then ( (* FIXME: not necessary if no docker command was run *)
+          sprintf "docker run -v %s:/bistro -t busybox chown -R %d /bistro" tmpdir uid
           |> Sys.command
           |> ignore
         ) ;
