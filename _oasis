@@ -26,6 +26,7 @@ Library bistro_bioinfo
   Path:             lib/bioinfo
   Pack:             true
   Modules:          Bowtie,
+                    Bowtie2,
                     Fastq,
                     Macs2,
                     Samtools,

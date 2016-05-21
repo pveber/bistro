@@ -1,8 +1,6 @@
 open Bistro.Std
 open Types
 
-val package : package
-
 type index = [`bowtie2_index] directory
 
 val bowtie2_build :

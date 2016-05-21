@@ -1,20 +1,16 @@
 open Core_kernel.Std
-open Bistro.Std
-open Misc.Infix
-open Bistro.EDSL_sh
+open Bistro
+open Bistro.EDSL
 
 type index = [`bowtie2_index] directory
 
-let package = {
-  Bistro.pkg_name = "bowtie2" ;
-  pkg_version = "2.2.8" ;
-}
+let env = Bistro.docker_image ~account:"pveber" ~name:"bowtie2" ~tag:"2.2.9" ()
 
 (* memory bound correspond to storing a human index in memory, following bowtie manual *)
 let bowtie2_build ?large_index ?noauto ?packed ?bmax ?bmaxdivn ?dcv ?nodc ?noref ?justref ?offrate ?ftabchars ?seed ?cutoff fa =
-  workflow ~descr:"bowtie2_build" ~mem:(3 * 1024) ~pkgs:[package] [
+  workflow ~descr:"bowtie2_build" ~mem:(3 * 1024) [
     mkdir_p dest ;
-    cmd "bowtie2-build" [
+    cmd "bowtie2-build" ~env [
       option (flag string "--large-index") large_index ;
       option (flag string "--no-auto") noauto ;
       option (flag string "--packed") packed ;
@@ -76,8 +72,8 @@ let bowtie2
         opt "-2" (list dep ~sep:",") fqs2
       ]
   in
-  workflow ~descr:"bowtie2" ~mem:(3 * 1024) ~np:8 ~pkgs:[package] [
-    cmd "bowtie2" [
+  workflow ~descr:"bowtie2" ~mem:(3 * 1024) ~np:8 [
+    cmd "bowtie2" ~env [
       option (opt "--skip" int) skip ;
       option (opt "--qupto" int) qupto ;
       option (opt "--trim5" int) trim5 ;
