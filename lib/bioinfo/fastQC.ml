@@ -1,24 +1,17 @@
-open Types
-open Bistro
-open Bistro.EDSL_sh
+open Bistro.Std
+open Bistro.EDSL
 
-let package = {
-  pkg_name = "fastqc" ;
-  pkg_version = "0.10.1" ;
-}
+let env = Bistro.docker_image ~account:"pveber" ~name:"fastqc" ~tag:"0.11.5" ()
 
 type report = [`fastQC_report] directory
 
-let run fq = Workflow.make ~pkgs:[package] ~descr:"fastQC" [%bash{|
-DEST={{ dest }}
-mkdir $DEST
-
-set -e
-fastqc --outdir=$DEST {{ dep fq }}
-rm -rf $DEST/*.zip
-mv $DEST/*_fastqc/* $DEST
-rm -rf $DEST/*_fastqc
-|}]
+let run fq = workflow ~descr:"fastQC" [
+    mkdir_p dest ;
+    cmd "fastqc" ~env [
+      seq ~sep:"" [ string "--outdir=" ; dest ] ;
+      dep fq ;
+    ] ;
+  ]
 
 let html_report =
   selector ["fastqc_report.html"]

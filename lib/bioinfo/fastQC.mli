@@ -1,8 +1,6 @@
 open Bistro.Std
 open Types
 
-val package : package
-
 type report = [`fastQC_report] directory
 
 val run : 'a fastq workflow -> report workflow
