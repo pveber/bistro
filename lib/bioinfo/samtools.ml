@@ -25,7 +25,7 @@ let indexed_bam_of_sam sam =
     ] ;
     samtools "sort" [
       dest // "temp.bam" ;
-      opt "-o" ident (dest // "reads") ;
+      opt "-o" ident (dest // "reads.bam") ;
     ] ;
     samtools "index" [ dest // "reads.bam" ] ;
     rm_rf (dest // "temp.bam") ;
