@@ -29,6 +29,7 @@ Library bistro_bioinfo
                     Bowtie2,
                     Fastq,
                     FastQC,
+                    Htseq,
                     Macs2,
                     Samtools,
                     Sra_toolkit,

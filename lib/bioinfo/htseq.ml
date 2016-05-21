@@ -1,13 +1,9 @@
 open Core_kernel.Std
 open Bistro.Std
-open Bistro.EDSL_sh
+open Bistro.EDSL
 open Types
-open Misc.Infix
 
-let package = {
-  Bistro.pkg_name = "htseq" ;
-  pkg_version = "0.6.1" ;
-}
+let env = Bistro.docker_image ~account:"pveber" ~name:"htseq" ~tag:"0.6.1" ()
 
 class type count_tsv = object
   inherit [ < header : [`no] ; .. > ] tsv
@@ -34,8 +30,8 @@ let count ?order ?mode ?stranded ?feature_type ?minaqual ?idattribute alns gff =
     | `sam sam -> "sam", dep sam
     | `bam bam -> "bam", dep bam
   in
-  workflow ~descr:"htseq-count" ~pkgs:[package] [
-    cmd ~stdout:dest "htseq-count" [
+  workflow ~descr:"htseq-count" [
+    cmd "htseq-count" ~env ~stdout:dest [
       opt "-f" string format ;
       option (opt "-m" (string_of_mode % string)) mode ;
       option (opt "-r" (string_of_order % string)) order ;
