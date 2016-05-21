@@ -176,14 +176,20 @@ module Cmd = struct
       List.map cmd.tokens ~f
       |> String.concat
 
-  let rec to_string ~use_docker ~string_of_workflow ~tmp ~dest ~np ~mem script =
+  let rec to_string ~use_docker ~string_of_workflow ~tmp ~dest ~np ~mem cmd =
     let par x = "(" ^ x ^ ")" in
+    let par_if_necessary x y = match x with
+      | Simple_command _ -> y
+      | And_sequence _
+      | Or_sequence _
+      | Pipe_sequence _ -> par y
+    in
     let f sep xs =
       List.map xs ~f:(to_string ~use_docker ~string_of_workflow ~tmp ~dest ~np ~mem)
-      |> List.map ~f:par
+      |> List.map2_exn ~f:par_if_necessary xs
       |> String.concat ~sep
     in
-    match script with
+    match cmd with
     | And_sequence xs -> f " && " xs
     | Or_sequence xs -> f " || " xs
     | Pipe_sequence xs -> f " | " xs
