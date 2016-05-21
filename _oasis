@@ -27,7 +27,8 @@ Library bistro_bioinfo
   Pack:             true
   Modules:          Sra_toolkit,
                     Std,
-                    Types
+                    Types,
+                    Ucsc_gb
   FindlibName:      bioinfo
   FindlibParent:    bistro
   BuildDepends:     bistro

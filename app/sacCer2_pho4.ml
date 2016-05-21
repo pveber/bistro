@@ -7,7 +7,7 @@ open Bistro_bioinfo.Std
 
 let chIP_pho4_noPi = List.map ~f:Sra.fetch_srr [ "SRR217304" ; "SRR217305" ]
 
-(* let genome = Ucsc_gb.genome_sequence `sacCer2 *)
+let genome = Ucsc_gb.genome_sequence `sacCer2
 
 (* SAMPLES AS FASTQ *)
 let chIP_pho4_noPi_fq = List.map chIP_pho4_noPi ~f:Sra_toolkit.fastq_dump
@@ -25,7 +25,7 @@ let main tmpdir outdir np mem () =
   in
   Bistro_app.(
     with_backend backend ~outdir [
-      [ "delme" ] %> List.hd_exn chIP_pho4_noPi_fq ;
+      [ "delme" ] %> genome ;
       (* [ "chIP_pho4_noPi_macs2.peaks" ] %> chIP_pho4_noPi_macs2 *)
     ]
   )

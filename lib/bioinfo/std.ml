@@ -24,4 +24,4 @@ type sra = Types.sra
 (* module Sra = Sra *)
 module Sra_toolkit = Sra_toolkit
 (* module Tophat = Tophat *)
-(* module Ucsc_gb = Ucsc_gb *)
+module Ucsc_gb = Ucsc_gb

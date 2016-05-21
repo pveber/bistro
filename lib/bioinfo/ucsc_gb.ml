@@ -1,7 +1,7 @@
 open Core_kernel.Std
 open Bistro
 open Bistro.Std
-open Bistro.EDSL_sh
+open Bistro.EDSL
 open Types
 
 type genome = [ `dm3 | `hg18 | `hg19 | `mm8 | `mm9 | `mm10 | `sacCer2 ]
@@ -32,10 +32,7 @@ type wig = ([`wig], [`text]) file
 
 type bigWig = ([`bigWig], [`binary]) file
 
-let package = {
-  pkg_name = "kent-tree" ;
-  pkg_version = "330" ;
-}
+let env = Bistro.docker_image ~account:"pveber" ~name:"ucsc-kent" ~tag:"330" ()
 
 
 (** {5 Dealing with genome sequences} *)
@@ -67,10 +64,7 @@ let genome_2bit_sequence_dir org =
   let org = string_of_genome org in
   workflow ~descr:(sprintf "ucsc_gb.2bit_sequence(%s)" org) [
     mkdir dest ;
-    and_list [
-      cd dest ;
-      wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/bigZips/%s.2bit" org org) () ;
-    ]
+    wget ~dest (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/bigZips/%s.2bit" org org) () ;
   ]
 
 let genome_2bit_sequence org =
@@ -87,8 +81,8 @@ let genome_2bit_sequence org =
 (* (\* let wg_encode_crg_mappability_100 org = wg_encode_crg_mappability 100 org *\) *)
 
 let twoBitToFa bed twobits =
-  workflow ~pkgs:[package] ~descr:"ucsc_gb.twoBitToFa" [
-    cmd "twoBitToFa" [
+  workflow ~descr:"ucsc_gb.twoBitToFa" [
+    cmd ~env "twoBitToFa" [
       opt' "-bed" dep bed ;
       dep twobits ;
       dest
@@ -127,8 +121,8 @@ let twoBitToFa bed twobits =
 (** {5 Chromosome size and clipping} *)
 
 let fetchChromSizes org =
-  workflow ~pkgs:[package] ~descr:"ucsc_gb.fetchChromSizes" [
-    cmd "fetchChromSizes" ~stdout:dest [
+  workflow ~descr:"ucsc_gb.fetchChromSizes" [
+    cmd "fetchChromSizes" ~env ~stdout:dest [
       string (string_of_genome org) ;
     ]
   ]
@@ -167,13 +161,13 @@ let fetchChromSizes org =
 
 let bedGraphToBigWig org bg =
   let tmp = seq [ tmp ; string "/sorted.bedGraph" ] in
-  workflow ~pkgs:[package] ~descr:"bedGraphToBigWig" [
+  workflow ~descr:"bedGraphToBigWig" [
     cmd "sort" ~stdout:tmp [
       string "-k1,1" ;
       string "-k2,2n" ;
       dep bg ;
     ] ;
-    cmd "bedGraphToBigWig" [
+    cmd "bedGraphToBigWig" ~env [
       tmp ;
       dep (fetchChromSizes org) ;
       dest ;
@@ -189,20 +183,19 @@ let bedToBigBed_command org bed =
       dep bed ;
     ] in
   let bedToBigBed =
-    cmd "bedToBigBed" [
+    cmd "bedToBigBed" ~env [
       tmp ;
       dep (fetchChromSizes org) ;
       dest ;
     ]
   in
-  and_list [ sort ; bedToBigBed ]
+  [ sort ; bedToBigBed ]
 
 let bedToBigBed org =
   let f bed =
     workflow
-      ~pkgs:[package]
       ~descr:"ucsc_gb.bedToBigBed"
-      [ bedToBigBed_command org bed ]
+      (bedToBigBed_command org bed)
   in
   function
   | `bed3 bed -> f bed
@@ -219,9 +212,9 @@ let bedToBigBed_failsafe org =
     let touch = cmd "touch" [ dest ] in
     let cmd = or_list [
         and_list [ test ; touch ] ;
-        bedToBigBed_command org bed
+        and_list (bedToBigBed_command org bed) ;
       ] in
-    workflow ~pkgs:[package] [ cmd ]
+    workflow [ cmd ]
   in
   function
   | `bed3 bed -> f bed
