@@ -75,5 +75,5 @@ let with_backend backend ~outdir targets =
   in
   Lwt_unix.run main
 
-let local ?(np = 1) ?(mem = 1024) ?tmpdir ~outdir targets =
-  with_backend (Scheduler.local_backend ?tmpdir ~np ~mem ()) ~outdir targets
+let local ?use_docker ?(np = 1) ?(mem = 1024) ?tmpdir ~outdir targets =
+  with_backend (Scheduler.local_backend ?use_docker ?tmpdir ~np ~mem ()) ~outdir targets

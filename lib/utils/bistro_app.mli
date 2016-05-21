@@ -10,6 +10,7 @@ val plan_of_channel : in_channel -> plan
 val plan_to_channel : plan -> out_channel -> unit
 
 val local :
+  ?use_docker:bool ->
   ?np:int ->
   ?mem:int ->
   ?tmpdir:string ->

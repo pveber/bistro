@@ -20,11 +20,8 @@ let chIP_pho4_noPi_bam = Samtools.(indexed_bam_of_sam chIP_pho4_noPi_sam / index
 let chIP_pho4_noPi_macs2 = Macs2.callpeak ~mfold:(1,100) chIP_pho4_noPi_bam
 
 let main tmpdir outdir np mem () =
-  let backend =
-    Bistro_engine.Scheduler.local_backend ~use_docker:true ?tmpdir ~np ~mem:(mem * 1024) ()
-  in
   Bistro_app.(
-    with_backend backend ~outdir [
+    local  ~use_docker:true ?tmpdir ~np ~mem:(mem * 1024) ~outdir [
       [ "chIP_pho4_noPi_macs2.peaks" ] %> chIP_pho4_noPi_macs2
     ]
   )
