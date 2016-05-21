@@ -55,16 +55,20 @@ module T = struct
     id : string ;
     descr : string ;
     deps : u list ;
-    script : script ;
+    cmd : cmd ;
     np : int ; (** Required number of processors *)
     mem : int ; (** Required memory in MB *)
     timeout : int option ; (** Maximum allowed running time in hours *)
     version : int option ; (** Version number of the wrapper *)
   }
 
-  and script = cmd list
+  and cmd =
+    | Simple_command of simple_command
+    | And_sequence of cmd list
+    | Or_sequence of cmd list
+    | Pipe_sequence of cmd list
 
-  and cmd = {
+  and simple_command = {
     tokens : token list ;
     env : docker_image option ;
   }
@@ -98,22 +102,24 @@ let workflow_id = function
   | Select (id, _, _)
   | Step { id } -> id
 
-module Script = struct
-  type t = script
+module Cmd = struct
+  type t = cmd
 
-  let make xs = xs
-
-  let deps_of_cmd cmd =
+  let deps_of_simple_cmd cmd =
     List.filter_map cmd.tokens ~f:(function
         | D r -> Some (r :> u)
         | S _ | DEST | TMP | NP | MEM -> None
       )
     |> List.dedup
 
-  let deps xs =
-    List.map xs ~f:deps_of_cmd
-    |> List.concat
-    |> List.dedup
+  let rec deps = function
+    | And_sequence xs
+    | Or_sequence xs
+    | Pipe_sequence xs ->
+      List.map xs ~f:deps
+      |> List.concat
+      |> List.dedup
+    | Simple_command cmd -> deps_of_simple_cmd cmd
 
   let string_of_token ~string_of_workflow ~tmp ~dest ~np ~mem = function
     | S s -> s
@@ -123,14 +129,14 @@ module Script = struct
     | NP -> string_of_int np
     | MEM -> string_of_int mem
 
-  let rec string_of_cmd ~use_docker ~string_of_workflow ~tmp ~dest ~np ~mem cmd =
+  let rec string_of_simple_cmd ~use_docker ~string_of_workflow ~tmp ~dest ~np ~mem cmd =
     match use_docker, cmd.env with
     | true, Some image ->
       let image_dest = "/bistro/dest" in
       let image_tmp = "/bistro/tmp" in
       let image_dep d = sprintf "/bistro/data/%s" (workflow_id d) in
       let image_cmd =
-        string_of_cmd
+        string_of_simple_cmd
           ~use_docker:false
           ~string_of_workflow:image_dep
           ~tmp:image_tmp
@@ -138,7 +144,7 @@ module Script = struct
           ~np ~mem
           cmd
       in
-      let deps = deps_of_cmd cmd in
+      let deps = deps_of_simple_cmd cmd in
       let deps_mount =
         let f d =
           sprintf
@@ -170,10 +176,19 @@ module Script = struct
       List.map cmd.tokens ~f
       |> String.concat
 
-  let to_string ~use_docker ~string_of_workflow ~tmp ~dest ~np ~mem script =
-    let f = string_of_cmd ~use_docker ~string_of_workflow ~tmp ~dest ~np ~mem in
-    List.map script ~f
-    |> String.concat
+  let rec to_string ~use_docker ~string_of_workflow ~tmp ~dest ~np ~mem script =
+    let par x = "(" ^ x ^ ")" in
+    let f sep xs =
+      List.map xs ~f:(to_string ~use_docker ~string_of_workflow ~tmp ~dest ~np ~mem)
+      |> List.map ~f:par
+      |> String.concat ~sep
+    in
+    match script with
+    | And_sequence xs -> f " && " xs
+    | Or_sequence xs -> f " || " xs
+    | Pipe_sequence xs -> f " | " xs
+    | Simple_command cmd ->
+      string_of_simple_cmd ~use_docker ~string_of_workflow ~tmp ~dest ~np ~mem cmd
 end
 
 module Workflow = struct
@@ -197,20 +212,20 @@ module Workflow = struct
       ?(np = 1)
       ?timeout
       ?version
-      script =
-    let deps = Script.deps script in
+      cmd =
+    let deps = Cmd.deps cmd in
     let script_as_string : string =
-      Script.to_string
+      Cmd.to_string
         ~use_docker:true
         ~string_of_workflow:id
         ~np:1
         ~mem:1024
         ~tmp:"TMP"
         ~dest:"DEST"
-        script
+        cmd
     in
     let id = digest ("step", version, script_as_string) in
-    Step { descr ; deps ; script ; np ; mem ; timeout ; version ; id }
+    Step { descr ; deps ; cmd ; np ; mem ; timeout ; version ; id }
 
   let select u (Selector path) =
     let u, path =
@@ -298,10 +313,14 @@ module EDSL = struct
 
   type cmd = T.cmd
 
-  let script = Script.make
-
   let workflow ?descr ?mem ?np ?timeout ?version cmds =
-    Workflow.make ?descr ?mem ?np ?timeout ?version (script cmds)
+    let script = match cmds with
+      | [] ->
+        raise (Invalid_argument "EDSL.workflow: empty script")
+      | [ Simple_command _ as cmd ] -> cmd
+      | cmds -> And_sequence cmds
+    in
+    Workflow.make ?descr ?mem ?np ?timeout ?version script
 
 
   let cmd p ?env ?stdin ?stdout ?stderr args =
@@ -327,7 +346,7 @@ module EDSL = struct
       |> List.intersperse ~sep:[S " "]
       |> List.concat
     in
-    { tokens ; env }
+    Simple_command { tokens ; env }
 
   let opt o f x = S o :: S " " :: f x
 
@@ -352,17 +371,9 @@ module EDSL = struct
 
   let ( // ) x y = x @ [ S "/" ; S y ]
 
-  let par cmd =
-    S "( " :: (cmd @ [ S " )" ])
-
-  let cmd_list op cmds =
-    List.intersperse ~sep:[ S " " ; S op ; S " " ] cmds
-    |> List.concat
-    |> par
-
-  let or_list = cmd_list "||"
-  let and_list = cmd_list "&&"
-  let pipe = cmd_list "|"
+  let or_list xs = Or_sequence xs
+  let and_list xs = And_sequence xs
+  let pipe xs = Pipe_sequence xs
 
   let with_env vars cmd =
     (

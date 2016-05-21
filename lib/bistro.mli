@@ -25,14 +25,14 @@ module Workflow : sig
     id : string ;
     descr : string ;
     deps : u list ;
-    script : script ;
+    cmd : cmd ;
     np : int ; (** Required number of processors *)
     mem : int ; (** Required memory in MB *)
     timeout : int option ; (** Maximum allowed running time in hours *)
     version : int option ; (** Version number of the wrapper *)
   }
 
-  and script
+  and cmd
   with sexp
 
   type 'a t = private u
@@ -49,13 +49,25 @@ module Workflow : sig
     ?np:int ->
     ?timeout:int ->
     ?version:int ->
-    script -> 'a t
+    cmd -> 'a t
 
   val select : (_ directory as 'a) t -> ('a, 'b) selector -> 'b t
 
   val u : _ t -> u
 
   val to_dot : u -> out_channel -> unit
+end
+
+module Cmd : sig
+  type t = Workflow.cmd
+  val to_string :
+    use_docker:bool ->
+    string_of_workflow:(Workflow.u -> string) ->
+    tmp:string ->
+    dest:string ->
+    np:int ->
+    mem:int ->
+    t -> string
 end
 
 module Expr : sig
@@ -81,7 +93,7 @@ end
 module EDSL : sig
   include module type of Expr with type t := Expr.t
 
-  type cmd
+  type cmd = Workflow.cmd
   val selector : path -> ('a, 'b) Workflow.selector
   val ( / ) : 'a Workflow.t -> ('a, 'b) Workflow.selector -> 'b Workflow.t
 
@@ -104,10 +116,9 @@ module EDSL : sig
   val opt' : string -> ('a -> Expr.t) -> 'a -> Expr.t
   val flag : ('a -> Expr.t) -> 'a -> bool -> Expr.t
 
-  (* FIXME *)
-  (* val or_list : cmd list -> cmd *)
-  (* val and_list : cmd list -> cmd *)
-  (* val pipe : cmd list -> cmd *)
+  val or_list : cmd list -> cmd
+  val and_list : cmd list -> cmd
+  val pipe : cmd list -> cmd
 
   (* val with_env : (string * Expr.t) list -> cmd -> cmd *)
 
@@ -119,19 +130,6 @@ module EDSL : sig
   val mv : Expr.t -> Expr.t -> cmd
 
   val ( % ) : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c
-end
-
-module Script : sig
-  type t = Workflow.script
-  val make : EDSL.cmd list -> t
-  val to_string :
-    use_docker:bool ->
-    string_of_workflow:(Workflow.u -> string) ->
-    tmp:string ->
-    dest:string ->
-    np:int ->
-    mem:int ->
-    t -> string
 end
 
 module Std : sig

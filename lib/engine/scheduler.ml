@@ -135,7 +135,7 @@ let extension_of_interpreter = function
 
 let local_backend ?tmpdir ?(use_docker = false) ~np ~mem () : backend =
   let pool = Pool.create ~np ~mem in
-  fun db ({ script ; np ; mem } as step) ->
+  fun db ({ cmd ; np ; mem } as step) ->
     Pool.use pool ~np ~mem ~f:(fun ~np ~mem ->
         let tmpdir = match tmpdir with
           | None -> Db.tmp_path db step
@@ -148,10 +148,10 @@ let local_backend ?tmpdir ?(use_docker = false) ~np ~mem () : backend =
         let script_file =
           Filename.temp_file "guizmin" ".sh" in
         let script_text =
-          Script.to_string
+          Cmd.to_string
             ~use_docker
             ~string_of_workflow
-            ~np ~mem ~dest ~tmp script in
+            ~np ~mem ~dest ~tmp cmd in
         Lwt_io.(with_file
                   ~mode:output script_file
                   (fun oc -> write oc script_text)) >>= fun () ->
@@ -284,7 +284,7 @@ let rec build_workflow e = function
 
 and build_step
     e
-    ({ np ; mem ; timeout ; script } as step)
+    ({ np ; mem ; timeout ; cmd } as step)
     dep_threads =
 
   join_results dep_threads >>=? fun () ->
