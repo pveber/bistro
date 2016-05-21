@@ -1,21 +1,14 @@
 open Core_kernel.Std
-open Bistro
-open Bistro.Std
-open Bistro.EDSL_sh
+open Bistro.EDSL
 open Types
 
-let package_script = Unix_tools.wget "https://raw.githubusercontent.com/pveber/compbio-scripts/master/macs2-install/2.1.0.20140616/macs2-install.sh"
-
-let package = {
-  pkg_name = "macs2" ;
-  pkg_version = "2.1.0" ;
-}
+let env = Bistro.docker_image ~account:"pveber" ~name:"macs2" ~tag:"2.1.1" ()
 
 let macs2 subcmd opts =
-  cmd "macs2" (string subcmd :: opts)
+  cmd "macs2" ~env (string subcmd :: opts)
 
 let pileup ?extsize ?both_direction bam =
-  workflow ~descr:"macs2.pileup" ~pkgs:[package] [
+  workflow ~descr:"macs2.pileup" [
     macs2 "pileup" [
       opt "-i" dep bam ;
       opt "-o" ident dest ;
@@ -38,7 +31,7 @@ let name = "macs2"
 
 let callpeak ?pvalue ?qvalue ?gsize ?call_summits
              ?fix_bimodal ?mfold ?extsize ?control treatment =
-  workflow ~pkgs:[package] ~descr:"macs2.callpeak" [
+  workflow ~descr:"macs2.callpeak" [
     macs2 "callpeak" [
       opt "--outdir" ident dest ;
       opt "--name" string name ;

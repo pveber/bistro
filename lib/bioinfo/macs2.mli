@@ -1,8 +1,6 @@
 open Bistro.Std
 open Types
 
-val package : package
-
 val pileup :
   ?extsize:int ->
   ?both_direction:bool ->
