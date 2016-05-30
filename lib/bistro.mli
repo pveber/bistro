@@ -49,6 +49,13 @@ module EDSL : sig
     ?stdin:Expr.t -> ?stdout:Expr.t -> ?stderr:Expr.t ->
     Expr.t list -> cmd
 
+  val script :
+    string ->
+    ?env:docker_image ->
+    ?stdin:Expr.t -> ?stdout:Expr.t -> ?stderr:Expr.t ->
+    ?args:Expr.t list ->
+    Expr.t -> cmd
+
   val docker_image :
     ?tag:string ->
     ?registry:string ->
@@ -122,7 +129,8 @@ module Task : sig
 
   and script = {
     interpreter : string ;
-    text : template ;
+    args : token list list ;
+    text : token list ;
     script_env : docker_image option ;
   }
 

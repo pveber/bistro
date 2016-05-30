@@ -69,6 +69,7 @@ module T = struct
 
   and script = {
     interpreter : string ;
+    args : token list list ;
     text : token list ;
     script_env : docker_image option ;
   }
@@ -280,6 +281,14 @@ module EDSL = struct
     in
     Simple_command { tokens ; env }
 
+  let script interpreter ?env ?stdin ?stdout ?stderr ?(args = []) text =
+    Run_script {
+      interpreter ;
+      script_env = env ;
+      args ;
+      text ;
+    }
+
   let opt o f x = S o :: S " " :: f x
 
   let opt' o f x = S o :: S "=" :: f x
@@ -363,7 +372,8 @@ module Task = struct
 
   and script = {
     interpreter : string ;
-    text : template ;
+    args : token list list ;
+    text : token list ;
     script_env : docker_image option ;
   }
 
@@ -395,14 +405,17 @@ module Task = struct
     | T.MEM -> MEM
     | T.D d -> D (denormalize_dep d)
 
+  let denormalize_template tmpl =
+    List.map tmpl ~f:denormalize_token
+
   let rec denormalize_cmd = function
     | T.Simple_command scmd ->
-      let tokens = List.map scmd.tokens ~f:denormalize_token in
+      let tokens = denormalize_template scmd.tokens in
       Simple_command { tokens ; env = scmd.env }
 
     | Run_script s ->
-      let text = List.map s.text ~f:denormalize_token in
-      Run_script { text ;
+      Run_script { text = denormalize_template s.text ;
+                   args = List.map s.args ~f:denormalize_template ;
                    interpreter = s.interpreter ;
                    script_env = s.script_env }
 
