@@ -32,7 +32,7 @@ type wig = ([`wig], [`text]) file
 
 type bigWig = ([`bigWig], [`binary]) file
 
-let env = Bistro.docker_image ~account:"pveber" ~name:"ucsc-kent" ~tag:"330" ()
+let env = docker_image ~account:"pveber" ~name:"ucsc-kent" ~tag:"330" ()
 
 
 (** {5 Dealing with genome sequences} *)
@@ -48,7 +48,6 @@ let chromosome_sequences org =
 
 let genome_sequence org =
   let chr_seqs = chromosome_sequences org in
-  let open Workflow in
   workflow ~descr:"ucsc_gb.genome_sequence" [
     cmd "bash" [
       opt "-c" string "'shopt -s nullglob ; cat $0/{chr?.fa,chr??.fa,chr???.fa,chr????.fa} > $1'" ;

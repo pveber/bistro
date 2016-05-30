@@ -38,13 +38,6 @@ type docker_image = {
 }
 with sexp
 
-let docker_image ?tag ?registry ~account ~name () = {
-  dck_account = account ;
-  dck_name = name ;
-  dck_tag = tag ;
-  dck_registry = registry ;
-}
-
 module T = struct
   type u =
     | Input of string * path
@@ -64,6 +57,7 @@ module T = struct
 
   and cmd =
     | Simple_command of simple_command
+    | Run_script of script
     | And_sequence of cmd list
     | Or_sequence of cmd list
     | Pipe_sequence of cmd list
@@ -71,6 +65,12 @@ module T = struct
   and simple_command = {
     tokens : token list ;
     env : docker_image option ;
+  }
+
+  and script = {
+    interpreter : string ;
+    text : token list ;
+    script_env : docker_image option ;
   }
 
   and token =
@@ -93,9 +93,13 @@ module T = struct
 
   with sexp
 
+  type ('a, 'b) selector = Selector of path
+
 end
 
 include T
+
+type 'a workflow = u
 
 let workflow_id = function
   | Input (id, _)
@@ -105,13 +109,14 @@ let workflow_id = function
 module Cmd = struct
   type t = cmd
 
-  let deps_of_simple_cmd cmd =
-    List.filter_map cmd.tokens ~f:(function
+  let deps_of_template tmpl =
+    List.filter_map tmpl ~f:(function
         | D r -> Some (r :> u)
         | S _ | DEST | TMP | NP | MEM -> None
       )
     |> List.dedup
 
+  let deps_of_simple_cmd cmd = deps_of_template cmd.tokens
   let rec deps = function
     | And_sequence xs
     | Or_sequence xs
@@ -120,87 +125,13 @@ module Cmd = struct
       |> List.concat
       |> List.dedup
     | Simple_command cmd -> deps_of_simple_cmd cmd
-
-  let string_of_token ~string_of_workflow ~tmp ~dest ~np ~mem = function
-    | S s -> s
-    | D w -> string_of_workflow (w :> u)
-    | DEST -> dest
-    | TMP -> tmp
-    | NP -> string_of_int np
-    | MEM -> string_of_int mem
-
-  let rec string_of_simple_cmd ~use_docker ~string_of_workflow ~tmp ~dest ~np ~mem cmd =
-    match use_docker, cmd.env with
-    | true, Some image ->
-      let image_dest = "/bistro/dest" in
-      let image_tmp = "/bistro/tmp" in
-      let image_dep d = sprintf "/bistro/data/%s" (workflow_id d) in
-      let image_cmd =
-        string_of_simple_cmd
-          ~use_docker:false
-          ~string_of_workflow:image_dep
-          ~tmp:image_tmp
-          ~dest:image_dest
-          ~np ~mem
-          cmd
-      in
-      let deps = deps_of_simple_cmd cmd in
-      let deps_mount =
-        let f d =
-          sprintf
-            "-v %s:%s"
-            (string_of_workflow d)
-            (image_dep d)
-        in
-        List.map deps ~f
-        |> String.concat ~sep:" "
-      in
-      let tmp_mount = sprintf "-v %s:%s" tmp image_tmp in
-      let dest_mount = sprintf "-v %s:%s" Filename.(dirname dest) Filename.(dirname image_dest) in
-      let image =
-        sprintf "%s%s/%s%s"
-          (Option.value_map ~default:"" ~f:(sprintf "%s/") image.dck_registry)
-          image.dck_account
-          image.dck_name
-          (Option.value_map ~default:"" ~f:(sprintf ":%s")  image.dck_tag)
-      in
-      sprintf
-        "docker run %s %s %s -t %s sh -c \"%s\""
-        deps_mount
-        tmp_mount
-        dest_mount
-        image
-        image_cmd
-    | _ ->
-      let f = string_of_token ~string_of_workflow ~tmp ~dest ~np ~mem in
-      List.map cmd.tokens ~f
-      |> String.concat
-
-  let rec to_string ~use_docker ~string_of_workflow ~tmp ~dest ~np ~mem cmd =
-    let par x = "(" ^ x ^ ")" in
-    let par_if_necessary x y = match x with
-      | Simple_command _ -> y
-      | And_sequence _
-      | Or_sequence _
-      | Pipe_sequence _ -> par y
-    in
-    let f sep xs =
-      List.map xs ~f:(to_string ~use_docker ~string_of_workflow ~tmp ~dest ~np ~mem)
-      |> List.map2_exn ~f:par_if_necessary xs
-      |> String.concat ~sep
-    in
-    match cmd with
-    | And_sequence xs -> f " && " xs
-    | Or_sequence xs -> f " || " xs
-    | Pipe_sequence xs -> f " | " xs
-    | Simple_command cmd ->
-      string_of_simple_cmd ~use_docker ~string_of_workflow ~tmp ~dest ~np ~mem cmd
+    | Run_script s ->
+      deps_of_template s.text
 end
 
 module Workflow = struct
   include T
   type 'a t = u
-  type ('a, 'b) selector = Selector of path
 
   let id = workflow_id
 
@@ -220,17 +151,7 @@ module Workflow = struct
       ?version
       cmd =
     let deps = Cmd.deps cmd in
-    let script_as_string : string =
-      Cmd.to_string
-        ~use_docker:true
-        ~string_of_workflow:id
-        ~np:1
-        ~mem:1024
-        ~tmp:"TMP"
-        ~dest:"DEST"
-        cmd
-    in
-    let id = digest ("step", version, script_as_string) in
+    let id = digest ("step", version, cmd) in
     Step { descr ; deps ; cmd ; np ; mem ; timeout ; version ; id }
 
   let select u (Selector path) =
@@ -319,6 +240,11 @@ module EDSL = struct
 
   type cmd = T.cmd
 
+  let input ?(may_change = false) target =
+    let hash = if may_change then Some (Digest.file target) else None in
+    let id = digest ("input", target, hash) in
+    Input (id, path_of_string target)
+
   let workflow ?descr ?mem ?np ?timeout ?version cmds =
     let script = match cmds with
       | [] ->
@@ -393,7 +319,129 @@ module EDSL = struct
 
   let selector x = Workflow.Selector x
   let ( / ) = Workflow.select
+
+  let docker_image ?tag ?registry ~account ~name () = {
+    dck_account = account ;
+    dck_name = name ;
+    dck_tag = tag ;
+    dck_registry = registry ;
+  }
+
 end
+
+
+module Task = struct
+  type t = {
+    id      : id ;
+    descr   : string ;
+    deps    : dep list ;
+    cmd     : cmd ;
+    np      : int ; (** Required number of processors *)
+    mem     : int ; (** Required memory in MB *)
+    timeout : int option ; (** Maximum allowed running time in hours *)
+    version : int option ; (** Version number of the wrapper *)
+  }
+
+  and dep = [
+      `Task of id
+    | `Select of id * path
+    | `Input of path
+  ]
+  and id = string
+
+  and cmd =
+    | Simple_command of simple_command
+    | Run_script of script
+    | And_sequence of cmd list
+    | Or_sequence of cmd list
+    | Pipe_sequence of cmd list
+
+  and simple_command = {
+    tokens : token list ;
+    env : docker_image option ;
+  }
+
+  and script = {
+    interpreter : string ;
+    text : template ;
+    script_env : docker_image option ;
+  }
+
+  and template = token list
+
+  and token =
+    | S of string
+    | D of dep
+    | DEST
+    | TMP
+    | NP
+    | MEM
+  with sexp
+
+  let denormalize_dep = function
+    | Step s -> `Task s.id
+    | Input (_, p) -> `Input p
+    | Select (_, Input (_, p), q) ->
+      `Input (p @ q)
+    | Select (_, Step s, p) ->
+      `Select (s.id, p)
+    | Select (_, Select _, _) -> assert false
+
+  let denormalize_token = function
+    | T.S s -> S s
+    | T.DEST -> DEST
+    | T.TMP -> TMP
+    | T.NP -> NP
+    | T.MEM -> MEM
+    | T.D d -> D (denormalize_dep d)
+
+  let rec denormalize_cmd = function
+    | T.Simple_command scmd ->
+      let tokens = List.map scmd.tokens ~f:denormalize_token in
+      Simple_command { tokens ; env = scmd.env }
+
+    | Run_script s ->
+      let text = List.map s.text ~f:denormalize_token in
+      Run_script { text ;
+                   interpreter = s.interpreter ;
+                   script_env = s.script_env }
+
+    | And_sequence xs -> And_sequence (List.map xs ~f:denormalize_cmd)
+    | Or_sequence xs -> And_sequence (List.map xs ~f:denormalize_cmd)
+    | Pipe_sequence xs -> And_sequence (List.map xs ~f:denormalize_cmd)
+
+  let rec decompose_workflow_aux accu w =
+    let wid = Workflow.id w in
+    if String.Map.mem accu wid then
+      accu
+    else
+      match w with
+      | T.Input (_, p) -> accu
+
+      | Select (id, dir, p) ->
+        decompose_workflow_aux accu dir
+
+      | Step step ->
+        let accu = List.fold_left step.deps ~init:accu ~f:decompose_workflow_aux in
+        let deps = List.map step.deps ~f:denormalize_dep in
+        let t = {
+            id = step.id ;
+            descr = step.descr ;
+            deps ;
+            cmd = denormalize_cmd step.cmd ;
+            np = step.np ;
+            mem = step.mem ;
+            version = step.version ;
+            timeout = step.timeout ;
+          }
+        in
+        String.Map.add accu ~key:step.id ~data:t
+
+  let classify_workflow = denormalize_dep
+  let decompose_workflow w =
+    decompose_workflow_aux String.Map.empty w
+end
+
 
 module Std = struct
   type 'a workflow = 'a Workflow.t

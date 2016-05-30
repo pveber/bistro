@@ -1,13 +1,10 @@
 open Bistro.Std
 open Bistro_engine
 
-type target with sexp
-type plan = target list with sexp
+type target
+type plan = target list
 
 val ( %> ) : string list -> _ workflow -> target
-
-val plan_of_channel : in_channel -> plan
-val plan_to_channel : plan -> out_channel -> unit
 
 val local :
   ?use_docker:bool ->

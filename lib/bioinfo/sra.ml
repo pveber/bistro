@@ -3,7 +3,7 @@ open Bistro
 open Bistro.EDSL
 open Types
 
-let input x = Workflow.input x
+let input x = input x
 
 let fetch_srr id =
   if (String.length id > 6) then (

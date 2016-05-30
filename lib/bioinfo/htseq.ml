@@ -3,7 +3,7 @@ open Bistro.Std
 open Bistro.EDSL
 open Types
 
-let env = Bistro.docker_image ~account:"pveber" ~name:"htseq" ~tag:"0.6.1" ()
+let env = docker_image ~account:"pveber" ~name:"htseq" ~tag:"0.6.1" ()
 
 class type count_tsv = object
   inherit [ < header : [`no] ; .. > ] tsv

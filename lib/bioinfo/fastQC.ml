@@ -1,7 +1,7 @@
 open Bistro.Std
 open Bistro.EDSL
 
-let env = Bistro.docker_image ~account:"pveber" ~name:"fastqc" ~tag:"0.11.5" ()
+let env = docker_image ~account:"pveber" ~name:"fastqc" ~tag:"0.11.5" ()
 
 type report = [`fastQC_report] directory
 

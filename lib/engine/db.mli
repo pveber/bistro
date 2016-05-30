@@ -26,46 +26,16 @@ val init : string -> t result
 val init_exn : string -> t
 (** @raise Failure*)
 
-(** {5 Access for build engines} *)
-
-val build_path : t -> Workflow.step -> string
-(** Returns the path where a step workflow is supposed to build its
-    result. It should be deleted after the execution of a workflow,
-    except if the execution failed. *)
-
-val tmp_path : t -> Workflow.step -> string
-(** Provides a temporary location that a workflow may use during its
-    execution. It should be deleted after the execution of a
-    workflow, except if the execution failed. *)
-
-val stdout_path : t -> Workflow.step -> string
-(** Returns a path where to store the stdout of the execution of a
-    workflow *)
-
-val stderr_path : t -> Workflow.step -> string
-(** Returns a path where to store the stderr of the execution of a
-    workflow *)
-
-val cache_path : t -> Workflow.step -> string
-(** Path where a step workflow's result is stored. *)
-
-val workflow_path : t -> _ Workflow.t -> string
-(** Path where a workflow's result is stored. *)
-
-val workflow_path' : t -> Workflow.u -> string
-
-val in_cache : t -> Workflow.u -> bool
-(** Tests if the result of [u]'s execution is in cache *)
-
-val requested : t -> Workflow.step -> unit
-val built : t -> Workflow.step -> unit
-
-
 (** {5 Traversal} *)
+
+module Task_table : sig
+  val get : db -> string -> Task.t option
+  val save : db -> Task.t -> unit
+end
 
 module Stats : sig
   type t = private {
-    workflow_id : string ;
+    step_id : string ;
     history : (Time.t * event) list ;
     build_time : float option ;
   }
@@ -80,7 +50,7 @@ module Wave : sig
   type t = {
     name : string ;
     description : string ;
-    targets : Workflow.u list ;
+    targets : Task.t list ;
   }
   with sexp
 
@@ -95,11 +65,47 @@ end
 
 
 module Submitted_script_table : sig
-  val get : db -> Workflow.step -> string option
-  val set : db -> Workflow.step -> string -> unit
+  val get : db -> Task.t -> string option
+  val set : db -> Task.t -> string -> unit
 end
 
 (** {5 Reporting } *)
 
-val report : t -> Workflow.u -> string
-val output_report : t -> Workflow.u -> out_channel -> unit
+val report : t -> Task.t -> string
+val output_report : t -> Task.t -> out_channel -> unit
+
+
+(** {5 Access for build engines} *)
+
+module Task : sig
+  val build_path : t -> Task.t -> string
+  (** Returns the path where a step workflow is supposed to build its
+      result. It should be deleted after the execution of a workflow,
+      except if the execution failed. *)
+
+  val tmp_path : t -> Task.t -> string
+  (** Provides a temporary location that a workflow may use during its
+      execution. It should be deleted after the execution of a
+      workflow, except if the execution failed. *)
+
+  val stdout_path : t -> Task.t -> string
+  (** Returns a path where to store the stdout of the execution of a
+      workflow *)
+
+  val stderr_path : t -> Task.t -> string
+  (** Returns a path where to store the stderr of the execution of a
+      workflow *)
+
+  val cache_path : t -> Task.t -> string
+  (** Path where a step workflow's result is stored. *)
+
+  val in_cache : t -> Task.t -> bool
+  (** Tests if the result of [u]'s execution is in cache *)
+
+  val requested : t -> Task.t -> unit
+  val built : t -> Task.t -> unit
+end
+
+
+val register_workflow : t -> _ workflow -> unit
+val workflow_path : t -> _ workflow -> string

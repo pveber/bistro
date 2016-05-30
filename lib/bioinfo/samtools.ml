@@ -2,7 +2,7 @@ open Core_kernel.Std
 open Types
 open Bistro.EDSL
 
-let env = Bistro.docker_image ~account:"pveber" ~name:"samtools" ~tag:"1.3.1" ()
+let env = docker_image ~account:"pveber" ~name:"samtools" ~tag:"1.3.1" ()
 
 let samtools subcmd args =
   cmd "samtools" ~env (string subcmd :: args)

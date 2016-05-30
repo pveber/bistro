@@ -3,22 +3,11 @@ open Bistro.Std
 open Bistro_engine
 open Lwt
 
-type target = string list * Bistro.Workflow.u
-with sexp
+type target = Target : string list * _ workflow -> target
 
-type plan = target list with sexp
+type plan = target list
 
-let plan_of_channel ic =
-  In_channel.input_all ic
-  |> Sexp.of_string
-  |> plan_of_sexp
-
-let plan_to_channel p oc =
-  sexp_of_plan p
-  |> Sexp.to_string_hum
-  |> Out_channel.output_string oc
-
-let ( %> ) path w = path, Bistro.Workflow.u w
+let ( %> ) path w = Target (path, w)
 
 let rec string_of_path = function
   | [] -> "."
@@ -36,33 +25,50 @@ let link p p_u =
   let cmd = sprintf "rm -rf %s && ln -s %s %s" dst src dst in
   ignore (Sys.command cmd)
 
-let foreach_target db scheduler outdir (dest, u) =
-  Scheduler.build' scheduler u >|= function
+let foreach_target db scheduler outdir (Target (dest, w)) =
+  Scheduler.build scheduler w >|= function
   | Ok cache_path ->
     link (outdir :: dest) cache_path ;
     Ok ()
-  | Error xs ->
-    Error (
-      List.map xs ~f:(fun (u, msg) ->
-          Bistro.Workflow.id' u,
-          msg,
-          Db.report db u
-        )
-    )
+  | Error xs -> Error xs
 
-let error_report = function
+let error_report db = function
   | Ok () -> ()
   | Error xs ->
-    List.iter xs ~f:(fun (wid, msg, report) ->
-        fprintf stderr "################################################################################\n" ;
-        fprintf stderr "#                                                                              #\n" ;
-        fprintf stderr "#  Workflow %s failed\n" wid ;
-        fprintf stderr "#                                                                               \n" ;
-        fprintf stderr "#------------------------------------------------------------------------------#\n" ;
-        fprintf stderr "#                                                                               \n" ;
-        fprintf stderr "# %s\n" msg ;
-        fprintf stderr "#                                                                              #\n" ;
-        prerr_endline report
+    List.iter xs ~f:(fun (dep, msg) ->
+        match dep with
+        | `Input i ->
+          fprintf stderr "################################################################################\n" ;
+          fprintf stderr "#                                                                              #\n" ;
+          fprintf stderr "#  Invalid input %s\n" (string_of_path i) ;
+          fprintf stderr "#                                                                              #\n" ;
+          fprintf stderr "# %s\n" msg ;
+          fprintf stderr "#                                                                              #\n" ;
+          fprintf stderr "################################################################################\n"
+
+        | `Select (tid, p) ->
+          fprintf stderr "################################################################################\n" ;
+          fprintf stderr "#                                                                              #\n" ;
+          fprintf stderr "#  Invalid select: no %s in %s\n" (string_of_path p) tid ;
+          fprintf stderr "#                                                                              #\n" ;
+          fprintf stderr "# %s\n" msg ;
+          fprintf stderr "#                                                                              #\n" ;
+          fprintf stderr "################################################################################\n" ;
+
+        | `Task tid ->
+          let report = match Db.Task_table.get db tid with
+            | Some t -> Db.report db t
+            | None -> sprintf "Unregistered task %s" tid
+          in
+          fprintf stderr "################################################################################\n" ;
+          fprintf stderr "#                                                                              #\n" ;
+          fprintf stderr "#  Task %s failed\n" tid ;
+          fprintf stderr "#                                                                               \n" ;
+          fprintf stderr "#------------------------------------------------------------------------------#\n" ;
+          fprintf stderr "#                                                                               \n" ;
+          fprintf stderr "# %s\n" msg ;
+          fprintf stderr "#                                                                              #\n" ;
+          prerr_endline report
       )
 
 let with_backend backend ~outdir targets =
@@ -70,7 +76,7 @@ let with_backend backend ~outdir targets =
     let db = Db.init_exn "_bistro" in
     let scheduler = Scheduler.make backend db in
     Lwt_list.map_p (foreach_target db scheduler outdir) targets >>= fun results ->
-    List.iter results ~f:error_report ;
+    List.iter results ~f:(error_report db) ;
     return ()
   in
   Lwt_unix.run main

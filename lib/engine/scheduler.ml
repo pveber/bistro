@@ -1,6 +1,5 @@
 open Core.Std
 open Bistro
-open Bistro.Workflow
 
 let string_of_path = function
   | []
@@ -97,7 +96,7 @@ struct
 end
 
 
-type error = (Workflow.u * string) list
+type error = (Task.dep * string) list
 type 'a result = ('a, error) Result.t
 
 type execution_report = {
@@ -106,7 +105,7 @@ type execution_report = {
 }
 
 type backend =
-  Db.t -> Workflow.step -> execution_report Lwt.t
+  Db.t -> Task.t -> execution_report Lwt.t
 
 let redirection filename =
   Lwt_unix.openfile filename Unix.([O_APPEND ; O_CREAT ; O_WRONLY]) 0o640 >>= fun fd ->
@@ -133,26 +132,128 @@ let extension_of_interpreter = function
   | `R -> "R"
   | `sh -> "sh"
 
+let deps_of_template tmpl =
+  let open Task in
+  List.filter_map tmpl ~f:(function
+      | D id -> Some id
+      | S _ | DEST | TMP | NP | MEM -> None
+    )
+  |> List.dedup
+
+let deps_of_simple_cmd cmd = deps_of_template cmd.Task.tokens
+
+let string_of_command ~use_docker ~np ~mem ~dest ~tmp db cmd =
+  let open Task in
+
+  let par x = "(" ^ x ^ ")" in
+
+  let par_if_necessary x y = match x with
+    | Run_script _
+    | Simple_command _ -> y
+    | And_sequence _
+    | Or_sequence _
+    | Pipe_sequence _ -> par y
+  in
+
+  let path_of_task_id id =
+    Db.Task.cache_path db (Option.value_exn (Db.Task_table.get db id))
+  in
+
+  let docker_image_url image =
+    sprintf "%s%s/%s%s"
+      (Option.value_map ~default:"" ~f:(sprintf "%s/") image.dck_registry)
+      image.dck_account
+      image.dck_name
+      (Option.value_map ~default:"" ~f:(sprintf ":%s")  image.dck_tag)
+  in
+
+  let dep = function
+    | `Input p -> string_of_path p
+    | `Task tid -> path_of_task_id tid
+    | `Select (tid, p) ->
+      Filename.concat (path_of_task_id tid) (string_of_path p)
+  in
+
+  let token ~tmp ~dest ~dep = function
+    | S s -> s
+    | D d -> dep d
+    | DEST -> dest
+    | TMP -> tmp
+    | NP -> string_of_int np
+    | MEM -> string_of_int mem
+  in
+  let digest x =
+    Digest.to_hex (Digest.string (Marshal.to_string x []))
+  in
+
+  let rec simple_cmd ~use_docker ~dest ~tmp ~dep cmd =
+    match use_docker, cmd.env with
+    | true, Some image ->
+      let image_dest = "/bistro/dest" in
+      let image_tmp = "/bistro/tmp" in
+      let image_dep d = sprintf "/bistro/data/%s" (digest d) in
+      let deps = deps_of_simple_cmd cmd in
+      let deps_mount =
+        let f d =
+          sprintf
+            "-v %s:%s"
+            (dep d)
+            (image_dep d)
+        in
+        List.map deps ~f
+        |> String.concat ~sep:" "
+      in
+      let tmp_mount = sprintf "-v %s:%s" tmp image_tmp in
+      let dest_mount = sprintf "-v %s:%s" Filename.(dirname dest) Filename.(dirname image_dest) in
+      sprintf
+        "docker run %s %s %s -t %s sh -c \"%s\""
+        deps_mount
+        tmp_mount
+        dest_mount
+        (docker_image_url image)
+        (simple_cmd ~use_docker:false ~dest:image_dest ~tmp:image_tmp ~dep:image_dep cmd)
+    | _ ->
+      List.map cmd.tokens ~f:(token ~dest ~tmp ~dep)
+      |> String.concat
+  in
+
+  let run_script s =
+    assert false
+  in
+
+  let rec any = function
+    | And_sequence xs -> sequence " && " xs
+    | Or_sequence xs -> sequence " || " xs
+    | Pipe_sequence xs -> sequence " | " xs
+    | Simple_command cmd ->
+      simple_cmd ~use_docker ~dest ~tmp ~dep cmd
+    | Run_script s ->
+      run_script s
+
+  and sequence sep xs =
+    List.map xs ~f:any
+    |> List.map2_exn ~f:par_if_necessary xs
+    |> String.concat ~sep
+
+  in
+  any cmd
+
 let local_backend ?tmpdir ?(use_docker = false) ~np ~mem () : backend =
+  let open Task in
   let pool = Pool.create ~np ~mem in
   let uid = Unix.getuid () in
-  fun db ({ cmd ; np ; mem } as step) ->
+  fun db ({ cmd ; np ; mem } as task) ->
     Pool.use pool ~np ~mem ~f:(fun ~np ~mem ->
         let tmpdir = match tmpdir with
-          | None -> Db.tmp_path db step
-          | Some p -> Filename.concat p step.id in
-        let stdout = Db.stdout_path db step in
-        let stderr = Db.stderr_path db step in
+          | None -> Db.Task.tmp_path db task
+          | Some p -> Filename.concat p task.id in
+        let stdout = Db.Task.stdout_path db task in
+        let stderr = Db.Task.stderr_path db task in
         let dest = Filename.concat tmpdir "dest" in
         let tmp = Filename.concat tmpdir "tmp" in
-        let string_of_workflow = Db.workflow_path' db in
         let script_file =
           Filename.temp_file "guizmin" ".sh" in
-        let script_text =
-          Cmd.to_string
-            ~use_docker
-            ~string_of_workflow
-            ~np ~mem ~dest ~tmp cmd in
+        let script_text = string_of_command ~use_docker ~np ~mem ~dest ~tmp db cmd in
         Lwt_io.(with_file
                   ~mode:output script_file
                   (fun oc -> write oc script_text)) >>= fun () ->
@@ -175,7 +276,7 @@ let local_backend ?tmpdir ?(use_docker = false) ~np ~mem () : backend =
         in
         (
           if Sys.file_exists dest = `Yes then
-            mv dest (Db.build_path db step)
+            mv dest (Db.Task.build_path db task)
           else
             Lwt.return ()
         ) >>= fun () ->
@@ -202,13 +303,14 @@ module CBST :
 sig
   type t
   val create : unit -> t
-  val find_or_add : t -> step -> (unit -> unit result Lwt.t) -> unit result Lwt.t
+  val find_or_add : t -> Task.t -> (unit -> unit result Lwt.t) -> unit result Lwt.t
   val join : t -> unit Lwt.t
 end
 =
 struct
   module S = struct
-    type t = step
+    open Task
+    type t = Task.t
     let equal x y = x.id = y.id
     let hash x = String.hash x.id
   end
@@ -270,116 +372,117 @@ let join_results xs =
   Lwt_list.fold_left_s f (Ok ()) xs
 
 
-let rec build_workflow e = function
-  | Input _ as i -> build_input e i
-  | Select (_,dir,p) as x -> build_select e x dir p
-  | Step step as u ->
-    Db.requested e.db step ;
-    if Db.in_cache e.db u then
+let rec build_dep e = function
+  | `Input i -> (build_input e i : _ Lwt.t)
+  | `Select (sel_from, sel_path) -> build_select e sel_from sel_path
+  | `Task id ->
+    let task = Option.value_exn (Db.Task_table.get e.db id) in
+    Db.Task.requested e.db task ;
+    if Db.Task.in_cache e.db task then
       Lwt.return (Ok ())
     else
-      CBST.find_or_add e.cbs step (fun () ->
-          let dep_threads = List.map step.deps ~f:(build_workflow e) in
-          build_step e step dep_threads
+      CBST.find_or_add e.cbs task (fun () ->
+          let dep_threads = List.map task.Task.deps ~f:(build_dep e) in
+          build_task e task dep_threads
         )
 
-and build_step
+and build_task
     e
-    ({ np ; mem ; timeout ; cmd } as step)
+    ({ Task.np ; mem ; cmd } as task)
     dep_threads =
 
   join_results dep_threads >>=? fun () ->
   (
-    let stdout = Db.stdout_path e.db step in
-    let stderr = Db.stderr_path e.db step in
-    let build_path = Db.build_path e.db step in
+    let stdout = Db.Task.stdout_path e.db task in
+    let stderr = Db.Task.stderr_path e.db task in
+    let build_path = Db.Task.build_path e.db task in
     remove_if_exists stdout >>= fun () ->
     remove_if_exists stderr >>= fun () ->
     remove_if_exists build_path >>= fun () ->
-    e.backend e.db step >>= fun { script ; exit_status } ->
-    Db.Submitted_script_table.set e.db step script ;
+    e.backend e.db task >>= fun { script ; exit_status } ->
+    Db.Submitted_script_table.set e.db task script ;
     match exit_status, Sys.file_exists build_path = `Yes with
     | 0, true ->
-      Db.built e.db step ;
-      mv build_path (Db.cache_path e.db step) >>= fun () ->
+      Db.Task.built e.db task ;
+      mv build_path (Db.Task.cache_path e.db task) >>= fun () ->
       Lwt.return (Ok ())
     | 0, false ->
       let msg =
         "Workflow failed to produce its output at the prescribed location."
       in
-      Lwt.return (Error [ Step step, msg ])
+      Lwt.return (Error [ `Task task.Task.id, msg ])
     | error_code, _ ->
       let msg = sprintf "Script exited with code %d" error_code in
-      Lwt.return (Error [ Step step, msg ])
+      Lwt.return (Error [ `Task task.Task.id, msg ])
   )
 
-and build_input e i =
+and build_input e input_path =
   Lwt.wrap (fun () ->
-      let p = Db.workflow_path' e.db i in
+      let p = string_of_path input_path in
       if Sys.file_exists p <> `Yes then
         let msg =
           sprintf
             "File %s is declared as an input of a workflow but does not exist."
             p
         in
-        Error [ i, msg ]
+        Error [ `Input input_path, msg ]
       else
         Ok ()
     )
 
-and build_select e x dir p =
-  let p = string_of_path p in
-  let dir_path = Db.workflow_path' e.db dir in
+and build_select e sel_from sel_path =
+  let p = string_of_path sel_path in
+  let dir = Option.value_exn (Db.Task_table.get e.db sel_from) in
+  let dir_path = Db.Task.cache_path e.db dir in
   let check_in_dir () =
-    if Sys.file_exists (Db.workflow_path' e.db x) <> `Yes
+    if Sys.file_exists (Filename.concat dir_path p) <> `Yes
     then (
       let msg =
         sprintf "No file or directory named %s in directory workflow %s."
           p
           dir_path
       in
-      Lwt.return (Error [ x, msg ])
+      Lwt.return (Error [ `Select (sel_from, sel_path), msg ])
     )
     else Lwt.return (Ok ())
   in
   if Sys.file_exists dir_path = `Yes then (
     check_in_dir () >>=? fun () ->
-    let () = match dir with
-      | Input _ -> ()
-      | Select _ -> assert false
-      | Step s -> Db.requested e.db s
-    in
+    Db.Task.requested e.db dir ;
     Lwt.return (Ok ())
   )
   else (
-    let dir_thread = build_workflow e dir in
+    let dir_thread = build_dep e (`Task sel_from) in
     dir_thread >>=? check_in_dir
   )
 
 
-let build' e u =
+let build e w =
   (
-    if e.on then
-      build_workflow e u
+    if e.on then (
+      Db.register_workflow e.db w ;
+      build_dep e (Task.classify_workflow w)
+    )
     else
-      Lwt.return (Error [u, "Engine_halted"])
+      Lwt.fail (Invalid_argument "Engine_halted")
   )
   >>= function
-  | Ok () -> Lwt.return (Ok (Db.workflow_path' e.db u))
+  | Ok () -> Lwt.return (Ok (Db.workflow_path e.db w))
   | Error xs ->
     Lwt.return (Error xs)
 
-let build_exn' e w =
-  build' e w >>= function
+let title_of_dep = function
+  | `Task tid -> tid
+  | `Select (tid, p) -> Filename.concat tid (string_of_path p)
+  | `Input i -> string_of_path i
+
+let build_exn e w =
+  build e w >>= function
   | Ok s -> Lwt.return s
   | Error xs ->
-    let msgs = List.map ~f:(fun (w, msg) -> Workflow.id' w ^ "\t" ^ msg) xs in
+    let msgs = List.map ~f:(fun (dep, msg) -> (title_of_dep dep) ^ "\t" ^ msg) xs in
     let msg = sprintf "Some build(s) failed:\n\t%s\n" (String.concat ~sep:"\n\t" msgs) in
     Lwt.fail (Failure msg)
-
-let build e w = build' e (Workflow.u w)
-
-let build_exn e w = build_exn' e (Workflow.u w)
 
 let shutdown e =
   e.on <- false ;

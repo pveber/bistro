@@ -2,9 +2,6 @@ open Core.Std
 open Rresult
 open Lwt
 open Bistro
-open Bistro.Workflow
-
-
 
 type 'a result = ('a, R.msg) Rresult.result
 
@@ -142,10 +139,28 @@ end
 
 
 
+module Task_as_value = struct
+  type t = Task.t
+  let id = "task"
+  let to_string s =
+    Sexp.to_string (Task.sexp_of_t s)
+  let of_string s =
+    Task.t_of_sexp (Sexp.of_string s)
+end
+
+module Task_table = struct
+  include Table(String)(Task_as_value)
+  let save db task = set db task.Bistro.Task.id task
+end
+
+module Task_as_key = struct
+  type t = Task.t
+  let to_string s = s.Task.id
+end
 
 module Stats = struct
   type t = {
-    workflow_id : string ;
+    step_id : string ;
     history : (Time.t * event) list ;
     build_time : float option ;
   }
@@ -161,25 +176,20 @@ module Stats = struct
   let id = "stats"
 
   let make s = {
-    workflow_id = s.id ;
+    step_id = s.Task.id ;
     history = [] ;
     build_time = None ;
   }
 end
 
-module Step = struct
-  type t = step
-  let to_string s = s.id
-end
-
-module Stats_table = Table(Step)(Stats)
+module Stats_table = Table(Task_as_key)(Stats)
 
 
 module Wave = struct
   type t = {
     name : string ;
     description : string ;
-    targets : Workflow.u list ;
+    targets : Task.t list ;
   }
   with sexp
 
@@ -202,7 +212,7 @@ module Submitted_script = struct
   let id = "scripts"
 end
 
-module Submitted_script_table = Table(Step)(Submitted_script)
+module Submitted_script_table = Table(Task_as_key)(Submitted_script)
 
 (* Database initialization and check *)
 
@@ -289,53 +299,47 @@ let init path =
 
 let init_exn path = ok_exn (init path)
 
-let aux_path f db step =
-  Filename.concat (f db) step.id
+module Task = struct
+  let aux_path f db t =
+    Filename.concat (f db) t.Task.id
 
-let cache_path = aux_path cache_dir
-let build_path = aux_path build_dir
-let tmp_path = aux_path tmp_dir
-let stdout_path = aux_path stdout_dir
-let stderr_path = aux_path stderr_dir
+  let cache_path = aux_path cache_dir
+  let build_path = aux_path build_dir
+  let tmp_path = aux_path tmp_dir
+  let stdout_path = aux_path stdout_dir
+  let stderr_path = aux_path stderr_dir
 
-let update_stats db step f =
-  let stat =
-    match Stats_table.get db step with
-    | Some s -> s
-    | None -> Stats.make step
-  in
-  Stats_table.set db step (f stat)
+  let update_stats db step f =
+    let stat =
+      match Stats_table.get db step with
+      | Some s -> s
+      | None -> Stats.make step
+    in
+    Stats_table.set db step (f stat)
 
-let append_history ~db u evt =
-  update_stats db u (fun stat ->
-      { stat with
-        Stats.history = (Time.now (), evt) :: stat.Stats.history }
-    )
+  let append_history ~db u evt =
+    update_stats db u (fun stat ->
+        { stat with
+          Stats.history = (Time.now (), evt) :: stat.Stats.history }
+      )
 
-let requested db step =
-  append_history ~db step Stats.Requested
+  let requested db step =
+    append_history ~db step Stats.Requested
 
-let built db step =
-  append_history ~db step Stats.Built
+  let built db step =
+    append_history ~db step Stats.Built
 
-let rec workflow_path' db = function
-  | Select (_, dir, p) ->
-    Filename.concat (workflow_path' db dir) (string_of_path p)
-  | Input (_, p) -> string_of_path p
-  | Step step -> cache_path db step
+  let in_cache db u =
+    let dest = cache_path db u in
+    Sys.file_exists dest = `Yes
+end
 
-let workflow_path db w = workflow_path' db (Workflow.u w)
-
-let in_cache db u =
-  let dest = workflow_path' db u in
-  Sys.file_exists dest = `Yes
-
-let report_step db step =
+let report db task =
   let buf = Buffer.create 251 in
-  let script = Submitted_script_table.get db step in
+  let script = Submitted_script_table.get db task in
   bprintf buf "################################################################################\n" ;
   bprintf buf "###\n" ;
-  bprintf buf "##    Report on %s \n" step.id ;
+  bprintf buf "##    Report on %s \n" task.Bistro.Task.id ;
   bprintf buf "#\n" ;
   Option.iter script ~f:(fun script ->
       bprintf buf "+------------------------------------------------------------------------------+\n" ;
@@ -346,22 +350,30 @@ let report_step db step =
   bprintf buf "+------------------------------------------------------------------------------+\n" ;
   bprintf buf "| STDOUT                                                                       |\n" ;
   bprintf buf "+------------------------------------------------------------------------------+\n" ;
-  bprintf buf "%s\n" (In_channel.read_all (stdout_path db step)) ;
+  bprintf buf "%s\n" (In_channel.read_all (Task.stdout_path db task)) ;
   bprintf buf "+------------------------------------------------------------------------------+\n" ;
   bprintf buf "| STDERR                                                                       |\n" ;
   bprintf buf "+------------------------------------------------------------------------------+\n" ;
-  bprintf buf "%s\n" (In_channel.read_all (stderr_path db step)) ;
+  bprintf buf "%s\n" (In_channel.read_all (Task.stderr_path db task)) ;
   Buffer.contents buf
 
-let report db = function
-  | Input _ -> ""
-  | Select _ -> ""
-  | Step step -> report_step db step
 
-let output_report db u oc = match u with
-  | Input _ -> ()
-  | Select _ -> ()
-  | Step step -> output_string oc (report_step db step)
+let output_report db t oc = output_string oc (report db t)
+
+let register_workflow db w =
+  let tasks = Bistro.Task.decompose_workflow w in
+  String.Map.iter tasks ~f:(fun ~key ~data -> Task_table.set db key data)
+
+let workflow_path db w =
+  match Bistro.Task.classify_workflow w with
+  | `Input i -> string_of_path i
+  | `Select (id, p) ->
+    List.fold_right
+      [ cache_dir db ; id ; string_of_path p ]
+      ~init:""
+      ~f:Filename.concat
+  | `Task tid ->
+    Filename.concat (cache_dir db) tid
 
 (* let log db fmt = *)
 (*   let f msg = *)

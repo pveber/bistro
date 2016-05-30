@@ -1,74 +1,22 @@
 (** A library to build scientific workflows. *)
+open Core_kernel.Std
 
 type path = string list
 
 type 'a directory = [`directory of 'a]
 
 (** Name and version of an external dependency for a workflow *)
-type docker_image
+type docker_image = private {
+  dck_account : string ;
+  dck_name : string ;
+  dck_tag : string option ;
+  dck_registry : string option ;
+}
 with sexp
 
-val docker_image :
-  ?tag:string ->
-  ?registry:string ->
-  account:string ->
-  name:string ->
-  unit -> docker_image
+type 'a workflow
 
-module Workflow : sig
-  type u =
-    | Input of string * path
-    | Select of string * u * path
-    | Step of step
-
-  and step = {
-    id : string ;
-    descr : string ;
-    deps : u list ;
-    cmd : cmd ;
-    np : int ; (** Required number of processors *)
-    mem : int ; (** Required memory in MB *)
-    timeout : int option ; (** Maximum allowed running time in hours *)
-    version : int option ; (** Version number of the wrapper *)
-  }
-
-  and cmd
-  with sexp
-
-  type 'a t = private u
-  type ('a, 'b) selector = Selector of path
-
-  val id : _ t -> string
-  val id' : u -> string
-
-  val input : ?may_change:bool -> string -> 'a t
-
-  val make :
-    ?descr:string ->
-    ?mem:int ->
-    ?np:int ->
-    ?timeout:int ->
-    ?version:int ->
-    cmd -> 'a t
-
-  val select : (_ directory as 'a) t -> ('a, 'b) selector -> 'b t
-
-  val u : _ t -> u
-
-  val to_dot : u -> out_channel -> unit
-end
-
-module Cmd : sig
-  type t = Workflow.cmd
-  val to_string :
-    use_docker:bool ->
-    string_of_workflow:(Workflow.u -> string) ->
-    tmp:string ->
-    dest:string ->
-    np:int ->
-    mem:int ->
-    t -> string
-end
+type ('a, 'b) selector
 
 module Expr : sig
   type t
@@ -81,7 +29,7 @@ module Expr : sig
   val int : int -> t
   val float : float -> t
   val path : path -> t
-  val dep : _ Workflow.t -> t
+  val dep : _ workflow -> t
   val quote : ?using:char -> t -> t
   val option : ('a -> t) -> 'a option -> t
   val list : ('a -> t) -> ?sep:string -> 'a list -> t
@@ -93,9 +41,20 @@ end
 module EDSL : sig
   include module type of Expr with type t := Expr.t
 
-  type cmd = Workflow.cmd
-  val selector : path -> ('a, 'b) Workflow.selector
-  val ( / ) : 'a Workflow.t -> ('a, 'b) Workflow.selector -> 'b Workflow.t
+  type cmd
+
+  val cmd :
+    string ->
+    ?env:docker_image ->
+    ?stdin:Expr.t -> ?stdout:Expr.t -> ?stderr:Expr.t ->
+    Expr.t list -> cmd
+
+  val docker_image :
+    ?tag:string ->
+    ?registry:string ->
+    account:string ->
+    name:string ->
+    unit -> docker_image
 
   val workflow :
     ?descr:string ->
@@ -103,13 +62,12 @@ module EDSL : sig
     ?np:int ->
     ?timeout:int ->
     ?version:int ->
-    cmd list -> 'a Workflow.t
+    cmd list -> 'a workflow
 
-  val cmd :
-    string ->
-    ?env:docker_image ->
-    ?stdin:Expr.t -> ?stdout:Expr.t -> ?stderr:Expr.t ->
-    Expr.t list -> cmd
+  val input : ?may_change:bool -> string -> 'a workflow
+
+  val selector : path -> ('a, 'b) selector
+  val ( / ) : 'a workflow -> ('a, 'b) selector -> 'b workflow
 
   val ( // ) : Expr.t -> string -> Expr.t
   val opt : string -> ('a -> Expr.t) -> 'a -> Expr.t
@@ -119,8 +77,6 @@ module EDSL : sig
   val or_list : cmd list -> cmd
   val and_list : cmd list -> cmd
   val pipe : cmd list -> cmd
-
-  (* val with_env : (string * Expr.t) list -> cmd -> cmd *)
 
   val mkdir : Expr.t -> cmd
   val mkdir_p : Expr.t -> cmd
@@ -132,9 +88,62 @@ module EDSL : sig
   val ( % ) : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c
 end
 
+
+module Task : sig
+  type t = private {
+    id      : id ;
+    descr   : string ;
+    deps    : dep list ;
+    cmd     : cmd ;
+    np      : int ; (** Required number of processors *)
+    mem     : int ; (** Required memory in MB *)
+    timeout : int option ; (** Maximum allowed running time in hours *)
+    version : int option ; (** Version number of the wrapper *)
+  }
+
+  and dep = [
+      `Task of id
+    | `Select of id * path
+    | `Input of path
+  ]
+  and id = string
+
+  and cmd =
+    | Simple_command of simple_command
+    | Run_script of script
+    | And_sequence of cmd list
+    | Or_sequence of cmd list
+    | Pipe_sequence of cmd list
+
+  and simple_command = {
+    tokens : token list ;
+    env : docker_image option ;
+  }
+
+  and script = {
+    interpreter : string ;
+    text : template ;
+    script_env : docker_image option ;
+  }
+
+  and template = token list
+
+  and token =
+    | S of string
+    | D of dep
+    | DEST
+    | TMP
+    | NP
+    | MEM
+  with sexp
+
+  val classify_workflow : _ workflow -> dep
+  val decompose_workflow : _ workflow -> t String.Map.t
+end
+
 module Std : sig
-  type 'a workflow = 'a Workflow.t
-  type ('a, 'b) selector = ('a, 'b) Workflow.selector
+  type nonrec 'a workflow = 'a workflow
+  type nonrec ('a, 'b) selector = ('a, 'b) selector
 
   class type ['a,'b] file = object
     method format : 'a

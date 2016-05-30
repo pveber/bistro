@@ -4,7 +4,7 @@ open Bistro.EDSL
 
 type index = [`bowtie_index] directory
 
-let env = Bistro.docker_image ~account:"pveber" ~name:"bowtie" ~tag:"1.1.2" ()
+let env = docker_image ~account:"pveber" ~name:"bowtie" ~tag:"1.1.2" ()
 
 (* memory bound correspond to storing a human index in memory, following bowtie manual *)
 let bowtie_build ?packed ?color fa =

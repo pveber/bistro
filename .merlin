@@ -18,6 +18,7 @@ PKG cohttp.lwt
 PKG dbm
 PKG ppx_deriving_yojson
 PKG lwt.unix
+PKG ocamlgraph
 PKG oUnit
 PKG pbs
 PKG pvem
