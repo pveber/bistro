@@ -4,6 +4,7 @@ B _build/lib/engine
 B _build/lib/utils
 B _build/lib/pbs
 B _build/ppx
+FLG -short-paths
 S lib
 S lib/bioinfo
 S lib/engine
