@@ -17,11 +17,12 @@ PKG ppx_tools.metaquot
 PKG core
 PKG cohttp.lwt
 PKG dbm
-PKG ppx_deriving_yojson
 PKG lwt.unix
 PKG ocamlgraph
 PKG oUnit
 PKG pbs
+PKG ppx_bistro
+PKG ppx_deriving_yojson
 PKG pvem
 PKG react
 PKG rresult
