@@ -27,6 +27,7 @@ Library bistro_bioinfo
   Pack:             true
   Modules:          Bowtie,
                     Bowtie2,
+                    Deseq2,
                     Fastq,
                     FastQC,
                     Htseq,

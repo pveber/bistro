@@ -1,7 +1,7 @@
 open Core_kernel.Std
 open Bistro.Std
 open Types
-open Bistro.EDSL_sh
+open Bistro.EDSL
 
 class type table = object
   inherit [ < header : [`yes] ; .. > ] tsv
@@ -17,46 +17,10 @@ type output =
     sample_pca : svg workflow ;
   >
 
-let wrapper_package = workflow [
-    mkdir_p (dest // "bin") ;
-    wget
-      "https://raw.githubusercontent.com/pveber/compbio-scripts/master/deseq2-wrapper/0.0.1/deseq2-wrapper.R"
-      ~dest:(dest // "bin/deseq2-wrapper.R") () ;
-    cmd "chmod" [
-      string "u+x" ;
-      (dest // "bin/deseq2-wrapper.R")
-    ]
-  ]
-
-let wrapper factors samples =
-  let factors = opt "--factors" (list string ~sep:",") factors in
-  let samples = List.map samples ~f:(fun (factor_vals, counts) ->
-      seq [ list string ~sep:"," factor_vals ; string "," ; dep counts ]
-    )
-  in
-  let outdir = opt "--outdir" ident dest in
-  workflow [
-    with_env
-      [ "PATH", seq ~sep:"/" [ dep wrapper_package ; string "bin" ] ]
-      (cmd "deseq2-wrapper.R" (outdir :: factors :: samples)) ;
-  ]
-
-let wrapper factors samples =
-  Bistro.Workflow.make ~descr:"deseq2.wrapper" [%R {|
+let wrapper_script = {|\
 library(DESeq2)
 library(gplots)
 library(RColorBrewer)
-
-outdir <- {{ quote dest ~using:'"' }}
-factor_names <- c({{ list (string % quote ~using:'"') ~sep:"," factors }})
-sample_files <- c({{ list (snd % dep % quote ~using:'"') ~sep:"," samples }})
-description <- as.data.frame(
-                 matrix(
-                   c({{ list (fst % list (string % quote ~using:'"') ~sep:",") ~sep:"," samples }}),
-                   ncol = {{ int (List.length factors) }},
-                   byrow = T))
-colnames(description) <- factor_names
-rownames(description) <- NULL
 
 ### DATA PROCESSING
 loadCounts <- function(sample_files) {
@@ -67,7 +31,7 @@ loadCounts <- function(sample_files) {
     sapply(sample_files,loadFile)
 }
 
-loadIds <- function(samples_files) {
+loadIds <- function(sample_files) {
     d <- read.table(sample_files[1],header=F,sep='\t')
     d[1:(dim(d)[1] - 5),1]
 }
@@ -92,7 +56,7 @@ my.summary.results <- function(object) {
 }
 
 ### OUTPUT
-outputForAllComparisons <- function(ids, dds) {
+outputForAllComparisons <- function(outdir, factor_names, ids, dds) {
     recap <- data.frame(gene = ids)
     stats <- data.frame(comparison = character(0),
                         expressed = integer(0),
@@ -127,7 +91,7 @@ outputForAllComparisons <- function(ids, dds) {
 }
 
 
-generalPlots <- function(ids, dds) {
+generalPlots <- function(outdir, factor_names, ids, dds) {
     rld <- rlog(dds)
     rldMat <- assay(rld)
     rldDist <- dist(t(rldMat))
@@ -148,17 +112,32 @@ generalPlots <- function(ids, dds) {
     write.table(counts, file = paste0(outdir,"/normalized_counts.tsv"),row.names=F,sep='\t',quote=F,col.names=F)
 }
 
-main <- function() {
+main <- function(outdir, factor_names, sample_files, conditions) {
+    description <- as.data.frame(conditions)
+    colnames(description) <- factor_names
+    rownames(description) <- NULL
     ids <- loadIds(sample_files)
     counts <- loadCounts(sample_files)
     dds <- differentialAnalysis(counts, description)
     system(paste("mkdir -p", outdir))
-    outputForAllComparisons(ids, dds)
-    generalPlots(ids, dds)
+    outputForAllComparisons(outdir, ids, dds)
+    generalPlots(outdir, factor_names, ids, dds)
 }
+|}
 
-main()
-|}]
+let wrapper factors samples =
+  workflow ~descr:"deseq2.wrapper" [
+    script "R" [%bistro {|\
+{{ string wrapper_script }}
+
+main({{ quote dest ~using:'"' }},
+     c({{ list (string % quote ~using:'"') ~sep:"," factors }}),
+     c({{ list (snd % dep % quote ~using:'"') ~sep:"," samples }}),
+     matrix(c({{ list (fst % list (string % quote ~using:'"') ~sep:",") ~sep:"," samples }}),
+              ncol = {{ int (List.length factors) }},
+              byrow = T))
+|} ]
+  ]
 
 (*
    remove duplicates *and* keep original order
