@@ -1,6 +1,7 @@
 (** {:{http://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE29506}GEO Series GSE29506} *)
 
 open Core.Std
+open Bistro.Std
 open Bistro.EDSL
 open Bistro_bioinfo.Std
 
@@ -43,12 +44,71 @@ module ChIP_seq = struct
       main
 end
 
+module RNA_seq = struct
+  let samples = [
+    (`WT, `High_Pi) ;
+    (`WT, `No_Pi 15) ;
+  ]
+
+  let sra_id = function
+    | `WT, `High_Pi -> "SRR1583715"
+    | `WT, `No_Pi 15 -> "SRR1583716"
+    | `WT, `No_Pi _ -> assert false
+
+  let sra x = Sra.fetch_srr (sra_id x)
+
+  let fastq x = Sra_toolkit.fastq_dump (sra x)
+
+  let genome = Ucsc_gb.genome_sequence `sacCer2
+
+  (* MAPPING *)
+  let bowtie_index = Bowtie.bowtie_build genome
+
+  let bam x =
+    Tophat.(
+      tophat1
+        bowtie_index
+        (`single_end [ fastq x ])
+      /
+      accepted_hits
+    )
+
+  let gene_annotation : gff workflow =
+    Unix_tools.wget "ftp://ftp.ensemblgenomes.org/pub/fungi/release-31/gff3/saccharomyces_cerevisiae/Saccharomyces_cerevisiae.R64-1-1.31.gff3.gz"
+    |> Unix_tools.gunzip
+
+  let counts x =
+    Htseq.count ~stranded:`no ~feature_type:"gene" (`bam (bam x)) gene_annotation
+
+  let deseq2 =
+    Deseq2.main_effects
+      ["time"]
+      [ [  "0" ], counts (`WT, `High_Pi) ;
+        [ "15" ], counts (`WT, `No_Pi 15) ; ]
+
+  let main tmpdir outdir np mem () =
+    Bistro_app.(
+      local  ~use_docker:true ?tmpdir ~np ~mem:(mem * 1024) ~outdir [
+        [ "deseq2" ] %> deseq2#effect_table ;
+      ]
+    )
+
+  let spec = common_spec
+
+  let command =
+    Command.basic
+      ~summary:"Analysis of a RNA-seq dataset"
+      spec
+      main
+
+end
 
 let command =
   Command.group
     ~summary:"Demo pipelines for bistro"
     [
       "chipseq", ChIP_seq.command ;
+      "rnaseq",  RNA_seq.command ;
     ]
 
 let () = Command.run ~version:"0.1" command
