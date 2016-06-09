@@ -35,6 +35,7 @@ Library bistro_bioinfo
                     Samtools,
                     Sra_toolkit,
                     Std,
+                    Tophat,
                     Types,
                     Ucsc_gb
   FindlibName:      bioinfo

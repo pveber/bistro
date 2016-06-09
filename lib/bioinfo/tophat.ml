@@ -1,12 +1,7 @@
 open Core_kernel.Std
-open Types
-open Bistro
-open Bistro.EDSL_sh
+open Bistro.EDSL
 
-let package = {
-  pkg_name = "tophat" ;
-  pkg_version = "2.1.1" ;
-}
+let env = docker_image ~account:"pveber" ~name:"tophat" ~tag:"2.1.1" ()
 
 let tophat1 ?color index fqs =
   let args = match fqs with
@@ -18,11 +13,9 @@ let tophat1 ?color index fqs =
         list dep ~sep:"," fqs2
       ]
   in
-  workflow
-    ~np:8
-    ~mem:(4 * 1024)
-    ~pkgs:[Bowtie.package ; Samtools.package ; package] [
-    cmd "tophat" [
+  workflow ~np:8 ~mem:(4 * 1024) [
+    cmd ~env "tophat" [
+      string "--bowtie1" ;
       opt "--num-threads" ident np ;
       option (flag string "--color") color ;
       opt "--output-dir" ident dest ;
@@ -41,11 +34,8 @@ let tophat2 index fqs =
         list dep ~sep:"," fqs2
       ]
   in
-  workflow
-    ~np:8
-    ~mem:(4 * 1024)
-    ~pkgs:[Bowtie2.package ; Samtools.package ; package] [
-    cmd "tophat2" [
+  workflow ~np:8 ~mem:(4 * 1024) [
+    cmd ~env "tophat2" [
       opt "--num-threads" ident np ;
       opt "--output-dir" ident dest ;
       seq [ dep index ; string "/index" ] ;
