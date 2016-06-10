@@ -1,6 +1,6 @@
 open Core_kernel.Std
 open Bistro.Std
-open Bistro.EDSL_sh
+open Bistro.EDSL
 open Types
 
 type species = [
