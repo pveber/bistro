@@ -368,9 +368,8 @@ let workflow_path db w =
   match Bistro.Task.classify_workflow w with
   | `Input i -> string_of_path i
   | `Select (id, p) ->
-    List.fold_right
+    List.reduce_exn
       [ cache_dir db ; id ; string_of_path p ]
-      ~init:""
       ~f:Filename.concat
   | `Task tid ->
     Filename.concat (cache_dir db) tid
