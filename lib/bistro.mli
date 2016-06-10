@@ -129,7 +129,7 @@ module Task : sig
 
   and script = {
     interpreter : string ;
-    args : token list list ;
+    args : token list ;
     text : token list ;
     script_env : docker_image option ;
   }

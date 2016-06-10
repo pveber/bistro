@@ -69,7 +69,7 @@ module T = struct
 
   and script = {
     interpreter : string ;
-    args : token list list ;
+    args : token list ;
     text : token list ;
     script_env : docker_image option ;
   }
@@ -285,7 +285,7 @@ module EDSL = struct
     Run_script {
       interpreter ;
       script_env = env ;
-      args ;
+      args = List.intersperse ~sep:[S " "] args |> List.concat ;
       text ;
     }
 
@@ -372,7 +372,7 @@ module Task = struct
 
   and script = {
     interpreter : string ;
-    args : token list list ;
+    args : token list ;
     text : token list ;
     script_env : docker_image option ;
   }
@@ -415,7 +415,7 @@ module Task = struct
 
     | Run_script s ->
       Run_script { text = denormalize_template s.text ;
-                   args = List.map s.args ~f:denormalize_template ;
+                   args = denormalize_template s.args ;
                    interpreter = s.interpreter ;
                    script_env = s.script_env }
 
