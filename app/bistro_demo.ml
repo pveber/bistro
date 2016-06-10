@@ -73,8 +73,17 @@ module RNA_seq = struct
       accepted_hits
     )
 
+  let remove_fasta_from_gff gff =
+    workflow ~descr:"remove_fasta_from_gff" [
+      cmd "sed" ~stdout:dest [
+        string "'/###/q'" ;
+        dep gff ;
+      ]
+    ]
   let gene_annotation : gff workflow =
-    Unix_tools.wget "http://downloads.yeastgenome.org/curation/chromosomal_feature/saccharomyces_cerevisiae.gff"
+    Unix_tools.wget
+      "http://downloads.yeastgenome.org/curation/chromosomal_feature/saccharomyces_cerevisiae.gff"
+    |> remove_fasta_from_gff
 
   let counts x =
     Htseq.count
