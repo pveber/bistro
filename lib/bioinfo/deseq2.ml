@@ -17,7 +17,9 @@ type output =
     sample_pca : svg workflow ;
   >
 
-let wrapper_script = {|\
+let env = docker_image ~account:"pveber" ~name:"bioconductor" ~tag:"3.3" ()
+
+let wrapper_script = {|
 library(DESeq2)
 library(gplots)
 library(RColorBrewer)
@@ -56,7 +58,7 @@ my.summary.results <- function(object) {
 }
 
 ### OUTPUT
-outputForAllComparisons <- function(outdir, factor_names, ids, dds) {
+outputForAllComparisons <- function(description, outdir, factor_names, ids, dds) {
     recap <- data.frame(gene = ids)
     stats <- data.frame(comparison = character(0),
                         expressed = integer(0),
@@ -91,7 +93,7 @@ outputForAllComparisons <- function(outdir, factor_names, ids, dds) {
 }
 
 
-generalPlots <- function(outdir, factor_names, ids, dds) {
+generalPlots <- function(description, outdir, factor_names, ids, dds) {
     rld <- rlog(dds)
     rldMat <- assay(rld)
     rldDist <- dist(t(rldMat))
@@ -120,14 +122,14 @@ main <- function(outdir, factor_names, sample_files, conditions) {
     counts <- loadCounts(sample_files)
     dds <- differentialAnalysis(counts, description)
     system(paste("mkdir -p", outdir))
-    outputForAllComparisons(outdir, ids, dds)
-    generalPlots(outdir, factor_names, ids, dds)
+    outputForAllComparisons(description, outdir, factor_names, ids, dds)
+    generalPlots(description, outdir, factor_names, ids, dds)
 }
 |}
 
 let wrapper factors samples =
   workflow ~descr:"deseq2.wrapper" [
-    script "R" [%bistro {|\
+    script "Rscript" ~env [%bistro {|
 {{ string wrapper_script }}
 
 main({{ quote dest ~using:'"' }},
@@ -194,4 +196,3 @@ let main_effects factors samples =
           comp, sel [ sprintf "results_%s_%s_%s.tsv" name l1 l2 ]
         )
   end
-
