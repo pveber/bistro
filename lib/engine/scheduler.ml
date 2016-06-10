@@ -1,6 +1,9 @@
 open Core.Std
 open Bistro
 
+let digest x =
+  Digest.to_hex (Digest.string (Marshal.to_string x []))
+
 let string_of_path = function
   | []
   | "" :: _ -> failwith "string_of_path: wrong path"
@@ -142,7 +145,13 @@ let deps_of_template tmpl =
 
 let deps_of_simple_cmd cmd = deps_of_template cmd.Task.tokens
 
-let string_of_command ~use_docker ~np ~mem ~dest ~tmp db cmd =
+let deps_of_script script =
+  List.append
+    (deps_of_template script.Task.args)
+    (deps_of_template script.Task.text)
+  |> List.dedup
+
+let string_of_command ~use_docker ~script_tmp ~np ~mem ~dest ~tmp db cmd =
   let open Task in
 
   let par x = "(" ^ x ^ ")" in
@@ -182,6 +191,12 @@ let string_of_command ~use_docker ~np ~mem ~dest ~tmp db cmd =
     | NP -> string_of_int np
     | MEM -> string_of_int mem
   in
+
+  let tokens ~tmp ~dest ~dep xs =
+    List.map ~f:(token ~tmp ~dest ~dep) xs
+    |> String.concat
+  in
+
   let digest x =
     Digest.to_hex (Digest.string (Marshal.to_string x []))
   in
@@ -213,12 +228,54 @@ let string_of_command ~use_docker ~np ~mem ~dest ~tmp db cmd =
         (docker_image_url image)
         (simple_cmd ~use_docker:false ~dest:image_dest ~tmp:image_tmp ~dep:image_dep cmd)
     | _ ->
-      List.map cmd.tokens ~f:(token ~dest ~tmp ~dep)
-      |> String.concat
+      tokens ~dest ~tmp ~dep cmd.tokens
   in
 
-  let run_script s =
-    assert false
+  let rec run_script ?(write_script = true) ~use_docker ~dest ~tmp ~dep ~script_file script =
+    match use_docker, script.script_env with
+    | true, Some image ->
+      let image_dest = "/bistro/dest" in
+      let image_tmp = "/bistro/tmp" in
+      let image_script = "/bistro/script" in
+      let image_dep d = sprintf "/bistro/data/%s" (digest d) in
+      let deps = deps_of_script script in
+      let deps_mount =
+        let f d =
+          sprintf
+            "-v %s:%s"
+            (dep d)
+            (image_dep d)
+        in
+        List.map deps ~f
+        |> String.concat ~sep:" "
+      in
+      let tmp_mount = sprintf "-v %s:%s" tmp image_tmp in
+      let dest_mount = sprintf "-v %s:%s" Filename.(dirname dest) Filename.(dirname image_dest) in
+      let script_mount = sprintf "-v %s:%s" script_file image_script in
+      let () = (* UGLY: this function shouldn't do a side effect cleaned by someone else *)
+        if write_script then
+          let text = tokens ~dep:image_dep ~tmp:image_tmp ~dest:image_dest script.text in
+          Out_channel.write_all script_file ~data:text
+      in
+      sprintf
+        "docker run %s %s %s %s -t %s sh -c \"%s\""
+        deps_mount
+        tmp_mount
+        dest_mount
+        script_mount
+        (docker_image_url image)
+        (run_script ~write_script:false ~use_docker:false ~dest:image_dest ~tmp:image_tmp ~dep:image_dep ~script_file:image_script script)
+    | _ ->
+      let () = (* UGLY: this function shouldn't do a side effect cleaned by someone else *)
+        if write_script then
+          let text = tokens ~dep ~tmp ~dest script.text in
+          Out_channel.write_all script_file ~data:text
+      in
+      sprintf "%s %s %s"
+        script.interpreter
+        script_file
+        (tokens ~dest ~tmp ~dep script.args)
+
   in
 
   let rec any = function
@@ -228,7 +285,7 @@ let string_of_command ~use_docker ~np ~mem ~dest ~tmp db cmd =
     | Simple_command cmd ->
       simple_cmd ~use_docker ~dest ~tmp ~dep cmd
     | Run_script s ->
-      run_script s
+      run_script ~use_docker ~dest ~tmp ~dep ~script_file:(script_tmp s) s
 
   and sequence sep xs =
     List.map xs ~f:any
@@ -251,14 +308,15 @@ let local_backend ?tmpdir ?(use_docker = false) ~np ~mem () : backend =
         let stderr = Db.Task.stderr_path db task in
         let dest = Filename.concat tmpdir "dest" in
         let tmp = Filename.concat tmpdir "tmp" in
+        remove_if_exists tmpdir >>= fun () ->
+        Unix.mkdir_p tmp ;
+        let script_tmp s = Filename.concat tmpdir (digest s) in
         let script_file =
           Filename.temp_file "guizmin" ".sh" in
-        let script_text = string_of_command ~use_docker ~np ~mem ~dest ~tmp db cmd in
+        let script_text = string_of_command ~use_docker ~np ~mem ~dest ~tmp ~script_tmp db cmd in
         Lwt_io.(with_file
                   ~mode:output script_file
                   (fun oc -> write oc script_text)) >>= fun () ->
-        remove_if_exists tmpdir >>= fun () ->
-        Unix.mkdir_p tmp ;
         redirection stdout >>= fun stdout ->
         redirection stderr >>= fun stderr ->
         let cmd = interpreter_cmd script_file `sh in
