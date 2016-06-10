@@ -74,11 +74,12 @@ module RNA_seq = struct
     )
 
   let gene_annotation : gff workflow =
-    Unix_tools.wget "ftp://ftp.ensemblgenomes.org/pub/fungi/release-31/gff3/saccharomyces_cerevisiae/Saccharomyces_cerevisiae.R64-1-1.31.gff3.gz"
-    |> Unix_tools.gunzip
+    Unix_tools.wget "http://downloads.yeastgenome.org/curation/chromosomal_feature/saccharomyces_cerevisiae.gff"
 
   let counts x =
-    Htseq.count ~stranded:`no ~feature_type:"gene" (`bam (bam x)) gene_annotation
+    Htseq.count
+      ~stranded:`no ~feature_type:"gene" ~idattribute:"Name"
+      (`bam (bam x)) gene_annotation
 
   let deseq2 =
     Deseq2.main_effects
