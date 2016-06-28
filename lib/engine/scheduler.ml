@@ -151,6 +151,171 @@ let deps_of_script script =
     (deps_of_template script.Task.text)
   |> List.dedup
 
+type execution_env = {
+  use_docker : bool ;
+  dest : string ;
+  tmp : string ;
+  script_tmp : Task.script -> string ;
+  dep : Task.dep -> string ;
+  np : int ;
+  mem : int ;
+}
+
+let make_execution_env ~tmpdir ~use_docker ~np ~mem db task =
+  let tmpdir = match tmpdir with
+    | None -> Db.Task.tmp_path db task
+    | Some p -> Filename.concat p task.Task.id
+  in
+  let path_of_task_id id =
+    Db.Task.cache_path db (Option.value_exn (Db.Task_table.get db id))
+  in
+  let dep = function
+    | `Input p -> string_of_path p
+    | `Task tid -> path_of_task_id tid
+    | `Select (tid, p) ->
+      Filename.concat (path_of_task_id tid) (string_of_path p)
+  in
+  {
+    use_docker ;
+    tmp = Filename.concat tmpdir "tmp" ;
+    dest = Filename.concat tmpdir "dest" ;
+    script_tmp = (fun s -> Filename.concat tmpdir (digest s)) ;
+    dep ;
+    np ;
+    mem ;
+  }
+
+let make_docker_execution_env env = {
+  use_docker = false ;
+  dest = "/bistro/dest" ;
+  tmp = "/bistro/tmp" ;
+  dep = (fun d -> sprintf "/bistro/data/%s" (digest d)) ;
+  script_tmp = (fun s -> Filename.concat "/bistro/script" (digest s)) ;
+  np = env.np ;
+  mem = env.mem ;
+}
+
+module Concrete_task = struct
+  type t =
+    | Sh of string
+    | Run_script of run_script
+    | And of t list
+    | Or of t list
+    | Pipe of t list
+
+  and run_script = {
+    cmd  : string ;
+    text : string ;
+  }
+
+  let par x = "(" ^ x ^ ")"
+
+  let par_if_necessary x y =
+    let open Task in
+    match x with
+    | Run_script _
+    | Simple_command _ -> y
+    | And_sequence _
+    | Or_sequence _
+    | Pipe_sequence _ -> par y
+
+
+  let docker_image_url image =
+    sprintf "%s%s/%s%s"
+      (Option.value_map ~default:"" ~f:(sprintf "%s/") image.dck_registry)
+      image.dck_account
+      image.dck_name
+      (Option.value_map ~default:"" ~f:(sprintf ":%s")  image.dck_tag)
+
+  let token env =
+    let open Task in
+    function
+    | S s -> s
+    | D d -> env.dep d
+    | DEST -> env.dest
+    | TMP -> env.tmp
+    | NP -> string_of_int env.np
+    | MEM -> string_of_int env.mem
+
+  let tokens env xs =
+    List.map ~f:(token env) xs
+    |> String.concat
+
+  let digest x =
+    Digest.to_hex (Digest.string (Marshal.to_string x []))
+
+  let deps_mount env dck_env deps =
+    let f d = sprintf "-v %s:%s" (env.dep d) (dck_env.dep d) in
+    List.map deps ~f
+    |> String.concat ~sep:" "
+
+  let tmp_mount env dck_env =
+    sprintf "-v %s:%s" env.tmp dck_env.tmp
+
+  let dest_mount env dck_env =
+    sprintf "-v %s:%s" Filename.(dirname env.dest) Filename.(dirname dck_env.dest)
+
+  let rec simple_cmd env cmd =
+    let open Task in
+    match env.use_docker, cmd.env with
+    | true, Some image ->
+      let dck_env = make_docker_execution_env env in
+      Sh (
+        sprintf
+          "docker run %s %s %s -t %s sh -c \"%s\""
+          (deps_mount env dck_env (deps_of_simple_cmd cmd))
+          (tmp_mount env dck_env)
+          (dest_mount env dck_env)
+          (docker_image_url image)
+          (tokens (make_docker_execution_env env) cmd.tokens))
+    | _ ->
+      Sh (tokens env cmd.tokens)
+
+  let rec run_script env script =
+    let script_invokation env =
+      sprintf "%s %s %s"
+        script.Task.interpreter
+        (env.script_tmp script)
+        (tokens env script.Task.args)
+    in
+    match env.use_docker, script.Task.script_env with
+    | true, Some image ->
+      let dck_env = make_docker_execution_env env in
+      let script_mount = sprintf "-v %s:%s" (env.script_tmp script) (dck_env.script_tmp script) in
+      let text = tokens dck_env script.Task.text in
+      Run_script {
+        text ;
+        cmd =
+          sprintf
+            "docker run %s %s %s %s -t %s sh -c \"%s\""
+            (deps_mount env dck_env (deps_of_script script))
+            (tmp_mount env dck_env)
+            (dest_mount env dck_env)
+            script_mount
+            (docker_image_url image)
+            (script_invokation dck_env) ;
+      }
+    | _ ->
+      let text = tokens env script.Task.text in
+      Run_script {
+        text ;
+        cmd = script_invokation env ;
+      }
+
+  let rec any env =
+    let open Task in
+    function
+    | And_sequence xs -> And (sequence env " && " xs)
+    | Or_sequence xs -> Or (sequence env " || " xs)
+    | Pipe_sequence xs -> Pipe (sequence env " | " xs)
+    | Simple_command cmd -> simple_cmd env cmd
+    | Run_script s -> run_script env s
+
+  and sequence env sep xs = List.map xs ~f:(any env)
+
+  let of_task_cmd env cmd = any env cmd
+end
+
 let string_of_command ~use_docker ~script_tmp ~np ~mem ~dest ~tmp db cmd =
   let open Task in
 
