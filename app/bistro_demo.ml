@@ -45,14 +45,16 @@ module ChIP_seq = struct
 end
 
 module RNA_seq = struct
+  (* http://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE61661 *)
+
   let samples = [
     (`WT, `High_Pi) ;
-    (`WT, `No_Pi 15) ;
+    (`WT, `No_Pi 360) ;
   ]
 
   let sra_id = function
-    | `WT, `High_Pi -> "SRR1583715"
-    | `WT, `No_Pi 15 -> "SRR1583716"
+    | `WT, `High_Pi  -> "SRR1583715"
+    | `WT, `No_Pi 360 -> "SRR1583740"
     | `WT, `No_Pi _ -> assert false
 
   let sra x = Sra.fetch_srr (sra_id x)
@@ -73,6 +75,8 @@ module RNA_seq = struct
       accepted_hits
     )
 
+  (* oddly the gff from sgd has a fasta file at the end, which htseq-count
+     doesn't like. This is a step to remove it. *)
   let remove_fasta_from_gff gff =
     workflow ~descr:"remove_fasta_from_gff" [
       cmd "sed" ~stdout:dest [
@@ -80,6 +84,7 @@ module RNA_seq = struct
         dep gff ;
       ]
     ]
+
   let gene_annotation : gff workflow =
     Unix_tools.wget
       "http://downloads.yeastgenome.org/curation/chromosomal_feature/saccharomyces_cerevisiae.gff"
@@ -93,13 +98,13 @@ module RNA_seq = struct
   let deseq2 =
     Deseq2.main_effects
       ["time"]
-      [ [  "0" ], counts (`WT, `High_Pi) ;
-        [ "15" ], counts (`WT, `No_Pi 15) ; ]
+      [ [   "0" ], counts (`WT, `High_Pi) ;
+        [ "360" ], counts (`WT, `No_Pi 360) ; ]
 
   let main tmpdir outdir np mem () =
     Bistro_app.(
       local  ~use_docker:true ?tmpdir ~np ~mem:(mem * 1024) ~outdir [
-        [ "deseq2" ] %> deseq2#effect_table ;
+        [ "deseq2" ; "0_vs_360" ] %> deseq2#effect_table ;
       ]
     )
 
