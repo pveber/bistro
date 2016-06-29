@@ -26,3 +26,10 @@ let concat = function
     workflow ~descr:"fastq.concat" [
       cmd "cat" ~stdout:dest [ list dep ~sep:" " fqs ]
     ]
+
+let head n fq =
+  workflow ~descr:"fastq.head" [
+    cmd "head" ~stdout:dest [
+      opt "-n" int (n * 4)
+    ]
+  ]
