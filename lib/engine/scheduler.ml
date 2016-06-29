@@ -162,10 +162,6 @@ type execution_env = {
 }
 
 let make_execution_env ~tmpdir ~use_docker ~np ~mem db task =
-  let tmpdir = match tmpdir with
-    | None -> Db.Task.tmp_path db task
-    | Some p -> Filename.concat p task.Task.id
-  in
   let path_of_task_id id =
     Db.Task.cache_path db (Option.value_exn (Db.Task_table.get db id))
   in
@@ -206,6 +202,7 @@ module Concrete_task = struct
   and run_script = {
     cmd  : string ;
     text : string ;
+    path : string ;
   }
 
 
@@ -261,6 +258,11 @@ module Concrete_task = struct
       Sh (tokens env cmd.tokens)
 
   let rec run_script env script =
+    let make_script ~cmd ~text =
+      Run_script {
+        cmd ; text ; path = env.script_tmp script
+      }
+    in
     let script_invokation env =
       sprintf "%s %s %s"
         script.Task.interpreter
@@ -272,24 +274,22 @@ module Concrete_task = struct
       let dck_env = make_docker_execution_env env in
       let script_mount = sprintf "-v %s:%s" (env.script_tmp script) (dck_env.script_tmp script) in
       let text = tokens dck_env script.Task.text in
-      Run_script {
-        text ;
-        cmd =
-          sprintf
-            "docker run %s %s %s %s -t %s sh -c \"%s\""
-            (deps_mount env dck_env (deps_of_script script))
-            (tmp_mount env dck_env)
-            (dest_mount env dck_env)
-            script_mount
-            (docker_image_url image)
-            (script_invokation dck_env) ;
-      }
+      let cmd =
+        sprintf
+          "docker run %s %s %s %s -t %s sh -c \"%s\""
+          (deps_mount env dck_env (deps_of_script script))
+          (tmp_mount env dck_env)
+          (dest_mount env dck_env)
+          script_mount
+          (docker_image_url image)
+          (script_invokation dck_env)
+      in
+      make_script ~text ~cmd
+
     | _ ->
       let text = tokens env script.Task.text in
-      Run_script {
-        text ;
-        cmd = script_invokation env ;
-      }
+      let cmd = script_invokation env in
+      make_script ~text ~cmd
 
   let rec any env =
     let open Task in
@@ -336,149 +336,11 @@ module Concrete_task = struct
 
 end
 
-let string_of_command ~use_docker ~script_tmp ~np ~mem ~dest ~tmp db cmd =
-  let open Task in
-
-  let par x = "(" ^ x ^ ")" in
-
-  let par_if_necessary x y = match x with
-    | Run_script _
-    | Simple_command _ -> y
-    | And_sequence _
-    | Or_sequence _
-    | Pipe_sequence _ -> par y
-  in
-
-  let path_of_task_id id =
-    Db.Task.cache_path db (Option.value_exn (Db.Task_table.get db id))
-  in
-
-  let docker_image_url image =
-    sprintf "%s%s/%s%s"
-      (Option.value_map ~default:"" ~f:(sprintf "%s/") image.dck_registry)
-      image.dck_account
-      image.dck_name
-      (Option.value_map ~default:"" ~f:(sprintf ":%s")  image.dck_tag)
-  in
-
-  let dep = function
-    | `Input p -> string_of_path p
-    | `Task tid -> path_of_task_id tid
-    | `Select (tid, p) ->
-      Filename.concat (path_of_task_id tid) (string_of_path p)
-  in
-
-  let token ~tmp ~dest ~dep = function
-    | S s -> s
-    | D d -> dep d
-    | DEST -> dest
-    | TMP -> tmp
-    | NP -> string_of_int np
-    | MEM -> string_of_int mem
-  in
-
-  let tokens ~tmp ~dest ~dep xs =
-    List.map ~f:(token ~tmp ~dest ~dep) xs
-    |> String.concat
-  in
-
-  let digest x =
-    Digest.to_hex (Digest.string (Marshal.to_string x []))
-  in
-
-  let rec simple_cmd ~use_docker ~dest ~tmp ~dep cmd =
-    match use_docker, cmd.env with
-    | true, Some image ->
-      let image_dest = "/bistro/dest" in
-      let image_tmp = "/bistro/tmp" in
-      let image_dep d = sprintf "/bistro/data/%s" (digest d) in
-      let deps = deps_of_simple_cmd cmd in
-      let deps_mount =
-        let f d =
-          sprintf
-            "-v %s:%s"
-            (dep d)
-            (image_dep d)
-        in
-        List.map deps ~f
-        |> String.concat ~sep:" "
-      in
-      let tmp_mount = sprintf "-v %s:%s" tmp image_tmp in
-      let dest_mount = sprintf "-v %s:%s" Filename.(dirname dest) Filename.(dirname image_dest) in
-      sprintf
-        "docker run %s %s %s -t %s sh -c \"%s\""
-        deps_mount
-        tmp_mount
-        dest_mount
-        (docker_image_url image)
-        (simple_cmd ~use_docker:false ~dest:image_dest ~tmp:image_tmp ~dep:image_dep cmd)
-    | _ ->
-      tokens ~dest ~tmp ~dep cmd.tokens
-  in
-
-  let rec run_script ?(write_script = true) ~use_docker ~dest ~tmp ~dep ~script_file script =
-    match use_docker, script.script_env with
-    | true, Some image ->
-      let image_dest = "/bistro/dest" in
-      let image_tmp = "/bistro/tmp" in
-      let image_script = "/bistro/script" in
-      let image_dep d = sprintf "/bistro/data/%s" (digest d) in
-      let deps = deps_of_script script in
-      let deps_mount =
-        let f d =
-          sprintf
-            "-v %s:%s"
-            (dep d)
-            (image_dep d)
-        in
-        List.map deps ~f
-        |> String.concat ~sep:" "
-      in
-      let tmp_mount = sprintf "-v %s:%s" tmp image_tmp in
-      let dest_mount = sprintf "-v %s:%s" Filename.(dirname dest) Filename.(dirname image_dest) in
-      let script_mount = sprintf "-v %s:%s" script_file image_script in
-      let () = (* UGLY: this function shouldn't do a side effect cleaned by someone else *)
-        if write_script then
-          let text = tokens ~dep:image_dep ~tmp:image_tmp ~dest:image_dest script.text in
-          Out_channel.write_all script_file ~data:text
-      in
-      sprintf
-        "docker run %s %s %s %s -t %s sh -c \"%s\""
-        deps_mount
-        tmp_mount
-        dest_mount
-        script_mount
-        (docker_image_url image)
-        (run_script ~write_script:false ~use_docker:false ~dest:image_dest ~tmp:image_tmp ~dep:image_dep ~script_file:image_script script)
-    | _ ->
-      let () = (* UGLY: this function shouldn't do a side effect cleaned by someone else *)
-        if write_script then
-          let text = tokens ~dep ~tmp ~dest script.text in
-          Out_channel.write_all script_file ~data:text
-      in
-      sprintf "%s %s %s"
-        script.interpreter
-        script_file
-        (tokens ~dest ~tmp ~dep script.args)
-
-  in
-
-  let rec any = function
-    | And_sequence xs -> sequence " && " xs
-    | Or_sequence xs -> sequence " || " xs
-    | Pipe_sequence xs -> sequence " | " xs
-    | Simple_command cmd ->
-      simple_cmd ~use_docker ~dest ~tmp ~dep cmd
-    | Run_script s ->
-      run_script ~use_docker ~dest ~tmp ~dep ~script_file:(script_tmp s) s
-
-  and sequence sep xs =
-    List.map xs ~f:any
-    |> List.map2_exn ~f:par_if_necessary xs
-    |> String.concat ~sep
-
-  in
-  any cmd
+let write_scripts ctask =
+  let scripts = Concrete_task.scripts ctask in
+  List.iter scripts ~f:(fun { Concrete_task.path ; text } ->
+      Out_channel.write_all path ~data:text
+    )
 
 let local_backend ?tmpdir ?(use_docker = false) ~np ~mem () : backend =
   let open Task in
@@ -491,14 +353,14 @@ let local_backend ?tmpdir ?(use_docker = false) ~np ~mem () : backend =
           | Some p -> Filename.concat p task.id in
         let stdout = Db.Task.stdout_path db task in
         let stderr = Db.Task.stderr_path db task in
-        let dest = Filename.concat tmpdir "dest" in
-        let tmp = Filename.concat tmpdir "tmp" in
+        let env = make_execution_env ~tmpdir ~use_docker ~np ~mem db task in
+        let ctask = Concrete_task.of_task_cmd env cmd in
         remove_if_exists tmpdir >>= fun () ->
-        Unix.mkdir_p tmp ;
-        let script_tmp s = Filename.concat tmpdir (digest s) in
+        Unix.mkdir_p env.tmp ;
+        write_scripts ctask ;
         let script_file =
           Filename.temp_file "guizmin" ".sh" in
-        let script_text = string_of_command ~use_docker ~np ~mem ~dest ~tmp ~script_tmp db cmd in
+        let script_text = Concrete_task.to_cmd ctask in
         Lwt_io.(with_file
                   ~mode:output script_file
                   (fun oc -> write oc script_text)) >>= fun () ->
@@ -518,8 +380,8 @@ let local_backend ?tmpdir ?(use_docker = false) ~np ~mem () : backend =
           )
         in
         (
-          if Sys.file_exists dest = `Yes then
-            mv dest (Db.Task.build_path db task)
+          if Sys.file_exists env.dest = `Yes then
+            mv env.dest (Db.Task.build_path db task)
           else
             Lwt.return ()
         ) >>= fun () ->
