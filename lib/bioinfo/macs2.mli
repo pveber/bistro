@@ -8,6 +8,11 @@ val pileup :
 
 type gsize = [`hs | `mm | `ce | `dm | `gsize of int]
 
+type _ format
+
+val sam : sam format
+val bam : bam format
+
 val callpeak :
   ?pvalue:float ->
   ?qvalue:float ->
@@ -16,8 +21,9 @@ val callpeak :
   ?fix_bimodal:bool ->
   ?mfold:int * int ->
   ?extsize:int ->
-  ?control:bam workflow ->
-  bam workflow ->
+  ?control:'a workflow list ->
+  'a format ->
+  'a workflow list ->
   [`macs2_callpeak_output] directory workflow
 
 class type peaks_xls = object

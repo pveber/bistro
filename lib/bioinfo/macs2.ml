@@ -17,6 +17,16 @@ let pileup ?extsize ?both_direction bam =
     ]
   ]
 
+type _ format =
+  | Sam
+  | Bam
+
+let sam = Sam
+let bam = Bam
+
+let opt_of_format = function
+  | Sam -> "SAM"
+  | Bam -> "BAM"
 
 type gsize = [`hs | `mm | `ce | `dm | `gsize of int]
 
@@ -30,12 +40,12 @@ let gsize_expr = function
 let name = "macs2"
 
 let callpeak ?pvalue ?qvalue ?gsize ?call_summits
-             ?fix_bimodal ?mfold ?extsize ?control treatment =
+             ?fix_bimodal ?mfold ?extsize ?control format treatment =
   workflow ~descr:"macs2.callpeak" [
     macs2 "callpeak" [
       opt "--outdir" ident dest ;
       opt "--name" string name ;
-      opt "--format" string "BAM" ;
+      opt "--format" (fun x -> x |> opt_of_format |> string) format ;
       option (opt "--pvalue" float) pvalue ;
       option (opt "--qvalue" float) qvalue ;
       option (opt "--gsize" gsize_expr) gsize ;
@@ -44,8 +54,8 @@ let callpeak ?pvalue ?qvalue ?gsize ?call_summits
       option (opt "--mfold" (fun (i, j) -> seq ~sep:" " [int i ; int j])) mfold ;
       option (opt "--extsize" int) extsize ;
       option (flag string "--fix-bimodal") fix_bimodal ;
-      option (opt "--control" dep) control ;
-      opt "--treatment" dep treatment ;
+      option (opt "--control" (list dep)) control ;
+      opt "--treatment" (list dep) treatment ;
     ]
   ]
 
