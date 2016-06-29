@@ -379,14 +379,20 @@ let local_backend ?tmpdir ?(use_docker = false) ~np ~mem () : backend =
             | WSTOPPED code -> code
           )
         in
+        let dest_exists = Sys.file_exists env.dest = `Yes in
         (
-          if Sys.file_exists env.dest = `Yes then
+          if dest_exists then
             mv env.dest (Db.Task.build_path db task)
           else
             Lwt.return ()
         ) >>= fun () ->
         Lwt_unix.unlink script_file >>= fun () ->
-        remove_if_exists tmpdir >>= fun () ->
+        (
+          if exit_status = 0 && dest_exists then
+            remove_if_exists tmpdir
+          else
+            Lwt.return ()
+        ) >>= fun () ->
         Lwt.return {
           script = script_text ;
           exit_status ;
