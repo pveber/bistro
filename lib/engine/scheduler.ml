@@ -208,17 +208,6 @@ module Concrete_task = struct
     text : string ;
   }
 
-  let par x = "(" ^ x ^ ")"
-
-  let par_if_necessary x y =
-    let open Task in
-    match x with
-    | Run_script _
-    | Simple_command _ -> y
-    | And_sequence _
-    | Or_sequence _
-    | Pipe_sequence _ -> par y
-
 
   let docker_image_url image =
     sprintf "%s%s/%s%s"
@@ -322,6 +311,28 @@ module Concrete_task = struct
       List.concat (List.map xs ~f:scripts)
     | Sh _ -> []
     | Run_script s -> [ s ]
+
+  let par x = "(" ^ x ^ ")"
+
+  let par_if_necessary x y =
+    match x with
+    | Run_script _
+    | Sh _ -> y
+    | And _
+    | Or _
+    | Pipe _ -> par y
+
+  let rec to_cmd = function
+    | And xs -> to_cmd_aux " && " xs
+    | Or xs -> to_cmd_aux " || " xs
+    | Pipe xs -> to_cmd_aux " | " xs
+    | Sh cmd -> cmd
+    | Run_script s -> s.cmd
+
+  and to_cmd_aux sep xs =
+    List.map xs ~f:to_cmd
+    |> List.map2_exn ~f:par_if_necessary xs
+    |> String.concat ~sep
 
 end
 
