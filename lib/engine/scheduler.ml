@@ -314,6 +314,15 @@ module Concrete_task = struct
   and sequence env sep xs = List.map xs ~f:(any env)
 
   let of_task_cmd env cmd = any env cmd
+
+  let rec scripts = function
+    | And xs
+    | Or xs
+    | Pipe xs ->
+      List.concat (List.map xs ~f:scripts)
+    | Sh _ -> []
+    | Run_script s -> [ s ]
+
 end
 
 let string_of_command ~use_docker ~script_tmp ~np ~mem ~dest ~tmp db cmd =
