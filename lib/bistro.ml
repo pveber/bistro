@@ -127,7 +127,7 @@ module Cmd = struct
       |> List.dedup
     | Simple_command cmd -> deps_of_simple_cmd cmd
     | Run_script s ->
-      deps_of_template s.text
+      deps_of_template s.text @ deps_of_template s.args
 end
 
 module Workflow = struct
