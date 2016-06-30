@@ -21,6 +21,7 @@ val callpeak :
   ?fix_bimodal:bool ->
   ?mfold:int * int ->
   ?extsize:int ->
+  ?nomodel:bool ->
   ?control:'a workflow list ->
   'a format ->
   'a workflow list ->
