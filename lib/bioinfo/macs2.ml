@@ -54,8 +54,8 @@ let callpeak ?pvalue ?qvalue ?gsize ?call_summits
       option (opt "--mfold" (fun (i, j) -> seq ~sep:" " [int i ; int j])) mfold ;
       option (opt "--extsize" int) extsize ;
       option (flag string "--fix-bimodal") fix_bimodal ;
-      option (opt "--control" (list dep)) control ;
-      opt "--treatment" (list dep) treatment ;
+      option (opt "--control" (list ~sep:" " dep)) control ;
+      opt "--treatment" (list ~sep:" " dep) treatment ;
     ]
   ]
 
