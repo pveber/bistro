@@ -166,7 +166,12 @@ let make_execution_env ~tmpdir ~use_docker ~np ~mem db task =
     Db.Task.cache_path db (Option.value_exn (Db.Task_table.get db id))
   in
   let dep = function
-    | `Input p -> string_of_path p
+    | `Input p ->
+      let p = string_of_path p in
+      if Filename.is_relative p then
+        Filename.concat (Sys.getcwd ()) p
+      else
+        p
     | `Task tid -> path_of_task_id tid
     | `Select (tid, p) ->
       Filename.concat (path_of_task_id tid) (string_of_path p)
