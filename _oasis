@@ -34,6 +34,7 @@ Library bistro_bioinfo
                     Htseq,
                     Macs2,
                     Samtools,
+                    Sra,
                     Sra_toolkit,
                     Std,
                     Tophat,

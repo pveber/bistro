@@ -12,5 +12,5 @@ let fetch_srr id =
       wget ~dest (sprintf "ftp://ftp-trace.ncbi.nlm.nih.gov/sra/sra-instant/reads/ByRun/sra/SRR/%s/%s/%s.sra" prefix id id) ()
     ]
   )
-  else failwithf "Guizmin_workflow.Sra.fetch_srr: id %s is invalid (should be longer than 6 characters long)" id ()
+  else failwithf "Bistro_bioinfo.Sra.fetch_srr: id %s is invalid (should be longer than 6 characters long)" id ()
 
