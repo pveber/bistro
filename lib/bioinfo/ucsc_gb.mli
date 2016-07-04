@@ -17,7 +17,7 @@ type wig = ([`wig], [`text]) file
 
 type bigWig = ([`bigWig], [`binary]) file
 
-type genome = [ `dm3 | `hg18 | `hg19 | `mm8 | `mm9 | `mm10 | `sacCer2 ]
+type genome = [ `dm3 | `hg18 | `hg19 | `hg38 | `mm8 | `mm9 | `mm10 | `sacCer2 ]
 val string_of_genome : [< genome] -> string
 
 
