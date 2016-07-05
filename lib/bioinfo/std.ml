@@ -8,7 +8,7 @@ type 'a fastq = 'a Types.fastq
 type sam = Types.sam
 type sra = Types.sra
 
-(* module Bed = Bed *)
+module Bed = Bed
 module Bowtie = Bowtie
 module Bowtie2 = Bowtie2
 module Deseq2 = Deseq2

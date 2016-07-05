@@ -25,7 +25,8 @@ Library bistro
 Library bistro_bioinfo
   Path:             lib/bioinfo
   Pack:             true
-  Modules:          Bowtie,
+  Modules:          Bed,
+                    Bowtie,
                     Bowtie2,
                     Deseq2,
                     Ensembl,

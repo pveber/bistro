@@ -1,5 +1,5 @@
 open Printf
-open Bistro.EDSL_sh
+open Bistro.EDSL
 
 let keep ~n bed =
   if n < 1 then raise (Invalid_argument "Bed.keep") ;
