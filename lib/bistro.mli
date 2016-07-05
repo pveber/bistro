@@ -16,7 +16,7 @@ with sexp
 
 type 'a workflow
 
-type ('a, 'b) selector
+type ('a, 'b) selector = private Selector of path
 
 module Expr : sig
   type t
