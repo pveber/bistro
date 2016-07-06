@@ -420,8 +420,8 @@ module Task = struct
                    script_env = s.script_env }
 
     | And_sequence xs -> And_sequence (List.map xs ~f:denormalize_cmd)
-    | Or_sequence xs -> And_sequence (List.map xs ~f:denormalize_cmd)
-    | Pipe_sequence xs -> And_sequence (List.map xs ~f:denormalize_cmd)
+    | Or_sequence xs -> Or_sequence (List.map xs ~f:denormalize_cmd)
+    | Pipe_sequence xs -> Pipe_sequence (List.map xs ~f:denormalize_cmd)
 
   let rec decompose_workflow_aux accu w =
     let wid = Workflow.id w in
