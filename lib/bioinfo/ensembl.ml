@@ -12,11 +12,13 @@ let ucsc_reference_genome ~release ~species =
   match species with
   | `mus_musculus when 63 <= release && release <= 65 -> `mm9
   | `homo_sapiens when release = 71 -> `hg19
+  | `homo_sapiens when release = 84 -> `hg38
   | _ -> failwith "unknown release for this species"
 
 (* acronym of the lab where the species was sequenced *)
 let lab_label_of_genome = function
   | `hg19 -> "GRCh37"
+  | `hg38 -> "GRCh38"
   | `mm9 -> "NCBIM37"
   | `mm10 -> "GRCm38"
 
