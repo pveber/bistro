@@ -1,6 +1,6 @@
 FROM pveber/bistro-base:latest
 
-RUN apt-get install -y r-base=3.3.0-1 libxml2-dev
+RUN apt-get install -y r-base=3.3.1-1 libxml2-dev
 
 RUN echo 'install.packages("gplots", repos="https://pbil.univ-lyon1.fr/CRAN/")' | R --vanilla
 
