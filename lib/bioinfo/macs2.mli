@@ -22,6 +22,7 @@ val callpeak :
   ?mfold:int * int ->
   ?extsize:int ->
   ?nomodel:bool ->
+  ?bdg:bool ->
   ?control:'a workflow list ->
   'a format ->
   'a workflow list ->
