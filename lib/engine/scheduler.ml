@@ -161,7 +161,7 @@ type execution_env = {
   mem : int ;
 }
 
-let make_execution_env ~tmpdir ~use_docker ~np ~mem db task =
+let make_execution_env ~tmpdir ~use_docker ~np ~mem db =
   let path_of_task_id id =
     Db.Task.cache_path db (Option.value_exn (Db.Task_table.get db id))
   in
@@ -299,13 +299,13 @@ module Concrete_task = struct
   let rec any env =
     let open Task in
     function
-    | And_sequence xs -> And (sequence env " && " xs)
-    | Or_sequence xs -> Or (sequence env " || " xs)
-    | Pipe_sequence xs -> Pipe (sequence env " | " xs)
+    | And_sequence xs -> And (sequence env xs)
+    | Or_sequence xs -> Or (sequence env xs)
+    | Pipe_sequence xs -> Pipe (sequence env xs)
     | Simple_command cmd -> simple_cmd env cmd
     | Run_script s -> run_script env s
 
-  and sequence env sep xs = List.map xs ~f:(any env)
+  and sequence env xs = List.map xs ~f:(any env)
 
   let of_task_cmd env cmd = any env cmd
 
@@ -358,7 +358,7 @@ let local_backend ?tmpdir ?(use_docker = false) ~np ~mem () : backend =
           | Some p -> Filename.concat p task.id in
         let stdout = Db.Task.stdout_path db task in
         let stderr = Db.Task.stderr_path db task in
-        let env = make_execution_env ~tmpdir ~use_docker ~np ~mem db task in
+        let env = make_execution_env ~tmpdir ~use_docker ~np ~mem db in
         let ctask = Concrete_task.of_task_cmd env cmd in
         remove_if_exists tmpdir >>= fun () ->
         Unix.mkdir_p env.tmp ;
