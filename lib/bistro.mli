@@ -49,6 +49,14 @@ module EDSL : sig
     ?stdin:Expr.t -> ?stdout:Expr.t -> ?stderr:Expr.t ->
     Expr.t list -> cmd
 
+  val workflow :
+    ?descr:string ->
+    ?mem:int ->
+    ?np:int ->
+    ?timeout:int ->
+    ?version:int ->
+    cmd list -> 'a workflow
+
   val script :
     string ->
     ?env:docker_image ->
@@ -62,14 +70,6 @@ module EDSL : sig
     account:string ->
     name:string ->
     unit -> docker_image
-
-  val workflow :
-    ?descr:string ->
-    ?mem:int ->
-    ?np:int ->
-    ?timeout:int ->
-    ?version:int ->
-    cmd list -> 'a workflow
 
   val input : ?may_change:bool -> string -> 'a workflow
 
@@ -93,6 +93,22 @@ module EDSL : sig
   val mv : Expr.t -> Expr.t -> cmd
 
   val ( % ) : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c
+end
+
+module OCamlscript : sig
+  type expr
+  type arg
+
+  val app : string -> arg list -> expr
+  val arg : ?l:string -> Expr.t -> arg
+
+  val make :
+    ?env:docker_image ->
+    ?findlib_deps:string list ->
+    string ->
+    expr ->
+    EDSL.cmd
+
 end
 
 

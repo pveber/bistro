@@ -228,7 +228,12 @@ module Expr = struct
     |> List.intersperse ~sep:[ S sep ]
     |> List.concat
 
-  let seq ?(sep = "") xs = List.concat (List.intersperse ~sep:(string sep) xs)
+  let seq ?sep xs =
+    let format = match sep with
+      | None -> ident
+      | Some sep -> List.intersperse ~sep:(string sep)
+    in
+    List.concat (format xs)
 
   let enum dic x = [ S (List.Assoc.find_exn dic x) ]
 
@@ -335,6 +340,65 @@ module EDSL = struct
     dck_tag = tag ;
     dck_registry = registry ;
   }
+
+end
+
+module OCamlscript = struct
+  open EDSL
+
+  type expr =
+    | App of string * arg list
+
+  and arg =
+    | Arg of string option * Expr.t
+
+  let app fn args = App (fn, args)
+
+  let arg ?l expr = Arg (l, expr)
+
+  let render_arg : arg -> Expr.t = function
+    | Arg (None, expr) -> expr
+    | Arg (Some l, expr) ->
+      seq [ string "~" ; string l ; string ":" ; expr ]
+
+  let render_expr = function
+    | App (fn, args) ->
+      seq [
+        string "let () = " ;
+        string fn ;
+        string " " ;
+      ]
+      @
+      (
+        List.map args ~f:render_arg
+        |> List.intersperse ~sep:(string " ")
+        |> List.concat
+      )
+
+  let make ?env ?(findlib_deps = []) code call =
+    let quote = sprintf "\"%s\"" in
+    let packs =
+      List.map findlib_deps ~f:quote
+      |> String.concat ~sep:";"
+      |> sprintf "Ocaml.packs := [%s] ;"
+    in
+    let text = [
+      string packs ;
+      string "Ocaml.ocamlflags := [\"-thread\"]" ;
+      string "--" ;
+      string code ;
+      render_expr call ;
+    ]
+      |> List.intersperse ~sep:(string "\n")
+      |> List.concat
+    in
+    Run_script {
+      interpreter = "ocamlscript" ;
+      script_env = env ;
+      args = [] ;
+      text ;
+    }
+
 
 end
 

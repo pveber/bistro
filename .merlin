@@ -13,7 +13,6 @@ S lib/pbs
 S ppx
 S test
 PKG compiler-libs.common
-PKG ppx_tools.metaquot
 PKG core
 PKG cohttp.lwt
 PKG dbm
@@ -23,6 +22,7 @@ PKG oUnit
 PKG pbs
 PKG ppx_bistro
 PKG ppx_deriving_yojson
+PKG ppx_tools.metaquot
 PKG pvem
 PKG react
 PKG rresult
