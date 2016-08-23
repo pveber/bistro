@@ -1,15 +1,13 @@
 open Core_kernel.Std
 open Types
-open Bistro.EDSL_sh
+open Bistro.EDSL
 
-let package = {
-  Bistro.pkg_name = "meme" ;
-  pkg_version = "4.11.1" ;
-}
+
+let env = docker_image ~account:"pveber" ~name:"meme" ~tag:"4.11.2_1" ()
 
 let meme_chip ?meme_nmotifs ?meme_minw ?meme_maxw fa =
-  workflow ~pkgs:[package] ~descr:"meme_chip" ~np:8 [
-    cmd "meme_chip" [
+  workflow ~descr:"meme-chip" ~np:8 [
+    cmd "meme-chip" ~env [
       option (opt "-meme-nmotifs" int) meme_nmotifs ;
       option (opt "-meme-minw" int) meme_minw ;
       option (opt "-meme-maxw" int) meme_maxw ;
