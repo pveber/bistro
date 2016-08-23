@@ -64,7 +64,10 @@ let genome_2bit_sequence_dir org =
   let org = string_of_genome org in
   workflow ~descr:(sprintf "ucsc_gb.2bit_sequence(%s)" org) [
     mkdir dest ;
-    wget ~dest (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/bigZips/%s.2bit" org org) () ;
+    and_list [
+      cd dest ;
+      wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/bigZips/%s.2bit" org org) () ;
+    ]
   ]
 
 let genome_2bit_sequence org =
@@ -290,4 +293,3 @@ let bedToBigBed_failsafe org =
 (* (\*   let mapped x = select x "mapped.bed" *\) *)
 (* (\*   let unmapped x = select x "unmapped.bed" *\) *)
 (* (\* end *\) *)
-
