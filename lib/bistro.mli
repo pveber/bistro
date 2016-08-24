@@ -101,6 +101,11 @@ module OCamlscript : sig
 
   val app : string -> arg list -> expr
   val arg : ?l:string -> Expr.t -> arg
+  val int : ?l:string -> int -> arg
+  val string : ?l:string -> string -> arg
+  val dep : ?l:string -> _ workflow -> arg
+  val dest : ?l:string -> unit -> arg
+  val tmp : ?l:string -> unit -> arg
 
   val make :
     ?env:docker_image ->

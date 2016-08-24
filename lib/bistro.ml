@@ -352,10 +352,6 @@ module OCamlscript = struct
   and arg =
     | Arg of string option * Expr.t
 
-  let app fn args = App (fn, args)
-
-  let arg ?l expr = Arg (l, expr)
-
   let render_arg : arg -> Expr.t = function
     | Arg (None, expr) -> expr
     | Arg (Some l, expr) ->
@@ -398,6 +394,20 @@ module OCamlscript = struct
       args = [] ;
       text ;
     }
+
+  let app fn args = App (fn, args)
+
+  let arg ?l expr = Arg (l, expr)
+
+  let dep ?l w = arg ?l Expr.(quote (dep w))
+
+  let dest ?l () = arg ?l Expr.(quote dest)
+
+  let tmp ?l () = arg ?l Expr.(quote tmp)
+
+  let int ?l i = arg ?l Expr.(int i)
+
+  let string ?l s = arg ?l Expr.(quote (string s))
 
 
 end

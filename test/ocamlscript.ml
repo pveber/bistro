@@ -29,8 +29,8 @@ let head n file =
     Bistro.OCamlscript.(
       make
         ~findlib_deps:["core"]
-        (app "head" [ arg (int 42) ; arg (quote (dep file)) ; arg (quote dest) ; ])
         head_code
+        (app "head" [ int 42 ; dep file ; dest () ; ])
     )
   ]
 
