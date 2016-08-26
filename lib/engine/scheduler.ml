@@ -587,6 +587,23 @@ let build e w =
   | Error xs ->
     Lwt.return (Error xs)
 
+let build_all e ws =
+  (
+    if e.on then (
+      Db.register_workflows e.db ws ;
+      List.map ws ~f:Task.classify_any_workflow
+      |> Lwt_list.map_p (build_dep e)
+    )
+    else
+      Lwt.fail (Invalid_argument "Engine_halted")
+  )
+  >>|
+  List.map2_exn ws ~f:(fun (Workflow w) -> function
+      | Ok () -> Ok (Db.workflow_path e.db w)
+      | Error xs -> Error xs
+    )
+
+
 let title_of_dep = function
   | `Task tid -> tid
   | `Select (tid, p) -> Filename.concat tid (string_of_path p)

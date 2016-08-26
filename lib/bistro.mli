@@ -16,6 +16,8 @@ with sexp
 
 type 'a workflow
 
+type any_workflow = Workflow : _ workflow -> any_workflow
+
 type (-'a, +'b) selector = private Selector of path
 
 module Expr : sig
@@ -167,7 +169,9 @@ module Task : sig
   with sexp
 
   val classify_workflow : _ workflow -> dep
+  val classify_any_workflow : any_workflow -> dep
   val decompose_workflow : _ workflow -> t String.Map.t
+  val decompose_any_workflow : any_workflow -> t String.Map.t
 end
 
 module Std : sig

@@ -26,7 +26,7 @@ val make : backend -> Db.t -> t
     path of the result or an error *)
 val build : t -> _ workflow -> string result Lwt.t
 val build_exn : t -> _ workflow -> string Lwt.t
-
+val build_all : t -> any_workflow list -> string result list Lwt.t
 val shutdown : t -> unit Lwt.t
 
 

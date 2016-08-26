@@ -108,4 +108,5 @@ end
 
 
 val register_workflow : t -> _ workflow -> unit
+val register_workflows : t -> any_workflow list -> unit
 val workflow_path : t -> _ workflow -> string

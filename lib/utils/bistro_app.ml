@@ -25,8 +25,7 @@ let link p p_u =
   let cmd = sprintf "rm -rf %s && ln -s %s %s" dst src dst in
   ignore (Sys.command cmd)
 
-let foreach_target db scheduler outdir (Target (dest, w)) =
-  Scheduler.build scheduler w >|= function
+let foreach_target outdir (Target (dest, w)) = function
   | Ok cache_path ->
     link (outdir :: dest) cache_path ;
     Ok ()
@@ -75,8 +74,10 @@ let with_backend backend ~outdir targets =
   let main =
     let db = Db.init_exn "_bistro" in
     let scheduler = Scheduler.make backend db in
-    Lwt_list.map_p (foreach_target db scheduler outdir) targets >>= fun results ->
-    List.iter results ~f:(error_report db) ;
+    let workflows = List.map targets ~f:(fun (Target (_, w)) -> Bistro.Workflow w) in
+    Scheduler.build_all scheduler workflows >>= fun results ->
+    List.map2_exn targets results ~f:(foreach_target outdir)
+    |> List.iter ~f:(error_report db) ;
     return ()
   in
   Lwt_unix.run main

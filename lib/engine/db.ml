@@ -364,6 +364,20 @@ let register_workflow db w =
   let tasks = Bistro.Task.decompose_workflow w in
   String.Map.iter tasks ~f:(fun ~key ~data -> Task_table.set db key data)
 
+let register_workflows db ws =
+  let tasks_by_workflow = List.map ws ~f:Bistro.Task.decompose_any_workflow in
+  let merge x y = String.Map.merge x y ~f:(fun ~key -> function
+        `Left t -> Some t
+      | `Right t -> Some t
+      | `Both (t1, t2) ->
+        assert (t1 = t2) ;
+        Some t1
+    )
+  in
+  let all_tasks = List.fold tasks_by_workflow ~init:String.Map.empty ~f:merge in
+  String.Map.iter all_tasks ~f:(fun ~key ~data -> Task_table.set db key data)
+
+
 let workflow_path db w =
   match Bistro.Task.classify_workflow w with
   | `Input i -> string_of_path i

@@ -102,6 +102,8 @@ include T
 
 type 'a workflow = u
 
+type any_workflow = Workflow : _ workflow -> any_workflow
+
 let workflow_id = function
   | Input (id, _)
   | Select (id, _, _)
@@ -525,8 +527,11 @@ module Task = struct
         String.Map.add accu ~key:step.id ~data:t
 
   let classify_workflow = denormalize_dep
+  let classify_any_workflow (Workflow w) = classify_workflow w
   let decompose_workflow w =
     decompose_workflow_aux String.Map.empty w
+  let decompose_any_workflow (Workflow w) =
+    decompose_workflow w
 end
 
 
