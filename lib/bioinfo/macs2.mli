@@ -50,7 +50,13 @@ class type narrow_peaks = object
   method f10 : int
 end
 
-
 val narrow_peaks :
   ([`macs2_callpeak_output] directory, narrow_peaks) selector
 
+class type summit_peaks = object
+  inherit bed4
+  method f5 : float
+end
+
+val summit_peaks :
+  ([`macs2_callpeak_output] directory, summit_peaks) selector
