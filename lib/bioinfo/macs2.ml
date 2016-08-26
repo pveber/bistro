@@ -83,3 +83,10 @@ end
 
 let narrow_peaks =
   selector [ name ^ "_peaks.narrowPeak" ]
+
+class type peak_summits = object
+  inherit bed4
+  method f5 : float
+  end
+
+let peak_summits = selector [ name ^ "_summits.bed" ]
