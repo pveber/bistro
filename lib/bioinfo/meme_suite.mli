@@ -5,5 +5,6 @@ val meme_chip :
   ?meme_nmotifs:int ->
   ?meme_minw:int ->
   ?meme_maxw:int ->
+  ?np:int ->
   fasta workflow ->
   [`meme_chip_output] directory workflow

@@ -2,7 +2,7 @@ FROM pveber/bistro-base:latest
 
 RUN \
   apt-get update && apt-get install -y zlib1g-dev libexpat1-dev python-dev \
-  automake autoconf libtool
+  automake autoconf libtool ghostscript libc6 libopenmpi-dev openmpi-common openmpi-bin
 
 RUN \
   wget http://meme-suite.org/meme-software/4.11.2/meme_4.11.2_1.tar.gz && \
