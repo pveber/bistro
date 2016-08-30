@@ -5,13 +5,29 @@ open Bistro.EDSL
 
 let env = docker_image ~account:"pveber" ~name:"meme" ~tag:"4.11.2_1" ()
 
-let meme_chip ?meme_nmotifs ?meme_minw ?meme_maxw fa =
-  workflow ~descr:"meme-chip" ~np:8 [
+let meme_chip ?meme_nmotifs ?meme_minw ?meme_maxw ?np fa =
+  workflow ~descr:"meme-chip" ?np [
     cmd "meme-chip" ~env [
       option (opt "-meme-nmotifs" int) meme_nmotifs ;
       option (opt "-meme-minw" int) meme_minw ;
       option (opt "-meme-maxw" int) meme_maxw ;
-      opt "-meme-p" ident np ;
+      opt "-meme-p" ident Bistro.EDSL.np ;
       dep fa ;
+    ]
+  ]
+
+let fimo ?alpha ?bgfile ?max_stored_scores ?motif ?motif_pseudo ?qv_tresh ?tresh meme_motifs fa =
+  workflow ~descr:"fimo" [
+    cmd "fimo" ~env [
+      option (opt "--aplha" float) alpha;
+      option (opt "--bgfile" string) bgfile ;
+      option (opt "--max-stored-scores" int) max_stored_scores ;
+      option (opt "--motif" string) motif ;
+      option (opt "--motif-pseudo" float) motif_pseudo ;
+      option (flag string "--qv-tresh") qv_tresh ;
+      option (opt "--tresh" float) tresh ;
+      opt "--oc" ident dest ;
+      dep meme_motifs ;
+      dep fa;
     ]
   ]

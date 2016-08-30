@@ -23,3 +23,12 @@ let fastq_dump_pe sra =
   in
   dir / selector ["reads_1.fastq"],
   dir / selector ["reads_2.fastq"]
+
+let fastq_dump_to_fasta sra =
+  workflow ~descr:"sratoolkit.fastq_dump" [
+    cmd ~env "fastq-dump" [
+      string "-Z" ;
+      string "--fasta" ;
+      dep sra
+    ] ~stdout:dest
+  ]
