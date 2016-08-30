@@ -15,3 +15,19 @@ let meme_chip ?meme_nmotifs ?meme_minw ?meme_maxw ?np fa =
       dep fa ;
     ]
   ]
+
+let fimo ?alpha ?bgfile ?max_stored_scores ?motif ?motif_pseudo ?qv_tresh ?tresh meme_motifs fa =
+  workflow ~descr:"fimo" [
+    cmd "fimo" ~env [
+      option (opt "--aplha" float) alpha;
+      option (opt "--bgfile" string) bgfile ;
+      option (opt "--max-stored-scores" int) max_stored_scores ;
+      option (opt "--motif" string) motif ;
+      option (opt "--motif-pseudo" float) motif_pseudo ;
+      option (flag string "--qv-tresh") qv_tresh ;
+      option (opt "--tresh" float) tresh ;
+      opt "--oc" ident dest ;
+      dep meme_motifs ;
+      dep fa;
+    ]
+  ]
