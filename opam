@@ -27,3 +27,6 @@ depends: [
   "rresult"
   "sexplib" {>= "113.24.00"}
 ]
+available: [
+  ocaml-version >= "4.03.0"
+]
