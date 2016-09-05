@@ -17,7 +17,7 @@ remove: [
   ["ocamlfind" "remove" "ppx_bistro"]
 ]
 depends: [
-  "oasis" {>= "0.4" build}
+  "oasis" {build & >= "0.4"}
   "ocamlfind" {build}
   "core"
   "dbm"
