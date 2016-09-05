@@ -9,7 +9,6 @@ BuildTools:   ocamlbuild
 Homepage:     https://github.com/pveber/bistro
 OCamlVersion: >= 4.02
 FilesAB:      etc/META.ab
-AlphaFeatures: no_automatic_syntax
 
 PreInstallCommand:   $ocamlfind install ppx_bistro etc/META
 PreUninstallCommand: $ocamlfind remove ppx_bistro
