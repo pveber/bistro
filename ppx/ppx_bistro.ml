@@ -37,7 +37,7 @@ let bistro_mapper argv =
       | { pexp_desc = Pexp_extension ({ txt = "bistro" ; loc }, pstr)} -> (
           match pstr with
           | PStr [{ pstr_desc = Pstr_eval ({ pexp_loc  = loc;
-                                             pexp_desc = Pexp_constant (Const_string (sym, _))}, _)}] ->
+                                             pexp_desc = Pexp_constant (Pconst_string (sym, _))}, _)}] ->
             Ast_helper.default_loc := loc ;
             [%expr let open Bistro.EDSL in
                          [%e script_of_ast loc (parse sym)] ]
