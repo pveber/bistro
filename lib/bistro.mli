@@ -12,7 +12,7 @@ type docker_image = private {
   dck_tag : string option ;
   dck_registry : string option ;
 }
-with sexp
+[@@deriving sexp]
 
 type 'a workflow
 
@@ -166,7 +166,8 @@ module Task : sig
     | TMP
     | NP
     | MEM
-  with sexp
+
+  [@@deriving sexp]
 
   val classify_workflow : _ workflow -> dep
   val classify_any_workflow : any_workflow -> dep

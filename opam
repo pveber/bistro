@@ -25,5 +25,5 @@ depends: [
   "ppx_tools"
   "pvem"
   "rresult"
-  "sexplib" {< "113.24.00"}
+  "sexplib" {>= "113.24.00"}
 ]

@@ -18,7 +18,7 @@ Library bistro
   Path:             lib
   Modules:          Bistro
   FindlibName:      bistro
-  BuildDepends:     core_kernel
+  BuildDepends:     core_kernel, ppx_sexp_conv
   XMETARequires:    core_kernel
   XMETADescription: Core bistro library
 

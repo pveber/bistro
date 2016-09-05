@@ -165,7 +165,7 @@ module Stats = struct
     build_time : float option ;
   }
   and event = Built | Requested
-  with sexp
+  [@@deriving sexp]
 
   let to_string x =
     Sexp.to_string (sexp_of_t x)
@@ -191,7 +191,7 @@ module Wave = struct
     description : string ;
     targets : Task.t list ;
   }
-  with sexp
+  [@@deriving sexp]
 
   let to_string x =
     Sexp.to_string (sexp_of_t x)

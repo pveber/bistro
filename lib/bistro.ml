@@ -1,7 +1,7 @@
 open Core_kernel.Std
 
 type path = string list
-with sexp
+[@@deriving sexp]
 
 let string_of_path = function
   | []
@@ -36,7 +36,7 @@ type docker_image = {
   dck_tag : string option ;
   dck_registry : string option ;
 }
-with sexp
+[@@deriving sexp]
 
 module T = struct
   type u =
@@ -92,7 +92,7 @@ module T = struct
     | `sh
   ]
 
-  with sexp
+  [@@deriving sexp]
 
   type ('a, 'b) selector = Selector of path
 
@@ -462,7 +462,7 @@ module Task = struct
     | TMP
     | NP
     | MEM
-  with sexp
+  [@@deriving sexp]
 
   let denormalize_dep = function
     | Step s -> `Task s.id
