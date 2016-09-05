@@ -1,5 +1,5 @@
 (* open Core_kernel.Std *)
-(* open Bistro_workflow.Types *)
+(* open Bistro_workflow.Defs *)
 
 (* let package = Bistro_workflow.make <:script< *)
 (* URL=https://github.com/downloads/taoliu/MACS/MACS-1.4.2-1.tar.gz *)

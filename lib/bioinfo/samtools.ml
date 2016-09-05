@@ -1,5 +1,5 @@
 open Core_kernel.Std
-open Types
+open Defs
 open Bistro.EDSL
 
 let env = docker_image ~account:"pveber" ~name:"samtools" ~tag:"1.3.1" ()

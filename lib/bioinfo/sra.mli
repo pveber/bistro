@@ -1,5 +1,5 @@
 open Bistro.Std
-open Types
+open Defs
 
 val input : string -> sra workflow
 

@@ -1,6 +1,6 @@
 open Core_kernel.Std
 open Bistro.Std
-open Types
+open Defs
 open Bistro.EDSL
 
 class type table = object

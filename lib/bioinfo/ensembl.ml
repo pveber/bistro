@@ -1,7 +1,7 @@
 open Core_kernel.Std
 open Bistro.Std
 open Bistro.EDSL
-open Types
+open Defs
 
 type species = [
   | `homo_sapiens

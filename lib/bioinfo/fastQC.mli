@@ -1,5 +1,5 @@
 open Bistro.Std
-open Types
+open Defs
 
 type report = [`fastQC_report] directory
 

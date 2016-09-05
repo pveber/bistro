@@ -1,6 +1,6 @@
 open Core_kernel.Std
 open Bistro.EDSL
-open Types
+open Defs
 
 let env = docker_image ~account:"pveber" ~name:"macs2" ~tag:"2.1.1" ()
 

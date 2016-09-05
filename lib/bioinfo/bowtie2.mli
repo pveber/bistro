@@ -1,5 +1,5 @@
 open Bistro.Std
-open Types
+open Defs
 
 type index = [`bowtie2_index] directory
 

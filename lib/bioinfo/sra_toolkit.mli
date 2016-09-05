@@ -1,5 +1,5 @@
 open Bistro.Std
-open Types
+open Defs
 
 val fastq_dump : sra workflow -> [`sanger] fastq workflow
 

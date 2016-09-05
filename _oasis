@@ -29,6 +29,7 @@ Library bistro_bioinfo
                     Bowtie,
                     Bowtie2,
                     Deseq2,
+                    Defs,
                     Ensembl,
                     Fastq,
                     FastQC,
@@ -40,7 +41,6 @@ Library bistro_bioinfo
                     Sra_toolkit,
                     Std,
                     Tophat,
-                    Types,
                     Ucsc_gb
   FindlibName:      bioinfo
   FindlibParent:    bistro

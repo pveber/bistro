@@ -2,7 +2,7 @@ open Core_kernel.Std
 open Bistro
 open Bistro.Std
 open Bistro.EDSL
-open Types
+open Defs
 
 type genome = [ `dm3 | `hg18 | `hg19 | `hg38 | `mm8 | `mm9 | `mm10 | `sacCer2 ]
 

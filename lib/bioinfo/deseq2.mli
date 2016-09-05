@@ -1,5 +1,5 @@
 open Bistro.Std
-open Types
+open Defs
 
 class type table = object
   inherit [ < header : [`yes] ; .. > ] tsv

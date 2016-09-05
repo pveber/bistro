@@ -1,5 +1,5 @@
 open Bistro.Std
-open Types
+open Defs
 
 val tophat1 :
   ?color:bool ->

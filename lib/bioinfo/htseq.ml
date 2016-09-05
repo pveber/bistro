@@ -1,7 +1,7 @@
 open Core_kernel.Std
 open Bistro.Std
 open Bistro.EDSL
-open Types
+open Defs
 
 let env = docker_image ~account:"pveber" ~name:"htseq" ~tag:"0.6.1" ()
 

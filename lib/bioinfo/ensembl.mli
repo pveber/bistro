@@ -1,5 +1,5 @@
 open Bistro.Std
-open Types
+open Defs
 
 type species = [
   | `homo_sapiens

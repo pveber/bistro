@@ -1,5 +1,5 @@
 open Bistro.Std
-open Types
+open Defs
 
 class type count_tsv = object
   inherit [ < header : [`no] ; .. > ] tsv

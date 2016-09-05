@@ -1,12 +1,12 @@
-type bam = Types.bam
-class type bed3 = Types.bed3
-class type bed4 = Types.bed4
-class type bed5 = Types.bed5
-type fasta = Types.fasta
-class type gff = Types.gff
-type 'a fastq = 'a Types.fastq
-type sam = Types.sam
-type sra = Types.sra
+type bam = Defs.bam
+class type bed3 = Defs.bed3
+class type bed4 = Defs.bed4
+class type bed5 = Defs.bed5
+type fasta = Defs.fasta
+class type gff = Defs.gff
+type 'a fastq = 'a Defs.fastq
+type sam = Defs.sam
+type sra = Defs.sra
 
 module Bed = Bed
 module Bowtie = Bowtie

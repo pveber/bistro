@@ -1,5 +1,5 @@
 open Core_kernel.Std
-open Types
+open Defs
 open Bistro.EDSL
 
 

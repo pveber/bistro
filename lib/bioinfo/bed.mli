@@ -1,5 +1,5 @@
 open Bistro.Std
-open Types
+open Defs
 
 val keep3 : #bed3 workflow -> bed3 workflow
 

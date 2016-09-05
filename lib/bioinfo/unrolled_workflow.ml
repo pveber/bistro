@@ -1,4 +1,4 @@
-open Types
+open Defs
 open Ucsc_gb.Formats
 open Experiment_description
 
