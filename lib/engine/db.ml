@@ -362,7 +362,7 @@ let output_report db t oc = output_string oc (report db t)
 
 let register_workflow db w =
   let tasks = Bistro.Task.decompose_workflow w in
-  String.Map.iter tasks ~f:(fun ~key ~data -> Task_table.set db key data)
+  String.Map.iteri tasks ~f:(fun ~key ~data -> Task_table.set db key data)
 
 let register_workflows db ws =
   let tasks_by_workflow = List.map ws ~f:Bistro.Task.decompose_any_workflow in
@@ -375,7 +375,7 @@ let register_workflows db ws =
     )
   in
   let all_tasks = List.fold tasks_by_workflow ~init:String.Map.empty ~f:merge in
-  String.Map.iter all_tasks ~f:(fun ~key ~data -> Task_table.set db key data)
+  String.Map.iteri all_tasks ~f:(fun ~key ~data -> Task_table.set db key data)
 
 
 let workflow_path db w =
