@@ -66,6 +66,8 @@ module EDSL : sig
     ?args:Expr.t list ->
     Expr.t -> cmd
 
+  val dump : dest:Expr.t -> Expr.t -> cmd
+
   val docker_image :
     ?tag:string ->
     ?registry:string ->
@@ -141,6 +143,7 @@ module Task : sig
   and cmd =
     | Simple_command of simple_command
     | Run_script of script
+    | Dump of dump
     | And_sequence of cmd list
     | Or_sequence of cmd list
     | Pipe_sequence of cmd list
@@ -155,6 +158,11 @@ module Task : sig
     args : token list ;
     text : token list ;
     script_env : docker_image option ;
+  }
+
+  and dump = {
+    dest : template ;
+    contents : template
   }
 
   and template = token list

@@ -53,6 +53,7 @@ module Concrete_task : sig
   type t = private
     | Sh of string
     | Run_script of run_script
+    | Dump of dump
     | And of t list
     | Or of t list
     | Pipe of t list
@@ -61,6 +62,11 @@ module Concrete_task : sig
     cmd  : string ;
     text : string ;
     path : string ;
+  }
+
+  and dump = {
+    dump_dest : string  ;
+    dump_contents : string ;
   }
 
   val of_task_cmd : execution_env -> Task.cmd -> t

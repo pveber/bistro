@@ -200,6 +200,7 @@ module Concrete_task = struct
   type t =
     | Sh of string
     | Run_script of run_script
+    | Dump of dump
     | And of t list
     | Or of t list
     | Pipe of t list
@@ -210,6 +211,10 @@ module Concrete_task = struct
     path : string ;
   }
 
+  and dump = {
+    dump_dest : string  ;
+    dump_contents : string ;
+  }
 
   let docker_image_url image =
     sprintf "%s%s/%s%s"
@@ -296,6 +301,12 @@ module Concrete_task = struct
       let cmd = script_invokation env in
       make_script ~text ~cmd
 
+  let dump env { Task.dest ; contents } =
+    Dump {
+      dump_dest = tokens env dest ;
+      dump_contents = tokens env contents ;
+    }
+
   let rec any env =
     let open Task in
     function
@@ -304,6 +315,7 @@ module Concrete_task = struct
     | Pipe_sequence xs -> Pipe (sequence env xs)
     | Simple_command cmd -> simple_cmd env cmd
     | Run_script s -> run_script env s
+    | Dump d -> dump env d
 
   and sequence env xs = List.map xs ~f:(any env)
 
@@ -314,6 +326,7 @@ module Concrete_task = struct
     | Or xs
     | Pipe xs ->
       List.concat (List.map xs ~f:scripts)
+    | Dump _
     | Sh _ -> []
     | Run_script s -> [ s ]
 
@@ -321,6 +334,7 @@ module Concrete_task = struct
 
   let par_if_necessary x y =
     match x with
+    | Dump _
     | Run_script _
     | Sh _ -> y
     | And _
@@ -333,6 +347,11 @@ module Concrete_task = struct
     | Pipe xs -> to_cmd_aux " | " xs
     | Sh cmd -> cmd
     | Run_script s -> s.cmd
+    | Dump d ->
+      sprintf
+        "cat > %s <<'__HEREDOC__'\n%s\n__HEREDOC__"
+        d.dump_dest
+        d.dump_contents
 
   and to_cmd_aux sep xs =
     List.map xs ~f:to_cmd

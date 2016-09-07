@@ -58,6 +58,7 @@ module T = struct
   and cmd =
     | Simple_command of simple_command
     | Run_script of script
+    | Dump of dump
     | And_sequence of cmd list
     | Or_sequence of cmd list
     | Pipe_sequence of cmd list
@@ -72,6 +73,11 @@ module T = struct
     args : token list ;
     text : token list ;
     script_env : docker_image option ;
+  }
+
+  and dump = {
+    dest : token list ;
+    contents : token list ;
   }
 
   and token =
@@ -130,6 +136,9 @@ module Cmd = struct
     | Simple_command cmd -> deps_of_simple_cmd cmd
     | Run_script s ->
       deps_of_template s.text @ deps_of_template s.args
+    | Dump { dest ; contents } ->
+      deps_of_template dest (* this is fishy: there shouldn't be any deps in there... *)
+      @ deps_of_template contents
 end
 
 module Workflow = struct
@@ -296,6 +305,8 @@ module EDSL = struct
       text ;
     }
 
+  let dump ~dest contents = Dump { dest ; contents }
+
   let opt o f x = S o :: S " " :: f x
 
   let opt' o f x = S o :: S "=" :: f x
@@ -437,6 +448,7 @@ module Task = struct
   and cmd =
     | Simple_command of simple_command
     | Run_script of script
+    | Dump of dump
     | And_sequence of cmd list
     | Or_sequence of cmd list
     | Pipe_sequence of cmd list
@@ -451,6 +463,11 @@ module Task = struct
     args : token list ;
     text : token list ;
     script_env : docker_image option ;
+  }
+
+  and dump = {
+    dest : template ;
+    contents : template
   }
 
   and template = token list
@@ -495,6 +512,9 @@ module Task = struct
                    interpreter = s.interpreter ;
                    script_env = s.script_env }
 
+    | Dump { dest ; contents } ->
+      Dump { dest = denormalize_template dest ;
+             contents = denormalize_template contents }
     | And_sequence xs -> And_sequence (List.map xs ~f:denormalize_cmd)
     | Or_sequence xs -> Or_sequence (List.map xs ~f:denormalize_cmd)
     | Pipe_sequence xs -> Pipe_sequence (List.map xs ~f:denormalize_cmd)
