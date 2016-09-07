@@ -21,6 +21,7 @@ PKG ocamlgraph
 PKG oUnit
 PKG pbs
 PKG ppx_bistro
+PKG ppx_sexp_conv
 PKG ppx_deriving_yojson
 PKG ppx_tools.metaquot
 PKG pvem
