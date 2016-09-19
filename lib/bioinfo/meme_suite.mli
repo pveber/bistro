@@ -15,8 +15,8 @@ val fimo :
   ?max_stored_scores: int ->
   ?motif: string ->
   ?motif_pseudo: float ->
-  ?qv_tresh:bool ->
-  ?tresh: float ->
+  ?qv_thresh:bool ->
+  ?thresh: float ->
   [`meme_chip_output] directory workflow ->
   fasta workflow ->
   [`fimo_output] directory workflow
