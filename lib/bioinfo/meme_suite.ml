@@ -11,7 +11,8 @@ let meme_chip ?meme_nmotifs ?meme_minw ?meme_maxw ?np fa =
       option (opt "-meme-nmotifs" int) meme_nmotifs ;
       option (opt "-meme-minw" int) meme_minw ;
       option (opt "-meme-maxw" int) meme_maxw ;
-      opt "-meme-p" ident Bistro.EDSL.np ;
+      (*opt "-meme-p" ident Bistro.EDSL.np ;*)
+      opt "--oc" ident dest ;
       dep fa ;
     ]
   ]
