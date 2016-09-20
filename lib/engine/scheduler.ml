@@ -258,7 +258,7 @@ module Concrete_task = struct
       let dck_env = make_docker_execution_env env in
       Sh (
         sprintf
-          "docker run %s %s %s -t %s sh -c \"%s\""
+          "docker run %s %s %s -t %s bash -c \"%s\""
           (deps_mount env dck_env (deps_of_simple_cmd cmd))
           (tmp_mount env dck_env)
           (dest_mount env dck_env)
@@ -390,7 +390,7 @@ let local_backend ?tmpdir ?(use_docker = false) ~np ~mem () : backend =
                   (fun oc -> write oc script_text)) >>= fun () ->
         redirection stdout >>= fun stdout ->
         redirection stderr >>= fun stderr ->
-        let cmd = interpreter_cmd script_file `sh in
+        let cmd = interpreter_cmd script_file `bash in
         Lwt_process.exec ~stdout ~stderr cmd >>= fun status ->
         if use_docker then ( (* FIXME: not necessary if no docker command was run *)
           sprintf "docker run -v %s:/bistro -t busybox chown -R %d /bistro" tmpdir uid
