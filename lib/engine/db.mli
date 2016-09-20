@@ -31,6 +31,7 @@ val init_exn : string -> t
 module Task_table : sig
   val get : db -> string -> Task.t option
   val save : db -> Task.t -> unit
+  val fold : db -> init:'a -> f:('a -> Task.t-> 'a) -> 'a
 end
 
 module Stats : sig
