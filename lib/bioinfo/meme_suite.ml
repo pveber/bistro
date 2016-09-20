@@ -3,7 +3,7 @@ open Defs
 open Bistro.EDSL
 
 
-let env = docker_image ~account:"pveber" ~name:"meme" ~tag:"4.11.2_1" ()
+let env = docker_image ~account:"pveber" ~name:"meme" ~tag:"4.11.2" ()
 
 let meme_chip ?meme_nmotifs ?meme_minw ?meme_maxw ?np fa =
   workflow ~descr:"meme-chip" ?np [
