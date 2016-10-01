@@ -21,6 +21,13 @@ Library bistro
   XMETARequires:    core_kernel
   XMETADescription: Core bistro library
 
+Library bistro_tdag
+  Path:             lib/tdag
+  Modules:          Tdag_sig, Tdag
+  FindlibName:      tdag
+  BuildDepends:     core_kernel, ocamlgraph, lwt.unix, ppx_sexp_conv
+  XMETARequires:    core_kernel, ocamlgraph, lwt.unix
+  
 Library bistro_bioinfo
   Path:             lib/bioinfo
   Pack:             true
