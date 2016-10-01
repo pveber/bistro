@@ -28,10 +28,12 @@ module ChIP_seq = struct
   let chIP_pho4_noPi_macs2 = Macs2.callpeak ~mfold:(1,100) Macs2.bam [ chIP_pho4_noPi_bam ]
 
   let main outdir np mem () =
-    let open Bistro_app in
-    local  ~use_docker:true ~np ~mem:(mem * 1024) ~outdir [
+    let open Bistro_app2 in
+    let repo = [
       [ "chIP_pho4_noPi_macs2.peaks" ] %> chIP_pho4_noPi_macs2
     ]
+    in
+    run ~use_docker:true ~np ~mem:(mem * 1024) (of_repo ~outdir repo)
 
   let spec = common_spec
 
@@ -100,10 +102,12 @@ module RNA_seq = struct
         [ "360" ], counts (`WT, `No_Pi 360) ; ]
 
   let main outdir np mem () =
-    let open Bistro_app in
-    local  ~use_docker:true ~np ~mem:(mem * 1024) ~outdir [
+    let open Bistro_app2 in
+    let repo = [
       [ "deseq2" ; "0_vs_360" ] %> deseq2#effect_table ;
     ]
+    in
+    run ~use_docker:true ~np ~mem:(mem * 1024) (of_repo ~outdir repo)
 
   let spec = common_spec
 
