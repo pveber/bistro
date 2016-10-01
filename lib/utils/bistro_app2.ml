@@ -1,4 +1,4 @@
-open Core_kernel.Std
+open Core.Std
 open Bistro.Std
 open Bistro_engine
 
@@ -107,3 +107,35 @@ let run ?use_docker ?(np = 1) ?(mem = 1024) ?tmpdir app =
     )
   in
   Lwt_unix.run main
+
+
+type repo_item =
+  Repo_item : string list * _ workflow -> repo_item
+
+let ( %> ) path w = Repo_item (path, w)
+
+let rec string_of_path = function
+  | [] -> "."
+  | "" :: t -> Filename.concat "." (string_of_path t)
+  | p -> List.reduce_exn p ~f:Filename.concat
+
+let make_absolute p =
+  if Filename.is_absolute p then p
+  else Filename.concat (Sys.getcwd ()) p
+
+let link p p_u =
+  let dst = string_of_path p in
+  let src = make_absolute p_u in
+  Unix.mkdir_p (Filename.dirname dst) ;
+  let cmd = sprintf "rm -rf %s && ln -s %s %s" dst src dst in
+  ignore (Sys.command cmd)
+
+let generate_page outdir (dest, cache_path) =
+  link (outdir :: dest) cache_path
+
+let of_repo ~outdir items =
+  List.map items ~f:(function Repo_item (p, w) ->
+      pure (generate_page outdir) $ pureW w (fun s -> p, s)
+    )
+  |> list
+  |> app (pure ignore)
