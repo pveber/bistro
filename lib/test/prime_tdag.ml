@@ -33,6 +33,7 @@ let check_events xs =
       check_state accu ;
       accu
     )
+  |> ignore
 
 let check_performed xs =
   if List.contains_dup xs
@@ -106,12 +107,12 @@ module Task = struct
   let id (Push i) = string_of_int i
 
   let requirement (Push i) =
-    if i mod 0 = 0 then Allocator.Even
+    if i mod 2 = 0 then Allocator.Even
     else Allocator.Odd
 
   let perform _ (Push i) =
     log (Started i) ;
-    Lwt_unix.sleep (Random.float 0.1) >>| fun () ->
+    Lwt_unix.sleep (Random.float 0.5) >>| fun () ->
     log (Ended i) ;
     performed := i :: !performed ;
     Ok ()
@@ -145,6 +146,13 @@ module TG = struct
     in
     S.range 2 n
     |> S.fold ~init:empty ~f:add_task
+
+  let log t =
+    let t = Time.to_string (Time.of_float t) in
+    function
+    | Task_ready (Task.Push i) -> printf "[%s] ready push %d\n%!" t i
+    | Task_started (Task.Push i) -> printf "[%s] started push %d\n%!" t i
+    | Task_ended (Task.Push i, _) -> printf "[%s] ended push %d\n%!" t i
 end
 
 let command =
@@ -152,5 +160,8 @@ let command =
     ~summary:"Tests job scheduling on an integer divisor DAG"
     Command.Spec.empty
     (fun () ->
-       TG.run (Allocator.create ()) (TG.make 30)
-       |> Lwt_unix.run)
+       Lwt_unix.run (
+         TG.run ~log:TG.log (Allocator.create ()) (TG.make 100) >>| fun _ ->
+         check_performed (List.rev !performed) ;
+         check_events (List.rev !events)
+       ))

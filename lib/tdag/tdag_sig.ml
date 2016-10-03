@@ -1,4 +1,15 @@
+open Core_kernel.Std
+
 type 'a result = ('a, [`Msg of string]) Pervasives.result
+
+type trace =
+  | Run of { ready : time ;
+             start : time ;
+             end_ : time ;
+             outcome : unit result }
+  | Skipped of [`Done_already | `Missing_dep]
+
+and time = float
 
 module type Domain = sig
 
@@ -35,9 +46,16 @@ module type S = sig
   type allocator
   type 'a thread
 
+  type event =
+    | Task_ready of task
+    | Task_started of task
+    | Task_ended of task * unit result
+
   val empty : t
   val add_task : t -> task -> t
   val add_dep : t -> task -> on:task -> t
 
-  val run : allocator -> t -> unit thread
+  val run :
+    ?log:(time -> event -> unit) ->
+    allocator -> t -> trace String.Map.t thread
 end
