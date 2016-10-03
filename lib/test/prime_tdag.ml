@@ -1,4 +1,4 @@
-open Core_kernel.Std
+open Core.Std
 open Rresult
 
 let divides i j =
@@ -147,5 +147,9 @@ module TG = struct
     |> S.fold ~init:empty ~f:add_task
 end
 
-let () =
-  Lwt_unix.run (TG.run (TG.make 30))
+let command =
+  Command.basic
+    ~summary:"Tests job scheduling on an integer divisor DAG"
+    Command.Spec.empty
+    (fun () ->
+       Lwt_unix.run (TG.run (TG.make 30)))
