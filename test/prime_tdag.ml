@@ -48,30 +48,6 @@ let ended i =
   log (Ended i) ;
   performed := i :: !performed
 
-module Task = struct
-  type t = Push of int
-  type request = Even | Odd
-  type resource = request
-  type 'a thread = 'a Lwt.t
-
-  let id (Push i) = string_of_int i
-
-  let requirement (Push i) =
-    if i mod 0 = 0 then Even
-    else Odd
-
-  let perform _ (Push i) =
-    log (Started i) ;
-    Lwt_unix.sleep (Random.float 0.1) >>| fun () ->
-    log (Ended i) ;
-    performed := i :: !performed ;
-    Ok ()
-
-  let clean _ = Lwt.return ()
-
-  let is_done (Push i) =
-    Lwt.return (List.mem !performed i)
-end
 
 module Token_allocator = struct
   type 'a t = {
@@ -102,9 +78,8 @@ module Token_allocator = struct
 end
 
 module Allocator = struct
-  type resource = Task.resource
-  type request = resource
-  type 'a thread = 'a Lwt.t
+  type request = Even | Odd
+  type resource = request
 
   type t = {
     even : resource Token_allocator.t ;
@@ -112,21 +87,49 @@ module Allocator = struct
   }
 
   let create () = {
-    even = Token_allocator.create Task.Even ;
-    odd = Token_allocator.create Task.Odd ;
+    even = Token_allocator.create Even ;
+    odd = Token_allocator.create Odd ;
   }
 
   let request alloc = function
-    | Task.Odd -> Token_allocator.request alloc.odd
-    | Task.Even -> Token_allocator.request alloc.even
+    | Odd -> Token_allocator.request alloc.odd
+    | Even -> Token_allocator.request alloc.even
 
   let free alloc = function
-    | Task.Odd -> Token_allocator.free alloc.odd
-    | Task.Even -> Token_allocator.free alloc.even
+    | Odd -> Token_allocator.free alloc.odd
+    | Even -> Token_allocator.free alloc.even
+end
+
+module Task = struct
+  type t = Push of int
+
+  let id (Push i) = string_of_int i
+
+  let requirement (Push i) =
+    if i mod 0 = 0 then Allocator.Even
+    else Allocator.Odd
+
+  let perform _ (Push i) =
+    log (Started i) ;
+    Lwt_unix.sleep (Random.float 0.1) >>| fun () ->
+    log (Ended i) ;
+    performed := i :: !performed ;
+    Ok ()
+
+  let clean _ = Lwt.return ()
+
+  let is_done (Push i) =
+    Lwt.return (List.mem !performed i)
+end
+
+module D = struct
+  module Thread = Lwt
+  module Allocator = Allocator
+  module Task = Task
 end
 
 module TG = struct
-  include Tdag.Make(Task)(Allocator)(Lwt)
+  include Tdag.Make(D)
 
   let make n =
     let module S = Sequence in
@@ -145,4 +148,4 @@ module TG = struct
 end
 
 let () =
-  Lwt_unix.run (TG.run (make 30))
+  Lwt_unix.run (TG.run (TG.make 30))
