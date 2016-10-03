@@ -16,6 +16,7 @@ module Make(D : Domain) = struct
   type t = G.t
   type task = Task.t
   type 'a thread = 'a Thread.t
+  type allocator = Allocator.t
 
   let empty = G.empty
 

@@ -152,4 +152,5 @@ let command =
     ~summary:"Tests job scheduling on an integer divisor DAG"
     Command.Spec.empty
     (fun () ->
-       Lwt_unix.run (TG.run (TG.make 30)))
+       TG.run (Allocator.create ()) (TG.make 30)
+       |> Lwt_unix.run)
