@@ -127,18 +127,41 @@ main <- function(outdir, factor_names, sample_files, conditions) {
 }
 |}
 
-let wrapper factors samples =
-  workflow ~descr:"deseq2.wrapper" [
-    script "Rscript" ~env [%bistro {|
-{{ string wrapper_script }}
+let app fn args =
+  seq ~sep:"" [
+    string fn ; string "(" ;
+    seq ~sep:"," args ;
+    string ")" ;
+  ]
 
-main({{ quote dest ~using:'"' }},
-     c({{ list (string % quote ~using:'"') ~sep:"," factors }}),
-     c({{ list (snd % dep % quote ~using:'"') ~sep:"," samples }}),
-     matrix(c({{ list (fst % list (string % quote ~using:'"') ~sep:",") ~sep:"," samples }}),
-              ncol = {{ int (List.length factors) }},
-              byrow = T))
-|} ]
+let app' fn args =
+  let arg (k, v) = seq ~sep:"=" [ string k ; v ] in
+  seq ~sep:"" [
+    string fn ; string "(" ;
+    list arg ~sep:"," args
+  ]
+
+let wrapper factors samples =
+  let script_path = tmp // "script.R" in
+  let script = seq ~sep:"\n" [
+      string wrapper_script ;
+      app "main" [
+        quote dest ~using:'"' ;
+        app "c" (List.map factors ~f:(string % quote ~using:'"')) ;
+        app "c" (List.map samples ~f:(snd % dep % quote ~using:'"')) ;
+        app' "matrix" [
+          "data", app "c" (List.map samples ~f:fst
+                           |> List.concat
+                           |> List.map ~f:(string % quote ~using:'"')) ;
+          "ncol", int (List.length factors) ;
+          "byrow", string "T" ;
+        ]
+      ]
+    ]
+  in
+  workflow ~descr:"deseq2.wrapper" [
+    dump ~dest:script_path script ;
+    shcmd "Rscript" ~env [ script_path ] ;
   ]
 
 (*

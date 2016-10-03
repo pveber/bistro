@@ -79,7 +79,7 @@ module RNA_seq = struct
      doesn't like. This is a step to remove it. *)
   let remove_fasta_from_gff gff =
     workflow ~descr:"remove_fasta_from_gff" [
-      cmd "sed" ~stdout:dest [
+      shcmd "sed" ~stdout:dest [
         string "'/###/q'" ;
         dep gff ;
       ]

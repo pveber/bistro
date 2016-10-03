@@ -31,7 +31,7 @@ let count ?order ?mode ?stranded ?feature_type ?minaqual ?idattribute alns gff =
     | `bam bam -> "bam", dep bam
   in
   workflow ~descr:"htseq-count" [
-    cmd "htseq-count" ~env ~stdout:dest [
+    shcmd "htseq-count" ~env ~stdout:dest [
       opt "-f" string format ;
       option (opt "-m" (string_of_mode % string)) mode ;
       option (opt "-r" (string_of_order % string)) order ;

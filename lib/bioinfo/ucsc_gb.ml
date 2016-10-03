@@ -41,16 +41,18 @@ let env = docker_image ~account:"pveber" ~name:"ucsc-kent" ~tag:"330" ()
 let chromosome_sequences org =
   let org = string_of_genome org in
   workflow ~descr:(sprintf "ucsc_gb.chromosome_sequence(%s)" org) [
-    mkdir_p dest ;
-    cd dest ;
-    wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/chromosomes/*" org) () ;
-    cmd "gunzip" [ string "*.gz" ]
+    sh @@ and_list [
+      mkdir_p dest ;
+      cd dest ;
+      wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/chromosomes/*" org) () ;
+      cmd "gunzip" [ string "*.gz" ]
+    ]
   ]
 
 let genome_sequence org =
   let chr_seqs = chromosome_sequences org in
   workflow ~descr:"ucsc_gb.genome_sequence" [
-    cmd "bash" [
+    shcmd "bash" [
       opt "-c" string "'shopt -s nullglob ; cat $0/{chr?.fa,chr??.fa,chr???.fa,chr????.fa} > $1'" ;
       dep chr_seqs ;
       dest
@@ -63,8 +65,8 @@ let genome_sequence org =
 let genome_2bit_sequence_dir org =
   let org = string_of_genome org in
   workflow ~descr:(sprintf "ucsc_gb.2bit_sequence(%s)" org) [
-    mkdir dest ;
-    and_list [
+    sh @@ and_list [
+      mkdir dest ;
       cd dest ;
       wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/bigZips/%s.2bit" org org) () ;
     ]
@@ -85,7 +87,7 @@ let genome_2bit_sequence org =
 
 let twoBitToFa bed twobits =
   workflow ~descr:"ucsc_gb.twoBitToFa" [
-    cmd ~env "twoBitToFa" [
+    shcmd ~env "twoBitToFa" [
       opt' "-bed" dep bed ;
       dep twobits ;
       dest
@@ -125,7 +127,7 @@ let twoBitToFa bed twobits =
 
 let fetchChromSizes org =
   workflow ~descr:"ucsc_gb.fetchChromSizes" [
-    cmd "fetchChromSizes" ~env ~stdout:dest [
+    shcmd "fetchChromSizes" ~env ~stdout:dest [
       string (string_of_genome org) ;
     ]
   ]
@@ -165,12 +167,12 @@ let fetchChromSizes org =
 let bedGraphToBigWig org bg =
   let tmp = seq [ tmp ; string "/sorted.bedGraph" ] in
   workflow ~descr:"bedGraphToBigWig" [
-    cmd "sort" ~stdout:tmp [
+    shcmd "sort" ~stdout:tmp [
       string "-k1,1" ;
       string "-k2,2n" ;
       dep bg ;
     ] ;
-    cmd "bedGraphToBigWig" ~env [
+    shcmd "bedGraphToBigWig" ~env [
       tmp ;
       dep (fetchChromSizes org) ;
       dest ;
@@ -198,7 +200,7 @@ let bedToBigBed org =
   let f bed =
     workflow
       ~descr:"ucsc_gb.bedToBigBed"
-      (bedToBigBed_command org bed)
+      [ sh @@ and_list (bedToBigBed_command org bed) ]
   in
   function
   | `bed3 bed -> f bed
@@ -217,7 +219,7 @@ let bedToBigBed_failsafe org =
         and_list [ test ; touch ] ;
         and_list (bedToBigBed_command org bed) ;
       ] in
-    workflow [ cmd ]
+    workflow [ sh cmd ]
   in
   function
   | `bed3 bed -> f bed

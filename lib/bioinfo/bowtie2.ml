@@ -9,24 +9,25 @@ let env = docker_image ~account:"pveber" ~name:"bowtie2" ~tag:"2.2.9" ()
 (* memory bound correspond to storing a human index in memory, following bowtie manual *)
 let bowtie2_build ?large_index ?noauto ?packed ?bmax ?bmaxdivn ?dcv ?nodc ?noref ?justref ?offrate ?ftabchars ?seed ?cutoff fa =
   workflow ~descr:"bowtie2_build" ~mem:(3 * 1024) [
-    mkdir_p dest ;
-    cmd "bowtie2-build" ~env [
-      option (flag string "--large-index") large_index ;
-      option (flag string "--no-auto") noauto ;
-      option (flag string "--packed") packed ;
-      option (flag string "--nodc") nodc ;
-      option (flag string "--noref") noref ;
-      option (flag string "--justref") justref ;
-      option (opt "--bmax" int) bmax ;
-      option (opt "--bmaxdivn" int) bmaxdivn ;
-      option (opt "--dcv" int) dcv ;
-      option (opt "--offrate" int) offrate ;
-      option (opt "--ftabchars" int) ftabchars ;
-      option (opt "--seed" int) seed ;
-      option (opt "--cutoff" int) cutoff ;
-
-      opt "-f" dep fa ;
-      seq [ dest ; string "/index" ]
+    sh @@ and_list [
+      mkdir_p dest ;
+      cmd "bowtie2-build" ~env [
+        option (flag string "--large-index") large_index ;
+        option (flag string "--no-auto") noauto ;
+        option (flag string "--packed") packed ;
+        option (flag string "--nodc") nodc ;
+        option (flag string "--noref") noref ;
+        option (flag string "--justref") justref ;
+        option (opt "--bmax" int) bmax ;
+        option (opt "--bmaxdivn" int) bmaxdivn ;
+        option (opt "--dcv" int) dcv ;
+        option (opt "--offrate" int) offrate ;
+        option (opt "--ftabchars" int) ftabchars ;
+        option (opt "--seed" int) seed ;
+        option (opt "--cutoff" int) cutoff ;
+        opt "-f" dep fa ;
+        seq [ dest ; string "/index" ]
+      ]
     ]
   ]
 
@@ -73,7 +74,7 @@ let bowtie2
       ]
   in
   workflow ~descr:"bowtie2" ~mem:(3 * 1024) ~np:8 [
-    cmd "bowtie2" ~env [
+    shcmd "bowtie2" ~env [
       option (opt "--skip" int) skip ;
       option (opt "--qupto" int) qupto ;
       option (opt "--trim5" int) trim5 ;
