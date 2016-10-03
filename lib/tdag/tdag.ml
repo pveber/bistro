@@ -77,7 +77,7 @@ module Make(D : Domain) = struct
             Task.perform resource u >>= fun outcome ->
             let end_ = Unix.gettimeofday () in
             log end_ (Task_ended (u, outcome)) ;
-            Allocator.free alloc resource ;
+            Allocator.release alloc resource ;
             Thread.return (Run { ready ; start ; end_ ; outcome })
           )
           else

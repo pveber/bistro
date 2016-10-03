@@ -73,7 +73,7 @@ module Token_allocator = struct
       request a
     )
 
-  let free a =
+  let release a =
     a.state <- true ;
     Lwt_condition.signal a.cond ()
 end
@@ -96,9 +96,9 @@ module Allocator = struct
     | Odd -> Token_allocator.request alloc.odd
     | Even -> Token_allocator.request alloc.even
 
-  let free alloc = function
-    | Odd -> Token_allocator.free alloc.odd
-    | Even -> Token_allocator.free alloc.even
+  let release alloc = function
+    | Odd -> Token_allocator.release alloc.odd
+    | Even -> Token_allocator.release alloc.even
 end
 
 module Task = struct

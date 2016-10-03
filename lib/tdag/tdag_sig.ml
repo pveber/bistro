@@ -25,7 +25,7 @@ module type Domain = sig
     type resource
 
     val request : t -> request -> resource Thread.t
-    val free : t -> resource -> unit
+    val release : t -> resource -> unit
   end
 
   module Task : sig
