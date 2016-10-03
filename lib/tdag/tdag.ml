@@ -1,6 +1,6 @@
 open Tdag_sig
 
-module Make(T : Task)(A : Allocator) = struct
+module Make(T : Task)(A : Allocator)(Thread : Thread) = struct
   module V = struct
     type t = T.t
     let compare u v = String.compare (T.id u) (T.id v)
@@ -13,6 +13,7 @@ module Make(T : Task)(A : Allocator) = struct
 
   type t = G.t
   type task = T.t
+  type 'a thread = 'a Thread.t
 
   let empty = G.empty
 
