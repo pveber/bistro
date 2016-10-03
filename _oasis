@@ -21,6 +21,13 @@ Library bistro
   XMETARequires:    core_kernel
   XMETADescription: Core bistro library
 
+Library bistro_tdag
+  Path:             lib/tdag
+  Modules:          Tdag_sig, Tdag
+  FindlibName:      tdag
+  BuildDepends:     core_kernel, ocamlgraph, lwt.unix, ppx_sexp_conv
+  XMETARequires:    core_kernel, ocamlgraph, lwt.unix
+  
 Library bistro_bioinfo
   Path:             lib/bioinfo
   Pack:             true
@@ -69,6 +76,15 @@ Library bistro_utils
   XMETARequires:    bistro.engine
   XMETADescription: Utility functions for bistro
 
+Library bistro_test
+  Path:             lib/test
+  Modules:          Prime_tdag
+  FindlibName:      test
+  FindlibParent:    bistro
+  BuildDepends:     bistro.tdag, core, rresult, threads
+  XMETARequires:    bistro.tdag, core, rresult, threads
+  XMETADescription: Test modules for bistro
+
 Executable "ppx_bistro"
   Path:             ppx
   MainIs:           ppx_bistro.ml
@@ -92,22 +108,16 @@ Executable bistro
 # | Examples                                                          |
 # +-------------------------------------------------------------------+
 
-# Executable diamond
-#   Path:             test
-#   MainIs:           diamond.ml
-#   BuildDepends:     bistro.engine
-#   CompiledObject:   byte
-
-# Executable fail
-#   Path:             test
-#   MainIs:           fail.ml
-#   BuildDepends:     bistro.utils
-#   CompiledObject:   byte
-
 Executable bistro_demo
   Path:             app
   MainIs:           bistro_demo.ml
   BuildDepends:     bistro.utils, bistro.bioinfo
+  CompiledObject:   byte
+
+Executable bistro_test_app
+  Path:             app
+  MainIs:           bistro_test.ml
+  BuildDepends:     bistro.utils, bistro.bioinfo, bistro.test
   CompiledObject:   byte
 
 Document API

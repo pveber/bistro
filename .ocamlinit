@@ -1,16 +1,18 @@
 #use "topfind";;
 #thread;;
 
-#require "core.top lwt.unix dbm rresult";;
+#require "core.top lwt.unix dbm rresult ocamlgraph";;
 
 #directory "_build/lib";;
 #directory "_build/lib/bioinfo";;
 #directory "_build/lib/engine";;
 #directory "_build/lib/utils";;
+#directory "_build/lib/tdag";;
 #load "bistro.cma";;
 #load "bistro_bioinfo.cma";;
 #load "bistro_engine.cma";;
 #load "bistro_utils.cma";;
+#load "bistro_tdag.cma";;
 
 open Bistro.Std
 open Bistro_bioinfo.Std

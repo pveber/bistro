@@ -1,12 +1,73 @@
 (** A library to build scientific workflows. *)
 open Core_kernel.Std
 
-type path = string list
+type 'a workflow
 
-type 'a directory = [`directory of 'a]
+
+(** Workflow representation *)
+type u = private
+  | Input of string * path
+  | Select of string * u * path
+  | Step of step
+
+and step = private {
+  id : string ;
+  descr : string ;
+  deps : u list ;
+  cmd : cmd ;
+  np : int ; (** Required number of processors *)
+  mem : int ; (** Required memory in MB *)
+  timeout : int option ; (** Maximum allowed running time in hours *)
+  version : int option ; (** Version number of the wrapper *)
+}
+
+and cmd = private
+  | Simple_command of simple_command
+  | Run_script of script
+  | Dump of dump
+  | And_sequence of cmd list
+  | Or_sequence of cmd list
+  | Pipe_sequence of cmd list
+
+and simple_command = {
+  tokens : token list ;
+  env : docker_image option ;
+}
+
+and script = {
+  interpreter : string ;
+  args : token list ;
+  text : token list ;
+  script_env : docker_image option ;
+}
+
+and dump = {
+  dest : token list ;
+  contents : token list ;
+}
+
+and token =
+  | S of string
+  | D of u
+  | DEST
+  | TMP
+  | NP
+  | MEM
+
+and interpreter = [
+  | `bash
+  | `ocaml
+  | `ocamlscript
+  | `perl
+  | `python
+  | `R
+  | `sh
+]
+
+and path = string list
 
 (** Name and version of an external dependency for a workflow *)
-type docker_image = private {
+and docker_image = private {
   dck_account : string ;
   dck_name : string ;
   dck_tag : string option ;
@@ -14,7 +75,7 @@ type docker_image = private {
 }
 [@@deriving sexp]
 
-type 'a workflow
+type 'a directory = [`directory of 'a]
 
 type any_workflow = Workflow : _ workflow -> any_workflow
 
