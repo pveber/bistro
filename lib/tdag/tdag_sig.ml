@@ -15,8 +15,9 @@ module type Allocator = sig
   type t
   type request
   type resource
+  type 'a thread
 
-  val request : t -> request -> resource
+  val request : t -> request -> resource thread
   val free : t -> resource -> unit
 end
 
