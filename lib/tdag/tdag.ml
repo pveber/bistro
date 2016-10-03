@@ -1,18 +1,20 @@
 open Tdag_sig
 
-module Make(T : Task)(A : Allocator)(Thread : Thread) = struct
+module Make(D : Domain) = struct
+  open D
+
   module V = struct
-    type t = T.t
-    let compare u v = String.compare (T.id u) (T.id v)
-    let hash u = Hashtbl.hash (T.id u)
+    type t = Task.t
+    let compare u v = String.compare (Task.id u) (Task.id v)
+    let hash u = Hashtbl.hash (Task.id u)
     let equal u v =
-      T.id u = T.id v
+      Task.id u = Task.id v
   end
 
   module G = Graph.Persistent.Digraph.Concrete(V)
 
   type t = G.t
-  type task = T.t
+  type task = Task.t
   type 'a thread = 'a Thread.t
 
   let empty = G.empty
