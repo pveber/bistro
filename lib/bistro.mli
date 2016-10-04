@@ -35,6 +35,7 @@ and command =
 and dump = {
   dest : token list ;
   contents : token list ;
+  for_container : bool ;
 }
 
 and token =
@@ -111,7 +112,7 @@ module EDSL : sig
 
   val sh : command -> instruction
 
-  val dump : dest:Expr.t -> Expr.t -> instruction
+  val dump : ?for_container:bool -> dest:Expr.t -> Expr.t -> instruction
 
   val shcmd :
     string ->
@@ -185,6 +186,7 @@ module Task : sig
   and dump = {
     dest : token list ;
     contents : token list ;
+    for_container : bool ;
   }
 
   and token =

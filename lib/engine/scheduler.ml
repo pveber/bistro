@@ -205,6 +205,7 @@ module Concrete_task = struct
 
   and dump = {
     dump_dest : string  ;
+    dump_path : string ;
     dump_contents : string ;
   }
 
@@ -269,28 +270,27 @@ module Concrete_task = struct
     List.map xs ~f:(string_of_command env)
     |> String.concat ~sep
 
-  let dump env { Task.dest ; contents } =
+  let dump env { Task.dest ; contents ; for_container } =
+    let exec_env = if for_container then make_docker_execution_env env else env in
     Dump {
       dump_dest = string_of_tokens env dest ;
-      dump_contents = string_of_tokens env contents ;
+      dump_path = string_of_tokens exec_env dest ;
+      dump_contents = string_of_tokens exec_env contents ;
     }
 
   let of_instruction env = function
-    | Task.Dump d -> Dump {
-        dump_dest = string_of_tokens env d.Task.dest ;
-        dump_contents = string_of_tokens env d.Task.contents ;
-      }
+    | Task.Dump d -> dump env d
     | Task.Sh cmd -> Sh (string_of_command env cmd)
 
   let perform ~stdout ~stderr = function
-    | Sh cmd ->
+    | Sh script_text ->
       let script_file = Filename.temp_file "guizmin" ".sh" in
-      let script_text = cmd in
       Lwt_io.(with_file
                 ~mode:output script_file
                 (fun oc -> write oc script_text)) >>= fun () ->
       redirection stdout >>= fun stdout ->
       redirection stderr >>= fun stderr ->
+      print_endline script_text ;
       let cmd = "", [| "sh" ; script_file |] in
       Lwt_process.exec ~stdout ~stderr cmd >>= fun status ->
       Lwt_unix.unlink script_file >>| fun () ->
@@ -301,6 +301,7 @@ module Concrete_task = struct
         )
 
     | Dump { dump_dest ; dump_contents } ->
+      print_endline dump_contents ;
       Lwt_io.(with_file
                 ~mode:output dump_dest
                 (fun oc -> write oc dump_contents))

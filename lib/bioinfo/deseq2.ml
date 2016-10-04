@@ -161,7 +161,7 @@ let wrapper factors samples =
     ]
   in
   workflow ~descr:"deseq2.wrapper" [
-    dump ~dest:script_path script ;
+    dump ~for_container:true ~dest:script_path script ;
     shcmd "Rscript" ~env [ script_path ] ;
   ]
 

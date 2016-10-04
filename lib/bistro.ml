@@ -69,6 +69,7 @@ module T = struct
   and dump = {
     dest : token list ;
     contents : token list ;
+    for_container : bool ;
   }
 
   and token =
@@ -296,7 +297,7 @@ module EDSL = struct
   let shcmd p ?env ?stdin ?stdout ?stderr args =
     sh @@ cmd p ?env ?stdin ?stdout ?stderr args
 
-  let dump ~dest contents = Dump { dest ; contents }
+  let dump ?(for_container = true) ~dest contents = Dump { dest ; contents ; for_container }
 
   let opt o f x = S o :: S " " :: f x
 
@@ -381,6 +382,7 @@ module Task = struct
   and dump = {
     dest : token list ;
     contents : token list ;
+    for_container : bool ;
   }
 
   and token =
@@ -423,9 +425,10 @@ module Task = struct
       Docker (image, denormalize_cmd c)
 
   let denormalize_instruction = function
-    | T.Dump { dest ; contents } ->
+    | T.Dump { dest ; contents ; for_container } ->
       Dump { dest = denormalize_template dest ;
-             contents = denormalize_template contents }
+             contents = denormalize_template contents ;
+             for_container }
     | Sh cmd -> Sh (denormalize_cmd cmd)
 
   let denormalize_program = List.map ~f:denormalize_instruction

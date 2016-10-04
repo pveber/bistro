@@ -47,15 +47,3 @@ val make_execution_env :
   mem:int ->
   Db.t ->
   execution_env
-
-module Concrete_task : sig
-  type t = instruction list
-  and instruction =
-    | Sh of string
-    | Dump of dump
-
-  and dump = {
-    dump_dest : string  ;
-    dump_contents : string ;
-  }
-end
