@@ -24,7 +24,6 @@ let bowtie2_build ?large_index ?noauto ?packed ?bmax ?bmaxdivn ?dcv ?nodc ?noref
       option (opt "--ftabchars" int) ftabchars ;
       option (opt "--seed" int) seed ;
       option (opt "--cutoff" int) cutoff ;
-
       opt "-f" dep fa ;
       seq [ dest ; string "/index" ]
     ]

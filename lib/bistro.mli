@@ -14,41 +14,24 @@ and step = private {
   id : string ;
   descr : string ;
   deps : u list ;
-  cmd : cmd ;
+  cmd : command ;
   np : int ; (** Required number of processors *)
   mem : int ; (** Required memory in MB *)
   timeout : int option ; (** Maximum allowed running time in hours *)
   version : int option ; (** Version number of the wrapper *)
 }
 
-and cmd = private
-  | Simple_command of simple_command
-  | Run_script of script
-  | Dump of dump
-  | And_sequence of cmd list
-  | Or_sequence of cmd list
-  | Pipe_sequence of cmd list
-
-and simple_command = {
-  tokens : token list ;
-  env : docker_image option ;
-}
-
-and script = {
-  interpreter : string ;
-  args : token list ;
-  text : token list ;
-  script_env : docker_image option ;
-}
-
-and dump = {
-  dest : token list ;
-  contents : token list ;
-}
+and command =
+  | Docker of docker_image * command
+  | Simple_command of token list
+  | And_list of command list
+  | Or_list of command list
+  | Pipe_list of command list
 
 and token =
   | S of string
   | D of u
+  | F of token list
   | DEST
   | TMP
   | NP
@@ -81,6 +64,8 @@ type any_workflow = Workflow : _ workflow -> any_workflow
 
 type (-'a, +'b) selector = private Selector of path
 
+val u : _ workflow -> u
+
 module Expr : sig
   type t
 
@@ -98,19 +83,13 @@ module Expr : sig
   val list : ('a -> t) -> ?sep:string -> 'a list -> t
   val seq : ?sep:string -> t list -> t
   val enum : ('a * string) list -> 'a -> t
+
+  val file_dump : t -> t
 end
 
 
 module EDSL : sig
   include module type of Expr with type t := Expr.t
-
-  type cmd
-
-  val cmd :
-    string ->
-    ?env:docker_image ->
-    ?stdin:Expr.t -> ?stdout:Expr.t -> ?stderr:Expr.t ->
-    Expr.t list -> cmd
 
   val workflow :
     ?descr:string ->
@@ -118,16 +97,36 @@ module EDSL : sig
     ?np:int ->
     ?timeout:int ->
     ?version:int ->
-    cmd list -> 'a workflow
+    command list -> 'a workflow
 
-  val script :
+  val input : ?may_change:bool -> string -> 'a workflow
+
+  val selector : path -> ('a, 'b) selector
+
+  val ( / ) : 'a workflow -> ('a, 'b) selector -> 'b workflow
+
+  val cmd :
     string ->
     ?env:docker_image ->
     ?stdin:Expr.t -> ?stdout:Expr.t -> ?stderr:Expr.t ->
-    ?args:Expr.t list ->
-    Expr.t -> cmd
+    Expr.t list -> command
 
-  val dump : dest:Expr.t -> Expr.t -> cmd
+  val opt : string -> ('a -> Expr.t) -> 'a -> Expr.t
+  val opt' : string -> ('a -> Expr.t) -> 'a -> Expr.t
+  val flag : ('a -> Expr.t) -> 'a -> bool -> Expr.t
+  val ( // ) : Expr.t -> string -> Expr.t
+
+  val docker : docker_image -> command -> command
+  val or_list : command list -> command
+  val and_list : command list -> command
+  val pipe : command list -> command
+
+  val mkdir : Expr.t -> command
+  val mkdir_p : Expr.t -> command
+  val wget : string -> ?dest:Expr.t -> unit -> command
+  val cd : Expr.t -> command
+  val rm_rf : Expr.t -> command
+  val mv : Expr.t -> Expr.t -> command
 
   val docker_image :
     ?tag:string ->
@@ -136,58 +135,15 @@ module EDSL : sig
     name:string ->
     unit -> docker_image
 
-  val input : ?may_change:bool -> string -> 'a workflow
-
-  val selector : path -> ('a, 'b) selector
-  val ( / ) : 'a workflow -> ('a, 'b) selector -> 'b workflow
-
-  val ( // ) : Expr.t -> string -> Expr.t
-  val opt : string -> ('a -> Expr.t) -> 'a -> Expr.t
-  val opt' : string -> ('a -> Expr.t) -> 'a -> Expr.t
-  val flag : ('a -> Expr.t) -> 'a -> bool -> Expr.t
-
-  val or_list : cmd list -> cmd
-  val and_list : cmd list -> cmd
-  val pipe : cmd list -> cmd
-
-  val mkdir : Expr.t -> cmd
-  val mkdir_p : Expr.t -> cmd
-  val wget : string -> ?dest:Expr.t -> unit -> cmd
-  val cd : Expr.t -> cmd
-  val rm_rf : Expr.t -> cmd
-  val mv : Expr.t -> Expr.t -> cmd
-
   val ( % ) : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c
 end
-
-module OCamlscript : sig
-  type expr
-  type arg
-
-  val app : string -> arg list -> expr
-  val arg : ?l:string -> Expr.t -> arg
-  val int : ?l:string -> int -> arg
-  val string : ?l:string -> string -> arg
-  val dep : ?l:string -> _ workflow -> arg
-  val dest : ?l:string -> unit -> arg
-  val tmp : ?l:string -> unit -> arg
-
-  val make :
-    ?env:docker_image ->
-    ?findlib_deps:string list ->
-    string ->
-    expr ->
-    EDSL.cmd
-
-end
-
 
 module Task : sig
   type t = private {
     id      : id ;
     descr   : string ;
     deps    : dep list ;
-    cmd     : cmd ;
+    cmd     : command ;
     np      : int ; (** Required number of processors *)
     mem     : int ; (** Required memory in MB *)
     timeout : int option ; (** Maximum allowed running time in hours *)
@@ -201,36 +157,17 @@ module Task : sig
   ]
   and id = string
 
-  and cmd =
-    | Simple_command of simple_command
-    | Run_script of script
-    | Dump of dump
-    | And_sequence of cmd list
-    | Or_sequence of cmd list
-    | Pipe_sequence of cmd list
-
-  and simple_command = {
-    tokens : token list ;
-    env : docker_image option ;
-  }
-
-  and script = {
-    interpreter : string ;
-    args : token list ;
-    text : token list ;
-    script_env : docker_image option ;
-  }
-
-  and dump = {
-    dest : template ;
-    contents : template
-  }
-
-  and template = token list
+  and command =
+    | Docker of docker_image * command
+    | Simple_command of token list
+    | And_list of command list
+    | Or_list of command list
+    | Pipe_list of command list
 
   and token =
     | S of string
     | D of dep
+    | F of token list
     | DEST
     | TMP
     | NP

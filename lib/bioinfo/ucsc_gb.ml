@@ -37,7 +37,7 @@ let env = docker_image ~account:"pveber" ~name:"ucsc-kent" ~tag:"330" ()
 
 
 (** {5 Dealing with genome sequences} *)
-
+    
 let chromosome_sequences org =
   let org = string_of_genome org in
   workflow ~descr:(sprintf "ucsc_gb.chromosome_sequence(%s)" org) [
@@ -64,10 +64,8 @@ let genome_2bit_sequence_dir org =
   let org = string_of_genome org in
   workflow ~descr:(sprintf "ucsc_gb.2bit_sequence(%s)" org) [
     mkdir dest ;
-    and_list [
-      cd dest ;
-      wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/bigZips/%s.2bit" org org) () ;
-    ]
+    cd dest ;
+    wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/bigZips/%s.2bit" org org) () ;
   ]
 
 let genome_2bit_sequence org =

@@ -10,7 +10,7 @@ let run fq = workflow ~descr:"fastQC" [
     cmd "fastqc" ~env [
       seq ~sep:"" [ string "--outdir=" ; dest ] ;
       dep fq ;
-    ] ;
+    ]
   ]
 
 let html_report =
