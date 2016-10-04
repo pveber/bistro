@@ -249,9 +249,9 @@ module Concrete_task = struct
     let open Task in
     function
     | Simple_command tokens -> string_of_tokens env tokens
-    | And_list xs -> string_of_command_aux env " && " xs
-    | Or_list xs -> string_of_command_aux env " || " xs
-    | Pipe_list xs -> string_of_command_aux env " | " xs
+    | And_list xs -> par (string_of_command_aux env " && " xs)
+    | Or_list xs -> par (string_of_command_aux env " || " xs)
+    | Pipe_list xs -> par (string_of_command_aux env " | " xs)
     | Docker (image, cmd) ->
       if env.use_docker then
         let dck_env = make_docker_execution_env env in
@@ -267,7 +267,6 @@ module Concrete_task = struct
 
   and string_of_command_aux env sep xs =
     List.map xs ~f:(string_of_command env)
-    |> List.map ~f:par
     |> String.concat ~sep
 
   let dump env { Task.dest ; contents } =
