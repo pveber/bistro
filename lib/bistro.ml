@@ -71,6 +71,7 @@ module T = struct
   and token =
     | S of string
     | D of u
+    | F of token list
     | DEST
     | TMP
     | NP
@@ -108,11 +109,13 @@ let workflow_id = function
 module Cmd = struct
   type t = command
 
-  let deps_of_template tmpl =
-    List.filter_map tmpl ~f:(function
-        | D r -> Some (r :> u)
-        | S _ | DEST | TMP | NP | MEM -> None
+  let rec deps_of_template tmpl =
+    List.map tmpl ~f:(function
+        | D r -> [ r ]
+        | F toks -> deps_of_template toks
+        | S _ | DEST | TMP | NP | MEM -> []
       )
+    |> List.concat
     |> List.dedup
 
   let rec deps = function
@@ -233,6 +236,8 @@ module Expr = struct
 
   let enum dic x = [ S (List.Assoc.find_exn dic x) ]
 
+  let file_dump contents = [ F contents ] (* FIXME: should check that there is no file_dump in contents *)
+
   (* FIXME: remove this?
      let use s = s.tokens *)
 end
@@ -274,17 +279,6 @@ module EDSL = struct
     match env with
     | None -> cmd
     | Some image -> docker image cmd
-
-  let dump ~dest contents =
-    Simple_command (
-      List.concat [
-        [ S " (cat > " ] ;
-        dest ;
-        [ S " <<__HEREDOC__\n" ] ;
-        contents ;
-        [ S "\n__HEREDOC__\n)" ]
-      ]
-    )
 
   let opt o f x = S o :: S " " :: f x
 
@@ -360,6 +354,7 @@ module Task = struct
   and token =
     | S of string
     | D of dep
+    | F of token list
     | DEST
     | TMP
     | NP
@@ -375,13 +370,14 @@ module Task = struct
       `Select (s.id, p)
     | Select (_, Select _, _) -> assert false
 
-  let denormalize_token = function
+  let rec denormalize_token = function
     | T.S s -> S s
     | T.DEST -> DEST
     | T.TMP -> TMP
     | T.NP -> NP
     | T.MEM -> MEM
     | T.D d -> D (denormalize_dep d)
+    | T.F toks -> F (List.map toks ~f:denormalize_token)
 
   let denormalize_template tmpl =
     List.map tmpl ~f:denormalize_token

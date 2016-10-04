@@ -161,10 +161,8 @@ let script factors samples =
 
 
 let wrapper factors samples =
-  let script_path = tmp // "script.R" in
   workflow ~descr:"deseq2.wrapper" [
-    dump ~dest:script_path (script factors samples) ;
-    cmd "Rscript" ~env [ script_path ] ;
+    cmd "Rscript" ~env [ file_dump (script factors samples) ] ;
   ]
 
 (*

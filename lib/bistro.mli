@@ -31,6 +31,7 @@ and command =
 and token =
   | S of string
   | D of u
+  | F of token list
   | DEST
   | TMP
   | NP
@@ -82,6 +83,8 @@ module Expr : sig
   val list : ('a -> t) -> ?sep:string -> 'a list -> t
   val seq : ?sep:string -> t list -> t
   val enum : ('a * string) list -> 'a -> t
+
+  val file_dump : t -> t
 end
 
 
@@ -101,8 +104,6 @@ module EDSL : sig
   val selector : path -> ('a, 'b) selector
 
   val ( / ) : 'a workflow -> ('a, 'b) selector -> 'b workflow
-
-  val dump : dest:Expr.t -> Expr.t -> command
 
   val cmd :
     string ->
@@ -166,6 +167,7 @@ module Task : sig
   and token =
     | S of string
     | D of dep
+    | F of token list
     | DEST
     | TMP
     | NP

@@ -36,6 +36,7 @@ type execution_env = private {
   dest : string ;
   tmp : string ;
   dep : Task.dep -> string ;
+  file_dump : Task.token list -> string ;
   np : int ;
   mem : int ;
 }
