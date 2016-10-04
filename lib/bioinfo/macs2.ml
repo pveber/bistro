@@ -5,7 +5,7 @@ open Defs
 let env = docker_image ~account:"pveber" ~name:"macs2" ~tag:"2.1.1" ()
 
 let macs2 subcmd opts =
-  shcmd "macs2" ~env (string subcmd :: opts)
+  cmd "macs2" ~env (string subcmd :: opts)
 
 let pileup ?extsize ?both_direction bam =
   workflow ~descr:"macs2.pileup" [

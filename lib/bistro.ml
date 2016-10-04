@@ -48,16 +48,12 @@ module T = struct
     id : string ;
     descr : string ;
     deps : u list ;
-    program : instruction list ;
+    cmd : command ;
     np : int ; (** Required number of processors *)
     mem : int ; (** Required memory in MB *)
     timeout : int option ; (** Maximum allowed running time in hours *)
     version : int option ; (** Version number of the wrapper *)
   }
-
-  and instruction =
-    | Sh of command
-    | Dump of dump
 
   and command =
     | Docker of docker_image * command
@@ -102,13 +98,15 @@ type 'a workflow = u
 
 type any_workflow = Workflow : _ workflow -> any_workflow
 
+let u x = x
+
 let workflow_id = function
   | Input (id, _)
   | Select (id, _, _)
   | Step { id } -> id
 
-module Program = struct
-  type t = instruction list
+module Cmd = struct
+  type t = command
 
   let deps_of_template tmpl =
     List.filter_map tmpl ~f:(function
@@ -117,27 +115,15 @@ module Program = struct
       )
     |> List.dedup
 
-  let rec deps_of_command = function
+  let rec deps = function
     | And_list xs
     | Or_list xs
     | Pipe_list xs ->
-      List.map xs ~f:deps_of_command
+      List.map xs ~f:deps
       |> List.concat
       |> List.dedup
     | Simple_command tokens -> deps_of_template tokens
-    | Docker (_, c) -> deps_of_command c
-
-  let deps_of_instruction = function
-    | Dump { dest ; contents } ->
-      deps_of_template dest
-      (* FIXME: this is fishy, there shouldn't be any deps in there... *)
-      @ deps_of_template contents
-    | Sh c -> deps_of_command c
-
-  let deps xs =
-    List.map xs ~f:deps_of_instruction
-    |> List.concat
-    |> List.dedup
+    | Docker (_, c) -> deps c
 end
 
 module Workflow = struct
@@ -160,10 +146,10 @@ module Workflow = struct
       ?(np = 1)
       ?timeout
       ?version
-      program =
-    let deps = Program.deps program in
-    let id = digest ("step", version, program) in
-    Step { descr ; deps ; program ; np ; mem ; timeout ; version ; id }
+      cmd =
+    let deps = Cmd.deps cmd in
+    let id = digest ("step", version, cmd) in
+    Step { descr ; deps ; cmd ; np ; mem ; timeout ; version ; id }
 
   let select u (Selector path) =
     let u, path =
@@ -259,12 +245,7 @@ module EDSL = struct
     let id = digest ("input", target, hash) in
     Input (id, path_of_string target)
 
-  let workflow ?descr ?mem ?np ?timeout ?version instructions =
-    Workflow.make ?descr ?mem ?np ?timeout ?version instructions
-
   let docker image cmd = Docker (image, cmd)
-
-  let sh c = Sh c
 
   let cmd p ?env ?stdin ?stdout ?stderr args =
     let prog_expr = [ S p ] in
@@ -294,10 +275,16 @@ module EDSL = struct
     | None -> cmd
     | Some image -> docker image cmd
 
-  let shcmd p ?env ?stdin ?stdout ?stderr args =
-    sh @@ cmd p ?env ?stdin ?stdout ?stderr args
-
-  let dump ?(for_container = true) ~dest contents = Dump { dest ; contents ; for_container }
+  let dump ~dest contents =
+    Simple_command (
+      List.concat [
+        [ S " (cat > " ] ;
+        dest ;
+        [ S " <<__HEREDOC__\n" ] ;
+        contents ;
+        [ S "\n__HEREDOC__\n)" ]
+      ]
+    )
 
   let opt o f x = S o :: S " " :: f x
 
@@ -326,13 +313,8 @@ module EDSL = struct
   let and_list xs = And_list xs
   let pipe xs = Pipe_list xs
 
-  let with_env vars cmd =
-    (
-      List.map vars ~f:(fun (var, value) -> [ S var ; S "=" ] @ value)
-      |> List.intersperse ~sep:[ S " " ]
-      |> List.concat
-    )
-    @ (S " " :: cmd)
+  let workflow ?descr ?mem ?np ?timeout ?version cmds =
+    Workflow.make ?descr ?mem ?np ?timeout ?version (and_list cmds)
 
   let ( % ) f g x = g (f x)
 
@@ -354,7 +336,7 @@ module Task = struct
     id      : id ;
     descr   : string ;
     deps    : dep list ;
-    program : instruction list ;
+    cmd     : command ;
     np      : int ; (** Required number of processors *)
     mem     : int ; (** Required memory in MB *)
     timeout : int option ; (** Maximum allowed running time in hours *)
@@ -368,22 +350,12 @@ module Task = struct
   ]
   and id = string
 
-  and instruction =
-    | Sh of command
-    | Dump of dump
-
   and command =
     | Docker of docker_image * command
     | Simple_command of token list
     | And_list of command list
     | Or_list of command list
     | Pipe_list of command list
-
-  and dump = {
-    dest : token list ;
-    contents : token list ;
-    for_container : bool ;
-  }
 
   and token =
     | S of string
@@ -424,15 +396,6 @@ module Task = struct
     | Docker (image, c) ->
       Docker (image, denormalize_cmd c)
 
-  let denormalize_instruction = function
-    | T.Dump { dest ; contents ; for_container } ->
-      Dump { dest = denormalize_template dest ;
-             contents = denormalize_template contents ;
-             for_container }
-    | Sh cmd -> Sh (denormalize_cmd cmd)
-
-  let denormalize_program = List.map ~f:denormalize_instruction
-
   let rec decompose_workflow_aux accu w =
     let wid = Workflow.id w in
     if String.Map.mem accu wid then
@@ -451,7 +414,7 @@ module Task = struct
             id = step.id ;
             descr = step.descr ;
             deps ;
-            program = denormalize_program step.program ;
+            cmd = denormalize_cmd step.cmd ;
             np = step.np ;
             mem = step.mem ;
             version = step.version ;
@@ -508,37 +471,35 @@ module Std = struct
     let wget ?descr_url ?no_check_certificate url =
       let info = match descr_url with None -> "" | Some i -> sprintf "(%s)" i in
       workflow ~descr:("utils.wget" ^ info) [
-        shcmd "wget" [
+        cmd "wget" [
           option (flag string "--no-check-certificate") no_check_certificate ;
           opt "-O" ident dest ; string url ]
       ]
 
     let unzip zip =
       workflow ~descr:"utils.unzip" [
-        shcmd "unzip" [ opt "-d" ident dest ; dep zip ]
+        cmd "unzip" [ opt "-d" ident dest ; dep zip ]
       ]
 
     let gunzip gz =
       workflow ~descr:"utils.gunzip" [
-        shcmd "gunzip" [ opt "-c" dep gz ] ~stdout:dest
+        cmd "gunzip" [ opt "-c" dep gz ] ~stdout:dest
       ]
 
     let bunzip2 bz2 =
       workflow ~descr:"utils.bunzip2" [
-        shcmd "bunzip2" [ opt "-c" dep bz2 ] ~stdout:dest
+        cmd "bunzip2" [ opt "-c" dep bz2 ] ~stdout:dest
       ]
 
     let tar_xfz tgz =
       workflow ~descr:"utils.tar_xfz" [
-        sh @@ and_list [
-          mkdir_p dest ;
-          cmd "tar" [ string "xfz" ; dep tgz ; opt "-C" ident dest ] ;
-        ]
+        mkdir_p dest ;
+        cmd "tar" [ string "xfz" ; dep tgz ; opt "-C" ident dest ] ;
       ]
 
     let crlf2lf f =
       workflow ~descr:"utils.crlf2lf" [
-        shcmd "tr" [ opt "-d" string "'\r'"] ~stdin:(dep f) ~stdout:dest
+        cmd "tr" [ opt "-d" string "'\r'"] ~stdin:(dep f) ~stdout:dest
       ]
   end
 end

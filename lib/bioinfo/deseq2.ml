@@ -142,27 +142,29 @@ let app' fn args =
     string ")" ;
   ]
 
-let wrapper factors samples =
-  let script_path = tmp // "script.R" in
-  let script = seq ~sep:"\n" [
-      string wrapper_script ;
-      app "main" [
-        quote dest ~using:'"' ;
-        app "c" (List.map factors ~f:(string % quote ~using:'"')) ;
-        app "c" (List.map samples ~f:(snd % dep % quote ~using:'"')) ;
-        app' "matrix" [
-          "data", app "c" (List.map samples ~f:fst
-                           |> List.concat
-                           |> List.map ~f:(string % quote ~using:'"')) ;
-          "ncol", int (List.length factors) ;
-          "byrow", string "T" ;
-        ]
+let script factors samples =
+  seq ~sep:"\n" [
+    string wrapper_script ;
+    app "main" [
+      quote dest ~using:'"' ;
+      app "c" (List.map factors ~f:(string % quote ~using:'"')) ;
+      app "c" (List.map samples ~f:(snd % dep % quote ~using:'"')) ;
+      app' "matrix" [
+        "data", app "c" (List.map samples ~f:fst
+                         |> List.concat
+                         |> List.map ~f:(string % quote ~using:'"')) ;
+        "ncol", int (List.length factors) ;
+        "byrow", string "T" ;
       ]
     ]
-  in
+  ]
+
+
+let wrapper factors samples =
+  let script_path = tmp // "script.R" in
   workflow ~descr:"deseq2.wrapper" [
-    dump ~for_container:true ~dest:script_path script ;
-    shcmd "Rscript" ~env [ script_path ] ;
+    dump ~dest:script_path (script factors samples) ;
+    cmd "Rscript" ~env [ script_path ] ;
   ]
 
 (*

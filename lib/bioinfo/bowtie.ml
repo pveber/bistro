@@ -9,14 +9,12 @@ let env = docker_image ~account:"pveber" ~name:"bowtie" ~tag:"1.1.2" ()
 (* memory bound correspond to storing a human index in memory, following bowtie manual *)
 let bowtie_build ?packed ?color fa =
   workflow ~descr:"bowtie_build" ~mem:(3 * 1024) [
-    sh @@ and_list [
-      mkdir_p dest ;
-      cmd "bowtie-build" ~env [
-        option (flag string "-a -p") packed ;
-        option (flag string "--color") color ;
-        opt "-f" dep fa ;
-        seq [ dest ; string "/index" ]
-      ]
+    mkdir_p dest ;
+    cmd "bowtie-build" ~env [
+      option (flag string "-a -p") packed ;
+      option (flag string "--color") color ;
+      opt "-f" dep fa ;
+      seq [ dest ; string "/index" ]
     ]
   ]
 
@@ -36,7 +34,7 @@ let bowtie ?l ?e ?m ?fastq_format ?n ?v ?maxins index fastq_files =
       ]
   in
   workflow ~descr:"bowtie" ~mem:(3 * 1024) ~np:8 [
-    shcmd "bowtie" ~env [
+    cmd "bowtie" ~env [
       string "-S" ;
       option (opt "-n" int) n ;
       option (opt "-l" int) l ;

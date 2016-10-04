@@ -7,7 +7,7 @@ let env = docker_image ~account:"pveber" ~name:"meme" ~tag:"4.11.2" ()
 
 let meme_chip ?meme_nmotifs ?meme_minw ?meme_maxw ?np fa =
   workflow ~descr:"meme-chip" ?np [
-    shcmd "meme-chip" ~env [
+    cmd "meme-chip" ~env [
       option (opt "-meme-nmotifs" int) meme_nmotifs ;
       option (opt "-meme-minw" int) meme_minw ;
       option (opt "-meme-maxw" int) meme_maxw ;
@@ -19,7 +19,7 @@ let meme_chip ?meme_nmotifs ?meme_minw ?meme_maxw ?np fa =
 
 let fimo ?alpha ?bgfile ?max_stored_scores ?motif ?motif_pseudo ?qv_thresh ?thresh meme_motifs fa =
   workflow ~descr:"fimo" [
-    shcmd "fimo" ~env [
+    cmd "fimo" ~env [
       option (opt "--aplha" float) alpha;
       option (opt "--bgfile" string) bgfile ;
       option (opt "--max-stored-scores" int) max_stored_scores ;

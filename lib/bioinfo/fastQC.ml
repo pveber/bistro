@@ -6,12 +6,10 @@ let env = docker_image ~account:"pveber" ~name:"fastqc" ~tag:"0.11.5" ()
 type report = [`fastQC_report] directory
 
 let run fq = workflow ~descr:"fastQC" [
-    sh @@ and_list [
-      mkdir_p dest ;
-      cmd "fastqc" ~env [
-        seq ~sep:"" [ string "--outdir=" ; dest ] ;
-        dep fq ;
-      ] ;
+    mkdir_p dest ;
+    cmd "fastqc" ~env [
+      seq ~sep:"" [ string "--outdir=" ; dest ] ;
+      dep fq ;
     ]
   ]
 

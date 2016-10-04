@@ -14,7 +14,7 @@ let tophat1 ?color index fqs =
       ]
   in
   workflow ~np:8 ~mem:(4 * 1024) [
-    shcmd ~env "tophat" [
+    cmd ~env "tophat" [
       string "--bowtie1" ;
       opt "--num-threads" ident np ;
       option (flag string "--color") color ;
@@ -35,7 +35,7 @@ let tophat2 index fqs =
       ]
   in
   workflow ~np:8 ~mem:(4 * 1024) [
-    shcmd ~env "tophat2" [
+    cmd ~env "tophat2" [
       opt "--num-threads" ident np ;
       opt "--output-dir" ident dest ;
       seq [ dep index ; string "/index" ] ;

@@ -14,16 +14,12 @@ and step = private {
   id : string ;
   descr : string ;
   deps : u list ;
-  program : instruction list ;
+  cmd : command ;
   np : int ; (** Required number of processors *)
   mem : int ; (** Required memory in MB *)
   timeout : int option ; (** Maximum allowed running time in hours *)
   version : int option ; (** Version number of the wrapper *)
 }
-
-and instruction = private
-  | Sh of command
-  | Dump of dump
 
 and command =
   | Docker of docker_image * command
@@ -31,12 +27,6 @@ and command =
   | And_list of command list
   | Or_list of command list
   | Pipe_list of command list
-
-and dump = {
-  dest : token list ;
-  contents : token list ;
-  for_container : bool ;
-}
 
 and token =
   | S of string
@@ -73,6 +63,8 @@ type any_workflow = Workflow : _ workflow -> any_workflow
 
 type (-'a, +'b) selector = private Selector of path
 
+val u : _ workflow -> u
+
 module Expr : sig
   type t
 
@@ -102,7 +94,7 @@ module EDSL : sig
     ?np:int ->
     ?timeout:int ->
     ?version:int ->
-    instruction list -> 'a workflow
+    command list -> 'a workflow
 
   val input : ?may_change:bool -> string -> 'a workflow
 
@@ -110,15 +102,7 @@ module EDSL : sig
 
   val ( / ) : 'a workflow -> ('a, 'b) selector -> 'b workflow
 
-  val sh : command -> instruction
-
-  val dump : ?for_container:bool -> dest:Expr.t -> Expr.t -> instruction
-
-  val shcmd :
-    string ->
-    ?env:docker_image ->
-    ?stdin:Expr.t -> ?stdout:Expr.t -> ?stderr:Expr.t ->
-    Expr.t list -> instruction
+  val dump : dest:Expr.t -> Expr.t -> command
 
   val cmd :
     string ->
@@ -158,7 +142,7 @@ module Task : sig
     id      : id ;
     descr   : string ;
     deps    : dep list ;
-    program : instruction list ;
+    cmd     : command ;
     np      : int ; (** Required number of processors *)
     mem     : int ; (** Required memory in MB *)
     timeout : int option ; (** Maximum allowed running time in hours *)
@@ -172,22 +156,12 @@ module Task : sig
   ]
   and id = string
 
-  and instruction = private
-    | Sh of command
-    | Dump of dump
-
   and command =
     | Docker of docker_image * command
     | Simple_command of token list
     | And_list of command list
     | Or_list of command list
     | Pipe_list of command list
-
-  and dump = {
-    dest : token list ;
-    contents : token list ;
-    for_container : bool ;
-  }
 
   and token =
     | S of string

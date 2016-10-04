@@ -198,16 +198,7 @@ let make_docker_execution_env env = {
 }
 
 module Concrete_task = struct
-  type t = instruction list
-  and instruction =
-    | Sh of string
-    | Dump of dump
-
-  and dump = {
-    dump_dest : string  ;
-    dump_path : string ;
-    dump_contents : string ;
-  }
+  type t = Sh of string
 
   let docker_image_url image =
     sprintf "%s%s/%s%s"
@@ -270,61 +261,32 @@ module Concrete_task = struct
     List.map xs ~f:(string_of_command env)
     |> String.concat ~sep
 
-  let dump env { Task.dest ; contents ; for_container } =
-    let exec_env = if for_container then make_docker_execution_env env else env in
-    Dump {
-      dump_dest = string_of_tokens env dest ;
-      dump_path = string_of_tokens exec_env dest ;
-      dump_contents = string_of_tokens exec_env contents ;
-    }
+  let of_cmd env cmd = Sh (string_of_command env cmd)
 
-  let of_instruction env = function
-    | Task.Dump d -> dump env d
-    | Task.Sh cmd -> Sh (string_of_command env cmd)
-
-  let perform ~stdout ~stderr = function
-    | Sh script_text ->
-      let script_file = Filename.temp_file "guizmin" ".sh" in
-      Lwt_io.(with_file
-                ~mode:output script_file
-                (fun oc -> write oc script_text)) >>= fun () ->
-      redirection stdout >>= fun stdout ->
-      redirection stderr >>= fun stderr ->
-      print_endline script_text ;
-      let cmd = "", [| "sh" ; script_file |] in
-      Lwt_process.exec ~stdout ~stderr cmd >>= fun status ->
-      Lwt_unix.unlink script_file >>| fun () ->
-      Caml.Unix.(match status with
-          | WEXITED code
-          | WSIGNALED code
-          | WSTOPPED code -> code
-        )
-
-    | Dump { dump_dest ; dump_contents } ->
-      print_endline dump_contents ;
-      Lwt_io.(with_file
-                ~mode:output dump_dest
-                (fun oc -> write oc dump_contents))
-      >>| fun _ -> 0
-
-
+  let perform ~stdout ~stderr (Sh cmd) =
+    let script_file = Filename.temp_file "guizmin" ".sh" in
+    let script_text = cmd in
+    Lwt_io.(with_file
+              ~mode:output script_file
+              (fun oc -> write oc script_text)) >>= fun () ->
+    redirection stdout >>= fun stdout ->
+    redirection stderr >>= fun stderr ->
+    print_endline cmd ;
+    let cmd = "", [| "sh" ; script_file |] in
+    Lwt_process.exec ~stdout ~stderr cmd >>= fun status ->
+    Lwt_unix.unlink script_file >>| fun () ->
+    Caml.Unix.(match status with
+        | WEXITED code
+        | WSIGNALED code
+        | WSTOPPED code -> code
+      )
 end
-
-let run_program ~stdout ~stderr env instructions =
-  let rec loop code = function
-    | [] -> Lwt.return code
-    | h :: t ->
-      Concrete_task.(perform ~stdout ~stderr (of_instruction env h)) >>= fun code ->
-      if code = 0 then loop code t
-      else Lwt.return code
-  in
-  loop 0 instructions
 
 let local_backend ?tmpdir ?(use_docker = false) ~np ~mem () : backend =
   let open Task in
   let pool = Pool.create ~np ~mem in
   let uid = Unix.getuid () in
-  fun db ({ program ; np ; mem } as task) ->
+  fun db ({ cmd ; np ; mem } as task) ->
     Pool.use pool ~np ~mem ~f:(fun ~np ~mem ->
         let tmpdir = match tmpdir with
           | None -> Db.Task.tmp_path db task
@@ -335,7 +297,7 @@ let local_backend ?tmpdir ?(use_docker = false) ~np ~mem () : backend =
         remove_if_exists tmpdir >>= fun () ->
         Unix.mkdir_p env.tmp ;
 
-        run_program ~stdout ~stderr env program >>= fun exit_status ->
+        Concrete_task.(perform ~stdout ~stderr (of_cmd env cmd)) >>= fun exit_status ->
 
         if use_docker then ( (* FIXME: not necessary if no docker command was run *)
           sprintf "docker run -v %s:/bistro -t busybox chown -R %d /bistro" tmpdir uid
@@ -461,7 +423,7 @@ let rec build_dep e = function
 
 and build_task
     e
-    ({ Task.np ; mem ; program } as task)
+    ({ Task.np ; mem } as task)
     dep_threads =
 
   join_results dep_threads >>=? fun () ->

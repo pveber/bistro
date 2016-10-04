@@ -4,7 +4,7 @@ open Bistro.EDSL
 let keep ~n bed =
   if n < 1 then raise (Invalid_argument "Bed.keep") ;
   workflow ~descr:"bed.keep" [
-    shcmd "cut" ~stdout:dest [
+    cmd "cut" ~stdout:dest [
       string (sprintf "-f 1-%d" n) ;
       dep bed ;
     ]
