@@ -138,7 +138,8 @@ let app' fn args =
   let arg (k, v) = seq ~sep:"=" [ string k ; v ] in
   seq ~sep:"" [
     string fn ; string "(" ;
-    list arg ~sep:"," args
+    list arg ~sep:"," args ;
+    string ")" ;
   ]
 
 let wrapper factors samples =
