@@ -30,12 +30,13 @@ module type Domain = sig
 
   module Task : sig
     type t
+    type config
 
     val id : t -> string
     val requirement : t -> Allocator.request
-    val perform : Allocator.resource -> t -> unit result Thread.t
-    val is_done : t -> bool Thread.t
-    val clean : t -> unit Thread.t
+    val perform : Allocator.resource -> config -> t -> unit result Thread.t
+    val is_done : config -> t -> bool Thread.t
+    val clean : config -> t -> unit Thread.t
   end
 
 end
@@ -44,6 +45,7 @@ module type S = sig
   type t
   type task
   type allocator
+  type config
   type 'a thread
 
   type event =
@@ -57,5 +59,5 @@ module type S = sig
 
   val run :
     ?log:(time -> event -> unit) ->
-    allocator -> t -> trace String.Map.t thread
+    config -> allocator -> t -> trace String.Map.t thread
 end
