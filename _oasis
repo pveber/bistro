@@ -68,6 +68,19 @@ Library bistro_engine
                     pvem, rresult, threads
   XMETADescription: Execution engine for bistro workflows
 
+Library bistro_engine2
+  Path:             lib/engine2
+  Pack:             true
+  Modules:          Allocator, Task
+  FindlibName:      engine2
+  FindlibParent:    bistro
+  BuildDepends:     bistro, core, dbm,
+                    lwt.preemptive, lwt.unix,
+                    pvem, rresult, threads
+  XMETARequires:    bistro, core, dbm, lwt.preemptive, lwt.unix,
+                    pvem, rresult, threads
+  XMETADescription: Execution engine for bistro workflows
+
 Library bistro_utils
   Path:             lib/utils
   Modules:          Bistro_app
