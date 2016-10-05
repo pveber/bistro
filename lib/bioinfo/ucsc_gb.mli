@@ -30,7 +30,7 @@ val twoBitToFa : #bed4 workflow -> twobit workflow -> fasta workflow
 
 (** {5 Chromosome size and clipping} *)
 val fetchChromSizes : [< genome] -> chrom_sizes workflow
-(* val bedClip : [< genome] -> 'a Bed.file -> 'a Bed.file *)
+val bedClip : chrom_sizes workflow -> (#bed3 as 'a) workflow -> 'a workflow
 
 
 (** {5 Conversion between annotation file formats} *)
