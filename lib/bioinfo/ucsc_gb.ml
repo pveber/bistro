@@ -128,6 +128,16 @@ let fetchChromSizes org =
     ]
   ]
 
+let bedClip org bed =
+  workflow ~descr:"ucsc_gb.bedClip" [
+    cmd "bedClip -verbose=2" ~env [
+      dep bed ;
+      dep org ;
+      dest ;
+    ]
+  ]
+
+
 (* (\* let bedClip org bed = *\) *)
 (* (\*   let chrom_info = chrom_info org in *\) *)
 (* (\*   f2 *\) *)
