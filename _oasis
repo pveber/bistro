@@ -71,7 +71,7 @@ Library bistro_engine
 Library bistro_engine2
   Path:             lib/engine2
   Pack:             true
-  Modules:          Allocator, Task
+  Modules:          Allocator, Db, Task
   FindlibName:      engine2
   FindlibParent:    bistro
   BuildDepends:     bistro, core, dbm,

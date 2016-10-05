@@ -37,11 +37,13 @@ and path = string list
 
 type config
 
-val config : path:string -> config
+val config :
+  db_path:string ->
+  use_docker:bool ->
+  config
 
 val id : t -> string
 val requirement : t -> Allocator.request
 val perform : Allocator.resource -> config -> t -> (unit, [`Msg of string]) result Lwt.t
 val is_done : config -> t -> bool Lwt.t
 val clean : config -> t -> unit Lwt.t
-
