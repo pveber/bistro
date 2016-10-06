@@ -71,13 +71,13 @@ Library bistro_engine
 Library bistro_engine2
   Path:             lib/engine2
   Pack:             true
-  Modules:          Allocator, Db, Task
+  Modules:          Allocator, Db, Scheduler, Task
   FindlibName:      engine2
   FindlibParent:    bistro
-  BuildDepends:     bistro, core, dbm,
+  BuildDepends:     bistro, bistro.tdag, core, dbm,
                     lwt.preemptive, lwt.unix,
                     pvem, rresult, threads
-  XMETARequires:    bistro, core, dbm, lwt.preemptive, lwt.unix,
+  XMETARequires:    bistro, bistro.tdag, core, dbm, lwt.preemptive, lwt.unix,
                     pvem, rresult, threads
   XMETADescription: Execution engine for bistro workflows
 
