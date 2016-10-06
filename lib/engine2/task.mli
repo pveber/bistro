@@ -42,6 +42,7 @@ val config :
   use_docker:bool ->
   config
 
+val of_step : Bistro.step -> t
 val id : t -> string
 val requirement : t -> Allocator.request
 val perform : Allocator.resource -> config -> t -> (unit, [`Msg of string]) result Lwt.t

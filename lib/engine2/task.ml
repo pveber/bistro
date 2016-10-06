@@ -100,6 +100,53 @@ let config ~db_path ~use_docker = {
 
 let id t = t.id
 
+
+
+
+let denormalize_dep =
+  let open Bistro in
+  function
+  | Step s -> `Task s.id
+  | Input (_, p) -> `Input p
+  | Select (_, Input (_, p), q) ->
+    `Input (p @ q)
+  | Select (_, Step s, p) ->
+    `Select (s.id, p)
+  | Select (_, Select _, _) -> assert false
+
+let rec denormalize_token = function
+  | Bistro.S s -> S s
+  | Bistro.DEST -> DEST
+  | Bistro.TMP -> TMP
+  | Bistro.NP -> NP
+  | Bistro.MEM -> MEM
+  | Bistro.D d -> D (denormalize_dep d)
+  | Bistro.F toks -> F (List.map toks ~f:denormalize_token)
+
+let denormalize_template tmpl =
+  List.map tmpl ~f:denormalize_token
+
+let rec denormalize_cmd = function
+  | Bistro.Simple_command tokens ->
+    let tokens = denormalize_template tokens in
+    Simple_command tokens
+  | Bistro.And_list xs -> And_list (List.map xs ~f:denormalize_cmd)
+  | Bistro.Or_list xs -> Or_list (List.map xs ~f:denormalize_cmd)
+  | Bistro.Pipe_list xs -> Pipe_list (List.map xs ~f:denormalize_cmd)
+  | Bistro.Docker (image, c) ->
+    Docker (image, denormalize_cmd c)
+
+let of_step { Bistro.id ; mem ; np ; descr ; cmd ; deps ; timeout ; version } = {
+  id ;
+  descr ;
+  np ;
+  mem ;
+  cmd = denormalize_cmd cmd ;
+  deps = List.map deps ~f:denormalize_dep ;
+  timeout ;
+  version ;
+}
+
 let requirement t =
   Allocator.Request { np = t.np ; mem = t.mem }
 
