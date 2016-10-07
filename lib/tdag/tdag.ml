@@ -68,21 +68,25 @@ module Make(D : Domain) = struct
           String.Map.find_exn thread_table (Task.id v) :: accu
         in
         let thread =
-          map_p ~f:ident (G.fold_succ foreach_succ g u []) >>= fun dep_traces ->
-          if List.for_all dep_traces ~f:successfull_trace then (
-            let ready = Unix.gettimeofday () in
-            log ready (Task_ready u) ;
-            Allocator.request alloc (Task.requirement u) >>= fun resource ->
-            let start = Unix.gettimeofday () in
-            log start (Task_started u) ;
-            Task.perform resource config u >>= fun outcome ->
-            let end_ = Unix.gettimeofday () in
-            log end_ (Task_ended (u, outcome)) ;
-            Allocator.release alloc resource ;
-            Thread.return (Run { ready ; start ; end_ ; outcome })
-          )
+          Task.is_done config u >>= fun is_done ->
+          if is_done then
+            Thread.return (Skipped `Done_already)
           else
-            Thread.return (Skipped `Missing_dep)
+            map_p ~f:ident (G.fold_succ foreach_succ g u []) >>= fun dep_traces ->
+            if List.for_all dep_traces ~f:successfull_trace then (
+              let ready = Unix.gettimeofday () in
+              log ready (Task_ready u) ;
+              Allocator.request alloc (Task.requirement u) >>= fun resource ->
+              let start = Unix.gettimeofday () in
+              log start (Task_started u) ;
+              Task.perform resource config u >>= fun outcome ->
+              let end_ = Unix.gettimeofday () in
+              log end_ (Task_ended (u, outcome)) ;
+              Allocator.release alloc resource ;
+              Thread.return (Run { ready ; start ; end_ ; outcome })
+            )
+            else
+              Thread.return (Skipped `Missing_dep)
         in
         String.Map.add thread_table id thread
 
