@@ -43,7 +43,7 @@ let rec add_workflow dag w =
 
 let run alloc config workflows =
   let dag = List.fold workflows ~init:DAG.empty ~f:(fun accu (Bistro.Workflow w) ->
-      add_workflow accu (Bistro.u w)
+      add_workflow accu (Bistro.Workflow.u w)
       |> fst
     )
   in

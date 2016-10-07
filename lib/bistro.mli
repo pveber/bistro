@@ -64,7 +64,12 @@ type any_workflow = Workflow : _ workflow -> any_workflow
 
 type (-'a, +'b) selector = private Selector of path
 
-val u : _ workflow -> u
+module Workflow : sig
+  type 'a t = 'a workflow
+  val id : _ t -> string
+  val u : _ t -> u
+end
+
 
 module Expr : sig
   type t

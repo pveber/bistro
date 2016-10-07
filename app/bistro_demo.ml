@@ -8,7 +8,6 @@ open Bistro_bioinfo.Std
 let common_spec =
   let open Command.Spec in
   empty
-  +> flag "--tmpdir"  (optional string) ~doc:"DIR (Preferably local) directory where to put temporary files"
   +> flag "--outdir"  (required string) ~doc:"DIR Directory where to link exported targets"
   +> flag "--np"      (optional_with_default 4 int) ~doc:"INT Number of processors"
   +> flag "--mem"     (optional_with_default 4 int) ~doc:"INT Available memory (in GB)"
@@ -28,12 +27,11 @@ module ChIP_seq = struct
 
   let chIP_pho4_noPi_macs2 = Macs2.callpeak ~mfold:(1,100) Macs2.bam [ chIP_pho4_noPi_bam ]
 
-  let main tmpdir outdir np mem () =
-    Bistro_app.(
-      local  ~use_docker:true ?tmpdir ~np ~mem:(mem * 1024) ~outdir [
-        [ "chIP_pho4_noPi_macs2.peaks" ] %> chIP_pho4_noPi_macs2
-      ]
-    )
+  let main outdir np mem () =
+    let open Bistro_app in
+    local  ~use_docker:true ~np ~mem:(mem * 1024) ~outdir [
+      [ "chIP_pho4_noPi_macs2.peaks" ] %> chIP_pho4_noPi_macs2
+    ]
 
   let spec = common_spec
 
@@ -101,12 +99,11 @@ module RNA_seq = struct
       [ [   "0" ], counts (`WT, `High_Pi) ;
         [ "360" ], counts (`WT, `No_Pi 360) ; ]
 
-  let main tmpdir outdir np mem () =
-    Bistro_app.(
-      local  ~use_docker:true ?tmpdir ~np ~mem:(mem * 1024) ~outdir [
-        [ "deseq2" ; "0_vs_360" ] %> deseq2#effect_table ;
-      ]
-    )
+  let main outdir np mem () =
+    let open Bistro_app in
+    local  ~use_docker:true ~np ~mem:(mem * 1024) ~outdir [
+      [ "deseq2" ; "0_vs_360" ] %> deseq2#effect_table ;
+    ]
 
   let spec = common_spec
 

@@ -86,8 +86,8 @@ Library bistro_utils
   Modules:          Bistro_app
   FindlibName:      utils
   FindlibParent:    bistro
-  BuildDepends:     bistro.engine
-  XMETARequires:    bistro.engine
+  BuildDepends:     bistro.engine2
+  XMETARequires:    bistro.engine2
   XMETADescription: Utility functions for bistro
 
 Library bistro_test

@@ -40,7 +40,10 @@ and token =
 and path = string list
 [@@deriving sexp]
 
-type config
+type config = private {
+  db : Db.t ;
+  use_docker : bool ;
+}
 
 val config :
   db_path:string ->
