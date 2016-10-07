@@ -32,3 +32,5 @@ val cache : t -> string -> string
 val stdout : t -> string -> string
 val stderr : t -> string -> string
 val build : t -> string -> string
+
+val workflow_path : t -> _ Bistro.workflow -> string
