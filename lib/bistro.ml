@@ -99,8 +99,6 @@ type 'a workflow = u
 
 type any_workflow = Workflow : _ workflow -> any_workflow
 
-let u x = x
-
 let workflow_id = function
   | Input (id, _)
   | Select (id, _, _)

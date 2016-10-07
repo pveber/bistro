@@ -10,12 +10,5 @@ val local :
   ?use_docker:bool ->
   ?np:int ->
   ?mem:int ->
-  ?tmpdir:string ->
   outdir:string ->
   plan -> unit
-
-val with_backend :
-  Scheduler.backend ->
-  outdir:string ->
-  plan ->
-  unit

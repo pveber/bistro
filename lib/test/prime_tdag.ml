@@ -103,6 +103,7 @@ end
 
 module Task = struct
   type t = Push of int
+  type config = unit
 
   let id (Push i) = string_of_int i
 
@@ -110,16 +111,16 @@ module Task = struct
     if i mod 2 = 0 then Allocator.Even
     else Allocator.Odd
 
-  let perform _ (Push i) =
+  let perform _ _ (Push i) =
     log (Started i) ;
     Lwt_unix.sleep (Random.float 0.5) >>| fun () ->
     log (Ended i) ;
     performed := i :: !performed ;
     Ok ()
 
-  let clean _ = Lwt.return ()
+  let clean _ _ = Lwt.return ()
 
-  let is_done (Push i) =
+  let is_done _ (Push i) =
     Lwt.return (List.mem !performed i)
 end
 
@@ -161,7 +162,7 @@ let command =
     Command.Spec.empty
     (fun () ->
        Lwt_unix.run (
-         TG.run ~log:TG.log (Allocator.create ()) (TG.make 100) >>| fun _ ->
+         TG.run ~log:TG.log () (Allocator.create ()) (TG.make 100) >>| fun _ ->
          check_performed (List.rev !performed) ;
          check_events (List.rev !events)
        ))

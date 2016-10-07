@@ -30,6 +30,7 @@ module Make(D : Domain) = struct
   type task = Task.t
   type 'a thread = 'a Thread.t
   type allocator = Allocator.t
+  type config = Task.config
   type event =
     | Task_ready of task
     | Task_started of task
@@ -54,12 +55,12 @@ module Make(D : Domain) = struct
     | Skipped `Done_already -> true
     | _ -> false
 
-  let rec dft log alloc g thread_table u =
+  let rec dft log alloc config g thread_table u =
     let id = Task.id u in
     if String.Map.mem thread_table id then
       thread_table
     else
-      let thread_table = G.fold_succ (Fn.flip (dft log alloc g)) g u thread_table in
+      let thread_table = G.fold_succ (Fn.flip (dft log alloc config g)) g u thread_table in
       if String.Map.mem thread_table id then
         thread_table
       else
@@ -67,29 +68,33 @@ module Make(D : Domain) = struct
           String.Map.find_exn thread_table (Task.id v) :: accu
         in
         let thread =
-          map_p ~f:ident (G.fold_succ foreach_succ g u []) >>= fun dep_traces ->
-          if List.for_all dep_traces ~f:successfull_trace then (
-            let ready = Unix.gettimeofday () in
-            log ready (Task_ready u) ;
-            Allocator.request alloc (Task.requirement u) >>= fun resource ->
-            let start = Unix.gettimeofday () in
-            log start (Task_started u) ;
-            Task.perform resource u >>= fun outcome ->
-            let end_ = Unix.gettimeofday () in
-            log end_ (Task_ended (u, outcome)) ;
-            Allocator.release alloc resource ;
-            Thread.return (Run { ready ; start ; end_ ; outcome })
-          )
+          Task.is_done config u >>= fun is_done ->
+          if is_done then
+            Thread.return (Skipped `Done_already)
           else
-            Thread.return (Skipped `Missing_dep)
+            map_p ~f:ident (G.fold_succ foreach_succ g u []) >>= fun dep_traces ->
+            if List.for_all dep_traces ~f:successfull_trace then (
+              let ready = Unix.gettimeofday () in
+              log ready (Task_ready u) ;
+              Allocator.request alloc (Task.requirement u) >>= fun resource ->
+              let start = Unix.gettimeofday () in
+              log start (Task_started u) ;
+              Task.perform resource config u >>= fun outcome ->
+              let end_ = Unix.gettimeofday () in
+              log end_ (Task_ended (u, outcome)) ;
+              Allocator.release alloc resource ;
+              Thread.return (Run { ready ; start ; end_ ; outcome })
+            )
+            else
+              Thread.return (Skipped `Missing_dep)
         in
         String.Map.add thread_table id thread
 
-  let run ?(log = fun _ _ -> ()) alloc g =
+  let run ?(log = fun _ _ -> ()) config alloc g =
     if Dfs.has_cycle g then failwith "Cycle in dependency graph" ;
     let sources = sources g in
     let ids, threads =
-      List.fold sources ~init:String.Map.empty ~f:(dft log alloc g)
+      List.fold sources ~init:String.Map.empty ~f:(dft log alloc config g)
       |> String.Map.to_alist
       |> List.unzip
     in
