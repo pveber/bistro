@@ -1,14 +1,25 @@
 open Bistro.Std
-open Bistro_engine
 
-type target
-type plan = target list
+type 'a t
 
-val ( %> ) : string list -> _ workflow -> target
+val pure : 'a -> 'a t
 
-val local :
+val pureW : _ workflow -> (string -> 'a) -> 'a t
+
+val app : ('a -> 'b) t -> 'a t -> 'b t
+
+val ( $ ) : ('a -> 'b) t -> 'a t -> 'b t
+
+val list : 'a t list -> 'a list t
+
+val run :
   ?use_docker:bool ->
   ?np:int ->
   ?mem:int ->
-  outdir:string ->
-  plan -> unit
+  'a t -> 'a
+
+type repo_item
+
+val ( %> ) : string list -> _ workflow -> repo_item
+
+val of_repo : outdir:string -> repo_item list -> unit t

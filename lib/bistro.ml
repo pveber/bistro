@@ -3,9 +3,9 @@ open Core_kernel.Std
 type path = string list
 [@@deriving sexp]
 
-let string_of_path = function
-  | []
-  | "" :: _ -> failwith "string_of_path: wrong path"
+let rec string_of_path = function
+  | [] -> "."
+  | "" :: t -> Filename.concat "." (string_of_path t)
   | p -> List.reduce_exn p ~f:Filename.concat
 
 let path_of_string s = String.split ~on:'/' s
