@@ -368,13 +368,8 @@ let perform_step (Allocator.Resource { np ; mem }) ({ db } as config) ({ cmd ; n
   ) ;
   let dest_exists = Sys.file_exists env.dest = `Yes in
   (
-    if dest_exists then
-      mv env.dest (Db.build config.db task.id)
-    else
-      Lwt.return ()
-  ) >>= fun () ->
-  (
     if exit_status = 0 && dest_exists then
+      mv env.dest (Db.cache config.db task.id) >>= fun () ->
       remove_if_exists env.tmp_dir
     else
       Lwt.return ()
@@ -427,7 +422,7 @@ let is_done { db } t =
     | Select (_, dir, q) -> select_path db dir q
     | Step { id } -> Db.cache db id
   in
-  Lwt.return (Sys.file_exists path <> `Yes)
+  Lwt.return (Sys.file_exists path = `Yes)
 
 let clean { db } = function
   | Input _ | Select _ -> Lwt.return ()
