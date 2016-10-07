@@ -28,7 +28,7 @@ module ChIP_seq = struct
   let chIP_pho4_noPi_macs2 = Macs2.callpeak ~mfold:(1,100) Macs2.bam [ chIP_pho4_noPi_bam ]
 
   let main outdir np mem () =
-    let open Bistro_app2 in
+    let open Bistro_app in
     let repo = [
       [ "chIP_pho4_noPi_macs2.peaks" ] %> chIP_pho4_noPi_macs2
     ]
@@ -102,7 +102,7 @@ module RNA_seq = struct
         [ "360" ], counts (`WT, `No_Pi 360) ; ]
 
   let main outdir np mem () =
-    let open Bistro_app2 in
+    let open Bistro_app in
     let repo = [
       [ "deseq2" ; "0_vs_360" ] %> deseq2#effect_table ;
     ]
