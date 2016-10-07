@@ -1,5 +1,11 @@
 open Core_kernel.Std
 
+let ( >>= ) = Lwt.( >>= )
+let ( >>| ) = Lwt.( >|= )
+let ( >>=? ) x f = x >>= function
+  | Ok x -> f x
+  | Error _ as e -> Lwt.return e
+
 module Domain = struct
   module Thread = Lwt
   module Allocator = Allocator
@@ -8,21 +14,31 @@ end
 
 module DAG = Tdag.Make(Domain)
 
-let rec add_workflow dag =
+let workflow_deps =
+  let open Bistro in
   function
-  | Bistro.Input _ -> dag, None (* FIXME: should test if input is present! *)
-  | Bistro.Select (_, dir, _) -> add_workflow dag dir
-  | Bistro.Step s ->
-    let u = Task.of_step s in
-    let dag' =
-      List.fold s.Bistro.deps ~init:dag ~f:(fun accu dep ->
-          let accu', maybe_v = add_workflow accu dep in
-          match maybe_v with
-          | None -> accu'
-          | Some v -> DAG.add_dep accu' u ~on:v
-        )
-    in
-    dag', Some u
+  | Input _ -> []
+  | Select (_, dir, _) -> [ dir ]
+  | Step s -> s.deps
+
+let workflow_id =
+  let open Bistro in
+  function
+  | Input (id, _)
+  | Select (id, _, _)
+  | Step { id } -> id
+
+let rec add_workflow dag w =
+  let u = Task.of_workflow w in
+  let dag' =
+    List.fold (workflow_deps w) ~init:dag ~f:(fun accu dep ->
+        let accu', maybe_v = add_workflow accu dep in
+        match maybe_v with
+        | None -> accu'
+        | Some v -> DAG.add_dep accu' u ~on:v
+      )
+  in
+  dag', Some u
 
 
 let run alloc config workflows =
@@ -31,5 +47,7 @@ let run alloc config workflows =
       |> fst
     )
   in
-  DAG.run alloc config dag
-
+  DAG.run alloc config dag >>| fun trace_map ->
+  List.map workflows ~f:(function (Bistro.Workflow w) ->
+    String.Map.find_exn trace_map (workflow_id (Bistro.u w))
+    )

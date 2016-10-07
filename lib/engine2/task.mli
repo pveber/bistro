@@ -1,4 +1,9 @@
-type t = private {
+type t =
+  | Input of string * path
+  | Select of string * [`Input of path | `Step of string] * path
+  | Step of step
+
+and step = {
   id      : id ;
   descr   : string ;
   deps    : dep list ;
@@ -42,7 +47,7 @@ val config :
   use_docker:bool ->
   config
 
-val of_step : Bistro.step -> t
+val of_workflow : Bistro.u -> t
 val id : t -> string
 val requirement : t -> Allocator.request
 val perform : Allocator.resource -> config -> t -> (unit, [`Msg of string]) result Lwt.t

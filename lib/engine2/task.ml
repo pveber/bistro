@@ -28,7 +28,12 @@ let redirection filename =
   Lwt_unix.openfile filename Unix.([O_APPEND ; O_CREAT ; O_WRONLY]) 0o640 >>= fun fd ->
   Lwt.return (`FD_move (Lwt_unix.unix_file_descr fd))
 
-type t = {
+type t =
+  | Input of string * path
+  | Select of string * [`Input of path | `Step of string] * path
+  | Step of step
+
+and step = {
   id      : id ;
   descr   : string ;
   deps    : dep list ;
@@ -98,7 +103,10 @@ let config ~db_path ~use_docker = {
 }
 
 
-let id t = t.id
+let id = function
+  | Input (id, _)
+  | Select (id, _, _)
+  | Step { id } -> id
 
 
 
@@ -136,19 +144,32 @@ let rec denormalize_cmd = function
   | Bistro.Docker (image, c) ->
     Docker (image, denormalize_cmd c)
 
-let of_step { Bistro.id ; mem ; np ; descr ; cmd ; deps ; timeout ; version } = {
-  id ;
-  descr ;
-  np ;
-  mem ;
-  cmd = denormalize_cmd cmd ;
-  deps = List.map deps ~f:denormalize_dep ;
-  timeout ;
-  version ;
-}
+let of_step { Bistro.id ; mem ; np ; descr ; cmd ; deps ; timeout ; version } =
+  Step {
+    id ;
+    descr ;
+    np ;
+    mem ;
+    cmd = denormalize_cmd cmd ;
+    deps = List.map deps ~f:denormalize_dep ;
+    timeout ;
+    version ;
+  }
 
-let requirement t =
-  Allocator.Request { np = t.np ; mem = t.mem }
+let of_workflow = function
+  | Bistro.Input (id, p) -> Input (id, p)
+  | Bistro.Select (id, Bistro.Step { Bistro.id = dir_id }, p) ->
+    Select (id, `Step dir_id, p)
+  | Bistro.Select (id, Bistro.Input (_, dir_p), p) ->
+    Select (id, `Input dir_p, p)
+  | Bistro.Select (_, Bistro.Select _, _) -> assert false
+  | Bistro.Step s -> of_step s
+
+let requirement = function
+  | Input _
+  | Select _ -> Allocator.Request { np = 0 ; mem = 0 }
+  | Step { np ; mem } ->
+    Allocator.Request { np ; mem }
 
 
 type execution_env = {
@@ -329,7 +350,7 @@ module Concrete_task = struct
       )
 end
 
-let perform (Allocator.Resource { np ; mem }) ({ db } as config) ({ cmd ; np ; mem } as task) =
+let perform_step (Allocator.Resource { np ; mem }) ({ db } as config) ({ cmd ; np ; mem } as task) =
   let uid = Unix.getuid () in
   let env = make_execution_env config ~np ~mem in
   let stdout = Db.stdout db task.id in
@@ -365,10 +386,52 @@ let perform (Allocator.Resource { np ; mem }) ({ db } as config) ({ cmd ; np ; m
       R.error_msgf "Failed with code %d" exit_status
   )
 
-let is_done { db } t =
-  Lwt.return (Sys.file_exists (Db.cache db t.id) = `Yes)
+let perform_input p =
+  Lwt.wrap (fun () ->
+      if Sys.file_exists p <> `Yes then
+        R.error_msgf
+          "File %s is declared as an input of a workflow but does not exist."
+          p
+      else
+        Ok ()
+    )
 
-let clean { db } t =
-  remove_if_exists (Db.cache db t.id) >>= fun () ->
-  remove_if_exists (Db.stdout db t.id) >>= fun () ->
-  remove_if_exists (Db.stderr db t.id)
+let select_dir_path db = function
+  | `Input p -> string_of_path p
+  | `Step id -> Db.cache db id
+
+let select_path db dir q =
+  let p = select_dir_path db dir in
+  let q = string_of_path q in
+  Filename.concat p q
+
+let perform_select db dir q =
+  Lwt.wrap (fun () ->
+      let path = select_path db dir q in
+      if Sys.file_exists path <> `Yes then (
+        R.error_msgf
+          "No file or directory named %s in directory workflow %s"
+          (string_of_path q) (select_dir_path db dir)
+      )
+      else Ok ()
+    )
+
+let perform alloc config = function
+  | Input (_, p) -> perform_input (string_of_path p)
+  | Select (_, dir, q) -> perform_select config.db dir q
+  | Step s -> perform_step alloc config s
+
+let is_done { db } t =
+  let path = match t with
+    | Input (_, p) -> string_of_path p
+    | Select (_, dir, q) -> select_path db dir q
+    | Step { id } -> Db.cache db id
+  in
+  Lwt.return (Sys.file_exists path <> `Yes)
+
+let clean { db } = function
+  | Input _ | Select _ -> Lwt.return ()
+  | Step s ->
+    remove_if_exists (Db.cache db s.id) >>= fun () ->
+    remove_if_exists (Db.stdout db s.id) >>= fun () ->
+    remove_if_exists (Db.stderr db s.id)
