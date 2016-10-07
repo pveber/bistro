@@ -1,5 +1,5 @@
 open Bistro.Std
-open Bistro_engine2
+open Bistro_engine
 
 type target
 type plan = target list

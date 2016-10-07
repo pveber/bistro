@@ -55,24 +55,23 @@ Library bistro_bioinfo
   XMETARequires:    bistro
   XMETADescription: Workflow library for computational biology
 
-Library bistro_engine
-  Path:             lib/engine
+Library bistro_deprecated_engine
+  Path:             lib/deprecated/engine
   Pack:             true
   Modules:          Db, Scheduler
-  FindlibName:      engine
+  FindlibName:      deprecated_engine
   FindlibParent:    bistro
   BuildDepends:     bistro, core, dbm,
                     lwt.preemptive, lwt.unix,
                     pvem, rresult, threads
   XMETARequires:    bistro, core, dbm, lwt.preemptive, lwt.unix,
                     pvem, rresult, threads
-  XMETADescription: Execution engine for bistro workflows
 
-Library bistro_engine2
-  Path:             lib/engine2
+Library bistro_engine
+  Path:             lib/engine
   Pack:             true
   Modules:          Allocator, Db, Scheduler, Task
-  FindlibName:      engine2
+  FindlibName:      engine
   FindlibParent:    bistro
   BuildDepends:     bistro, bistro.tdag, core, dbm,
                     lwt.preemptive, lwt.unix,
@@ -86,8 +85,8 @@ Library bistro_utils
   Modules:          Bistro_app
   FindlibName:      utils
   FindlibParent:    bistro
-  BuildDepends:     bistro.engine2
-  XMETARequires:    bistro.engine2
+  BuildDepends:     bistro.engine
+  XMETARequires:    bistro.engine
   XMETADescription: Utility functions for bistro
 
 Library bistro_test

@@ -1,6 +1,6 @@
 open Core.Std
 open Bistro.Std
-open Bistro_engine2
+open Bistro_engine
 open Lwt
 
 type target = Target : string list * _ workflow -> target
