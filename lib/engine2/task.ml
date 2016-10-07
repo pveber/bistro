@@ -327,7 +327,6 @@ module Concrete_task = struct
       let exec_env = if in_docker then make_docker_execution_env env else env in
       let path = env.file_dump toks in
       let text = string_of_tokens exec_env toks in
-      print_endline text ;
       Lwt_io.(with_file ~mode:output path (fun oc -> write oc text))
     in
     Lwt_list.iter_p f file_dumps
@@ -339,7 +338,6 @@ module Concrete_task = struct
               (fun oc -> write oc cmd)) >>= fun () ->
     redirection stdout >>= fun stdout ->
     redirection stderr >>= fun stderr ->
-    print_endline cmd ;
     let cmd = "", [| "sh" ; script_file |] in
     Lwt_process.exec ~stdout ~stderr cmd >>= fun status ->
     Lwt_unix.unlink script_file >>| fun () ->
