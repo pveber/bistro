@@ -231,3 +231,6 @@ module Std : sig
     val crlf2lf : (_,[`text]) file workflow -> (_,[`text]) file workflow
   end
 end
+
+
+val string_of_path : path -> string

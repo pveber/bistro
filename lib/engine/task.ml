@@ -4,11 +4,6 @@ open Rresult
 let digest x =
   Digest.to_hex (Digest.string (Marshal.to_string x []))
 
-let string_of_path = function
-  | []
-  | "" :: _ -> failwith "string_of_path: wrong path"
-  | p -> List.reduce_exn p ~f:Filename.concat
-
 let ( >>= ) = Lwt.( >>= )
 let ( >>| ) = Lwt.( >|= )
 let ( >>=? ) x f = x >>= function
@@ -188,14 +183,14 @@ let make_execution_env { db ; use_docker } ~np ~mem step =
   let path_of_task_id tid = Db.cache db tid in
   let dep = function
     | `Input p ->
-      let p = string_of_path p in
+      let p = Bistro.string_of_path p in
       if Filename.is_relative p then
         Filename.concat (Sys.getcwd ()) p
       else
         p
     | `Task tid -> path_of_task_id tid
     | `Select (tid, p) ->
-      Filename.concat (path_of_task_id tid) (string_of_path p)
+      Filename.concat (path_of_task_id tid) (Bistro.string_of_path p)
   in
   let file_dump toks =
     Filename.concat tmp_dir (digest toks)
@@ -390,12 +385,12 @@ let perform_input p =
     )
 
 let select_dir_path db = function
-  | `Input p -> string_of_path p
+  | `Input p -> Bistro.string_of_path p
   | `Step id -> Db.cache db id
 
 let select_path db dir q =
   let p = select_dir_path db dir in
-  let q = string_of_path q in
+  let q = Bistro.string_of_path q in
   Filename.concat p q
 
 let perform_select db dir q =
@@ -404,19 +399,19 @@ let perform_select db dir q =
       if Sys.file_exists path <> `Yes then (
         R.error_msgf
           "No file or directory named %s in directory workflow %s"
-          (string_of_path q) (select_dir_path db dir)
+          (Bistro.string_of_path q) (select_dir_path db dir)
       )
       else Ok ()
     )
 
 let perform alloc config = function
-  | Input (_, p) -> perform_input (string_of_path p)
+  | Input (_, p) -> perform_input (Bistro.string_of_path p)
   | Select (_, dir, q) -> perform_select config.db dir q
   | Step s -> perform_step alloc config s
 
 let is_done { db } t =
   let path = match t with
-    | Input (_, p) -> string_of_path p
+    | Input (_, p) -> Bistro.string_of_path p
     | Select (_, dir, q) -> select_path db dir q
     | Step { id } -> Db.cache db id
   in
