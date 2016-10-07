@@ -4,4 +4,4 @@ val run :
   Task.config ->
   Allocator.t ->
   Bistro.any_workflow list ->
-  Tdag_sig.trace list Lwt.t
+  Tdag_sig.trace String.Map.t Lwt.t

@@ -47,7 +47,4 @@ let run alloc config workflows =
       |> fst
     )
   in
-  DAG.run alloc config dag >>| fun trace_map ->
-  List.map workflows ~f:(function (Bistro.Workflow w) ->
-    String.Map.find_exn trace_map (workflow_id (Bistro.u w))
-    )
+  DAG.run alloc config dag
