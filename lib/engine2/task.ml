@@ -183,8 +183,8 @@ type execution_env = {
   mem : int ;
 }
 
-let make_execution_env { db ; use_docker } ~np ~mem =
-  let tmp_dir = Db.tmp_dir db in
+let make_execution_env { db ; use_docker } ~np ~mem step =
+  let tmp_dir = Db.tmp db step.id in
   let path_of_task_id tid = Db.cache db tid in
   let dep = function
     | `Input p ->
@@ -352,7 +352,7 @@ end
 
 let perform_step (Allocator.Resource { np ; mem }) ({ db } as config) ({ cmd ; np ; mem } as task) =
   let uid = Unix.getuid () in
-  let env = make_execution_env config ~np ~mem in
+  let env = make_execution_env config ~np ~mem task in
   let stdout = Db.stdout db task.id in
   let stderr = Db.stderr db task.id in
   remove_if_exists env.tmp_dir >>= fun () ->
