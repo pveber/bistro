@@ -154,6 +154,7 @@ module TG = struct
     | Task_ready (Task.Push i) -> printf "[%s] ready push %d\n%!" t i
     | Task_started (Task.Push i) -> printf "[%s] started push %d\n%!" t i
     | Task_ended (Task.Push i, _) -> printf "[%s] ended push %d\n%!" t i
+    | _ -> ()
 end
 
 let command =

@@ -52,6 +52,7 @@ module type S = sig
     | Task_ready of task
     | Task_started of task
     | Task_ended of task * unit result
+    | Task_skipped of task * [`Done_already | `Missing_dep]
 
   val empty : t
   val add_task : t -> task -> t

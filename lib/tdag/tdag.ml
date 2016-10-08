@@ -35,6 +35,7 @@ module Make(D : Domain) = struct
     | Task_ready of task
     | Task_started of task
     | Task_ended of task * unit result
+    | Task_skipped of task * [`Done_already | `Missing_dep]
 
   let empty = G.empty
 
@@ -69,8 +70,10 @@ module Make(D : Domain) = struct
         in
         let thread =
           Task.is_done config u >>= fun is_done ->
-          if is_done then
+          if is_done then (
+            log (Unix.gettimeofday ()) (Task_skipped (u, `Missing_dep)) ;
             Thread.return (Skipped `Done_already)
+          )
           else
             map_p ~f:ident (G.fold_succ foreach_succ g u []) >>= fun dep_traces ->
             if List.for_all dep_traces ~f:successfull_trace then (
@@ -85,8 +88,10 @@ module Make(D : Domain) = struct
               Allocator.release alloc resource ;
               Thread.return (Run { ready ; start ; end_ ; outcome })
             )
-            else
+            else (
+              log (Unix.gettimeofday ()) (Task_skipped (u, `Missing_dep)) ;
               Thread.return (Skipped `Missing_dep)
+            )
         in
         String.Map.add thread_table id thread
 
