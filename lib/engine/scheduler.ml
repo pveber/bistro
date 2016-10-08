@@ -14,6 +14,13 @@ end
 
 module DAG = Tdag.Make(Domain)
 
+type event = DAG.event =
+  | Task_ready of Task.t
+  | Task_started of Task.t
+  | Task_ended of Task.t * unit Tdag_sig.result
+  | Task_skipped of Task.t * [`Done_already | `Missing_dep]
+type time = float
+
 let workflow_deps =
   let open Bistro in
   function
@@ -41,10 +48,10 @@ let rec add_workflow dag w =
   dag', Some u
 
 
-let run alloc config workflows =
+let run ?log alloc config workflows =
   let dag = List.fold workflows ~init:DAG.empty ~f:(fun accu (Bistro.Workflow w) ->
       add_workflow accu (Bistro.Workflow.u w)
       |> fst
     )
   in
-  DAG.run alloc config dag
+  DAG.run ?log alloc config dag
