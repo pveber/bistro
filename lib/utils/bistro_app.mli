@@ -16,6 +16,7 @@ val run :
   ?use_docker:bool ->
   ?np:int ->
   ?mem:int ->
+  ?verbose:bool ->
   'a t -> 'a
 
 type repo_item

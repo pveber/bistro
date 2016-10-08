@@ -82,7 +82,7 @@ Library bistro_engine
 
 Library bistro_utils
   Path:             lib/utils
-  Modules:          Bistro_app
+  Modules:          Bistro_app, Bistro_console_logger
   FindlibName:      utils
   FindlibParent:    bistro
   BuildDepends:     bistro.engine

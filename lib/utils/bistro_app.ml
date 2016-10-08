@@ -75,13 +75,20 @@ let has_error traces =
       | _ -> false
     )
 
-let run ?(use_docker = true) ?(np = 1) ?(mem = 1024) app =
+let run ?(use_docker = true) ?(np = 1) ?(mem = 1024) ?(verbose = false) app =
   let open Lwt in
   let main =
     let config = Task.config ~db_path:"_bistro" ~use_docker in
     let allocator = Allocator.create ~np ~mem in
     let workflows = to_workflow_list app in
-    Scheduler.run config allocator workflows >>= fun traces ->
+    let log =
+      if verbose then
+        let logger = Bistro_console_logger.create () in
+        Some (Bistro_console_logger.event logger)
+      else
+        None
+    in
+    Scheduler.run ?log config allocator workflows >>= fun traces ->
     if has_error traces then (
       error_report config.Task.db traces ;
       fail (Failure "Some workflow failed!")
