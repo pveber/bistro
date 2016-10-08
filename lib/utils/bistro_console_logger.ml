@@ -11,7 +11,7 @@ type t = {
 let msg t fmt =
   let k s =
     let t = Time.(to_string (of_float t)) in
-    printf "[%s] %s" t s
+    printf "[%s] %s\n%!" t s
   in
   ksprintf k fmt
 
