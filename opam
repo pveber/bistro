@@ -20,7 +20,6 @@ depends: [
   "oasis" {build & >= "0.4"}
   "ocamlfind" {build}
   "core"
-  "dbm"
   "lwt"
   "ppx_tools"
   "pvem"
