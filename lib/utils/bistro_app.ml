@@ -2,9 +2,14 @@ open Core.Std
 open Bistro.Std
 open Bistro_engine
 
+type 'a path = Path of string
+
+let ( / ) (Path p) (Bistro.Selector q) =
+  Path (p ^ (Bistro.string_of_path q))
+
 type _ t =
   | Pure : 'a -> 'a t
-  | PureW : _ workflow * (string -> 'a) -> 'a t
+  | PureW : 'a workflow * ('a path -> 'b) -> 'b t
   | App : ('a -> 'b) t * 'a t -> 'b t
   | List : 'a t list -> 'a list t
 
@@ -33,7 +38,8 @@ let rec eval : type s. Db.t -> s t -> s
   = fun db app ->
     match app with
     | Pure x -> x
-    | PureW (w, f) -> f (Db.workflow_path db w)
+    | PureW (w, f) ->
+      f (Path (Db.workflow_path db w))
     | App (f, x) ->
       (eval db f) (eval db x)
     | List xs ->
@@ -114,7 +120,7 @@ let link p p_u =
   let cmd = sprintf "rm -rf %s && ln -s %s %s" dst src dst in
   ignore (Sys.command cmd)
 
-let generate_page outdir (dest, cache_path) =
+let generate_page outdir (dest, Path cache_path) =
   link (outdir :: dest) cache_path
 
 let foreach_target { Task.db } outdir traces (Repo_item (dest, w)) =

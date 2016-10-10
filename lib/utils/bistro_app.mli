@@ -1,10 +1,14 @@
 open Bistro.Std
 
+type 'a path = private Path of string
+
+val ( / ) : 'a path -> ('a, 'b) Bistro.selector -> 'b path
+
 type 'a t
 
 val pure : 'a -> 'a t
 
-val pureW : _ workflow -> (string -> 'a) -> 'a t
+val pureW : 'a workflow -> ('a path -> 'b) -> 'b t
 
 val app : ('a -> 'b) t -> 'a t -> 'b t
 
