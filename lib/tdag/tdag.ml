@@ -35,7 +35,9 @@ module Make(D : Domain) = struct
     | Task_ready of task
     | Task_started of task
     | Task_ended of task * unit result
-    | Task_skipped of task * [`Done_already | `Missing_dep]
+    | Task_skipped of task * [ `Done_already
+                             | `Missing_dep
+                             | `Allocation_error of string ]
 
   let empty = G.empty
 
@@ -79,14 +81,19 @@ module Make(D : Domain) = struct
             if List.for_all dep_traces ~f:successfull_trace then (
               let ready = Unix.gettimeofday () in
               log ready (Task_ready u) ;
-              Allocator.request alloc (Task.requirement u) >>= fun resource ->
-              let start = Unix.gettimeofday () in
-              log start (Task_started u) ;
-              Task.perform resource config u >>= fun outcome ->
-              let end_ = Unix.gettimeofday () in
-              log end_ (Task_ended (u, outcome)) ;
-              Allocator.release alloc resource ;
-              Thread.return (Run { ready ; start ; end_ ; outcome })
+              Allocator.request alloc (Task.requirement u) >>= function
+              | Ok resource ->
+                let start = Unix.gettimeofday () in
+                log start (Task_started u) ;
+                Task.perform resource config u >>= fun outcome ->
+                let end_ = Unix.gettimeofday () in
+                log end_ (Task_ended (u, outcome)) ;
+                Allocator.release alloc resource ;
+                Thread.return (Run { ready ; start ; end_ ; outcome })
+              | Error (`Msg msg) ->
+                let err = `Allocation_error msg in
+                log (Unix.gettimeofday ()) (Task_skipped (u, err)) ;
+                Thread.return (Skipped err)
             )
             else (
               log (Unix.gettimeofday ()) (Task_skipped (u, `Missing_dep)) ;

@@ -18,7 +18,9 @@ type event = DAG.event =
   | Task_ready of Task.t
   | Task_started of Task.t
   | Task_ended of Task.t * unit Tdag_sig.result
-  | Task_skipped of Task.t * [`Done_already | `Missing_dep]
+  | Task_skipped of Task.t * [ `Done_already
+                             | `Missing_dep
+                             | `Allocation_error of string]
 type time = float
 
 let workflow_deps =

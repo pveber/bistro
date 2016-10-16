@@ -7,7 +7,9 @@ type trace =
              start : time ;
              end_ : time ;
              outcome : unit result }
-  | Skipped of [`Done_already | `Missing_dep]
+  | Skipped of [ `Done_already
+               | `Missing_dep
+               | `Allocation_error of string ]
 
 and time = float
 
@@ -24,7 +26,7 @@ module type Domain = sig
     type request
     type resource
 
-    val request : t -> request -> resource Thread.t
+    val request : t -> request -> resource result Thread.t
     val release : t -> resource -> unit
   end
 
@@ -52,7 +54,9 @@ module type S = sig
     | Task_ready of task
     | Task_started of task
     | Task_ended of task * unit result
-    | Task_skipped of task * [`Done_already | `Missing_dep]
+    | Task_skipped of task * [ `Done_already
+                             | `Missing_dep
+                             | `Allocation_error of string ]
 
   val empty : t
   val add_task : t -> task -> t

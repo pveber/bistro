@@ -66,7 +66,7 @@ module Token_allocator = struct
   let rec request a =
     if a.state then (
       a.state <- false ;
-      Lwt.return a.value
+      Lwt.return (Ok a.value)
     )
     else (
       Lwt_condition.wait a.cond >>= fun () ->

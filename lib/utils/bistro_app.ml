@@ -77,8 +77,10 @@ let error_report db traces =
 
 let has_error traces =
   String.Map.exists traces ~f:(function
-      | Tdag_sig.Run { outcome = Error _ } -> true
-      | _ -> false
+      | Tdag_sig.Run { outcome = Error _ }
+      | Tdag_sig.Skipped (`Missing_dep | `Allocation_error _) -> true
+      | Tdag_sig.Run { outcome = Ok _ }
+      | Tdag_sig.Skipped `Done_already -> false
     )
 
 let run ?(use_docker = true) ?(np = 1) ?(mem = 1024) ?(verbose = false) app =
@@ -131,7 +133,7 @@ let foreach_target { Task.db } outdir traces (Repo_item (dest, w)) =
     let cache_path = Db.cache db id in
     link (outdir :: dest) cache_path
   | Tdag_sig.Run { outcome = Error _ }
-  | Tdag_sig.Skipped `Missing_dep -> ()
+  | Tdag_sig.Skipped (`Missing_dep | `Allocation_error _) -> ()
 
 let of_repo ~outdir items =
   List.map items ~f:(function Repo_item (p, w) ->

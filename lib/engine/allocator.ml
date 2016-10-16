@@ -1,4 +1,5 @@
 open Lwt
+open Rresult
 
 type request = Request of {
     np : int ;
@@ -36,17 +37,19 @@ let incr p ~np ~mem =
 let request p (Request { np ; mem }) =
   let np = min np p.np in
   if mem > p.mem then
-    let msg = "Bistro_engine.Allocator: asked more memory than available" in
-    Lwt.fail (Invalid_argument msg)
+    R.error_msgf
+      "Bistro_engine.Allocator: asked more memory than available (%d against %d)"
+      mem p.mem
+    |> Lwt.return
   else
   if np <= p.current_np && mem <= p.current_mem then (
     decr p ~np ~mem ;
-    Lwt.return (Resource { np ; mem })
+    Lwt.return (Ok (Resource { np ; mem }))
   )
   else (
     let t, u = Lwt.wait () in
     p.waiters <- ((np,mem), u) :: p.waiters ;
-    t
+    Lwt.(t >|= R.ok)
   )
 
 let release p (Resource { np ; mem }) =
