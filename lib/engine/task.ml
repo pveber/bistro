@@ -86,6 +86,14 @@ let rec deps_of_command =
   | Simple_command tokens -> deps_of_template tokens
   | Docker (_, c) -> deps_of_command c
 
+type error =
+  | Input_doesn't_exist of string
+  | Invalid_select of string * path
+  | Step_failure of {
+      exit_code : int ;
+      script : string ;
+      dumps : (string * string) list ;
+    }
 
 type config = {
   db : Db.t ;
@@ -316,15 +324,21 @@ module Concrete_task = struct
 
   let of_cmd env cmd = Sh (string_of_command env cmd)
 
-  let generate_file_dumps env cmd =
+  let extract_file_dumps env cmd =
     let file_dumps = file_dumps_of_command false cmd in
     let f (`File_dump (toks, in_docker)) =
       let exec_env = if in_docker then make_docker_execution_env env else env in
       let path = env.file_dump toks in
       let text = string_of_tokens exec_env toks in
+      path, text
+    in
+    `File_dumps (List.map file_dumps ~f)
+
+  let write_file_dumps (`File_dumps xs) =
+    let f (path, text) =
       Lwt_io.(with_file ~mode:output path (fun oc -> write oc text))
     in
-    Lwt_list.iter_p f file_dumps
+    Lwt_list.iter_p f xs
 
   let perform ~stdout ~stderr (Sh cmd) =
     let script_file = Filename.temp_file "guizmin" ".sh" in
@@ -351,8 +365,10 @@ let perform_step (Allocator.Resource { np ; mem }) ({ db } as config) ({ cmd ; n
   remove_if_exists env.tmp_dir >>= fun () ->
   Unix.mkdir_p env.tmp ;
 
-  Concrete_task.generate_file_dumps env cmd >>= fun () ->
-  Concrete_task.(perform ~stdout ~stderr (of_cmd env cmd)) >>= fun exit_status ->
+  let ccmd = Concrete_task.of_cmd env cmd in
+  let file_dumps = Concrete_task.extract_file_dumps env cmd in
+  Concrete_task.write_file_dumps file_dumps >>= fun () ->
+  Concrete_task.(perform ~stdout ~stderr ccmd) >>= fun exit_status ->
 
   if config.use_docker then ( (* FIXME: not necessary if no docker command was run *)
     sprintf "docker run -v %s:/bistro -t busybox chown -R %d /bistro" env.tmp_dir uid
@@ -371,15 +387,21 @@ let perform_step (Allocator.Resource { np ; mem }) ({ db } as config) ({ cmd ; n
     if exit_status = 0 then
       Ok ()
     else
-      R.error_msgf "Failed with code %d" exit_status
+      let Concrete_task.Sh script = ccmd
+      and `File_dumps dumps = file_dumps in
+      Error (
+        Step_failure {
+          exit_code = exit_status ;
+          script ;
+          dumps ;
+        }
+      )
   )
 
 let perform_input p =
   Lwt.wrap (fun () ->
       if Sys.file_exists p <> `Yes then
-        R.error_msgf
-          "File %s is declared as an input of a workflow but does not exist."
-          p
+        Error (Input_doesn't_exist p)
       else
         Ok ()
     )
@@ -397,9 +419,9 @@ let perform_select db dir q =
   Lwt.wrap (fun () ->
       let path = select_path db dir q in
       if Sys.file_exists path <> `Yes then (
-        R.error_msgf
-          "No file or directory named %s in directory workflow %s"
-          (Bistro.string_of_path q) (select_dir_path db dir)
+        Error (
+          Invalid_select (select_dir_path db dir, q)
+        )
       )
       else Ok ()
     )

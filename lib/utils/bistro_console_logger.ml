@@ -15,6 +15,14 @@ let msg t fmt =
   in
   ksprintf k fmt
 
+let error_short_descr =
+  let open Task in
+  function
+  | Task.Input_doesn't_exist _ -> "input doesn't exist"
+  | Task.Invalid_select _ -> "invalid select"
+  | Task.Step_failure { exit_code } ->
+    sprintf "ended with exit code %d" exit_code
+
 let rec loop queue new_event =
   match Queue.dequeue queue with
   | None ->
@@ -30,7 +38,7 @@ let rec loop queue new_event =
         let id = String.prefix s.id 6 in
         let outcome = match res with
           | Ok () -> "success"
-          | Error (`Msg msg) -> sprintf "error: %s" msg
+          | Error e -> sprintf "error: %s" (error_short_descr e)
         in
         msg t "ended %s.%s (%s)" s.descr id outcome
 

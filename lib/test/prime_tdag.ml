@@ -104,6 +104,7 @@ end
 module Task = struct
   type t = Push of int
   type config = unit
+  type error = [ `Msg of string ]
 
   let id (Push i) = string_of_int i
 

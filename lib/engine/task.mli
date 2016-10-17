@@ -40,6 +40,15 @@ and token =
 and path = string list
 [@@deriving sexp]
 
+type error =
+  | Input_doesn't_exist of string
+  | Invalid_select of string * path
+  | Step_failure of {
+      exit_code : int ;
+      script : string ;
+      dumps : (string * string) list ;
+    }
+
 type config = private {
   db : Db.t ;
   use_docker : bool ;
@@ -53,6 +62,6 @@ val config :
 val of_workflow : Bistro.u -> t
 val id : t -> string
 val requirement : t -> Allocator.request
-val perform : Allocator.resource -> config -> t -> (unit, [`Msg of string]) result Lwt.t
+val perform : Allocator.resource -> config -> t -> (unit, error) result Lwt.t
 val is_done : config -> t -> bool Lwt.t
 val clean : config -> t -> unit Lwt.t

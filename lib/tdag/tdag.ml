@@ -28,13 +28,27 @@ module Make(D : Domain) = struct
 
   type t = G.t
   type task = Task.t
+  type task_error = Task.error
   type 'a thread = 'a Thread.t
   type allocator = Allocator.t
   type config = Task.config
+
+  type trace =
+    | Run of { ready : time ;
+               start : time ;
+               end_ : time ;
+               outcome : (unit, task_error) result }
+
+    | Skipped of [ `Done_already
+                 | `Missing_dep
+                 | `Allocation_error of string ]
+
+  and time = float
+
   type event =
     | Task_ready of task
     | Task_started of task
-    | Task_ended of task * unit result
+    | Task_ended of task * (unit, task_error) result
     | Task_skipped of task * [ `Done_already
                              | `Missing_dep
                              | `Allocation_error of string ]
