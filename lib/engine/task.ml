@@ -357,7 +357,7 @@ module Concrete_task = struct
       )
 end
 
-let perform_step (Allocator.Resource { np ; mem }) ({ db } as config) ({ cmd ; np ; mem } as task) =
+let perform_step (Allocator.Resource { np ; mem }) ({ db } as config) ({ cmd } as task) =
   let uid = Unix.getuid () in
   let env = make_execution_env config ~np ~mem task in
   let stdout = Db.stdout db task.id in
