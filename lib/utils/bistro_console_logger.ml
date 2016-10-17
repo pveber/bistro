@@ -20,13 +20,23 @@ let rec loop queue new_event =
   | None ->
     Lwt_condition.wait new_event >>= fun () ->
     loop queue new_event
-  | Some (t, ev) ->
-    Task.(
+  | Some (t, ev) -> Task.(
       match ev with
       | Scheduler.Task_started (Step s) ->
-        msg t "started %s" s.descr
-      | Scheduler.Task_ended (Step s, _) ->
-        msg t "ended %s" s.descr
+        let id = String.prefix s.id 6 in
+        msg t "started %s.%s" s.descr id
+
+      | Scheduler.Task_ended (Step s, res) ->
+        let id = String.prefix s.id 6 in
+        let outcome = match res with
+          | Ok () -> "(success)"
+          | Error (`Msg msg) -> sprintf "error: %s" msg
+        in
+        msg t "ended %s.%s (%s)" s.descr id outcome
+
+      | Scheduler.Task_skipped (Step s, `Allocation_error err) ->
+        msg t "allocation error for %s.%s (%s)" s.descr s.id err
+
       | _ -> ()
     ) ;
     loop queue new_event
