@@ -29,7 +29,7 @@ let rec loop queue new_event =
       | Scheduler.Task_ended (Step s, res) ->
         let id = String.prefix s.id 6 in
         let outcome = match res with
-          | Ok () -> "(success)"
+          | Ok () -> "success"
           | Error (`Msg msg) -> sprintf "error: %s" msg
         in
         msg t "ended %s.%s (%s)" s.descr id outcome
