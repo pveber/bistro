@@ -60,14 +60,14 @@ module Make(D : Domain) = struct
   let add_dep g u ~on:v =
     G.add_edge g u v
 
-  let dot_output g label fn =
+  let dot_output g vertex_attributes edge_attributes fn =
     let module G = struct
       include G
       let graph_attributes _ = []
       let default_vertex_attributes _ = []
-      let vertex_name t = Task.id t
-      let vertex_attributes t = [ `Label (label t) ]
-      let edge_attributes _ = []
+      let vertex_name t = sprintf "\"%s\"" (Task.id t)
+      let vertex_attributes = vertex_attributes
+      let edge_attributes = edge_attributes
       let get_subgraph _ = None
       let default_edge_attributes _ = []
     end in

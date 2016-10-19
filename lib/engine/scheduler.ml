@@ -51,14 +51,25 @@ let compile workflows =
     )
 
 let dag_dot_output dag fn =
-  let label =
+  let vertex_attribute =
     let open Task in
     function
-    | Input (_, p) -> sprintf "input: %s" (Bistro.string_of_path p)
-    | Select (_, _, p) -> sprintf "select: %s" (Bistro.string_of_path p)
-    | Step { descr } -> descr
+    | Input (_, p) ->
+      let label = Bistro.string_of_path p in
+      [ `Label label ; `Color 0xFFFFFF ; `Shape `Box ]
+    | Select (_, _, p) ->
+      let label = Bistro.string_of_path p in
+      [ `Label label ; `Color 0xFFFFFF ; `Shape `Box ]
+    | Step { descr } ->
+      [ `Label descr ; `Shape `Box ]
   in
-  DAG.dot_output dag label fn
+  let edge_attribute =
+    let open Task in
+    function
+    | Select _, Step _ -> [ `Style `Dotted ]
+    | _ -> []
+  in
+  DAG.dot_output dag vertex_attribute edge_attribute fn
 
 let run ?log alloc config dag =
   DAG.run ?log alloc config dag

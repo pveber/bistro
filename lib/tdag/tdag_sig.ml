@@ -69,7 +69,8 @@ module type S = sig
   val add_dep : t -> task -> on:task -> t
   val dot_output :
     t ->
-    (task -> string) ->
+    (task -> Graph.Graphviz.DotAttributes.vertex list) ->
+    (task * task -> Graph.Graphviz.DotAttributes.edge list) ->
     string ->
     unit
 
