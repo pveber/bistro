@@ -65,8 +65,8 @@ module Make(D : Domain) = struct
       include G
       let graph_attributes _ = []
       let default_vertex_attributes _ = []
-      let vertex_name = label
-      let vertex_attributes _ = []
+      let vertex_name t = Task.id t
+      let vertex_attributes t = [ `Label (label t) ]
       let edge_attributes _ = []
       let get_subgraph _ = None
       let default_edge_attributes _ = []
