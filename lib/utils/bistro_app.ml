@@ -125,7 +125,7 @@ let run ?(use_docker = true) ?(np = 1) ?(mem = 1024) ?(verbose = false) app =
       else
         None
     in
-    Scheduler.run ?log config allocator workflows >>= fun traces ->
+    Scheduler.(run ?log config allocator (compile workflows)) >>= fun traces ->
     if has_error traces then (
       error_report config.Task.db traces ;
       fail (Failure "Some workflow failed!")

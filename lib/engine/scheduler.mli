@@ -1,6 +1,8 @@
 open Core_kernel.Std
 open Rresult
 
+type dag
+
 type time = float
 
 type event =
@@ -21,9 +23,13 @@ type trace =
                | `Missing_dep
                | `Allocation_error of string ]
 
+val compile : Bistro.any_workflow list -> dag
+
+val dag_dot_output : dag -> string -> unit
+
 val run :
   ?log:(time -> event -> unit) ->
   Task.config ->
   Allocator.t ->
-  Bistro.any_workflow list ->
+  dag ->
   trace String.Map.t Lwt.t
