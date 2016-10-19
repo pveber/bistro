@@ -112,7 +112,7 @@ let has_error traces =
       | Skipped `Done_already -> false
     )
 
-let run ?(use_docker = true) ?(np = 1) ?(mem = 1024) ?(verbose = false) app =
+let run ?(use_docker = true) ?(np = 1) ?(mem = 1024) ?(verbose = false) ?dag_dump app =
   let open Lwt in
   let main =
     let config = Task.config ~db_path:"_bistro" ~use_docker in
@@ -125,7 +125,19 @@ let run ?(use_docker = true) ?(np = 1) ?(mem = 1024) ?(verbose = false) app =
       else
         None
     in
-    Scheduler.(run ?log config allocator (compile workflows)) >>= fun traces ->
+    let dag = Scheduler.compile workflows in
+    let dag_dump =
+      match dag_dump with
+      | None -> Lwt.return ()
+      | Some fn ->
+        Lwt_preemptive.detach (fun () ->
+            let tmp = Filename.temp_file "bistro_app" ".dot" in
+            Scheduler.dag_dot_output dag tmp ;
+            Sys.command (sprintf "dot -Tpdf %s > %s" tmp fn) |> ignore
+          ) ()
+    in
+    Scheduler.(run ?log config allocator dag) >>= fun traces ->
+    dag_dump >>= fun () ->
     if has_error traces then (
       error_report config.Task.db traces ;
       fail (Failure "Some workflow failed!")

@@ -21,6 +21,7 @@ val run :
   ?np:int ->
   ?mem:int ->
   ?verbose:bool ->
+  ?dag_dump:string ->
   'a t -> 'a
 
 type repo_item
