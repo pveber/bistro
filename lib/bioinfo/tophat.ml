@@ -13,7 +13,7 @@ let tophat1 ?color index fqs =
         list dep ~sep:"," fqs2
       ]
   in
-  workflow ~np:8 ~mem:(4 * 1024) [
+  workflow ~np:8 ~mem:(4 * 1024) ~descr:"tophat" [
     cmd ~env "tophat" [
       string "--bowtie1" ;
       opt "--num-threads" ident np ;
@@ -34,7 +34,7 @@ let tophat2 index fqs =
         list dep ~sep:"," fqs2
       ]
   in
-  workflow ~np:8 ~mem:(4 * 1024) [
+  workflow ~np:8 ~mem:(4 * 1024) ~descr:"tophat2" [
     cmd ~env "tophat2" [
       opt "--num-threads" ident np ;
       opt "--output-dir" ident dest ;
