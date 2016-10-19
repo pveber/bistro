@@ -60,6 +60,22 @@ module Make(D : Domain) = struct
   let add_dep g u ~on:v =
     G.add_edge g u v
 
+  let dot_output g label fn =
+    let module G = struct
+      include G
+      let graph_attributes _ = []
+      let default_vertex_attributes _ = []
+      let vertex_name = label
+      let vertex_attributes _ = []
+      let edge_attributes _ = []
+      let get_subgraph _ = None
+      let default_edge_attributes _ = []
+    end in
+    let module Dot = Graph.Graphviz.Dot(G) in
+    Out_channel.with_file fn ~f:(fun oc ->
+        Dot.output_graph oc g
+      )
+
   let sources g =
     let f u accu =
       if G.in_degree g u = 0 then u :: accu

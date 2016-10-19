@@ -67,6 +67,11 @@ module type S = sig
   val empty : t
   val add_task : t -> task -> t
   val add_dep : t -> task -> on:task -> t
+  val dot_output :
+    t ->
+    (task -> string) ->
+    string ->
+    unit
 
   val run :
     ?log:(time -> event -> unit) ->
