@@ -11,7 +11,8 @@ type t = {
 let msg t fmt =
   let k s =
     let t = Time.(to_string (of_float t)) in
-    printf "[%s] %s\n%!" t s
+    printf "[%s] %s\n%!" t s ;
+    Lwt.return ()
   in
   ksprintf k fmt
 
@@ -28,7 +29,8 @@ let rec loop queue new_event =
   | None ->
     Lwt_condition.wait new_event >>= fun () ->
     loop queue new_event
-  | Some (t, ev) -> Task.(
+  | Some (t, ev) ->
+    Task.(
       match ev with
       | Scheduler.Task_started (Step s) ->
         let id = String.prefix s.id 6 in
@@ -45,8 +47,8 @@ let rec loop queue new_event =
       | Scheduler.Task_skipped (Step s, `Allocation_error err) ->
         msg t "allocation error for %s.%s (%s)" s.descr s.id err
 
-      | _ -> ()
-    ) ;
+      | _ -> Lwt.return ()
+    ) >>= fun () ->
     loop queue new_event
 
 

@@ -12,6 +12,13 @@ let common_spec =
   +> flag "--np"      (optional_with_default 4 int) ~doc:"INT Number of processors"
   +> flag "--mem"     (optional_with_default 4 int) ~doc:"INT Available memory (in GB)"+> flag "--verbose" no_arg ~doc:" Logs build events on the console"
 
+let logger verbose =
+  if verbose then
+    let open Bistro_console_logger in
+    Some (event (create ()))
+  else
+    None
+
 module ChIP_seq = struct
   let chIP_pho4_noPi = List.map ~f:Sra.fetch_srr [ "SRR217304" ; "SRR217305" ]
 
@@ -33,7 +40,7 @@ module ChIP_seq = struct
       [ "chIP_pho4_noPi_macs2.peaks" ] %> chIP_pho4_noPi_macs2
     ]
     in
-    run ~use_docker:true ~np ~mem:(mem * 1024) ~verbose (of_repo ~outdir repo)
+    run ~use_docker:true ~np ~mem:(mem * 1024) ?log:(logger verbose) (of_repo ~outdir repo)
 
   let spec = common_spec
 
@@ -107,7 +114,7 @@ module RNA_seq = struct
       [ "deseq2" ; "0_vs_360" ] %> deseq2#effect_table ;
     ]
     in
-    run ~use_docker:true ~np ~mem:(mem * 1024) ~verbose (of_repo ~outdir repo)
+    run ~use_docker:true ~np ~mem:(mem * 1024) ?log:(logger verbose) (of_repo ~outdir repo)
 
   let spec = common_spec
 

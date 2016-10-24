@@ -46,6 +46,7 @@ module Make(D : Domain) = struct
   and time = float
 
   type event =
+    | Init of t
     | Task_ready of task
     | Task_started of task
     | Task_ended of task * (unit, task_error) result
@@ -135,6 +136,7 @@ module Make(D : Domain) = struct
   let run ?(log = fun _ _ -> ()) config alloc g =
     if Dfs.has_cycle g then failwith "Cycle in dependency graph" ;
     let sources = sources g in
+    log (Unix.gettimeofday ()) (Init g) ;
     let ids, threads =
       List.fold sources ~init:String.Map.empty ~f:(dft log alloc config g)
       |> String.Map.to_alist

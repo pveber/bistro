@@ -57,6 +57,7 @@ module type S = sig
   and time = float
 
   type event =
+    | Init of t
     | Task_ready of task
     | Task_started of task
     | Task_ended of task * (unit, task_error) result
