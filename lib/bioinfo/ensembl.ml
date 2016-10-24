@@ -11,6 +11,7 @@ type species = [
 let ucsc_reference_genome ~release ~species =
   match species with
   | `mus_musculus when 63 <= release && release <= 65 -> `mm9
+  | `mus_musculus when 81 <= release && release <= 86 -> `mm10
   | `homo_sapiens when release = 71 -> `hg19
   | `homo_sapiens when release = 84 -> `hg38
   | _ -> failwith "unknown release for this species"
