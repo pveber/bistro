@@ -25,4 +25,5 @@ PKG pvem
 PKG react
 PKG rresult
 PKG str
+PKG tyxml
 PKG yojson
