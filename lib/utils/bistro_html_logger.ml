@@ -17,6 +17,7 @@ type model = {
 
 type t = {
   path : string ;
+  config : Task.config ;
   mutable model : model ;
   mutable queue : (Scheduler.time * Scheduler.event) list ;
   change : unit Lwt_condition.t ;
@@ -27,8 +28,9 @@ type t = {
 let ( >>= ) = Lwt.( >>= )
 let ( >>| ) = Lwt.( >|= )
 
-let create path = {
+let create path config = {
   path ;
+  config ;
   model = { dag = None ; events = [] } ;
   queue = [] ;
   change = Lwt_condition.create () ;
@@ -82,8 +84,8 @@ let rec loop logger =
   | `change -> loop logger
   | `stop -> Lwt.return ()
 
-let start path =
-  let logger = create path in
+let start path config =
+  let logger = create path config in
   { logger with loop = loop logger }
 
 let event logger time event =

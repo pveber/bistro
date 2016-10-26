@@ -112,10 +112,14 @@ let has_error traces =
       | Skipped `Done_already -> false
     )
 
-let run ?(use_docker = true) ?(np = 1) ?(mem = 1024) ?log app =
+let run
+    ?(config = Task.config ~db_path:"_bistro" ~use_docker:true)
+    ?(np = 1)
+    ?(mem = 1024)
+    ?log
+    app =
   let open Lwt in
   let main =
-    let config = Task.config ~db_path:"_bistro" ~use_docker in
     let allocator = Allocator.create ~np ~mem in
     let workflows = to_workflow_list app in
     let dag = Scheduler.compile workflows in
