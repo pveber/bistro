@@ -71,5 +71,5 @@ let compile workflows =
       |> fst
     )
 
-let run ?log alloc config dag =
-  DAG.run ?log alloc config dag
+let run ?logger alloc config dag =
+  DAG.run ?logger alloc config dag

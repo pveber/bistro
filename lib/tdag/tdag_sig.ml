@@ -65,6 +65,12 @@ module type S = sig
                              | `Missing_dep
                              | `Allocation_error of string ]
 
+  class type logger = object
+    method event : time -> event -> unit
+    method stop : unit
+    method wait4shutdown : unit thread
+  end
+
   val empty : t
   val add_task : t -> task -> t
   val add_dep : t -> task -> on:task -> t
@@ -76,6 +82,9 @@ module type S = sig
     unit
 
   val run :
-    ?log:(time -> event -> unit) ->
-    config -> allocator -> t -> trace String.Map.t thread
+    ?logger:logger ->
+    config ->
+    allocator ->
+    t ->
+    trace String.Map.t thread
 end

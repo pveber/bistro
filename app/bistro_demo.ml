@@ -15,27 +15,39 @@ let common_spec =
   +> flag "--verbose" no_arg ~doc:" Logs build events on the console"
   +> flag "--html-report" (optional string) ~doc:"PATH Logs build events in an HTML report"
 
+
+let null_logger = object
+  method event _ _ = ()
+  method stop = ()
+  method wait4shutdown = Lwt.return ()
+end
+
+let tee_logger l1 l2 = object
+  method event x y =
+    l1#event x y ;
+    l2#event x y
+
+  method stop =
+    l1#stop ; l2#stop
+
+  method wait4shutdown =
+    Lwt.join [ l1#wait4shutdown ; l2#wait4shutdown ]
+end
+
 let logger config verbose html_report =
-  let effects = List.filter_opt [
-    if verbose then
-      let open Bistro_console_logger in
-      Some (event (create ()))
-    else
-      None ;
-    Option.map html_report ~f:Bistro_html_logger.(fun path ->
-        event (start path config)
-      )
-  ]
-  in
-  fun t e ->
-    List.iter effects ~f:(fun f -> f t e)
+  tee_logger
+    (if verbose then Bistro_console_logger.create () else null_logger)
+    (match html_report with
+     | Some path -> Bistro_html_logger.create path config
+     | None -> null_logger)
+
 
 let main repo outdir np mem verbose html_report () =
   let open Bistro_app in
   let config = Task.config ~db_path:"_bistro" ~use_docker:true in
   run
     ~config ~np ~mem:(mem * 1024)
-    ~log:(logger config verbose html_report)
+    ~logger:(logger config verbose html_report)
     (of_repo ~outdir repo)
 
 module ChIP_seq = struct

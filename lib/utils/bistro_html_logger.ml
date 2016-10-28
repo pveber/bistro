@@ -13,17 +13,16 @@ type model = {
   events : (time * event) list ;
 }
 
+let ( >>= ) = Lwt.( >>= )
+let ( >>| ) = Lwt.( >|= )
+
 type t = {
   path : string ;
   config : Task.config ;
   mutable model : model ;
   mutable queue : (Scheduler.time * Scheduler.event) list ;
   mutable stop : bool ;
-  mutable loop : unit Lwt.t ;
 }
-
-let ( >>= ) = Lwt.( >>= )
-let ( >>| ) = Lwt.( >|= )
 
 let create path config = {
   path ;
@@ -31,7 +30,6 @@ let create path config = {
   model = { dag = None ; events = [] } ;
   queue = [] ;
   stop = false ;
-  loop = Lwt.return ()
 }
 
 let some_change logger = logger.queue <> []
@@ -186,14 +184,17 @@ let rec loop logger =
     loop logger
   )
 
-let start path config =
+class logger path config =
   let logger = create path config in
-  logger.loop <- loop logger ;
-  logger
+  let loop = loop logger in
+  object
+    method event time event =
+      logger.queue <- (time, event) :: logger.queue
 
-let event logger time event =
-  logger.queue <- (time, event) :: logger.queue
+    method stop =
+      logger.stop <- true
 
-let stop logger =
-  logger.stop <- true ;
-  logger.loop
+    method wait4shutdown = loop
+  end
+
+let create path config = new logger path config

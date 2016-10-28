@@ -21,7 +21,7 @@ val run :
   ?config:Task.config ->
   ?np:int ->
   ?mem:int ->
-  ?log:(Scheduler.time -> Scheduler.event -> unit) ->
+  ?logger:Scheduler.logger ->
   'a t -> 'a
 
 type repo_item

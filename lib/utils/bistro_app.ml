@@ -116,14 +116,14 @@ let run
     ?(config = Task.config ~db_path:"_bistro" ~use_docker:true)
     ?(np = 1)
     ?(mem = 1024)
-    ?log
+    ?logger
     app =
   let open Lwt in
   let main =
     let allocator = Allocator.create ~np ~mem in
     let workflows = to_workflow_list app in
     let dag = Scheduler.compile workflows in
-    Scheduler.(run ?log config allocator dag) >>= fun traces ->
+    Scheduler.(run ?logger config allocator dag) >>= fun traces ->
     if has_error traces then (
       error_report config.Task.db traces ;
       fail (Failure "Some workflow failed!")

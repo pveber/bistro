@@ -2,12 +2,6 @@ open Core.Std
 open Bistro_engine
 open Lwt
 
-type t = {
-  queue : (Scheduler.time * Scheduler.event) Queue.t ;
-  new_event : unit Lwt_condition.t ;
-  loop : unit Lwt.t ;
-}
-
 let msg t fmt =
   let k s =
     let t = Time.(to_string (of_float t)) in
@@ -24,11 +18,12 @@ let error_short_descr =
   | Task.Step_failure { exit_code } ->
     sprintf "ended with exit code %d" exit_code
 
-let rec loop queue new_event =
+let rec loop stop queue new_event =
   match Queue.dequeue queue with
   | None ->
     Lwt_condition.wait new_event >>= fun () ->
-    loop queue new_event
+    if !stop then Lwt.return ()
+    else loop stop queue new_event
   | Some (t, ev) ->
     Task.(
       match ev with
@@ -49,16 +44,22 @@ let rec loop queue new_event =
 
       | _ -> Lwt.return ()
     ) >>= fun () ->
-    loop queue new_event
+    loop stop queue new_event
 
-
-let create () =
+class t =
   let queue = Queue.create () in
   let new_event = Lwt_condition.create () in
-  let loop = loop queue new_event in
-  { queue ; new_event ; loop }
+  let stop = ref false in
+  let loop = loop stop queue new_event in
+  object
+    method event time event =
+      Queue.enqueue queue (time, event) ;
+      Lwt_condition.signal new_event ()
 
+    method stop =
+      stop := true
 
-let event log time event =
-  Queue.enqueue log.queue (time, event) ;
-  Lwt_condition.signal log.new_event ()
+    method wait4shutdown = loop
+  end
+
+let create () = new t
