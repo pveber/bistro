@@ -3,26 +3,19 @@ open Bistro_engine
 
 type time = float
 
-type event =
-  | Task_started of Task.t
-  | Task_ended of Task.t * (unit, Task.error) result
-  | Task_skipped of Task.t * [ `Done_already
-                             | `Missing_dep
-                             | `Allocation_error of string]
-
 type model = {
   dag : Scheduler.DAG.t option ;
-  events : (time * event) list ;
+  events : (time * Scheduler.event) list ;
 }
+
 
 type t = {
   path : string ;
   config : Task.config ;
   mutable model : model ;
   mutable queue : (Scheduler.time * Scheduler.event) list ;
-  change : unit Lwt_condition.t ;
-  stop : unit Lwt_mvar.t ;
-  loop : unit Lwt.t ;
+  mutable stop : bool ;
+  mutable loop : unit Lwt.t ;
 }
 
 let ( >>= ) = Lwt.( >>= )
@@ -33,31 +26,77 @@ let create path config = {
   config ;
   model = { dag = None ; events = [] } ;
   queue = [] ;
-  change = Lwt_condition.create () ;
-  stop = Lwt_mvar.create () ;
+  stop = false ;
   loop = Lwt.return ()
 }
 
-let handle_event = function
-  | Scheduler.Task_started t ->
-    Some (Task_started t)
-
-  | _ -> None
+let some_change logger = logger.queue <> []
 
 let update model time = function
   | Scheduler.Init dag ->
     { model with dag = Some dag }
   | evt -> {
-      model with events = (
-      match handle_event evt with
-      | None -> model.events
-      | Some evt -> (time, evt) :: model.events
-    )
+      model with events = (time, evt) :: model.events
     }
 
-let render doc =
+module Render = struct
+  open Tyxml_html
+  let k = pcdata
+
+  let task config = function
+    | Task.Input (_, p) ->
+      [ k "input " ; k (Bistro.string_of_path p) ]
+
+    | Task.Select (_, `Input input_path, path) ->
+      [ k "select " ;
+        k (Bistro.string_of_path path) ;
+        k " in " ;
+        k (Bistro.string_of_path input_path) ]
+
+    | Task.Select (_, `Step id, path) ->
+      [ k "select " ;
+        k (Bistro.string_of_path path) ;
+        k " in step " ;
+        k id ]
+
+    | Task.Step  { Task.descr } ->
+      [ details (summary [ k descr ]) [ k descr ] ]
+
+  let selected_event config time evt_type t =
+    [
+      td [ k (Float.to_string time) ] ;
+      td [ evt_type ] ;
+      td (task config t)
+    ]
+
+  let event config time evt =
+    let open Scheduler in
+    match evt with
+    | Task_started t ->
+      Some (selected_event config time (k "STARTED") t)
+    | Task_ended (t, _) ->
+      Some (selected_event config time (k "ENDED") t)
+    | Task_skipped (t, `Done_already) ->
+      Some (selected_event config time (k "CACHED") t)
+
+    | Init _
+    | Task_ready _
+    | Task_skipped (_, (`Allocation_error _ | `Missing_dep)) -> None
+
+  let model config m =
+    [
+      table (
+        List.filter_map m.events ~f:(fun (time, evt) -> event config time evt)
+        |> List.map ~f:tr
+      )
+    ]
+
+end
+
+let render config model =
   let open Tyxml_html in
-  html (head (title (pcdata "")) []) (body [])
+  let contents = Render.model config model in
+  html (head (title (pcdata "")) []) (body contents)
 
 let save path doc =
   let buf = Buffer.create 253 in
@@ -69,29 +108,30 @@ let save path doc =
     )
 
 let rec loop logger =
-  logger.model <-
-    List.fold_right logger.queue ~init:logger.model ~f:(fun (time, evt) model ->
-        update model time evt
-      ) ;
-  logger.queue <- [] ;
-  let doc = render logger.model in
-  save logger.path doc >>= fun () ->
-  Lwt.choose [
-    Lwt_condition.wait logger.change >>| (fun () -> `change) ;
-    Lwt_mvar.take logger.stop >>| (fun () -> `stop) ;
-  ] >>=
-  function
-  | `change -> loop logger
-  | `stop -> Lwt.return ()
+  if logger.stop then Lwt.return ()
+  else if some_change logger then (
+    logger.model <-
+      List.fold_right logger.queue ~init:logger.model ~f:(fun (time, evt) model ->
+          update model time evt
+        ) ;
+    logger.queue <- [] ;
+    let doc = render logger.config logger.model in
+    save logger.path doc >>= fun () ->
+    loop logger
+  )
+  else (
+    Lwt_unix.sleep 1. >>= fun () ->
+    loop logger
+  )
 
 let start path config =
   let logger = create path config in
-  { logger with loop = loop logger }
+  logger.loop <- loop logger ;
+  logger
 
 let event logger time event =
-  logger.queue <- (time, event) :: logger.queue ;
-  Lwt_condition.signal logger.change ()
+  logger.queue <- (time, event) :: logger.queue
 
 let stop logger =
-  Lwt_mvar.put logger.stop () >>= fun () ->
+  logger.stop <- true ;
   logger.loop

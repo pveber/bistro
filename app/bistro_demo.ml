@@ -17,15 +17,17 @@ let common_spec =
 
 let logger config verbose html_report =
   let effects = List.filter_opt [
-    if verbose then
-      let open Bistro_console_logger in
-      Some (event (create ()))
-    else
-      None ;
-    Option.map html_report ~f:Bistro_html_logger.(fun path ->
-        event (start path config)
-      )
-  ]
+      (
+        if verbose then
+          let open Bistro_console_logger in
+          Some (event (create ()))
+        else
+          None
+      );
+      Option.map html_report ~f:Bistro_html_logger.(fun path ->
+          event (start path config)
+        )
+    ]
   in
   fun t e ->
     List.iter effects ~f:(fun f -> f t e)
