@@ -74,12 +74,12 @@ module Render = struct
   let k = pcdata
 
   let step_details config ({Task.id ; np ; mem } as step)  =
+    let file_uri = Db.cache config.Task.db id in
     [
-      p [ strong [k"id:"] ; k id ] ;
+      p [ strong [k"id: "] ; a ~a:[a_href file_uri] [ k id ]] ;
       p [ strong [k"command:"] ] ;
       pre [ k (Task.render_step_command ~np ~mem config step) ] ;
-      
-  ]
+    ]
 
   let task config = function
     | Task.Input (_, p) ->
