@@ -15,31 +15,12 @@ let common_spec =
   +> flag "--verbose" no_arg ~doc:" Logs build events on the console"
   +> flag "--html-report" (optional string) ~doc:"PATH Logs build events in an HTML report"
 
-
-let null_logger = object
-  method event _ _ = ()
-  method stop = ()
-  method wait4shutdown = Lwt.return ()
-end
-
-let tee_logger l1 l2 = object
-  method event x y =
-    l1#event x y ;
-    l2#event x y
-
-  method stop =
-    l1#stop ; l2#stop
-
-  method wait4shutdown =
-    Lwt.join [ l1#wait4shutdown ; l2#wait4shutdown ]
-end
-
 let logger config verbose html_report =
-  tee_logger
-    (if verbose then Bistro_console_logger.create () else null_logger)
+  Bistro_logger.tee
+    (if verbose then Bistro_console_logger.create () else Bistro_logger.null)
     (match html_report with
      | Some path -> Bistro_html_logger.create path config
-     | None -> null_logger)
+     | None -> Bistro_logger.null)
 
 
 let main repo outdir np mem verbose html_report () =
