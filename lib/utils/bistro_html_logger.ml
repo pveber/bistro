@@ -3,11 +3,15 @@ open Bistro_engine
 
 type time = float
 
+type event =
+  | Task_started of Task.t
+  | Task_ended of Task.t * (unit, Task.error) result
+  | Task_done_already of Task.t
+
 type model = {
   dag : Scheduler.DAG.t option ;
-  events : (time * Scheduler.event) list ;
+  events : (time * event) list ;
 }
-
 
 type t = {
   path : string ;
@@ -32,12 +36,31 @@ let create path config = {
 
 let some_change logger = logger.queue <> []
 
-let update model time = function
-  | Scheduler.Init dag ->
-    { model with dag = Some dag }
-  | evt -> {
-      model with events = (time, evt) :: model.events
-    }
+let translate_event time = function
+  | Scheduler.Task_started t ->
+    Some (Task_started t)
+  | Scheduler.Task_ended (t, outcome) ->
+    Some (Task_ended (t, outcome))
+  | Scheduler.Task_skipped (t, `Done_already) ->
+    Some (Task_done_already t)
+
+  | Scheduler.Init _
+  | Scheduler.Task_ready _
+  | Scheduler.Task_skipped (_, (`Allocation_error _ | `Missing_dep)) -> None
+
+let update model time evt =
+  {
+    dag = (
+      match evt with
+      | Scheduler.Init dag -> Some dag
+      | _ -> model.dag
+    ) ;
+    events = (
+      match translate_event time evt with
+      | None -> model.events
+      | Some evt -> (time, evt) :: model.events
+    ) ;
+  }
 
 module Render = struct
   open Tyxml_html
@@ -62,32 +85,28 @@ module Render = struct
     | Task.Step  { Task.descr } ->
       [ details (summary [ k descr ]) [ k descr ] ]
 
-  let selected_event config time evt_type t =
-    [
-      td [ k (Float.to_string time) ] ;
-      td [ evt_type ] ;
-      td (task config t)
-    ]
-
   let event config time evt =
-    let open Scheduler in
+    let table_line action t =
+      [
+        td [ k (Float.to_string time) ] ;
+        td [ action ] ;
+        td (task config t)
+      ]
+    in
     match evt with
     | Task_started t ->
-      Some (selected_event config time (k "STARTED") t)
-    | Task_ended (t, _) ->
-      Some (selected_event config time (k "ENDED") t)
-    | Task_skipped (t, `Done_already) ->
-      Some (selected_event config time (k "CACHED") t)
+      table_line (k "STARTED") t
 
-    | Init _
-    | Task_ready _
-    | Task_skipped (_, (`Allocation_error _ | `Missing_dep)) -> None
+    | Task_ended (t, _) ->
+      table_line (k "ENDED") t
+
+    | Task_done_already t ->
+      table_line (k "CACHED") t
 
   let model config m =
     [
       table (
-        List.filter_map m.events ~f:(fun (time, evt) -> event config time evt)
-        |> List.map ~f:tr
+        List.map m.events ~f:(fun (time, evt) -> tr (event config time evt))
       )
     ]
 
