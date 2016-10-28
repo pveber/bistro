@@ -65,3 +65,6 @@ val requirement : t -> Allocator.request
 val perform : Allocator.resource -> config -> t -> (unit, error) result Lwt.t
 val is_done : config -> t -> bool Lwt.t
 val clean : config -> t -> unit Lwt.t
+
+(* LOW-LEVEL API *)
+val render_step_command : np:int -> mem:int -> config -> step -> string
