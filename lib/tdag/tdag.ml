@@ -104,7 +104,7 @@ module Make(D : Domain) = struct
         let thread =
           Task.is_done config u >>= fun is_done ->
           if is_done then (
-            log (Unix.gettimeofday ()) (Task_skipped (u, `Missing_dep)) ;
+            log (Unix.gettimeofday ()) (Task_skipped (u, `Done_already)) ;
             Thread.return (Skipped `Done_already)
           )
           else
