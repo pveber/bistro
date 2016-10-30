@@ -1,5 +1,6 @@
 open Core.Std
 open Bistro_engine
+open Rresult
 
 type time = float
 
@@ -71,15 +72,20 @@ module Render = struct
 
   let k = pcdata
 
-  let step_details config ({Task.id ; np ; mem } as step)  =
-    let file_uri = Db.cache config.Task.db id in
+  let step_details ?outcome config ({Task.id ; np ; mem } as step)  =
+    let id_elt = match outcome with
+      | Some (Ok ()) ->
+        let file_uri = Db.cache config.Task.db id in
+        a ~a:[a_href file_uri] [ k id ]
+      | Some (Error _) | None -> k id
+    in
     [
-      p [ strong [k"id: "] ; a ~a:[a_href file_uri] [ k id ]] ;
+      p [ strong [k"id: "] ; id_elt ] ;
       p [ strong [k"command:"] ] ;
       pre [ k (Task.render_step_command ~np ~mem config step) ] ;
     ]
 
-  let task config = function
+  let task ?outcome config = function
     | Task.Input (_, p) ->
       [ k "input " ; k (Bistro.string_of_path p) ]
 
@@ -106,7 +112,7 @@ module Render = struct
               ]
             ] ;
             div ~a:[a_id elt_id ; a_class ["panel-collapse";"collapse"]] (
-              step_details config step ;
+              step_details ?outcome config step ;
             )
 
           ]
@@ -114,22 +120,22 @@ module Render = struct
       ]
 
   let event config time evt =
-    let table_line action t =
+    let table_line ?outcome action t =
       [
         td [ k Time.(to_string_trimmed ~zone:Zone.local (of_float time)) ] ;
         td [ action ] ;
-        td (task config t)
+        td (task ?outcome config t)
       ]
     in
     match evt with
     | Task_started t ->
       table_line (k "STARTED") t
 
-    | Task_ended (t, _) ->
-      table_line (k "ENDED") t
+    | Task_ended (t, outcome) ->
+      table_line ~outcome (k "ENDED") t
 
     | Task_done_already t ->
-      table_line (k "CACHED") t
+      table_line ~outcome:(Ok ()) (k "CACHED") t
 
   let event_table config m =
     let table =
