@@ -77,12 +77,12 @@ module Render = struct
 
   let step_details ?outcome config ({Task.id ; np ; mem } as step)  =
     let outputs = match outcome with
-      | Some _ -> div [
-          item "log" [
+      | Some res -> div [
+          item "outcome" [
             a ~a:[a_href (Db.stdout config.Task.db id) ] [ k "stdout" ] ;
             k " " ;
             a ~a:[a_href (Db.stderr config.Task.db id) ] [ k "stderr" ] ;
-          ]
+          ] ;
         ]
       | None -> div []
     in
@@ -101,21 +101,40 @@ module Render = struct
       pre [ k (Task.render_step_command ~np ~mem config step) ] ;
     ]
 
+  let outcome_par conf = function
+    | None
+    | Some (Ok ()) -> k""
+    | Some (Error e) ->
+      Task.(
+        match e with
+        | Input_doesn't_exist _ ->
+          p [ k"Input doesn't exist" ]
+        | Invalid_select (dir, sel) ->
+          p [ k"No path " ; k (Bistro.string_of_path sel) ; k" in " ;
+              k (Db.cache conf.db dir) ]
+        | Step_failure sf ->
+          p [ k (sprintf "Command failed with code %d" sf.exit_code) ]
+      )
+
   let task ?outcome config = function
-    | Task.Input (_, p) ->
-      [ k "input " ; k (Bistro.string_of_path p) ]
+    | Task.Input (_, path) ->
+      [ p [ k "input " ; k (Bistro.string_of_path path) ] ;
+        outcome_par config outcome ]
+
 
     | Task.Select (_, `Input input_path, path) ->
-      [ k "select " ;
-        k (Bistro.string_of_path path) ;
-        k " in " ;
-        k (Bistro.string_of_path input_path) ]
+      [ p [ k "select " ;
+            k (Bistro.string_of_path path) ;
+            k " in " ;
+            k (Bistro.string_of_path input_path) ] ;
+        outcome_par config outcome ]
 
     | Task.Select (_, `Step id, path) ->
-      [ k "select " ;
-        k (Bistro.string_of_path path) ;
-        k " in step " ;
-        k id ]
+      [ p [ k "select " ;
+            k (Bistro.string_of_path path) ;
+            k " in step " ;
+            k id ] ;
+        outcome_par config outcome ]
 
     | Task.Step step ->
       let elt_id = new_elt_id () in
@@ -125,10 +144,11 @@ module Render = struct
             div ~a:[a_class ["panel-heading"]] [
               h4 ~a:[a_class ["panel-title"]] [
                 a ~a:[a_user_data "toggle" "collapse" ; a_href ("#" ^ elt_id) ] [ k step.Task.descr ]
-              ]
+              ] ;
+              outcome_par config outcome ;
             ] ;
             div ~a:[a_id elt_id ; a_class ["panel-collapse";"collapse"]] (
-              step_details ?outcome config step ;
+              step_details ?outcome config step
             )
 
           ]
