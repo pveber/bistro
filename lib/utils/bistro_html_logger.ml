@@ -148,7 +148,13 @@ module Render = struct
       table_line (k "STARTED") t
 
     | Task_ended (t, outcome) ->
-      table_line ~outcome (k "ENDED") t
+      let col = match outcome with
+        | Ok _ -> "green"
+        | Error _ -> "red"
+      in
+      let style = sprintf "font-color:'%s'; font-weight:bold;" col in
+      let text = span ~a:[a_style style] [ k "ENDED" ] in
+      table_line ~outcome text t
 
     | Task_done_already t ->
       table_line ~outcome:(Ok ()) (k "CACHED") t
