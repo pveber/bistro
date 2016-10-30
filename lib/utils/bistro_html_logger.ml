@@ -72,16 +72,32 @@ module Render = struct
 
   let k = pcdata
 
+  let item label contents =
+    p (strong [k (label ^ ": ")] :: contents)
+
   let step_details ?outcome config ({Task.id ; np ; mem } as step)  =
-    let id_elt = match outcome with
-      | Some (Ok ()) ->
-        let file_uri = Db.cache config.Task.db id in
-        a ~a:[a_href file_uri] [ k id ]
-      | Some (Error _) | None -> k id
+    let outputs = match outcome with
+      | Some _ -> div [
+          item "log" [
+            a ~a:[a_href (Db.stdout config.Task.db id) ] [ k "stdout" ] ;
+            k " " ;
+            a ~a:[a_href (Db.stderr config.Task.db id) ] [ k "stderr" ] ;
+          ]
+        ]
+      | None -> div []
     in
     [
-      p [ strong [k"id: "] ; id_elt ] ;
-      p [ strong [k"command:"] ] ;
+      item "id" [
+        match outcome with
+        | Some (Ok ()) ->
+          let file_uri = Db.cache config.Task.db id in
+          a ~a:[a_href file_uri] [ k id ]
+        | Some (Error _) | None -> k id
+      ] ;
+
+      outputs ;
+
+      item "command" [] ;
       pre [ k (Task.render_step_command ~np ~mem config step) ] ;
     ]
 
