@@ -28,7 +28,7 @@ module Make(D : Domain) = struct
 
   type t = G.t
   type task = Task.t
-  type task_error = Task.error
+  type task_result = Task.result
   type 'a thread = 'a Thread.t
   type allocator = Allocator.t
   type config = Task.config
@@ -37,7 +37,7 @@ module Make(D : Domain) = struct
     | Run of { ready : time ;
                start : time ;
                end_ : time ;
-               outcome : (unit, task_error) result }
+               outcome : task_result }
 
     | Skipped of [ `Done_already
                  | `Missing_dep
@@ -49,7 +49,7 @@ module Make(D : Domain) = struct
     | Init of t
     | Task_ready of task
     | Task_started of task
-    | Task_ended of task * (unit, task_error) result
+    | Task_ended of task_result
     | Task_skipped of task * [ `Done_already
                              | `Missing_dep
                              | `Allocation_error of string ]
@@ -91,7 +91,7 @@ module Make(D : Domain) = struct
     G.fold_vertex f g []
 
   let successfull_trace = function
-    | Run { outcome = Ok () }
+    | Run { outcome } -> not (Task.failure outcome)
     | Skipped `Done_already -> true
     | _ -> false
 
@@ -124,7 +124,7 @@ module Make(D : Domain) = struct
                 logger#event start (Task_started u) ;
                 Task.perform resource config u >>= fun outcome ->
                 let end_ = Unix.gettimeofday () in
-                logger#event end_ (Task_ended (u, outcome)) ;
+                logger#event end_ (Task_ended outcome) ;
                 Allocator.release alloc resource ;
                 Thread.return (Run { ready ; start ; end_ ; outcome })
               | Error (`Msg msg) ->

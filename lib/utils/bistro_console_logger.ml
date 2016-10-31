@@ -12,9 +12,9 @@ let msg t fmt =
 let error_short_descr =
   let open Task in
   function
-  | Task.Input_doesn't_exist _ -> "input doesn't exist"
-  | Task.Invalid_select _ -> "invalid select"
-  | Task.Step_failure { exit_code } ->
+  | Input_check _ -> "input doesn't exist"
+  | Select_check _ -> "invalid select"
+  | Step_result { exit_code } ->
     sprintf "ended with exit code %d" exit_code
 
 let output_event t =
@@ -24,13 +24,14 @@ let output_event t =
     let id = String.prefix s.id 6 in
     msg t "started %s.%s" s.descr id
 
-  | Scheduler.Task_ended (Step s, res) ->
-    let id = String.prefix s.id 6 in
-    let outcome = match res with
-      | Ok () -> "success"
-      | Error e -> sprintf "error: %s" (error_short_descr e)
+  | Scheduler.Task_ended (Step_result { step } as res) ->
+    let id = String.prefix step.id 6 in
+    let outcome =
+      if Task.failure res then
+        sprintf "error: %s" (error_short_descr res)
+      else "success"
     in
-    msg t "ended %s.%s (%s)" s.descr id outcome
+    msg t "ended %s.%s (%s)" step.descr id outcome
 
   | Scheduler.Task_skipped (Step s, `Allocation_error err) ->
     msg t "allocation error for %s.%s (%s)" s.descr s.id err

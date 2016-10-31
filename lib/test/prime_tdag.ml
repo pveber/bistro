@@ -104,7 +104,7 @@ end
 module Task = struct
   type t = Push of int
   type config = unit
-  type error = [ `Msg of string ]
+  type result = t * (unit, [ `Msg of string ]) Pervasives.result
 
   let id (Push i) = string_of_int i
 
@@ -112,17 +112,19 @@ module Task = struct
     if i mod 2 = 0 then Allocator.Even
     else Allocator.Odd
 
-  let perform _ _ (Push i) =
+  let perform _ _ (Push i as t) =
     log (Started i) ;
     Lwt_unix.sleep (Random.float 0.5) >>| fun () ->
     log (Ended i) ;
     performed := i :: !performed ;
-    Ok ()
+    t, Ok ()
 
   let clean _ _ = Lwt.return ()
 
   let is_done _ (Push i) =
     Lwt.return (List.mem !performed i)
+
+  let failure (_, x) = x = Ok ()
 end
 
 module D = struct

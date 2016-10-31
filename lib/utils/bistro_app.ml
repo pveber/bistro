@@ -48,23 +48,23 @@ let rec eval : type s. Db.t -> s t -> s
 let error_short_descr =
   let open Task in
   function
-  | Task.Input_doesn't_exist p ->
-    sprintf "Input %s doesn't exist" p
-  | Task.Invalid_select (dir, sel) ->
-    sprintf "Path %s doesn't exist in %s" (Bistro.string_of_path sel) dir
-  | Task.Step_failure { script ; exit_code ; dumps } ->
+  | Task.Input_check { path } ->
+    sprintf "Input %s doesn't exist" path
+  | Select_check { dir_path ; sel } ->
+    sprintf "Path %s doesn't exist in %s" (Bistro.string_of_path sel) dir_path
+  | Step_result { exit_code } ->
     sprintf "Ended with exit code %d" exit_code
 
 let error_long_descr db tid =
   let open Task in
   function
-  | Input_doesn't_exist _
-  | Invalid_select _ -> ()
-  | Step_failure { script ; exit_code ; dumps } ->
+  | Input_check _
+  | Select_check _ -> ()
+  | Step_result { cmd ; exit_code ; dumps } ->
     fprintf stderr "+------------------------------------------------------------------------------+\n" ;
     fprintf stderr "| Submitted script                                                             |\n" ;
     fprintf stderr "+------------------------------------------------------------------------------+\n" ;
-    fprintf stderr "%s\n" script ;
+    fprintf stderr "%s\n" cmd ;
     List.iter dumps ~f:(fun (path, text) ->
         fprintf stderr "+------------------------------------------------------------------------------+\n" ;
         fprintf stderr "|> Dumped file: %s\n" path ;
@@ -82,8 +82,8 @@ let error_long_descr db tid =
     fprintf stderr "%s\n" (In_channel.read_all (Db.stderr db tid))
 
 let error_report_aux db = function
-  | tid, Scheduler.Run { outcome = Error e } ->
-    let short_descr = error_short_descr e in
+  | tid, Scheduler.Run { outcome } when Task.failure outcome ->
+    let short_descr = error_short_descr outcome in
     fprintf stderr "################################################################################\n" ;
     fprintf stderr "#                                                                              #\n" ;
     fprintf stderr "#  Task %s failed\n" tid ;
@@ -96,7 +96,7 @@ let error_report_aux db = function
     fprintf stderr "###\n" ;
     fprintf stderr "##\n" ;
     fprintf stderr "#\n" ;
-    error_long_descr db tid e
+    error_long_descr db tid outcome
   | _ -> ()
 
 let error_report db traces =
@@ -106,9 +106,8 @@ let error_report db traces =
 
 let has_error traces =
   String.Map.exists traces ~f:Scheduler.(function
-      | Run { outcome = Error _ }
+      | Run { outcome } -> Task.failure outcome
       | Skipped (`Missing_dep | `Allocation_error _) -> true
-      | Run { outcome = Ok _ }
       | Skipped `Done_already -> false
     )
 
@@ -161,12 +160,14 @@ let generate_page outdir (dest, Path cache_path) =
 
 let foreach_target { Task.db } outdir traces (Repo_item (dest, w)) =
   let id = Bistro.Workflow.id w in
-  match String.Map.find_exn traces id with
-  | Scheduler.Run { outcome = Ok () }
-  | Scheduler.Skipped `Done_already ->
+  let link () =
     let cache_path = Db.cache db id in
     link (outdir :: dest) cache_path
-  | Scheduler.Run { outcome = Error _ }
+  in
+  match String.Map.find_exn traces id with
+  | Scheduler.Run { outcome } ->
+    if not (Task.failure outcome) then link ()
+  | Scheduler.Skipped `Done_already -> link ()
   | Scheduler.Skipped (`Missing_dep | `Allocation_error _) -> ()
 
 let of_repo ~outdir items =

@@ -40,13 +40,18 @@ and token =
 and path = string list
 [@@deriving sexp]
 
-type error =
-  | Input_doesn't_exist of string
-  | Invalid_select of string * path
-  | Step_failure of {
+type result =
+  | Input_check of { path : string ; pass : bool }
+  | Select_check of { dir_path : string ; sel : string list ; pass : bool }
+  | Step_result of {
+      success : bool ;
+      step : step ;
       exit_code : int ;
-      script : string ;
+      cmd : string ;
       dumps : (string * string) list ;
+      cache : string option ;
+      stdout : string ;
+      stderr : string ;
     }
 
 type config = private {
@@ -62,7 +67,8 @@ val config :
 val of_workflow : Bistro.u -> t
 val id : t -> string
 val requirement : t -> Allocator.request
-val perform : Allocator.resource -> config -> t -> (unit, error) result Lwt.t
+val perform : Allocator.resource -> config -> t -> result Lwt.t
+val failure : result -> bool
 val is_done : config -> t -> bool Lwt.t
 val clean : config -> t -> unit Lwt.t
 

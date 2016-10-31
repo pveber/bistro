@@ -15,7 +15,7 @@ type event =
   | Init of DAG.t
   | Task_ready of Task.t
   | Task_started of Task.t
-  | Task_ended of Task.t * (unit, Task.error) result
+  | Task_ended of Task.result
   | Task_skipped of Task.t * [ `Done_already
                              | `Missing_dep
                              | `Allocation_error of string]
@@ -30,7 +30,7 @@ type trace =
   | Run of { ready : time ;
              start : time ;
              end_ : time ;
-             outcome : (unit, Task.error) result }
+             outcome : Task.result }
 
   | Skipped of [ `Done_already
                | `Missing_dep

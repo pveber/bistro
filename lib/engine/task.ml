@@ -86,14 +86,19 @@ let rec deps_of_command =
   | Simple_command tokens -> deps_of_template tokens
   | Docker (_, c) -> deps_of_command c
 
-type error =
-  | Input_doesn't_exist of string
-  | Invalid_select of string * path
-  | Step_failure of {
+type result =
+  | Input_check of { path : string ; pass : bool }
+  | Select_check of { dir_path : string ; sel : string list ; pass : bool }
+  | Step_result of {
+      success : bool ;
+      step : step ;
       exit_code : int ;
-      script : string ;
+      cmd : string ;
       dumps : (string * string) list ;
-   }
+      cache : string option ;
+      stdout : string ;
+      stderr : string ;
+    }
 
 type config = {
   db : Db.t ;
@@ -357,18 +362,18 @@ module Concrete_task = struct
       )
 end
 
-let perform_step (Allocator.Resource { np ; mem }) ({ db } as config) ({ cmd } as task) =
+let perform_step (Allocator.Resource { np ; mem }) ({ db } as config) ({ cmd } as step) =
   let uid = Unix.getuid () in
-  let env = make_execution_env config ~np ~mem task in
-  let stdout = Db.stdout db task.id in
-  let stderr = Db.stderr db task.id in
+  let env = make_execution_env config ~np ~mem step in
+  let stdout = Db.stdout db step.id in
+  let stderr = Db.stderr db step.id in
   remove_if_exists env.tmp_dir >>= fun () ->
   Unix.mkdir_p env.tmp ;
 
   let ccmd = Concrete_task.of_cmd env cmd in
   let file_dumps = Concrete_task.extract_file_dumps env cmd in
   Concrete_task.write_file_dumps file_dumps >>= fun () ->
-  Concrete_task.(perform ~stdout ~stderr ccmd) >>= fun exit_status ->
+  Concrete_task.(perform ~stdout ~stderr ccmd) >>= fun exit_code ->
 
   if config.use_docker then ( (* FIXME: not necessary if no docker command was run *)
     sprintf "docker run -v %s:/bistro -t busybox chown -R %d /bistro" env.tmp_dir uid
@@ -376,34 +381,34 @@ let perform_step (Allocator.Resource { np ; mem }) ({ db } as config) ({ cmd } a
     |> ignore
   ) ;
   let dest_exists = Sys.file_exists env.dest = `Yes in
+  let cache_dest = Db.cache config.db step.id in
   (
-    if exit_status = 0 && dest_exists then
-      mv env.dest (Db.cache config.db task.id) >>= fun () ->
+    if exit_code = 0 && dest_exists then
+      mv env.dest cache_dest >>= fun () ->
       remove_if_exists env.tmp_dir
     else
       Lwt.return ()
   ) >>= fun () ->
+  let Concrete_task.Sh cmd = ccmd
+  and `File_dumps dumps = file_dumps
+  and success = exit_code = 0 in
   Lwt.return (
-    if exit_status = 0 then
-      Ok ()
-    else
-      let Concrete_task.Sh script = ccmd
-      and `File_dumps dumps = file_dumps in
-      Error (
-        Step_failure {
-          exit_code = exit_status ;
-          script ;
-          dumps ;
-        }
-      )
+    Step_result {
+      success ;
+      step ;
+      exit_code ;
+      cmd ;
+      dumps ;
+      cache = if success then Some cache_dest else None ;
+      stdout ;
+      stderr ;
+    }
   )
 
-let perform_input p =
+let perform_input path =
   Lwt.wrap (fun () ->
-      if Sys.file_exists p <> `Yes then
-        Error (Input_doesn't_exist p)
-      else
-        Ok ()
+      let pass = Sys.file_exists path = `Yes in
+      Input_check { path ; pass }
     )
 
 let select_dir_path db = function
@@ -415,15 +420,15 @@ let select_path db dir q =
   let q = Bistro.string_of_path q in
   Filename.concat p q
 
-let perform_select db dir q =
+let perform_select db dir sel =
   Lwt.wrap (fun () ->
-      let path = select_path db dir q in
-      if Sys.file_exists path <> `Yes then (
-        Error (
-          Invalid_select (select_dir_path db dir, q)
-        )
-      )
-      else Ok ()
+      let p = select_path db dir sel in
+      let pass = Sys.file_exists p = `Yes in
+      Select_check {
+        dir_path = select_dir_path db dir ;
+        sel ;
+        pass ;
+      }
     )
 
 let perform alloc config = function
@@ -446,7 +451,10 @@ let clean { db } = function
     remove_if_exists (Db.stdout db s.id) >>= fun () ->
     remove_if_exists (Db.stderr db s.id)
 
-
+let failure = function
+  | Input_check { pass }
+  | Select_check { pass } -> not pass
+  | Step_result { success } -> not success
 
 let render_step_command ~np ~mem config task =
   let env = make_execution_env ~np ~mem config task in

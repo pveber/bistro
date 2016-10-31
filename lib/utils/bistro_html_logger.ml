@@ -6,7 +6,7 @@ type time = float
 
 type event =
   | Task_started of Task.t
-  | Task_ended of Task.t * (unit, Task.error) result
+  | Task_ended of Task.result
   | Task_done_already of Task.t
 
 type model = {
@@ -38,8 +38,8 @@ let some_change logger = logger.queue <> []
 let translate_event time = function
   | Scheduler.Task_started t ->
     Some (Task_started t)
-  | Scheduler.Task_ended (t, outcome) ->
-    Some (Task_ended (t, outcome))
+  | Scheduler.Task_ended outcome ->
+    Some (Task_ended outcome)
   | Scheduler.Task_skipped (t, `Done_already) ->
     Some (Task_done_already t)
 
@@ -72,44 +72,62 @@ module Render = struct
 
   let k = pcdata
 
+  let collapsible_panel ~title ~header ~body =
+    let elt_id = new_elt_id () in
+    [
+      div ~a:[a_class ["panel-group"]] [
+        div ~a:[a_class ["panel";"panel-default"]] [
+          div ~a:[a_class ["panel-heading"]] (
+            h4 ~a:[a_class ["panel-title"]] [
+              a ~a:[a_user_data "toggle" "collapse" ; a_href ("#" ^ elt_id) ] title
+            ]
+            :: header
+            @ [ div ~a:[a_id elt_id ; a_class ["panel-collapse";"collapse"]] body ]
+          )
+        ]
+      ]
+    ]
+
+
+  let modal ~header ~body =
+    let modal_id = new_elt_id () in
+    let elt =
+      div ~a:[a_id modal_id ; a_class ["modal";"fade"] ; Unsafe.string_attrib "role" "dialog"] [
+        div ~a:[a_class ["modal-dialog"] ; a_style "width:70%"] [
+          div ~a:[a_class ["modal-content"]] [
+            div ~a:[a_class ["modal-header"]] [
+              button ~a:[a_class ["close"] ; a_user_data "dismiss" "modal"] [
+                entity "times"
+              ] ;
+              h4 header
+            ] ;
+            div ~a:[a_class ["modal-body"]] body
+          ]
+        ]
+      ]
+    in
+    modal_id, elt
+
   let item label contents =
     p (strong [k (label ^ ": ")] :: contents)
 
-  let step_details ?outcome config ({Task.id ; np ; mem } as step)  =
-    let outputs = match outcome with
-      | Some res -> div [
-          item "outcome" [
-            a ~a:[a_href (Db.stdout config.Task.db id) ] [ k "stdout" ] ;
-            k " " ;
-            a ~a:[a_href (Db.stderr config.Task.db id) ] [ k "stderr" ] ;
-          ] ;
-        ]
-      | None -> div []
+  let step_result_details ~id ~cmd ~cache ~stdout ~stderr ~dumps =
+    let outputs = div [
+        item "outcome" [
+          a ~a:[a_href stdout ] [ k "stdout" ] ;
+          k " " ;
+          a ~a:[a_href stderr ] [ k "stderr" ] ;
+        ] ;
+      ]
     in
-    let file_dumps =
-      match Task.render_step_dumps ~np ~mem config step with
+    let file_dumps = match dumps with
       | [] -> k"" ;
-      | dumps ->
+      | _ :: _ ->
         let modals = List.map dumps ~f:(fun (fn, contents) ->
-            let modal_id = new_elt_id () in
-            let modal =
-              div ~a:[a_id modal_id ; a_class ["modal";"fade"] ; Unsafe.string_attrib "role" "dialog"] [
-                div ~a:[a_class ["modal-dialog"] ; a_style "width:70%"] [
-                  div ~a:[a_class ["modal-content"]] [
-                    div ~a:[a_class ["modal-header"]] [
-                      button ~a:[a_class ["close"] ; a_user_data "dismiss" "modal"] [
-                        entity "times"
-                      ] ;
-                      h4 [ k fn ]
-                    ] ;
-                    div ~a:[a_class ["modal-body"]] [
-                      pre [ k contents ]
-                    ]
-                  ]
-                ]
-              ]
+            let id, modal =
+              modal ~header:[ k fn ] ~body:[ pre [ k contents ] ]
             in
-            modal_id, fn, modal
+            id, fn, modal
           )
         in
         let links =
@@ -131,98 +149,113 @@ module Render = struct
     in
     [
       item "id" [
-        match outcome with
-        | Some (Ok ()) ->
-          let file_uri = Db.cache config.Task.db id in
+        match cache with
+        | Some file_uri ->
           a ~a:[a_href file_uri] [ k id ]
-        | Some (Error _) | None -> k id
+        | None -> k id
       ] ;
 
       outputs ;
 
       item "command" [] ;
-      pre [ k (Task.render_step_command ~np ~mem config step) ] ;
+      pre [ k cmd ] ;
 
       file_dumps ;
     ]
 
-  let outcome_par conf = function
-    | None
-    | Some (Ok ()) -> k""
-    | Some (Error e) ->
-      Task.(
-        match e with
-        | Input_doesn't_exist _ ->
+  let task_result =
+    let open Task in
+    function
+    | Input_check { path ; pass } ->
+      [ p [ k "input " ; k path ] ;
+        if pass then k"" else (
           p [ k"Input doesn't exist" ]
-        | Invalid_select (dir, sel) ->
+        ) ]
+
+    | Select_check { dir_path ; sel ; pass } ->
+      [ p [ k "select " ;
+            k (Bistro.string_of_path sel) ;
+            k " in " ;
+            k dir_path ] ;
+
+        if pass then k"" else (
           p [ k"No path " ; k (Bistro.string_of_path sel) ; k" in " ;
-              k (Db.cache conf.db dir) ]
-        | Step_failure sf ->
-          p [ k (sprintf "Command failed with code %d" sf.exit_code) ]
-      )
+              a ~a:[a_href dir_path] [k dir_path ] ]
+        ) ]
 
-  let task ?outcome config = function
+    | Step_result { exit_code ; success ; step ; stdout ; stderr ; cache ; dumps ; cmd } ->
+      collapsible_panel
+        ~title:[ k step.descr ]
+        ~header:[
+          if success then k"" else (
+            p [ k (sprintf "Command failed with code %d" exit_code) ]
+          )
+        ]
+        ~body:(step_result_details ~id:step.id ~cmd ~cache ~stderr ~stdout ~dumps)
+
+  let task = function
     | Task.Input (_, path) ->
-      [ p [ k "input " ; k (Bistro.string_of_path path) ] ;
-        outcome_par config outcome ]
-
+      [ p [ k "input " ; k (Bistro.string_of_path path) ] ]
 
     | Task.Select (_, `Input input_path, path) ->
       [ p [ k "select " ;
             k (Bistro.string_of_path path) ;
             k " in " ;
-            k (Bistro.string_of_path input_path) ] ;
-        outcome_par config outcome ]
+            k (Bistro.string_of_path input_path) ] ]
 
     | Task.Select (_, `Step id, path) ->
       [ p [ k "select " ;
             k (Bistro.string_of_path path) ;
             k " in step " ;
-            k id ] ;
-        outcome_par config outcome ]
+            k id ] ]
 
-    | Task.Step step ->
-      let elt_id = new_elt_id () in
-      [
-        div ~a:[a_class ["panel-group"]] [
-          div ~a:[a_class ["panel";"panel-default"]] [
-            div ~a:[a_class ["panel-heading"]] [
-              h4 ~a:[a_class ["panel-title"]] [
-                a ~a:[a_user_data "toggle" "collapse" ; a_href ("#" ^ elt_id) ] [ k step.Task.descr ]
-              ] ;
-              outcome_par config outcome ;
-            ] ;
-            div ~a:[a_id elt_id ; a_class ["panel-collapse";"collapse"]] (
-              step_details ?outcome config step
-            )
+    | Task.Step { Task.descr ; id } ->
+      collapsible_panel
+        ~title:[ k descr ]
+        ~header:[]
+        ~body:[ item "id" [ k id ] ]
 
-          ]
-        ]
-      ]
+  let event_label_text col text =
+    let col = match col with
+      | `BLACK -> "black"
+      | `RED -> "red"
+      | `GREEN -> "green"
+    in
+    let style = sprintf "color:%s; font-weight:bold;" col in
+    span ~a:[a_style style] [ k text ]
+
+  let result_label =
+    let open Task in
+    function
+    | Input_check { pass = true }
+    | Select_check { pass = true } ->
+      event_label_text `BLACK "CHECKED"
+
+    | Input_check { pass = false }
+    | Select_check { pass = false }
+    | Step_result { success = false } ->
+      event_label_text `RED "FAILED"
+
+    | Step_result { success = true } ->
+      event_label_text `GREEN "DONE"
 
   let event config time evt =
-    let table_line ?outcome action t =
+    let table_line label details =
       [
         td [ k Time.(to_string_trimmed ~zone:Zone.local (of_float time)) ] ;
-        td [ action ] ;
-        td (task ?outcome config t)
+        td [ label ] ;
+        td details
       ]
     in
     match evt with
     | Task_started t ->
-      table_line (k "STARTED") t
+      table_line (event_label_text `BLACK "STARTED") (task t)
 
-    | Task_ended (t, outcome) ->
-      let col = match outcome with
-        | Ok _ -> "green"
-        | Error _ -> "red"
-      in
-      let style = sprintf "color:%s; font-weight:bold;" col in
-      let text = span ~a:[a_style style] [ k "ENDED" ] in
-      table_line ~outcome text t
+    | Task_ended result ->
+      table_line (result_label result) (task_result result)
 
     | Task_done_already t ->
-      table_line ~outcome:(Ok ()) (k "CACHED") t
+      table_line (event_label_text `BLACK "CACHED") (task t)
 
   let event_table config m =
     let table =

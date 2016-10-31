@@ -21,7 +21,7 @@ module type Domain = sig
   module Task : sig
     type t
     type config
-    type error
+    type result
 
     val id : t -> string
     val requirement : t -> Allocator.request
@@ -29,7 +29,8 @@ module type Domain = sig
       Allocator.resource ->
       config ->
       t ->
-      (unit, error) Pervasives.result Thread.t
+      result Thread.t
+    val failure : result -> bool
     val is_done : config -> t -> bool Thread.t
     val clean : config -> t -> unit Thread.t
   end
@@ -39,7 +40,7 @@ end
 module type S = sig
   type t
   type task
-  type task_error
+  type task_result
   type allocator
   type config
   type 'a thread
@@ -48,7 +49,7 @@ module type S = sig
     | Run of { ready : time ;
                start : time ;
                end_ : time ;
-               outcome : (unit, task_error) result }
+               outcome : task_result }
 
     | Skipped of [ `Done_already
                  | `Missing_dep
@@ -60,7 +61,7 @@ module type S = sig
     | Init of t
     | Task_ready of task
     | Task_started of task
-    | Task_ended of task * (unit, task_error) result
+    | Task_ended of task_result
     | Task_skipped of task * [ `Done_already
                              | `Missing_dep
                              | `Allocation_error of string ]
