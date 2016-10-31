@@ -216,8 +216,7 @@ let save path doc =
     )
 
 let rec loop logger =
-  if logger.stop then Lwt.return ()
-  else if some_change logger then (
+  if some_change logger then (
     logger.model <-
       List.fold_right logger.queue ~init:logger.model ~f:(fun (time, evt) model ->
           update model time evt
@@ -227,6 +226,7 @@ let rec loop logger =
     save logger.path doc >>= fun () ->
     loop logger
   )
+  else if logger.stop then Lwt.return ()
   else (
     Lwt_unix.sleep 1. >>= fun () ->
     loop logger
