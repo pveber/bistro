@@ -124,6 +124,13 @@ let run
     let workflows = to_workflow_list app in
     let dag = Scheduler.compile workflows in
     Scheduler.(run ?logger config allocator dag) >>= fun traces ->
+    (
+      match logger with
+      | Some logger ->
+        logger#stop ;
+        logger#wait4shutdown
+      | None -> Lwt.return ()
+    ) >>= fun () ->
     if has_error traces then (
       error_report config.Task.db traces ;
       fail (Failure "Some workflow failed!")

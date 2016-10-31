@@ -154,8 +154,7 @@ module Make(D : Domain) = struct
       |> String.Map.to_alist
       |> List.unzip
     in
-    map_p threads ~f:ident >>= fun traces ->
-    logger#wait4shutdown >>| fun () ->
+    map_p threads ~f:ident >>| fun traces ->
     List.zip_exn ids traces
     |> String.Map.of_alist_exn
 end
