@@ -172,7 +172,7 @@ module Render = struct
         | Ok _ -> "green"
         | Error _ -> "red"
       in
-      let style = sprintf "font-color:'%s'; font-weight:bold;" col in
+      let style = sprintf "color:%s; font-weight:bold;" col in
       let text = span ~a:[a_style style] [ k "ENDED" ] in
       table_line ~outcome text t
 
