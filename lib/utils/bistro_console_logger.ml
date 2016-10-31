@@ -57,7 +57,6 @@ class t =
   object
     method event time event =
       Queue.enqueue queue (time, event) ;
-      output_event time event ;
       Lwt_condition.signal new_event ()
 
     method stop =
