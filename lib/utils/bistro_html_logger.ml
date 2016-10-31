@@ -91,11 +91,43 @@ module Render = struct
       | [] -> k"" ;
       | dumps ->
         let modals = List.map dumps ~f:(fun (fn, contents) ->
-            pre [ k contents ]
+            let modal_id = new_elt_id () in
+            let modal =
+              div ~a:[a_id modal_id ; a_class ["modal";"fade"] ; Unsafe.string_attrib "role" "dialog"] [
+                div ~a:[a_class ["modal-dialog"] ; a_style "width:70%"] [
+                  div ~a:[a_class ["modal-content"]] [
+                    div ~a:[a_class ["modal-header"]] [
+                      button ~a:[a_class ["close"] ; a_user_data "dismiss" "modal"] [
+                        entity "times"
+                      ] ;
+                      h4 [ k fn ]
+                    ] ;
+                    div ~a:[a_class ["modal-body"]] [
+                      pre [ k contents ]
+                    ]
+                  ]
+                ]
+              ]
+            in
+            modal_id, fn, modal
           )
         in
-        let links = item "file dumps" [] in
-        div (links :: modals)
+        let links =
+          List.map modals ~f:(fun (modal_id, fn, _) ->
+              li [
+                button ~a:[
+                  a_class ["btn-link"] ;
+                  a_user_data "toggle" "modal" ;
+                  a_user_data "target" ("#" ^ modal_id)] [ k fn ]
+              ]
+            )
+          |> ul
+        in
+        div (
+          (item "file dumps" [])
+          :: links
+          :: List.map modals ~f:(fun (_,_,x) -> x)
+        )
     in
     [
       item "id" [
