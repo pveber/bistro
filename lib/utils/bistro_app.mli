@@ -1,4 +1,5 @@
 open Bistro.Std
+open Bistro_engine
 
 type 'a path = private Path of string
 
@@ -17,11 +18,10 @@ val ( $ ) : ('a -> 'b) t -> 'a t -> 'b t
 val list : 'a t list -> 'a list t
 
 val run :
-  ?use_docker:bool ->
+  ?config:Task.config ->
   ?np:int ->
   ?mem:int ->
-  ?verbose:bool ->
-  ?dag_dump:string ->
+  ?logger:Scheduler.logger ->
   'a t -> 'a
 
 type repo_item

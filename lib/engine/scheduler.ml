@@ -12,11 +12,32 @@ module Domain = struct
   module Task = Task
 end
 
-module DAG = Tdag.Make(Domain)
+module DAG = struct
+  include Tdag.Make(Domain)
+
+  let dot_output dag fn =
+    let vertex_attribute =
+      let open Task in
+      function
+      | Input (_, p) ->
+        let label = Bistro.string_of_path p in
+        [ `Label label ; `Color 0xFFFFFF ; `Shape `Box ]
+      | Select (_, _, p) ->
+        let label = Bistro.string_of_path p in
+        [ `Label label ; `Color 0xFFFFFF ; `Shape `Box ]
+      | Step { descr } ->
+        [ `Label descr ; `Shape `Box ]
+    in
+    let edge_attribute =
+      let open Task in
+      function
+      | Select _, Step _ -> [ `Style `Dotted ]
+      | _ -> []
+    in
+    dot_output dag vertex_attribute edge_attribute fn
+end
 
 include DAG
-
-type dag = DAG.t
 
 let workflow_deps =
   let open Bistro in
@@ -50,26 +71,5 @@ let compile workflows =
       |> fst
     )
 
-let dag_dot_output dag fn =
-  let vertex_attribute =
-    let open Task in
-    function
-    | Input (_, p) ->
-      let label = Bistro.string_of_path p in
-      [ `Label label ; `Color 0xFFFFFF ; `Shape `Box ]
-    | Select (_, _, p) ->
-      let label = Bistro.string_of_path p in
-      [ `Label label ; `Color 0xFFFFFF ; `Shape `Box ]
-    | Step { descr } ->
-      [ `Label descr ; `Shape `Box ]
-  in
-  let edge_attribute =
-    let open Task in
-    function
-    | Select _, Step _ -> [ `Style `Dotted ]
-    | _ -> []
-  in
-  DAG.dot_output dag vertex_attribute edge_attribute fn
-
-let run ?log alloc config dag =
-  DAG.run ?log alloc config dag
+let run ?logger alloc config dag =
+  DAG.run ?logger alloc config dag

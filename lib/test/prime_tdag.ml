@@ -149,13 +149,17 @@ module TG = struct
     S.range 2 n
     |> S.fold ~init:empty ~f:add_task
 
-  let log t =
-    let t = Time.to_string (Time.of_float t) in
-    function
-    | Task_ready (Task.Push i) -> printf "[%s] ready push %d\n%!" t i
-    | Task_started (Task.Push i) -> printf "[%s] started push %d\n%!" t i
-    | Task_ended (Task.Push i, _) -> printf "[%s] ended push %d\n%!" t i
-    | _ -> ()
+  let logger = object
+    method event t evt =
+      let t = Time.to_string (Time.of_float t) in
+      match evt with
+      | Task_ready (Task.Push i) -> printf "[%s] ready push %d\n%!" t i
+      | Task_started (Task.Push i) -> printf "[%s] started push %d\n%!" t i
+      | Task_ended (Task.Push i, _) -> printf "[%s] ended push %d\n%!" t i
+      | _ -> ()
+    method stop = ()
+    method wait4shutdown = Lwt.return ()
+  end
 end
 
 let command =
@@ -164,7 +168,7 @@ let command =
     Command.Spec.empty
     (fun () ->
        Lwt_unix.run (
-         TG.run ~log:TG.log () (Allocator.create ()) (TG.make 100) >>| fun _ ->
+         TG.run ~logger:TG.logger () (Allocator.create ()) (TG.make 100) >>| fun _ ->
          check_performed (List.rev !performed) ;
          check_events (List.rev !events)
        ))

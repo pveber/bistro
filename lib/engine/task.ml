@@ -93,7 +93,7 @@ type error =
       exit_code : int ;
       script : string ;
       dumps : (string * string) list ;
-    }
+   }
 
 type config = {
   db : Db.t ;
@@ -445,3 +445,15 @@ let clean { db } = function
     remove_if_exists (Db.cache db s.id) >>= fun () ->
     remove_if_exists (Db.stdout db s.id) >>= fun () ->
     remove_if_exists (Db.stderr db s.id)
+
+
+
+let render_step_command ~np ~mem config task =
+  let env = make_execution_env ~np ~mem config task in
+  let Concrete_task.Sh cmd = Concrete_task.of_cmd env task.cmd in
+  cmd
+
+let render_step_dumps ~np ~mem config s =
+  let env = make_execution_env ~np ~mem config s in
+  let `File_dumps res = Concrete_task.extract_file_dumps env s.cmd in
+  res

@@ -70,11 +70,11 @@ Library bistro_engine
 
 Library bistro_utils
   Path:             lib/utils
-  Modules:          Bistro_app, Bistro_console_logger
+  Modules:          Bistro_app, Bistro_console_logger, Bistro_html_logger, Bistro_logger
   FindlibName:      utils
   FindlibParent:    bistro
-  BuildDepends:     bistro.engine
-  XMETARequires:    bistro.engine
+  BuildDepends:     bistro.engine, tyxml
+  XMETARequires:    bistro.engine, tyxml
   XMETADescription: Utility functions for bistro
 
 Library bistro_test

@@ -1,17 +1,30 @@
 open Core_kernel.Std
 open Rresult
 
-type dag
+module DAG : sig
+  type t
+  type task = Task.t
+
+  val dot_output : t -> string -> unit
+end
+
 
 type time = float
 
 type event =
+  | Init of DAG.t
   | Task_ready of Task.t
   | Task_started of Task.t
   | Task_ended of Task.t * (unit, Task.error) result
   | Task_skipped of Task.t * [ `Done_already
                              | `Missing_dep
                              | `Allocation_error of string]
+
+class type logger = object
+  method event : time -> event -> unit
+  method stop : unit
+  method wait4shutdown : unit Lwt.t
+end
 
 type trace =
   | Run of { ready : time ;
@@ -23,13 +36,11 @@ type trace =
                | `Missing_dep
                | `Allocation_error of string ]
 
-val compile : Bistro.any_workflow list -> dag
-
-val dag_dot_output : dag -> string -> unit
+val compile : Bistro.any_workflow list -> DAG.t
 
 val run :
-  ?log:(time -> event -> unit) ->
+  ?logger:logger ->
   Task.config ->
   Allocator.t ->
-  dag ->
+  DAG.t ->
   trace String.Map.t Lwt.t

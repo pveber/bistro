@@ -4,13 +4,32 @@ open Core.Std
 open Bistro.Std
 open Bistro.EDSL
 open Bistro_bioinfo.Std
+open Bistro_engine
 
 let common_spec =
   let open Command.Spec in
   empty
   +> flag "--outdir"  (required string) ~doc:"DIR Directory where to link exported targets"
   +> flag "--np"      (optional_with_default 4 int) ~doc:"INT Number of processors"
-  +> flag "--mem"     (optional_with_default 4 int) ~doc:"INT Available memory (in GB)"+> flag "--verbose" no_arg ~doc:" Logs build events on the console"
+  +> flag "--mem"     (optional_with_default 4 int) ~doc:"INT Available memory (in GB)"
+  +> flag "--verbose" no_arg ~doc:" Logs build events on the console"
+  +> flag "--html-report" (optional string) ~doc:"PATH Logs build events in an HTML report"
+
+let logger config verbose html_report =
+  Bistro_logger.tee
+    (if verbose then Bistro_console_logger.create () else Bistro_logger.null)
+    (match html_report with
+     | Some path -> Bistro_html_logger.create path config
+     | None -> Bistro_logger.null)
+
+
+let main repo outdir np mem verbose html_report () =
+  let open Bistro_app in
+  let config = Task.config ~db_path:"_bistro" ~use_docker:true in
+  run
+    ~config ~np ~mem:(mem * 1024)
+    ~logger:(logger config verbose html_report)
+    (of_repo ~outdir repo)
 
 module ChIP_seq = struct
   let chIP_pho4_noPi = List.map ~f:Sra.fetch_srr [ "SRR217304" ; "SRR217305" ]
@@ -27,13 +46,9 @@ module ChIP_seq = struct
 
   let chIP_pho4_noPi_macs2 = Macs2.callpeak ~mfold:(1,100) Macs2.bam [ chIP_pho4_noPi_bam ]
 
-  let main outdir np mem verbose () =
-    let open Bistro_app in
-    let repo = [
-      [ "chIP_pho4_noPi_macs2.peaks" ] %> chIP_pho4_noPi_macs2
-    ]
-    in
-    run ~use_docker:true ~np ~mem:(mem * 1024) ~verbose (of_repo ~outdir repo)
+  let repo = Bistro_app.[
+    [ "chIP_pho4_noPi_macs2.peaks" ] %> chIP_pho4_noPi_macs2
+  ]
 
   let spec = common_spec
 
@@ -41,7 +56,7 @@ module ChIP_seq = struct
     Command.basic
       ~summary:"Analysis of a ChIP-seq dataset"
       spec
-      main
+      (main repo)
 end
 
 module RNA_seq = struct
@@ -101,13 +116,9 @@ module RNA_seq = struct
       [ [   "0" ], counts (`WT, `High_Pi) ;
         [ "360" ], counts (`WT, `No_Pi 360) ; ]
 
-  let main outdir np mem verbose () =
-    let open Bistro_app in
-    let repo = [
-      [ "deseq2" ; "0_vs_360" ] %> deseq2#effect_table ;
-    ]
-    in
-    run ~use_docker:true ~np ~mem:(mem * 1024) ~verbose (of_repo ~outdir repo)
+  let repo = Bistro_app.[
+    [ "deseq2" ; "0_vs_360" ] %> deseq2#effect_table ;
+  ]
 
   let spec = common_spec
 
@@ -115,7 +126,7 @@ module RNA_seq = struct
     Command.basic
       ~summary:"Analysis of a RNA-seq dataset"
       spec
-      main
+      (main repo)
 
 end
 
