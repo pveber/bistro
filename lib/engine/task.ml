@@ -452,3 +452,8 @@ let render_step_command ~np ~mem config task =
   let env = make_execution_env ~np ~mem config task in
   let Concrete_task.Sh cmd = Concrete_task.of_cmd env task.cmd in
   cmd
+
+let render_step_dumps ~np ~mem config s =
+  let env = make_execution_env ~np ~mem config s in
+  let `File_dumps res = Concrete_task.extract_file_dumps env s.cmd in
+  res

@@ -68,3 +68,4 @@ val clean : config -> t -> unit Lwt.t
 
 (* LOW-LEVEL API *)
 val render_step_command : np:int -> mem:int -> config -> step -> string
+val render_step_dumps : np:int -> mem:int -> config -> step -> (string * string) list

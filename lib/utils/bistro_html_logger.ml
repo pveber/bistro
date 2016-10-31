@@ -86,6 +86,17 @@ module Render = struct
         ]
       | None -> div []
     in
+    let file_dumps =
+      match Task.render_step_dumps ~np ~mem config step with
+      | [] -> k"" ;
+      | dumps ->
+        let modals = List.map dumps ~f:(fun (fn, contents) ->
+            pre [ k contents ]
+          )
+        in
+        let links = item "file dumps" [] in
+        div (links :: modals)
+    in
     [
       item "id" [
         match outcome with
@@ -99,6 +110,8 @@ module Render = struct
 
       item "command" [] ;
       pre [ k (Task.render_step_command ~np ~mem config step) ] ;
+
+      file_dumps ;
     ]
 
   let outcome_par conf = function
