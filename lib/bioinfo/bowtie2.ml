@@ -8,7 +8,7 @@ let env = docker_image ~account:"pveber" ~name:"bowtie2" ~tag:"2.2.9" ()
 
 (* memory bound correspond to storing a human index in memory, following bowtie manual *)
 let bowtie2_build ?large_index ?noauto ?packed ?bmax ?bmaxdivn ?dcv ?nodc ?noref ?justref ?offrate ?ftabchars ?seed ?cutoff fa =
-  workflow ~descr:"bowtie2_build" ~mem:(3 * 1024) [
+  workflow ~descr:"bowtie2_build" ~np:8 ~mem:(3 * 1024) [
     mkdir_p dest ;
     cmd "bowtie2-build" ~env [
       option (flag string "--large-index") large_index ;
@@ -22,6 +22,7 @@ let bowtie2_build ?large_index ?noauto ?packed ?bmax ?bmaxdivn ?dcv ?nodc ?noref
       option (opt "--dcv" int) dcv ;
       option (opt "--offrate" int) offrate ;
       option (opt "--ftabchars" int) ftabchars ;
+      opt "--threads" ident np ;
       option (opt "--seed" int) seed ;
       option (opt "--cutoff" int) cutoff ;
       opt "-f" dep fa ;
