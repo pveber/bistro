@@ -19,32 +19,34 @@ let error_short_descr =
     sprintf "ended with exit code %d" exit_code
 
 let rec loop stop queue new_event =
-  match Queue.dequeue queue with
-  | None ->
-    Lwt_condition.wait new_event >>= fun () ->
-    if !stop then Lwt.return ()
-    else loop stop queue new_event
-  | Some (t, ev) ->
-    Task.(
-      match ev with
-      | Scheduler.Task_started (Step s) ->
-        let id = String.prefix s.id 6 in
-        msg t "started %s.%s" s.descr id
+  if !stop then Lwt.return ()
+  else (
+    match Queue.dequeue queue with
+    | None ->
+      Lwt_condition.wait new_event >>= fun () ->
+      loop stop queue new_event
+    | Some (t, ev) ->
+      Task.(
+        match ev with
+        | Scheduler.Task_started (Step s) ->
+          let id = String.prefix s.id 6 in
+          msg t "started %s.%s" s.descr id
 
-      | Scheduler.Task_ended (Step s, res) ->
-        let id = String.prefix s.id 6 in
-        let outcome = match res with
-          | Ok () -> "success"
-          | Error e -> sprintf "error: %s" (error_short_descr e)
-        in
-        msg t "ended %s.%s (%s)" s.descr id outcome
+        | Scheduler.Task_ended (Step s, res) ->
+          let id = String.prefix s.id 6 in
+          let outcome = match res with
+            | Ok () -> "success"
+            | Error e -> sprintf "error: %s" (error_short_descr e)
+          in
+          msg t "ended %s.%s (%s)" s.descr id outcome
 
-      | Scheduler.Task_skipped (Step s, `Allocation_error err) ->
-        msg t "allocation error for %s.%s (%s)" s.descr s.id err
+        | Scheduler.Task_skipped (Step s, `Allocation_error err) ->
+          msg t "allocation error for %s.%s (%s)" s.descr s.id err
 
-      | _ -> Lwt.return ()
-    ) >>= fun () ->
-    loop stop queue new_event
+        | _ -> Lwt.return ()
+      ) >>= fun () ->
+      loop stop queue new_event
+  )
 
 class t =
   let queue = Queue.create () in
@@ -57,7 +59,8 @@ class t =
       Lwt_condition.signal new_event ()
 
     method stop =
-      stop := true
+      stop := true ;
+      Lwt_condition.signal new_event ()
 
     method wait4shutdown = loop
   end
