@@ -9,13 +9,13 @@ let ( / ) (Path p) (Bistro.Selector q) =
 
 type _ t =
   | Pure : 'a -> 'a t
-  | PureW : 'a workflow * ('a path -> 'b) -> 'b t
+  | PureW : 'a workflow -> 'a path t
   | App : ('a -> 'b) t * 'a t -> 'b t
   | List : 'a t list -> 'a list t
 
 let pure x = Pure x
 
-let pureW w f = PureW (w, f)
+let pureW w = PureW w
 
 let app f x = App (f, x)
 
@@ -32,7 +32,7 @@ let rec to_workflow_list
   : type s. s t -> Bistro.any_workflow list
   = function
     | Pure _ -> []
-    | PureW (w, _) -> [ Bistro.Workflow w ]
+    | PureW w -> [ Bistro.Workflow w ]
     | App (f, x) ->
       to_workflow_list f @ to_workflow_list x
     | List xs ->
@@ -43,8 +43,8 @@ let rec eval : type s. Db.t -> s t -> s
   = fun db app ->
     match app with
     | Pure x -> x
-    | PureW (w, f) ->
-      f (Path (Db.workflow_path db w))
+    | PureW w ->
+      Path (Db.workflow_path db w)
     | App (f, x) ->
       (eval db f) (eval db x)
     | List xs ->
@@ -188,7 +188,7 @@ let foreach_target { Task.db } outdir traces (Repo_item (dest, w)) =
 
 let of_repo ~outdir items =
   List.map items ~f:(function Repo_item (p, w) ->
-      pure (generate_page outdir) $ pureW w (fun s -> p, s)
+      pure (generate_page outdir) $ (pure (fun s -> p, s) $ (pureW w))
     )
   |> list
   |> app (pure ignore)

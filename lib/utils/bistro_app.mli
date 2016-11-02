@@ -9,7 +9,7 @@ type 'a t
 
 val pure : 'a -> 'a t
 
-val pureW : 'a workflow -> ('a path -> 'b) -> 'b t
+val pureW : 'a workflow -> 'a path t
 
 val app : ('a -> 'b) t -> 'a t -> 'b t
 
