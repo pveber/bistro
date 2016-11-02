@@ -18,7 +18,6 @@ val ( $ ) : ('a -> 'b) t -> 'a t -> 'b t
 val list : 'a t list -> 'a list t
 
 val run :
-  ?config:Task.config ->
   ?np:int ->
   ?mem:int ->
   ?logger:Scheduler.logger ->

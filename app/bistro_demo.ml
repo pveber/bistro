@@ -15,20 +15,19 @@ let common_spec =
   +> flag "--verbose" no_arg ~doc:" Logs build events on the console"
   +> flag "--html-report" (optional string) ~doc:"PATH Logs build events in an HTML report"
 
-let logger config verbose html_report =
+let logger verbose html_report =
   Bistro_logger.tee
     (if verbose then Bistro_console_logger.create () else Bistro_logger.null)
     (match html_report with
-     | Some path -> Bistro_html_logger.create path config
+     | Some path -> Bistro_html_logger.create path
      | None -> Bistro_logger.null)
 
 
 let main repo outdir np mem verbose html_report () =
   let open Bistro_app in
-  let config = Task.config ~db_path:"_bistro" ~use_docker:true in
   run
-    ~config ~np ~mem:(mem * 1024)
-    ~logger:(logger config verbose html_report)
+    ~np ~mem:(mem * 1024)
+    ~logger:(logger verbose html_report)
     (of_repo ~outdir repo)
 
 module ChIP_seq = struct

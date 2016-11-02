@@ -7,7 +7,10 @@ type time = float
 type event =
   | Task_started of Task.t
   | Task_ended of Task.result
-  | Task_done_already of Task.t
+  | Task_done_already of {
+      task : Task.t ;
+      path : string ;
+    }
 
 type model = {
   dag : Scheduler.DAG.t option ;
@@ -19,35 +22,32 @@ let ( >>| ) = Lwt.( >|= )
 
 type t = {
   path : string ;
-  config : Task.config ;
   mutable model : model ;
-  mutable queue : (Task.config * Scheduler.time * Scheduler.event) list ;
+  mutable changed : bool ;
   mutable stop : bool ;
 }
 
-let create path config = {
+let create path = {
   path ;
-  config ;
   model = { dag = None ; events = [] } ;
-  queue = [] ;
   stop = false ;
+  changed = true ;
 }
 
-let some_change logger = logger.queue <> []
-
-let translate_event time = function
+let translate_event config time = function
   | Scheduler.Task_started t ->
     Some (Task_started t)
   | Scheduler.Task_ended outcome ->
     Some (Task_ended outcome)
-  | Scheduler.Task_skipped (t, `Done_already) ->
-    Some (Task_done_already t)
+  | Scheduler.Task_skipped (task, `Done_already) ->
+    let path = Db.cache config.Task.db (Task.id task) in
+    Some (Task_done_already { task ; path })
 
   | Scheduler.Init _
   | Scheduler.Task_ready _
   | Scheduler.Task_skipped (_, (`Allocation_error _ | `Missing_dep)) -> None
 
-let update model time evt =
+let update model config time evt =
   {
     dag = (
       match evt with
@@ -55,7 +55,7 @@ let update model time evt =
       | _ -> model.dag
     ) ;
     events = (
-      match translate_event time evt with
+      match translate_event config time evt with
       | None -> model.events
       | Some evt -> (time, evt) :: model.events
     ) ;
@@ -239,7 +239,7 @@ module Render = struct
     | Step_result { success = true } ->
       event_label_text `GREEN "DONE"
 
-  let event config time evt =
+  let event time evt =
     let table_line label details =
       [
         td [ k Time.(to_string_trimmed ~zone:Zone.local (of_float time)) ] ;
@@ -254,12 +254,12 @@ module Render = struct
     | Task_ended result ->
       table_line (result_label result) (task_result result)
 
-    | Task_done_already t ->
+    | Task_done_already { task = t } ->
       table_line (event_label_text `BLACK "CACHED") (task t)
 
-  let event_table config m =
+  let event_table m =
     let table =
-      List.map m.events ~f:(fun (time, evt) -> tr (event config time evt))
+      List.map m.events ~f:(fun (time, evt) -> tr (event time evt))
       |> table ~a:[a_class ["table"]]
     in
     [
@@ -275,9 +275,9 @@ module Render = struct
       script ~a:[a_src "http://netdna.bootstrapcdn.com/bootstrap/3.0.2/js/bootstrap.min.js"] (pcdata "") ;
     ]
 
-  let model config m =
+  let model m =
     let contents = List.concat [
-        event_table config m ;
+        event_table m ;
       ]
     in
     html head (body [ div ~a:[a_class ["container"]] contents ])
@@ -294,14 +294,10 @@ let save path doc =
     )
 
 let rec loop logger =
-  if some_change logger then (
-    logger.model <-
-      List.fold_right logger.queue ~init:logger.model ~f:(fun (_, time, evt) model ->
-          update model time evt
-        ) ;
-    logger.queue <- [] ;
-    let doc = Render.model logger.config logger.model in
+  if logger.changed then (
+    let doc = Render.model logger.model in
     save logger.path doc >>= fun () ->
+    logger.changed <- false ;
     loop logger
   )
   else if logger.stop then Lwt.return ()
@@ -310,12 +306,13 @@ let rec loop logger =
     loop logger
   )
 
-class logger path config =
-  let logger = create path config in
+class logger path =
+  let logger = create path in
   let loop = loop logger in
   object
     method event config time event =
-      logger.queue <- (config, time, event) :: logger.queue
+      logger.model <- update logger.model config time event ;
+      logger.changed <- true
 
     method stop =
       logger.stop <- true
@@ -323,4 +320,4 @@ class logger path config =
     method wait4shutdown = loop
   end
 
-let create path config = new logger path config
+let create path = new logger path

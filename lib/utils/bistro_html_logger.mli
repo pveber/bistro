@@ -1,3 +1,3 @@
 open Bistro_engine
 
-val create : string -> Task.config -> Scheduler.logger
+val create : string -> Scheduler.logger
