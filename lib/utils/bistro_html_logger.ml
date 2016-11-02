@@ -215,6 +215,16 @@ module Render = struct
         ~header:[]
         ~body:[ item "id" [ k id ] ]
 
+  let cached_task t path =
+    match t with
+    | Task.Input _
+    | Task.Select _ -> task t
+    | Task.Step { Task.descr ; id } ->
+      collapsible_panel
+        ~title:[ k descr ]
+        ~header:[]
+        ~body:[ item "id" [ a ~a:[a_href path] [ k id ] ] ]
+
   let event_label_text col text =
     let col = match col with
       | `BLACK -> "black"
@@ -254,8 +264,8 @@ module Render = struct
     | Task_ended result ->
       table_line (result_label result) (task_result result)
 
-    | Task_done_already { task = t } ->
-      table_line (event_label_text `BLACK "CACHED") (task t)
+    | Task_done_already { task = t ; path } ->
+      table_line (event_label_text `BLACK "CACHED") (cached_task t path)
 
   let event_table m =
     let table =
