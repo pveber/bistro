@@ -174,18 +174,6 @@ let link p p_u =
 let generate_page outdir (dest, Path cache_path) =
   link (outdir :: dest) cache_path
 
-let foreach_target { Task.db } outdir traces (Repo_item (dest, w)) =
-  let id = Bistro.Workflow.id w in
-  let link () =
-    let cache_path = Db.cache db id in
-    link (outdir :: dest) cache_path
-  in
-  match String.Map.find_exn traces id with
-  | Scheduler.Run { outcome } ->
-    if not (Task.failure outcome) then link ()
-  | Scheduler.Skipped `Done_already -> link ()
-  | Scheduler.Skipped (`Missing_dep | `Allocation_error _) -> ()
-
 let of_repo ~outdir items =
   List.map items ~f:(function Repo_item (p, w) ->
       pure (generate_page outdir) $ (pure (fun s -> p, s) $ (pureW w))
