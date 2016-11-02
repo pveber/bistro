@@ -50,6 +50,17 @@ let rec eval : type s. Db.t -> s t -> s
     | List xs ->
       List.map xs ~f:(eval db)
 
+
+module Syntax = struct
+  module Let_syntax = struct
+    type nonrec 'a t = 'a t
+    let map x ~f = app (pure f) x
+    let both x y =
+      pure (fun x y -> x, y) $ x $ y
+  end
+end
+
+
 let error_short_descr =
   let open Task in
   function

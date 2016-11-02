@@ -30,3 +30,11 @@ type repo_item
 val ( %> ) : string list -> _ workflow -> repo_item
 
 val of_repo : outdir:string -> repo_item list -> unit t
+
+module Syntax : sig
+  module Let_syntax : sig
+    type nonrec 'a t = 'a t
+    val map  : 'a t -> f:('a -> 'b) -> 'b t
+    val both : 'a t -> 'b t -> ('a * 'b) t
+  end
+end
