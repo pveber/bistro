@@ -21,7 +21,7 @@ type t = {
   path : string ;
   config : Task.config ;
   mutable model : model ;
-  mutable queue : (Scheduler.time * Scheduler.event) list ;
+  mutable queue : (Task.config * Scheduler.time * Scheduler.event) list ;
   mutable stop : bool ;
 }
 
@@ -296,7 +296,7 @@ let save path doc =
 let rec loop logger =
   if some_change logger then (
     logger.model <-
-      List.fold_right logger.queue ~init:logger.model ~f:(fun (time, evt) model ->
+      List.fold_right logger.queue ~init:logger.model ~f:(fun (_, time, evt) model ->
           update model time evt
         ) ;
     logger.queue <- [] ;
@@ -314,8 +314,8 @@ class logger path config =
   let logger = create path config in
   let loop = loop logger in
   object
-    method event time event =
-      logger.queue <- (time, event) :: logger.queue
+    method event config time event =
+      logger.queue <- (config, time, event) :: logger.queue
 
     method stop =
       logger.stop <- true

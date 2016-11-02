@@ -152,7 +152,7 @@ module TG = struct
     |> S.fold ~init:empty ~f:add_task
 
   let logger = object
-    method event t evt =
+    method event _ t evt =
       let t = Time.to_string (Time.of_float t) in
       match evt with
       | Task_ready (Task.Push i) -> printf "[%s] ready push %d\n%!" t i

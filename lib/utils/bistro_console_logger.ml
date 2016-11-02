@@ -56,7 +56,7 @@ class t =
   let stop = ref false in
   let loop = loop stop queue new_event in
   object
-    method event time event =
+    method event (_ : Task.config) time event =
       Queue.enqueue queue (time, event) ;
       Lwt_condition.signal new_event ()
 

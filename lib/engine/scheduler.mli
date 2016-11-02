@@ -21,7 +21,7 @@ type event =
                              | `Allocation_error of string]
 
 class type logger = object
-  method event : time -> event -> unit
+  method event : Task.config -> time -> event -> unit
   method stop : unit
   method wait4shutdown : unit Lwt.t
 end

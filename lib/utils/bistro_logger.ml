@@ -1,13 +1,13 @@
 let null = object
-  method event _ _ = ()
+  method event _ _ _ = ()
   method stop = ()
   method wait4shutdown = Lwt.return ()
 end
 
 let tee l1 l2 = object
-  method event x y =
-    l1#event x y ;
-    l2#event x y
+  method event x y z =
+    l1#event x y z ;
+    l2#event x y z
 
   method stop =
     l1#stop ; l2#stop

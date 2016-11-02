@@ -67,7 +67,7 @@ module type S = sig
                              | `Allocation_error of string ]
 
   class type logger = object
-    method event : time -> event -> unit
+    method event : config -> time -> event -> unit
     method stop : unit
     method wait4shutdown : unit thread
   end
