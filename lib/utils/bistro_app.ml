@@ -23,6 +23,11 @@ let ( $ ) = app
 
 let list xs = List xs
 
+let assoc xs =
+  let keys, terms = List.unzip xs in
+  pure (fun values -> List.zip_exn keys values)
+  $ list terms
+
 let rec to_workflow_list
   : type s. s t -> Bistro.any_workflow list
   = function

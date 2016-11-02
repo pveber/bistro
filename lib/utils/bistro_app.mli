@@ -17,6 +17,8 @@ val ( $ ) : ('a -> 'b) t -> 'a t -> 'b t
 
 val list : 'a t list -> 'a list t
 
+val assoc : ('a * 'b t) list -> ('a * 'b) list t
+
 val run :
   ?np:int ->
   ?mem:int ->
