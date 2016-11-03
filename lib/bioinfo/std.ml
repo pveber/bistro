@@ -9,6 +9,7 @@ type sam = Defs.sam
 type sra = Defs.sra
 
 module Bed = Bed
+module Bedtools = Bedtools
 module Bowtie = Bowtie
 module Bowtie2 = Bowtie2
 module Deseq2 = Deseq2
