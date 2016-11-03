@@ -158,25 +158,79 @@ let run
 type repo_item =
   Repo_item : string list * _ workflow -> repo_item
 
+type normalized_repo_item = {
+  repo_path  : string ;
+  file_path  : string ;
+  cache_path : string ;
+}
+
+type repo = normalized_repo_item list
+
+let normalized_repo_item (Repo_item (repo_path, w)) (Path cache_path) =
+  {
+    repo_path = Bistro.string_of_path repo_path ;
+    file_path = Filename.concat "_files" (Bistro.Workflow.id w) ;
+    cache_path ;
+  }
+
 let ( %> ) path w = Repo_item (path, w)
+
+let make_repo items =
+  List.map items ~f:(fun (item, cache_path) ->
+      normalized_repo_item item cache_path
+    )
+
+let is_strict_prefix ~prefix u =
+  String.length prefix < String.length u
+  && String.is_prefix ~prefix u
+
+let find_bottom items item =
+  let f min_item candidate =
+    if is_strict_prefix ~prefix:candidate.cache_path min_item.cache_path
+    then candidate
+    else min_item
+  in
+  List.fold items ~init:item ~f
+
+(* FIXME: quadratic complexity *)
+let remove_redundancies repo =
+  List.map repo ~f:(fun item ->
+      let bottom = find_bottom repo item in
+      if bottom = item then item
+      else
+        let cache_path =
+          Filename.concat
+            bottom.file_path
+            (String.chop_prefix_exn ~prefix:bottom.cache_path item.cache_path)
+        in
+        { item with cache_path }
+    )
 
 let make_absolute p =
   if Filename.is_absolute p then p
   else Filename.concat (Sys.getcwd ()) p
 
-let link p p_u =
-  let dst = Bistro.string_of_path p in
+let link dst p_u =
   let src = make_absolute p_u in
   Unix.mkdir_p (Filename.dirname dst) ;
   let cmd = sprintf "rm -rf %s && ln -s %s %s" dst src dst in
   ignore (Sys.command cmd)
 
-let generate_page outdir (dest, Path cache_path) =
-  link (outdir :: dest) cache_path
+let generate outdir items =
+  List.iter items ~f:(fun item ->
+      let repo_path = Filename.concat outdir item.repo_path in
+      let file_path = Filename.concat outdir item.file_path in
+      let cache_path =
+        if Filename.is_absolute item.cache_path then item.cache_path
+        else Filename.concat outdir item.cache_path in
+      link repo_path file_path ;
+      link file_path cache_path
+    )
 
 let of_repo ~outdir items =
-  List.map items ~f:(function Repo_item (p, w) ->
-      pure (generate_page outdir) $ (pure (fun s -> p, s) $ (pureW w))
+  List.map items ~f:(function (Repo_item (p, w) as item) ->
+      pure (normalized_repo_item item) $ (pureW w)
     )
   |> list
-  |> app (pure ignore)
+  |> app (pure remove_redundancies)
+  |> app (pure (generate outdir))
