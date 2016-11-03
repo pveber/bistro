@@ -11,7 +11,10 @@ end
 
 type bigBed = ([`bigBed], [`binary]) file
 
-type bedGraph = ([`bedGraph], [`text]) file
+class type bedGraph = object
+  inherit bed3
+  method f4 : float
+end
 
 type wig = ([`wig], [`text]) file
 

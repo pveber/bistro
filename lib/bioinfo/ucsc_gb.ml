@@ -27,7 +27,10 @@ end
 
 type bigBed = ([`bigBed], [`binary]) file
 
-type bedGraph = ([`bedGraph], [`text]) file
+class type bedGraph = object
+  inherit bed3
+  method f4 : float
+end
 
 type wig = ([`wig], [`text]) file
 
@@ -37,7 +40,7 @@ let env = docker_image ~account:"pveber" ~name:"ucsc-kent" ~tag:"330" ()
 
 
 (** {5 Dealing with genome sequences} *)
-    
+
 let chromosome_sequences org =
   let org = string_of_genome org in
   workflow ~descr:(sprintf "ucsc_gb.chromosome_sequence(%s)" org) [
