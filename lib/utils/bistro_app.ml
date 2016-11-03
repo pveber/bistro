@@ -213,7 +213,7 @@ let make_absolute p =
 let link dst p_u =
   let src = make_absolute p_u in
   Unix.mkdir_p (Filename.dirname dst) ;
-  let cmd = sprintf "rm -rf %s && ln -s %s %s" dst src dst in
+  let cmd = sprintf "rm -rf %s && ln -r -s %s %s" dst src dst in
   ignore (Sys.command cmd)
 
 let generate outdir items =
