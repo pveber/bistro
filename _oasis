@@ -33,6 +33,7 @@ Library bistro_bioinfo
   Path:             lib/bioinfo
   Pack:             true
   Modules:          Bed,
+                    Bedtools,
                     Bowtie,
                     Bowtie2,
                     Deseq2,
