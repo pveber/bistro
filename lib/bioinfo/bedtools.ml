@@ -4,8 +4,8 @@ open Bistro.EDSL
 
 let env = docker_image ~account:"pveber" ~name:"bedtools" ~tag:"2.21.0" ()
 
-let bedtools subcmd args =
-  cmd "bedtools" ~env (string subcmd :: args)
+let bedtools ?stdout subcmd args =
+  cmd "bedtools" ?stdout ~env (string subcmd :: args)
 
 type 'a input = Bed | Gff
 
@@ -28,7 +28,7 @@ module Cmd = struct
   ]
 
   let slop ?strand ?header ~mode format input chrom_size =
-    bedtools "slop" [
+    bedtools "slop" ~stdout:dest [
       seq (slop_args ?strand ?header ~mode) ;
       opt "-i" dep input ;
       opt "-g" dep chrom_size ;
