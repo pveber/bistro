@@ -46,7 +46,7 @@ let chromosome_sequences org =
   workflow ~descr:(sprintf "ucsc_gb.chromosome_sequence(%s)" org) [
     mkdir_p dest ;
     cd dest ;
-    wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/chromosomes/*" org) () ;
+    wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/chromosomes/*" org) ;
     cmd "gunzip" [ string "*.gz" ]
   ]
 
@@ -68,7 +68,7 @@ let genome_2bit_sequence_dir org =
   workflow ~descr:(sprintf "ucsc_gb.2bit_sequence(%s)" org) [
     mkdir dest ;
     cd dest ;
-    wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/bigZips/%s.2bit" org org) () ;
+    wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/bigZips/%s.2bit" org org) ;
   ]
 
 let genome_2bit_sequence org =

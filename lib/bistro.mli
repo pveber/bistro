@@ -128,7 +128,12 @@ module EDSL : sig
 
   val mkdir : Expr.t -> command
   val mkdir_p : Expr.t -> command
-  val wget : string -> ?dest:Expr.t -> unit -> command
+  val wget :
+    ?no_check_certificate:bool ->
+    ?user:string ->
+    ?password:string ->
+    ?dest:Expr.t ->
+    string -> command
   val cd : Expr.t -> command
   val rm_rf : Expr.t -> command
   val mv : Expr.t -> Expr.t -> command
@@ -223,6 +228,8 @@ module Std : sig
     val wget :
       ?descr_url:string ->
       ?no_check_certificate:bool ->
+      ?user:string ->
+      ?password:string ->
       string -> (_,_) #file workflow
     val gunzip : 'a gz workflow -> 'a workflow
     val bunzip2 : 'a bz2 workflow -> 'a workflow
