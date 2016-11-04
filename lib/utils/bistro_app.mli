@@ -23,6 +23,7 @@ val run :
   ?np:int ->
   ?mem:int ->
   ?logger:Scheduler.logger ->
+  ?dag_dump:string ->
   'a t -> 'a
 
 type repo_item

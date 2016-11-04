@@ -56,7 +56,7 @@ let workflow_id =
 let rec add_workflow dag w =
   let u = Task.of_workflow w in
   let dag' =
-    List.fold (workflow_deps w) ~init:dag ~f:(fun accu dep ->
+    List.fold (workflow_deps w) ~init:(DAG.add_task dag u) ~f:(fun accu dep ->
         let accu', maybe_v = add_workflow accu dep in
         match maybe_v with
         | None -> accu'

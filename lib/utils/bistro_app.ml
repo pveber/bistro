@@ -131,6 +131,7 @@ let run
     ?(np = 1)
     ?(mem = 1024)
     ?logger
+    ?dag_dump
     app =
   let open Lwt in
   let main =
@@ -138,6 +139,11 @@ let run
     let allocator = Allocator.create ~np ~mem in
     let workflows = to_workflow_list app in
     let dag = Scheduler.compile workflows in
+    let () = match dag_dump with
+      | None -> ()
+      | Some fn ->
+        Scheduler.DAG.dot_output dag fn
+    in
     Scheduler.(run ?logger config allocator dag) >>= fun traces ->
     (
       match logger with
