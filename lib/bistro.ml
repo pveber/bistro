@@ -294,12 +294,12 @@ module EDSL = struct
 
   let mv x y = cmd "mv" [ x ; y ]
 
-  let wget ?no_check_certificate ?user ?password ?(dest = dest) url =
+  let wget ?no_check_certificate ?user ?password ?dest url =
     cmd "wget" [
       option (flag string "--no-check-certificate") no_check_certificate ;
       option (opt "--user" string) user ;
       option (opt "--password" string) password ;
-      opt "-O" ident dest ;
+      option (opt "-O" ident) dest ;
       string url ;
     ]
 
@@ -469,7 +469,7 @@ module Std = struct
     let wget ?descr_url ?no_check_certificate ?user ?password url =
       let info = match descr_url with None -> "" | Some i -> sprintf "(%s)" i in
       workflow ~descr:("utils.wget" ^ info) [
-        wget ?no_check_certificate ?user ?password url
+        wget ?no_check_certificate ?user ?password ~dest url
       ]
 
     let unzip zip =
