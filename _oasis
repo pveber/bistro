@@ -28,7 +28,7 @@ Library bistro_tdag
   FindlibParent:    bistro
   BuildDepends:     core_kernel, ocamlgraph, lwt.unix, ppx_sexp_conv, rresult
   XMETARequires:    core_kernel, ocamlgraph, lwt.unix, rresult
-  
+
 Library bistro_bioinfo
   Path:             lib/bioinfo
   Pack:             true
