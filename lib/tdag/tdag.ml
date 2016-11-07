@@ -31,6 +31,7 @@ module Make(D : Domain) = struct
   type task_result = Task.result
   type 'a thread = 'a Thread.t
   type allocator = Allocator.t
+  type resource = Allocator.resource
   type config = Task.config
 
   type trace =
@@ -48,7 +49,7 @@ module Make(D : Domain) = struct
   type event =
     | Init of t
     | Task_ready of task
-    | Task_started of task
+    | Task_started of task * resource
     | Task_ended of task_result
     | Task_skipped of task * [ `Done_already
                              | `Missing_dep
@@ -121,7 +122,7 @@ module Make(D : Domain) = struct
               Allocator.request alloc (Task.requirement u) >>= function
               | Ok resource ->
                 let start = Unix.gettimeofday () in
-                logger#event config start (Task_started u) ;
+                logger#event config start (Task_started (u, resource)) ;
                 Task.perform resource config u >>= fun outcome ->
                 let end_ = Unix.gettimeofday () in
                 logger#event config end_ (Task_ended outcome) ;

@@ -20,7 +20,7 @@ let error_short_descr =
 let output_event t =
   let open Task in
   function
-  | Scheduler.Task_started (Step s) ->
+  | Scheduler.Task_started (Step s, _) ->
     let id = String.prefix s.id 6 in
     msg t "started %s.%s" s.descr id
 

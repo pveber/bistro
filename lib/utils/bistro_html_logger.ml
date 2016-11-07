@@ -35,7 +35,7 @@ let create path = {
 }
 
 let translate_event config time = function
-  | Scheduler.Task_started t ->
+  | Scheduler.Task_started (t, _) ->
     Some (Task_started t)
   | Scheduler.Task_ended outcome ->
     Some (Task_ended outcome)

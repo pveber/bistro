@@ -14,7 +14,7 @@ type time = float
 type event =
   | Init of DAG.t
   | Task_ready of Task.t
-  | Task_started of Task.t
+  | Task_started of Task.t * Allocator.resource
   | Task_ended of Task.result
   | Task_skipped of Task.t * [ `Done_already
                              | `Missing_dep

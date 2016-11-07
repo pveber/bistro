@@ -42,6 +42,7 @@ module type S = sig
   type task
   type task_result
   type allocator
+  type resource
   type config
   type 'a thread
 
@@ -60,7 +61,7 @@ module type S = sig
   type event =
     | Init of t
     | Task_ready of task
-    | Task_started of task
+    | Task_started of task * resource
     | Task_ended of task_result
     | Task_skipped of task * [ `Done_already
                              | `Missing_dep
