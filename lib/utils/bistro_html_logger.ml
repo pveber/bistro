@@ -330,8 +330,8 @@ let save path doc =
 let rec loop logger =
   if logger.changed then (
     let doc = Render.model logger.model in
-    save logger.path doc >>= fun () ->
     logger.changed <- false ;
+    save logger.path doc >>= fun () ->
     loop logger
   )
   else if logger.stop then Lwt.return ()
