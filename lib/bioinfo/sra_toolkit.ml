@@ -1,7 +1,7 @@
 open Core_kernel.Std
 open Bistro.EDSL
 
-let env = docker_image ~account:"pveber" ~name:"sra-toolkit" ~tag:"2.6.2" ()
+let env = docker_image ~account:"pveber" ~name:"sra-toolkit" ~tag:"2.8.0" ()
 
 let fastq_dump sra =
   workflow ~descr:"sratoolkit.fastq_dump" [
