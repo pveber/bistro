@@ -5,7 +5,11 @@ open Rresult
 type time = float
 
 type event =
-  | Task_started of Task.t
+  | Step_task_started of {
+      step : Task.step ;
+      cmd : string ;
+      file_dumps : (string * string) list ;
+    }
   | Task_ended of Task.result
   | Task_done_already of {
       task : Task.t ;
@@ -35,17 +39,23 @@ let create path = {
 }
 
 let translate_event config time = function
-  | Scheduler.Task_started (t, _) ->
-    Some (Task_started t)
+  | Scheduler.Task_started (Task.Step step,
+                            Allocator.Resource { np ; mem }) ->
+    let cmd = Task.render_step_command ~np ~mem config step in
+    let file_dumps = Task.render_step_dumps ~np ~mem config step in
+    Some (Step_task_started { step ; cmd ; file_dumps })
+
   | Scheduler.Task_ended outcome ->
     Some (Task_ended outcome)
+
   | Scheduler.Task_skipped (task, `Done_already) ->
     let path = Db.cache config.Task.db (Task.id task) in
     Some (Task_done_already { task ; path })
 
   | Scheduler.Init _
   | Scheduler.Task_ready _
-  | Scheduler.Task_skipped (_, (`Allocation_error _ | `Missing_dep)) -> None
+  | Scheduler.Task_skipped (_, (`Allocation_error _ | `Missing_dep))
+  | Scheduler.Task_started ((Task.Input _ | Task.Select _), _) -> None
 
 let update model config time evt =
   {
@@ -111,6 +121,39 @@ module Render = struct
   let item label contents =
     p (strong [k (label ^ ": ")] :: contents)
 
+
+  let step_file_dumps = function
+    | [] -> k"" ;
+    | _ :: _ as dumps ->
+      let modals = List.map dumps ~f:(fun (fn, contents) ->
+          let id, modal =
+            modal ~header:[ k fn ] ~body:[ pre [ k contents ] ]
+          in
+          id, fn, modal
+        )
+      in
+      let links =
+        List.map modals ~f:(fun (modal_id, fn, _) ->
+            li [
+              button ~a:[
+                a_class ["btn-link"] ;
+                a_user_data "toggle" "modal" ;
+                a_user_data "target" ("#" ^ modal_id)] [ k fn ]
+            ]
+          )
+        |> ul
+      in
+      div (
+        (item "file dumps" [])
+        :: links
+        :: List.map modals ~f:(fun (_,_,x) -> x)
+      )
+
+  let step_command cmd = div [
+      item "command" [] ;
+      pre [ k cmd ] ;
+    ]
+
   let step_result_details ~id ~cmd ~cache ~stdout ~stderr ~dumps =
     let outputs = div [
         item "outcome" [
@@ -119,33 +162,6 @@ module Render = struct
           a ~a:[a_href stderr ] [ k "stderr" ] ;
         ] ;
       ]
-    in
-    let file_dumps = match dumps with
-      | [] -> k"" ;
-      | _ :: _ ->
-        let modals = List.map dumps ~f:(fun (fn, contents) ->
-            let id, modal =
-              modal ~header:[ k fn ] ~body:[ pre [ k contents ] ]
-            in
-            id, fn, modal
-          )
-        in
-        let links =
-          List.map modals ~f:(fun (modal_id, fn, _) ->
-              li [
-                button ~a:[
-                  a_class ["btn-link"] ;
-                  a_user_data "toggle" "modal" ;
-                  a_user_data "target" ("#" ^ modal_id)] [ k fn ]
-              ]
-            )
-          |> ul
-        in
-        div (
-          (item "file dumps" [])
-          :: links
-          :: List.map modals ~f:(fun (_,_,x) -> x)
-        )
     in
     [
       item "id" [
@@ -156,11 +172,8 @@ module Render = struct
       ] ;
 
       outputs ;
-
-      item "command" [] ;
-      pre [ k cmd ] ;
-
-      file_dumps ;
+      step_command cmd ;
+      step_file_dumps dumps ;
     ]
 
   let task_result =
@@ -215,6 +228,15 @@ module Render = struct
         ~header:[]
         ~body:[ item "id" [ k id ] ]
 
+  let task_start ~step:{ Task.descr ; id } ~cmd ~file_dumps =
+    collapsible_panel
+      ~title:[ k descr ]
+      ~header:[]
+      ~body:[
+        item "id" [ k id ] ;
+        step_command cmd ;
+      ]
+
   let cached_task t path =
     match t with
     | Task.Input _
@@ -258,8 +280,10 @@ module Render = struct
       ]
     in
     match evt with
-    | Task_started t ->
-      table_line (event_label_text `BLACK "STARTED") (task t)
+    | Step_task_started { step ; cmd ; file_dumps } ->
+      table_line
+        (event_label_text `BLACK "STARTED")
+        (task_start ~step ~cmd ~file_dumps)
 
     | Task_ended result ->
       table_line (result_label result) (task_result result)
