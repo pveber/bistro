@@ -313,7 +313,7 @@ module Concrete_task = struct
       if env.use_docker then
         let dck_env = make_docker_execution_env env in
         sprintf
-          "docker run %s %s %s %s %s bash -c \"%s\""
+          "docker run %s %s %s %s -i %s bash -c \"%s\""
           (deps_mount env dck_env (deps_of_command cmd))
           (file_dumps_mount env dck_env (file_dumps_of_command true cmd))
           (tmp_mount env dck_env)
@@ -376,7 +376,7 @@ let perform_step (Allocator.Resource { np ; mem }) ({ db } as config) ({ cmd } a
   Concrete_task.(perform ~stdout ~stderr ccmd) >>= fun exit_code ->
 
   if config.use_docker then ( (* FIXME: not necessary if no docker command was run *)
-    sprintf "docker run -v %s:/bistro busybox chown -R %d /bistro" env.tmp_dir uid
+    sprintf "docker run -v %s:/bistro -i busybox chown -R %d /bistro" env.tmp_dir uid
     |> Sys.command
     |> ignore
   ) ;
