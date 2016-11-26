@@ -119,8 +119,8 @@ let init_exn path = ok_exn (init path)
 let rec workflow_path' db =
   let open Bistro in
   function
-  | Input (_, p) -> string_of_path p
-  | Select (_, dir, p) ->
+  | Input (_, p, _) -> string_of_path p
+  | Select (_, dir, p, _) ->
     Filename.concat (workflow_path' db dir) (string_of_path p)
   | Step s -> cache db s.id
 

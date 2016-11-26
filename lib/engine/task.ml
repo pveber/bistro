@@ -123,12 +123,12 @@ let denormalize_dep =
   let open Bistro in
   function
   | Step s -> `Task s.id
-  | Input (_, p) -> `Input p
-  | Select (_, Input (_, p), q) ->
+  | Input (_, p, _) -> `Input p
+  | Select (_, Input (_, p, _), q, _) ->
     `Input (p @ q)
-  | Select (_, Step s, p) ->
+  | Select (_, Step s, p, _) ->
     `Select (s.id, p)
-  | Select (_, Select _, _) -> assert false
+  | Select (_, Select _, _, _) -> assert false
 
 let rec denormalize_token = function
   | Bistro.S s -> S s
@@ -165,12 +165,12 @@ let of_step { Bistro.id ; mem ; np ; descr ; cmd ; deps ; timeout ; version } =
   }
 
 let of_workflow = function
-  | Bistro.Input (id, p) -> Input (id, p)
-  | Bistro.Select (id, Bistro.Step { Bistro.id = dir_id }, p) ->
+  | Bistro.Input (id, p, _) -> Input (id, p)
+  | Bistro.Select (id, Bistro.Step { Bistro.id = dir_id }, p, _) ->
     Select (id, `Step dir_id, p)
-  | Bistro.Select (id, Bistro.Input (_, dir_p), p) ->
+  | Bistro.Select (id, Bistro.Input (_, dir_p, _), p, _) ->
     Select (id, `Input dir_p, p)
-  | Bistro.Select (_, Bistro.Select _, _) -> assert false
+  | Bistro.Select (_, Bistro.Select _, _, _) -> assert false
   | Bistro.Step s -> of_step s
 
 let requirement = function

@@ -40,8 +40,8 @@ type docker_image = {
 
 module T = struct
   type u =
-    | Input of string * path
-    | Select of string * u * path
+    | Input of string * path * tag list
+    | Select of string * u * path * tag list
     | Step of step
 
   and step = {
@@ -53,6 +53,7 @@ module T = struct
     mem : int ; (** Required memory in MB *)
     timeout : int option ; (** Maximum allowed running time in hours *)
     version : int option ; (** Version number of the wrapper *)
+    tags : tag list ;
   }
 
   and command =
@@ -87,6 +88,7 @@ module T = struct
     | `sh
   ]
 
+  and tag = string
   [@@deriving sexp]
 
   type ('a, 'b) selector = Selector of path
@@ -100,8 +102,8 @@ type 'a workflow = u
 type any_workflow = Workflow : _ workflow -> any_workflow
 
 let workflow_id = function
-  | Input (id, _)
-  | Select (id, _, _)
+  | Input (id, _, _)
+  | Select (id, _, _, _)
   | Step { id } -> id
 
 module Cmd = struct
@@ -138,7 +140,7 @@ module Workflow = struct
   let input ?(may_change = false) target =
     let hash = if may_change then Some (Digest.file target) else None in
     let id = digest ("input", target, hash) in
-    Input (id, path_of_string target)
+    Input (id, path_of_string target, [])
 
 
   let make
@@ -150,28 +152,28 @@ module Workflow = struct
       cmd =
     let deps = Cmd.deps cmd in
     let id = digest ("step", version, cmd) in
-    Step { descr ; deps ; cmd ; np ; mem ; timeout ; version ; id }
+    Step { descr ; deps ; cmd ; np ; mem ; timeout ; version ; id ; tags = [] }
 
   let select u (Selector path) =
     let u, path =
       match u with
-      | Select (_, v, p) -> v, p @ path
+      | Select (_, v, p, _) -> v, p @ path
       | Input _ | Step _ -> u, path
     in
     let id = digest ("select", id u, path) in
-    Select (id, u, path)
+    Select (id, u, path, [])
 
   let rec collect accu u =
     let accu' = List.Assoc.add accu (id u) u in
     match u with
     | Input _ -> accu'
-    | Select (_, v, _) -> collect accu' v
+    | Select (_, v, _, _) -> collect accu' v
     | Step { deps } ->
       List.fold deps ~init:accu' ~f:collect
 
   let descr = function
-    | Input (_,p) -> (string_of_path p)
-    | Select (_, _, p) -> (string_of_path p)
+    | Input (_,p, _) -> (string_of_path p)
+    | Select (_, _, p, _) -> (string_of_path p)
     | Step { descr } -> descr
 
 
@@ -187,7 +189,7 @@ module Workflow = struct
           List.iter deps ~f:(fun m ->
               fprintf oc "n%s -> n%s;\n" id_n (id m)
             )
-        | Select (_,m,_) ->
+        | Select (_,m,_,_) ->
           fprintf oc "n%s [shape=box,label = \"%s\",shape=plaintext];\n" id_n (descr n) ;
           fprintf oc "n%s -> n%s [style=dotted];\n" id_n (id m)
         | Input _ ->
@@ -362,12 +364,12 @@ module Task = struct
 
   let denormalize_dep = function
     | Step s -> `Task s.id
-    | Input (_, p) -> `Input p
-    | Select (_, Input (_, p), q) ->
+    | Input (_, p, _) -> `Input p
+    | Select (_, Input (_, p, _), q, _) ->
       `Input (p @ q)
-    | Select (_, Step s, p) ->
+    | Select (_, Step s, p, _) ->
       `Select (s.id, p)
-    | Select (_, Select _, _) -> assert false
+    | Select (_, Select _, _, _) -> assert false
 
   let rec denormalize_token = function
     | T.S s -> S s
@@ -397,9 +399,9 @@ module Task = struct
       accu
     else
       match w with
-      | T.Input (_, p) -> accu
+      | T.Input (_, p, _) -> accu
 
-      | Select (id, dir, p) ->
+      | Select (id, dir, p, _) ->
         decompose_workflow_aux accu dir
 
       | Step step ->

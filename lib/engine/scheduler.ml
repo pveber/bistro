@@ -43,14 +43,14 @@ let workflow_deps =
   let open Bistro in
   function
   | Input _ -> []
-  | Select (_, dir, _) -> [ dir ]
+  | Select (_, dir, _, _) -> [ dir ]
   | Step s -> s.deps
 
 let workflow_id =
   let open Bistro in
   function
-  | Input (id, _)
-  | Select (id, _, _)
+  | Input (id, _, _)
+  | Select (id, _, _, _)
   | Step { id } -> id
 
 let rec add_workflow dag w =

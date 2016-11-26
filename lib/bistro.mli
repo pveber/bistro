@@ -6,8 +6,8 @@ type 'a workflow
 
 (** Workflow representation *)
 type u = private
-  | Input of string * path
-  | Select of string * u * path
+  | Input of string * path * tag list
+  | Select of string * u * path * tag list
   | Step of step
 
 and step = private {
@@ -19,6 +19,7 @@ and step = private {
   mem : int ; (** Required memory in MB *)
   timeout : int option ; (** Maximum allowed running time in hours *)
   version : int option ; (** Version number of the wrapper *)
+  tags : tag list ;
 }
 
 and command =
@@ -48,6 +49,8 @@ and interpreter = [
 ]
 
 and path = string list
+
+and tag = string
 
 (** Name and version of an external dependency for a workflow *)
 and docker_image = private {
