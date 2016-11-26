@@ -243,10 +243,7 @@ end
 module EDSL = struct
   include Expr
 
-  let input ?(may_change = false) target =
-    let hash = if may_change then Some (Digest.file target) else None in
-    let id = digest ("input", target, hash) in
-    Input (id, path_of_string target)
+  let input = Workflow.input
 
   let docker image cmd = Docker (image, cmd)
 
