@@ -108,7 +108,7 @@ module EDSL : sig
 
   val selector : path -> ('a, 'b) selector
 
-  val ( / ) : 'a workflow -> ('a, 'b) selector -> 'b workflow
+  val ( / ) : 'a directory workflow -> ('a, 'b) selector -> 'b workflow
 
   val cmd :
     string ->

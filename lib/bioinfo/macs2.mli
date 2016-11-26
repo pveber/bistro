@@ -39,7 +39,7 @@ class type peaks_xls = object
 end
 
 val peaks_xls :
-  ([`macs2_callpeak_output] directory, peaks_xls) selector
+  ([`macs2_callpeak_output], peaks_xls) selector
 
 class type narrow_peaks = object
   inherit bed5
@@ -51,7 +51,7 @@ class type narrow_peaks = object
 end
 
 val narrow_peaks :
-  ([`macs2_callpeak_output] directory, narrow_peaks) selector
+  ([`macs2_callpeak_output], narrow_peaks) selector
 
 class type peak_summits = object
   inherit bed4
@@ -59,4 +59,4 @@ class type peak_summits = object
 end
 
 val peak_summits :
-  ([`macs2_callpeak_output] directory, peak_summits) selector
+  ([`macs2_callpeak_output], peak_summits) selector
