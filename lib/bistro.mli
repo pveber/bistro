@@ -113,6 +113,8 @@ module EDSL : sig
 
   val ( / ) : 'a directory workflow -> ('a, 'b) selector -> 'b workflow
 
+  val tag : string list -> 'a workflow -> 'a workflow
+
   val cmd :
     string ->
     ?env:docker_image ->

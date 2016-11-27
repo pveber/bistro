@@ -316,6 +316,14 @@ module EDSL = struct
   let selector x = Workflow.Selector x
   let ( / ) = Workflow.select
 
+  let tag labels = function
+    | Input (id, path, labels') ->
+      Input (id, path, labels @ labels')
+    | Select (id, dir, path, labels') ->
+      Select (id, dir, path, labels @ labels')
+    | Step s ->
+      Step { s with tags = labels @ s.tags }
+
   let docker_image ?tag ?registry ~account ~name () = {
     dck_account = account ;
     dck_name = name ;
