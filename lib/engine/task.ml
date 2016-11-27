@@ -24,8 +24,8 @@ let redirection filename =
   Lwt.return (`FD_move (Lwt_unix.unix_file_descr fd))
 
 type t =
-  | Input of string * path
-  | Select of string * [`Input of path | `Step of string] * path
+  | Input of string * path * tag list
+  | Select of string * [`Input of path | `Step of string] * path * tag list
   | Step of step
 
 and step = {
@@ -37,6 +37,7 @@ and step = {
   mem     : int ; (** Required memory in MB *)
   timeout : int option ; (** Maximum allowed running time in hours *)
   version : int option ; (** Version number of the wrapper *)
+  tags    : tag list ;
 }
 
 and dep = [
@@ -63,6 +64,8 @@ and token =
   | MEM
 
 and path = string list
+
+and tag = string
 [@@deriving sexp]
 
 
@@ -112,8 +115,8 @@ let config ~db_path ~use_docker = {
 
 
 let id = function
-  | Input (id, _)
-  | Select (id, _, _)
+  | Input (id, _, _)
+  | Select (id, _, _, _)
   | Step { id } -> id
 
 
@@ -152,7 +155,7 @@ let rec denormalize_cmd = function
   | Bistro.Docker (image, c) ->
     Docker (image, denormalize_cmd c)
 
-let of_step { Bistro.id ; mem ; np ; descr ; cmd ; deps ; timeout ; version } =
+let of_step { Bistro.id ; mem ; np ; descr ; cmd ; deps ; timeout ; version ; tags } =
   Step {
     id ;
     descr ;
@@ -162,14 +165,15 @@ let of_step { Bistro.id ; mem ; np ; descr ; cmd ; deps ; timeout ; version } =
     deps = List.map deps ~f:denormalize_dep ;
     timeout ;
     version ;
+    tags ;
   }
 
 let of_workflow = function
-  | Bistro.Input (id, p, _) -> Input (id, p)
-  | Bistro.Select (id, Bistro.Step { Bistro.id = dir_id }, p, _) ->
-    Select (id, `Step dir_id, p)
-  | Bistro.Select (id, Bistro.Input (_, dir_p, _), p, _) ->
-    Select (id, `Input dir_p, p)
+  | Bistro.Input (id, p, tags) -> Input (id, p, tags)
+  | Bistro.Select (id, Bistro.Step { Bistro.id = dir_id }, p, tags) ->
+    Select (id, `Step dir_id, p, tags)
+  | Bistro.Select (id, Bistro.Input (_, dir_p, _), p, tags) ->
+    Select (id, `Input dir_p, p, tags)
   | Bistro.Select (_, Bistro.Select _, _, _) -> assert false
   | Bistro.Step s -> of_step s
 
@@ -432,14 +436,14 @@ let perform_select db dir sel =
     )
 
 let perform alloc config = function
-  | Input (_, p) -> perform_input (Bistro.string_of_path p)
-  | Select (_, dir, q) -> perform_select config.db dir q
+  | Input (_, p, _) -> perform_input (Bistro.string_of_path p)
+  | Select (_, dir, q, _) -> perform_select config.db dir q
   | Step s -> perform_step alloc config s
 
 let is_done { db } t =
   let path = match t with
-    | Input (_, p) -> Bistro.string_of_path p
-    | Select (_, dir, q) -> select_path db dir q
+    | Input (_, p, _) -> Bistro.string_of_path p
+    | Select (_, dir, q, _) -> select_path db dir q
     | Step { id } -> Db.cache db id
   in
   Lwt.return (Sys.file_exists path = `Yes)

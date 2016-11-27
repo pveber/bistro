@@ -1,6 +1,6 @@
 type t =
-  | Input of string * path
-  | Select of string * [`Input of path | `Step of string] * path
+  | Input of string * path * tag list
+  | Select of string * [`Input of path | `Step of string] * path * tag list
   | Step of step
 
 and step = {
@@ -12,6 +12,7 @@ and step = {
   mem     : int ; (** Required memory in MB *)
   timeout : int option ; (** Maximum allowed running time in hours *)
   version : int option ; (** Version number of the wrapper *)
+  tags    : tag list ;
 }
 
 and dep = [
@@ -38,6 +39,8 @@ and token =
   | MEM
 
 and path = string list
+
+and tag = string
 [@@deriving sexp]
 
 type result =

@@ -19,10 +19,10 @@ module DAG = struct
     let vertex_attribute =
       let open Task in
       function
-      | Input (_, p) ->
+      | Input (_, p, _) ->
         let label = Bistro.string_of_path p in
         [ `Label label ; `Color 0xFFFFFF ; `Shape `Box ]
-      | Select (_, _, p) ->
+      | Select (_, _, p, _) ->
         let label = Bistro.string_of_path p in
         [ `Label label ; `Color 0xFFFFFF ; `Shape `Box ]
       | Step { descr } ->

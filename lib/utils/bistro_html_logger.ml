@@ -207,16 +207,16 @@ module Render = struct
         ~body:(step_result_details ~id:step.id ~cmd ~cache ~stderr ~stdout ~dumps)
 
   let task = function
-    | Task.Input (_, path) ->
+    | Task.Input (_, path, _) ->
       [ p [ k "input " ; k (Bistro.string_of_path path) ] ]
 
-    | Task.Select (_, `Input input_path, path) ->
+    | Task.Select (_, `Input input_path, path, _) ->
       [ p [ k "select " ;
             k (Bistro.string_of_path path) ;
             k " in " ;
             k (Bistro.string_of_path input_path) ] ]
 
-    | Task.Select (_, `Step id, path) ->
+    | Task.Select (_, `Step id, path, _) ->
       [ p [ k "select " ;
             k (Bistro.string_of_path path) ;
             k " in step " ;
