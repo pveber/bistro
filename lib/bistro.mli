@@ -148,49 +148,6 @@ module EDSL : sig
   val ( % ) : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c
 end
 
-module Task : sig
-  type t = private {
-    id      : id ;
-    descr   : string ;
-    deps    : dep list ;
-    cmd     : command ;
-    np      : int ; (** Required number of processors *)
-    mem     : int ; (** Required memory in MB *)
-    timeout : int option ; (** Maximum allowed running time in hours *)
-    version : int option ; (** Version number of the wrapper *)
-  }
-
-  and dep = [
-      `Task of id
-    | `Select of id * path
-    | `Input of path
-  ]
-  and id = string
-
-  and command =
-    | Docker of docker_image * command
-    | Simple_command of token list
-    | And_list of command list
-    | Or_list of command list
-    | Pipe_list of command list
-
-  and token =
-    | S of string
-    | D of dep
-    | F of token list
-    | DEST
-    | TMP
-    | NP
-    | MEM
-
-  [@@deriving sexp]
-
-  val classify_workflow : _ workflow -> dep
-  val classify_any_workflow : any_workflow -> dep
-  val decompose_workflow : _ workflow -> t String.Map.t
-  val decompose_any_workflow : any_workflow -> t String.Map.t
-end
-
 module Std : sig
   type nonrec 'a workflow = 'a workflow
   type nonrec ('a, 'b) selector = ('a, 'b) selector
