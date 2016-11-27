@@ -25,7 +25,7 @@ depends: [
   "pvem"
   "rresult"
   "sexplib" {>= "113.24.00"}
-  "tyxml" {>= "0.4"}
+  "tyxml" {>= "4.0"}
 ]
 available: [
   ocaml-version >= "4.03.0"
