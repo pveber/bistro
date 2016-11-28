@@ -40,7 +40,7 @@ let gsize_expr = function
 let name = "macs2"
 
 let callpeak ?pvalue ?qvalue ?gsize ?call_summits
-             ?fix_bimodal ?mfold ?extsize ?nomodel ?bdg ?control format treatment =
+             ?fix_bimodal ?mfold ?extsize ?nomodel ?bdg ?control ?keep_dup format treatment =
   workflow ~descr:"macs2.callpeak" [
     macs2 "callpeak" [
       opt "--outdir" ident dest ;
@@ -55,6 +55,7 @@ let callpeak ?pvalue ?qvalue ?gsize ?call_summits
       option (opt "--extsize" int) extsize ;
       option (flag string "--nomodel") nomodel ;
       option (flag string "--fix-bimodal") fix_bimodal ;
+      option (opt "--keep-dup" string) keep_dup ;
       option (opt "--control" (list ~sep:" " dep)) control ;
       opt "--treatment" (list ~sep:" " dep) treatment ;
     ]

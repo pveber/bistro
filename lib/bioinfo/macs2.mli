@@ -24,6 +24,7 @@ val callpeak :
   ?nomodel:bool ->
   ?bdg:bool ->
   ?control:'a workflow list ->
+  ?keep_dup:string ->
   'a format ->
   'a workflow list ->
   [`macs2_callpeak_output] directory workflow
