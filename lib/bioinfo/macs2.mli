@@ -7,6 +7,7 @@ val pileup :
   bam workflow -> Ucsc_gb.bedGraph workflow
 
 type gsize = [`hs | `mm | `ce | `dm | `gsize of int]
+type keep_dup = [ `all | `auto | `int of int ]
 
 type _ format
 
@@ -24,7 +25,7 @@ val callpeak :
   ?nomodel:bool ->
   ?bdg:bool ->
   ?control:'a workflow list ->
-  ?keep_dup:string ->
+  ?keep_dup:keep_dup ->
   'a format ->
   'a workflow list ->
   [`macs2_callpeak_output] directory workflow
