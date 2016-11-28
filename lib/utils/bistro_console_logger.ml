@@ -17,12 +17,16 @@ let error_short_descr =
   | Step_result { exit_code } ->
     sprintf "ended with exit code %d" exit_code
 
+let string_of_tags xs =
+  List.map xs ~f:(( ^ ) "#")
+  |> String.concat ~sep:" "
+
 let output_event t =
   let open Task in
   function
   | Scheduler.Task_started (Step s, _) ->
     let id = String.prefix s.id 6 in
-    msg t "started %s.%s" s.descr id
+    msg t "started %s.%s %s" s.descr id (string_of_tags s.tags)
 
   | Scheduler.Task_ended (Step_result { step } as res) ->
     let id = String.prefix step.id 6 in
@@ -31,7 +35,7 @@ let output_event t =
         sprintf "error: %s" (error_short_descr res)
       else "success"
     in
-    msg t "ended %s.%s (%s)" step.descr id outcome
+    msg t "ended %s.%s (%s) %s" step.descr id outcome (string_of_tags step.tags)
 
   | Scheduler.Task_skipped (Step s, `Allocation_error err) ->
     msg t "allocation error for %s.%s (%s)" s.descr s.id err
