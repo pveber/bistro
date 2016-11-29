@@ -55,15 +55,15 @@ let workflow_id =
 
 let rec add_workflow dag w =
   let u = Task.of_workflow w in
-  let dag' =
-    List.fold (workflow_deps w) ~init:(DAG.add_task dag u) ~f:(fun accu dep ->
-        let accu', maybe_v = add_workflow accu dep in
-        match maybe_v with
-        | None -> accu'
-        | Some v -> DAG.add_dep accu' u ~on:v
-      )
-  in
-  dag', Some u
+  if DAG.mem_task dag u then dag, u
+  else
+    let dag' =
+      List.fold (workflow_deps w) ~init:(DAG.add_task dag u) ~f:(fun accu dep ->
+          let accu', dep_v = add_workflow accu dep in
+          DAG.add_dep accu' u ~on:dep_v
+        )
+    in
+    dag', u
 
 let compile workflows =
   List.fold workflows ~init:DAG.empty ~f:(fun accu (Bistro.Workflow w) ->

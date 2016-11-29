@@ -73,6 +73,8 @@ module type S = sig
     method wait4shutdown : unit thread
   end
 
+  val mem_task : t -> task -> bool
+
   val empty : t
   val add_task : t -> task -> t
   val add_dep : t -> task -> on:task -> t
