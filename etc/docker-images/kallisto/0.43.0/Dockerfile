@@ -1,4 +1,4 @@
-FROM pveber/bistro-base:latest
+FROM pveber/bistro-base:jessie
 
 RUN \
   apt-get update && apt-get install -y cmake g++ --fix-missing
