@@ -7,13 +7,21 @@ module Make(D : Domain) = struct
   let ( >>= ) = Thread.bind
   let ( >>| ) x f = x >>= fun x -> Thread.return (f x)
 
-  let rec map_p ~f = function
-    | [] -> Thread.return []
+  let rec rev_map_p_aux ~f accu = function
+    | [] -> accu
     | h :: t ->
-      let f_h = f h and map_f_t = map_p t ~f in
-      f_h >>= fun f_h ->
-      map_f_t >>| fun map_f_t ->
-      f_h :: map_f_t
+      let f_h = f h in
+      let accu' =
+        accu >>= fun ys ->
+        f_h >>| fun y ->
+        y :: ys
+      in
+      rev_map_p_aux ~f accu' t
+
+  let rev_map_p ~f xs = rev_map_p_aux ~f (Thread.return []) xs
+
+  let map_p ~f xs =
+    rev_map_p ~f xs >>| List.rev
 
   module V = struct
     type t = Task.t
