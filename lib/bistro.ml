@@ -140,6 +140,24 @@ module Workflow = struct
     let id = digest ("input", target, hash) in
     Input (id, path_of_string target)
 
+  let rec digestable_command = function
+    | Docker (im, cmd) -> `Docker (im, digestable_command cmd)
+    | Simple_command toks ->
+      `Simple_command (List.map ~f:digestable_token toks)
+    | And_list cmds -> `And_list (List.map cmds ~f:digestable_command)
+    | Or_list cmds -> `Or_list (List.map cmds ~f:digestable_command)
+    | Pipe_list cmds -> `Pipe_list (List.map cmds ~f:digestable_command)
+
+  and digestable_token = function
+    | S s -> `S s
+    | D (Input (id, _)) -> `D (`Input id)
+    | D (Select (id, _, _)) -> `D (`Select id)
+    | D (Step s) -> `D (`Step s.id)
+    | F toks -> `F (List.map toks ~f:digestable_token)
+    | DEST -> `DEST
+    | TMP -> `TMP
+    | NP -> `NP
+    | MEM -> `MEM
 
   let make
       ?(descr = "")
@@ -149,7 +167,7 @@ module Workflow = struct
       ?version
       cmd =
     let deps = Cmd.deps cmd in
-    let id = digest ("step", version, cmd) in
+    let id = digest ("step", version, digestable_command cmd) in
     Step { descr ; deps ; cmd ; np ; mem ; timeout ; version ; id }
 
   let select u (Selector path) =
