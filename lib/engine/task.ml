@@ -179,6 +179,12 @@ let requirement = function
   | Step { np ; mem } ->
     Allocator.Request { np ; mem }
 
+let rec command_uses_docker = function
+  | Docker (_, _) -> true
+  | Simple_command _ -> false
+  | And_list xs
+  | Or_list xs
+  | Pipe_list xs -> List.exists xs ~f:command_uses_docker
 
 type execution_env = {
   use_docker : bool ;
@@ -362,6 +368,11 @@ module Concrete_task = struct
       )
 end
 
+let docker_chown dir uid =
+  sprintf "docker run -v %s:/bistro -i busybox chown -R %d /bistro" dir uid
+  |> Sys.command
+  |> ignore
+
 let perform_step (Allocator.Resource { np ; mem }) ({ db } as config) ({ cmd } as step) =
   let uid = Unix.getuid () in
   let env = make_execution_env config ~np ~mem step in
@@ -375,13 +386,12 @@ let perform_step (Allocator.Resource { np ; mem }) ({ db } as config) ({ cmd } a
   Concrete_task.write_file_dumps file_dumps >>= fun () ->
   Concrete_task.(perform ~stdout ~stderr ccmd) >>= fun exit_code ->
 
-  if config.use_docker then ( (* FIXME: not necessary if no docker command was run *)
-    sprintf "docker run -v %s:/bistro -i busybox chown -R %d /bistro" env.tmp_dir uid
-    |> Sys.command
-    |> ignore
-  ) ;
   let dest_exists = Sys.file_exists env.dest = `Yes in
   let cache_dest = Db.cache config.db step.id in
+  if config.use_docker && command_uses_docker cmd then (
+    docker_chown env.tmp_dir uid ;
+    if dest_exists then docker_chown env.dest uid
+  ) ;
   (
     if exit_code = 0 && dest_exists then
       mv env.dest cache_dest >>= fun () ->
