@@ -319,7 +319,7 @@ module Concrete_task = struct
       if env.use_docker then
         let dck_env = make_docker_execution_env env in
         sprintf
-          "docker run %s %s %s %s -i %s bash -c \"%s\""
+          "docker run --log-driver=none --rm %s %s %s %s -i %s bash -c \"%s\""
           (deps_mount env dck_env (deps_of_command cmd))
           (file_dumps_mount env dck_env (file_dumps_of_command true cmd))
           (tmp_mount env dck_env)
@@ -369,7 +369,7 @@ module Concrete_task = struct
 end
 
 let docker_chown dir uid =
-  sprintf "docker run -v %s:/bistro -i busybox chown -R %d /bistro" dir uid
+  sprintf "docker run --log-driver=none --rm -v %s:/bistro -i busybox chown -R %d /bistro" dir uid
   |> Sys.command
   |> ignore
 
