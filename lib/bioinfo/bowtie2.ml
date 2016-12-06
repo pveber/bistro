@@ -59,7 +59,7 @@ let bowtie2
     ?_N ?_L ?ignore_quals ?(mode = `end_to_end)
     ?a ?k ?_D ?_R ?minins ?maxins ?orientation
     ?no_mixed ?no_discordant ?dovetail ?no_contain ?no_overlap
-    ?seed
+    ?no_unal ?seed
     ?fastq_format index fqs =
 
   let args = match fqs with
@@ -95,6 +95,7 @@ let bowtie2
       option (flag string "--dovetail") dovetail ;
       option (flag string "--no-contain") no_contain ;
       option (flag string "--no-overlap") no_overlap ;
+      option (flag string "--no-unal") no_unal ;
       opt "--threads" ident np ;
       option (opt "--seed" int) seed ;
       option (opt "-q" (qual_option % string)) fastq_format ;
