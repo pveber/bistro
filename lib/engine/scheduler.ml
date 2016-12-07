@@ -53,23 +53,28 @@ let workflow_id =
   | Select (id, _, _)
   | Step { id } -> id
 
-let rec add_workflow dag w =
-  let u = Task.of_workflow w in
-  if DAG.mem_task dag u then dag, u
-  else
-    let dag' =
-      List.fold (workflow_deps w) ~init:(DAG.add_task dag u) ~f:(fun accu dep ->
-          let accu', dep_v = add_workflow accu dep in
-          DAG.add_dep accu' u ~on:dep_v
+let rec add_workflow (seen, dag) w =
+  let id = workflow_id w in
+  match String.Map.find seen id with
+  | None ->
+    let u = Task.of_workflow w in
+    let seen', dag' =
+      List.fold (workflow_deps w) ~init:(seen, DAG.add_task dag u) ~f:(fun accu dep ->
+          let seen, dag, dep_v = add_workflow accu dep in
+          String.Map.add seen id u,
+          DAG.add_dep dag u ~on:dep_v
         )
     in
-    dag', u
+    seen', dag', u
+
+  | Some u -> seen, dag, u
 
 let compile workflows =
-  List.fold workflows ~init:DAG.empty ~f:(fun accu (Bistro.Workflow w) ->
-      add_workflow accu (Bistro.Workflow.u w)
-      |> fst
+  List.fold workflows ~init:(String.Map.empty, DAG.empty) ~f:(fun accu (Bistro.Workflow w) ->
+      let seen, dag, _ = add_workflow accu (Bistro.Workflow.u w) in
+      seen, dag
     )
+  |> snd
 
 let run ?logger alloc config dag =
   DAG.run ?logger alloc config dag
