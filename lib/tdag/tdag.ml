@@ -31,7 +31,7 @@ module Make(D : Domain) = struct
       Task.id u = Task.id v
   end
 
-  module G = Graph.Persistent.Digraph.Concrete(V)
+  module G = Graph.Persistent.Digraph.ConcreteBidirectional(V)
   module Dfs = Graph.Traverse.Dfs(G)
 
   type t = G.t
