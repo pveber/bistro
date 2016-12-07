@@ -69,6 +69,7 @@ module Make(D : Domain) = struct
     method wait4shutdown : unit thread
   end
 
+  let nb_tasks = G.nb_vertex
   let mem_task = G.mem_vertex
 
   let empty = G.empty
