@@ -83,7 +83,7 @@ Library bistro_test
   Modules:          Prime_tdag
   FindlibName:      test
   FindlibParent:    bistro
-  BuildDepends:     bistro.tdag, core, rresult, threads
+  BuildDepends:     bistro.tdag, bistro.utils, core, rresult, threads
   XMETARequires:    bistro.tdag, core, rresult, threads
   XMETADescription: Test modules for bistro
 
