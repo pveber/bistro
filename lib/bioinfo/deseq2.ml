@@ -15,6 +15,7 @@ type output =
     normalized_counts : table workflow ;
     sample_clustering : svg workflow ;
     sample_pca : svg workflow ;
+    directory : [ `deseq2_output ] directory workflow ;
   >
 
 let env = docker_image ~account:"pveber" ~name:"bioconductor" ~tag:"3.3" ()
@@ -219,4 +220,5 @@ let main_effects factors samples =
       List.map (comparisons factors conditions) ~f:(fun ((name, l1, l2) as comp) ->
           comp, sel [ sprintf "results_%s_%s_%s.tsv" name l1 l2 ]
         )
+    method directory = o
   end
