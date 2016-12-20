@@ -13,6 +13,7 @@ type output =
     normalized_counts : table workflow ;
     sample_clustering : svg workflow ;
     sample_pca : svg workflow ;
+    directory : [ `deseq2_output ] directory workflow
   >
 
 val main_effects :
