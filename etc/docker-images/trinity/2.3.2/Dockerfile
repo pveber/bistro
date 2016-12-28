@@ -10,3 +10,4 @@ RUN wget "https://github.com/trinityrnaseq/trinityrnaseq/archive/Trinity-v2.3.2.
 RUN tar xvfz Trinity-v2.3.2.tar.gz
 RUN cd trinityrnaseq-Trinity-v2.3.2 && make && make plugins
 RUN cd trinityrnaseq-Trinity-v2.3.2 && cp -r Trinity PerlLib Butterfly Chrysalis Inchworm trinity-plugins util /usr/bin
+ENV TRINITY_HOME /trinityrnaseq-Trinity-v2.3.2
