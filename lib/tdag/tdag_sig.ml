@@ -32,7 +32,6 @@ module type Domain = sig
       result Thread.t
     val failure : result -> bool
     val is_done : config -> t -> bool Thread.t
-    val clean : config -> t -> unit Thread.t
   end
 
 end
