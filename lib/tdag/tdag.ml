@@ -23,6 +23,12 @@ module Make(D : Domain) = struct
   let map_p ~f xs =
     rev_map_p ~f xs >>| List.rev
 
+  (* This implementation doesn't have the exact same semantics as
+     [Lwt.join] and is less efficient (since it builds a list of unit
+     values). Another option would be to include [map_p] and [join] in
+     [Thread]. *)
+  let join (xs : unit Thread.t list) = map_p ~f:ident xs >>| ignore
+
   module V = struct
     type t = Task.t
     let compare u v = String.compare (Task.id u) (Task.id v)
@@ -120,7 +126,7 @@ module Make(D : Domain) = struct
           String.Map.find_exn thread_table (Task.id v) :: accu
         in
         let thread =
-          Task.is_done config u >>= fun is_done ->
+          Task.is_done u config >>= fun is_done ->
           if is_done then (
             logger#event config (Unix.gettimeofday ()) (Task_skipped (u, `Done_already)) ;
             Thread.return (Skipped `Done_already)
@@ -151,6 +157,22 @@ module Make(D : Domain) = struct
         in
         String.Map.add thread_table id thread
 
+  let post_revdeps_actions config g thread_table =
+    let foreach_task u accu =
+      let f v accu =
+        match String.Map.find thread_table (Task.id v) with
+        | Some t -> (t >>| ignore) :: accu
+        | None -> accu
+      in
+      let thread =
+        join (G.fold_pred f g u []) >>= fun () ->
+        Task.hook u config `post_revdeps
+      in
+      thread :: accu
+    in
+    G.fold_vertex foreach_task g []
+    |> join
+
   let null_logger = object
     method event _ _ _ = ()
     method stop = ()
@@ -161,11 +183,15 @@ module Make(D : Domain) = struct
     if Dfs.has_cycle g then failwith "Cycle in dependency graph" ;
     let sources = sources g in
     logger#event config (Unix.gettimeofday ()) (Init g) ;
-    let ids, threads =
+    let thread_table =
       List.fold sources ~init:String.Map.empty ~f:(dft logger alloc config g)
+    in
+    let ids, threads =
+      thread_table
       |> String.Map.to_alist
       |> List.unzip
     in
+    post_revdeps_actions config g thread_table >>= fun () ->
     map_p threads ~f:ident >>| fun traces ->
     List.zip_exn ids traces
     |> String.Map.of_alist_exn

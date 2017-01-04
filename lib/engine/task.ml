@@ -446,7 +446,7 @@ let perform alloc config = function
   | Select (_, dir, q) -> perform_select config.db dir q
   | Step s -> perform_step alloc config s
 
-let is_done { db } t =
+let is_done t { db } =
   let path = match t with
     | Input (_, p) -> Bistro.string_of_path p
     | Select (_, dir, q) -> select_path db dir q
@@ -454,12 +454,15 @@ let is_done { db } t =
   in
   Lwt.return (Sys.file_exists path = `Yes)
 
-let clean { db } = function
+let clean t { db } = match t with
   | Input _ | Select _ -> Lwt.return ()
   | Step s ->
     remove_if_exists (Db.cache db s.id) >>= fun () ->
     remove_if_exists (Db.stdout db s.id) >>= fun () ->
     remove_if_exists (Db.stderr db s.id)
+
+let hook t config `post_revdeps =
+  Lwt.return ()
 
 let failure = function
   | Input_check { pass }
