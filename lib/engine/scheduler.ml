@@ -60,6 +60,18 @@ let rec add_workflow (seen, dag) w =
     let u = Task.of_workflow w in
     let seen', dag' =
       List.fold (workflow_deps w) ~init:(seen, DAG.add_task dag u) ~f:(fun accu dep ->
+          (* If [dep] is a select, we need to add its parent dir as a
+             dep of [u], because [dep] only performs a side effect,
+             the real contents that [u] needs is in the result of
+             [dep] parent directory.*)
+          let accu = Bistro.(
+              match dep with
+              | Select (_, dep_dir, _) ->
+                let seen, dag, dep_dir_v = add_workflow accu dep_dir in
+                seen, DAG.add_dep dag u ~on:dep_dir_v
+              | Input _ | Step _ -> accu
+            )
+          in
           let seen, dag, dep_v = add_workflow accu dep in
           String.Map.add seen id u,
           DAG.add_dep dag u ~on:dep_v

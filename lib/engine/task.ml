@@ -29,14 +29,15 @@ type t =
   | Step of step
 
 and step = {
-  id      : id ;
-  descr   : string ;
-  deps    : dep list ;
-  cmd     : command ;
-  np      : int ; (** Required number of processors *)
-  mem     : int ; (** Required memory in MB *)
-  timeout : int option ; (** Maximum allowed running time in hours *)
-  version : int option ; (** Version number of the wrapper *)
+  id       : id ;
+  descr    : string ;
+  deps     : dep list ;
+  cmd      : command ;
+  np       : int ; (** Required number of processors *)
+  mem      : int ; (** Required memory in MB *)
+  timeout  : int option ; (** Maximum allowed running time in hours *)
+  version  : int option ; (** Version number of the wrapper *)
+  precious : bool ;
 }
 
 and dep = [
@@ -152,7 +153,7 @@ let rec denormalize_cmd = function
   | Bistro.Docker (image, c) ->
     Docker (image, denormalize_cmd c)
 
-let of_step { Bistro.id ; mem ; np ; descr ; cmd ; deps ; timeout ; version } =
+let of_step { Bistro.id ; mem ; np ; descr ; cmd ; deps ; timeout ; version ; precious } =
   Step {
     id ;
     descr ;
@@ -162,6 +163,7 @@ let of_step { Bistro.id ; mem ; np ; descr ; cmd ; deps ; timeout ; version } =
     deps = List.map deps ~f:denormalize_dep ;
     timeout ;
     version ;
+    precious ;
   }
 
 let of_workflow = function
@@ -462,7 +464,11 @@ let clean t { db } = match t with
     remove_if_exists (Db.stderr db s.id)
 
 let hook t config `post_revdeps =
-  Lwt.return ()
+  match t with
+  | Input _ | Select _ -> Lwt.return ()
+  | Step s ->
+    if not s.precious then clean t config
+    else Lwt.return ()
 
 let failure = function
   | Input_check { pass }

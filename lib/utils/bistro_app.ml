@@ -32,7 +32,18 @@ let rec to_workflow_list
   : type s. s t -> Bistro.any_workflow list
   = function
     | Pure _ -> []
-    | PureW w -> [ Bistro.Workflow w ]
+    | PureW w ->
+      let open Bistro in
+      (* If [w] is a select, we need to add its parent dir as a
+         workflow of the app so that it is marked as precious. [w]
+         only performs a side effect, the real contents is in the
+         result of [dir]. *)
+      let opt_dir = match Workflow.u w with
+        | Select (_, dir, _) ->
+          [ Workflow (EDSL.precious w) ]
+        | Input _ | Step _ -> []
+      in
+      opt_dir @ [ Workflow (EDSL.precious w) ]
     | App (f, x) ->
       to_workflow_list f @ to_workflow_list x
     | List xs ->

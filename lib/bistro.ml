@@ -41,7 +41,7 @@ type docker_image = {
 module T = struct
   type u =
     | Input of string * path
-    | Select of string * u * path
+    | Select of string * u * path (* invariant: [u] is not a select *)
     | Step of step
 
   and step = {
