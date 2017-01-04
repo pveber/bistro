@@ -53,6 +53,7 @@ module T = struct
     mem : int ; (** Required memory in MB *)
     timeout : int option ; (** Maximum allowed running time in hours *)
     version : int option ; (** Version number of the wrapper *)
+    precious : bool ;
   }
 
   and command =
@@ -165,10 +166,11 @@ module Workflow = struct
       ?(np = 1)
       ?timeout
       ?version
+      ?(precious = false)
       cmd =
     let deps = Cmd.deps cmd in
     let id = digest ("step", version, digestable_command cmd) in
-    Step { descr ; deps ; cmd ; np ; mem ; timeout ; version ; id }
+    Step { descr ; deps ; cmd ; np ; mem ; timeout ; version ; id ; precious }
 
   let select u (Selector path) =
     let u, path =
@@ -339,6 +341,9 @@ module EDSL = struct
     dck_registry = registry ;
   }
 
+  let precious = function
+    | (Input _ | Select _ as w) -> w
+    | Step s -> Step { s with precious = true }
 end
 
 
