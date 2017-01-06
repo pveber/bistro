@@ -32,7 +32,18 @@ let rec to_workflow_list
   : type s. s t -> Bistro.any_workflow list
   = function
     | Pure _ -> []
-    | PureW w -> [ Bistro.Workflow w ]
+    | PureW w ->
+      let open Bistro in
+      (* If [w] is a select, we need to add its parent dir as a
+         workflow of the app so that it is marked as precious. [w]
+         only performs a side effect, the real contents is in the
+         result of [dir]. *)
+      let opt_dir = match Workflow.u w with
+        | Select (_, dir, _) ->
+          [ Workflow (EDSL.precious w) ]
+        | Input _ | Step _ -> []
+      in
+      opt_dir @ [ Workflow (EDSL.precious w) ]
     | App (f, x) ->
       to_workflow_list f @ to_workflow_list x
     | List xs ->
@@ -132,10 +143,11 @@ let run
     ?(mem = 1024)
     ?logger
     ?dag_dump
+    ?(keep_all = true)
     app =
   let open Lwt in
   let main =
-    let config = Task.config ~db_path:"_bistro" ~use_docker:true in
+    let config = Task.config ~db_path:"_bistro" ~use_docker:true ~keep_all in
     let allocator = Allocator.create ~np ~mem in
     let workflows = to_workflow_list app in
     let dag = Scheduler.compile workflows in

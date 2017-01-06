@@ -4,14 +4,15 @@ type t =
   | Step of step
 
 and step = {
-  id      : id ;
-  descr   : string ;
-  deps    : dep list ;
-  cmd     : command ;
-  np      : int ; (** Required number of processors *)
-  mem     : int ; (** Required memory in MB *)
-  timeout : int option ; (** Maximum allowed running time in hours *)
-  version : int option ; (** Version number of the wrapper *)
+  id       : id ;
+  descr    : string ;
+  deps     : dep list ;
+  cmd      : command ;
+  np       : int ; (** Required number of processors *)
+  mem      : int ; (** Required memory in MB *)
+  timeout  : int option ; (** Maximum allowed running time in hours *)
+  version  : int option ; (** Version number of the wrapper *)
+  precious : bool ;
 }
 
 and dep = [
@@ -57,11 +58,13 @@ type result =
 type config = private {
   db : Db.t ;
   use_docker : bool ;
+  keep_all : bool ;
 }
 
 val config :
   db_path:string ->
   use_docker:bool ->
+  keep_all:bool ->
   config
 
 val of_workflow : Bistro.u -> t
@@ -69,8 +72,9 @@ val id : t -> string
 val requirement : t -> Allocator.request
 val perform : Allocator.resource -> config -> t -> result Lwt.t
 val failure : result -> bool
-val is_done : config -> t -> bool Lwt.t
-val clean : config -> t -> unit Lwt.t
+val is_done : t -> config -> bool Lwt.t
+val hook : t -> config -> [`post_revdeps] -> unit Lwt.t
+val clean : t -> config -> unit Lwt.t
 
 (* LOW-LEVEL API *)
 val render_step_command : np:int -> mem:int -> config -> step -> string

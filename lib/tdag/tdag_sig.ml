@@ -30,9 +30,9 @@ module type Domain = sig
       config ->
       t ->
       result Thread.t
+    val hook : t -> config -> [`post_revdeps] -> unit Thread.t
     val failure : result -> bool
-    val is_done : config -> t -> bool Thread.t
-    val clean : config -> t -> unit Thread.t
+    val is_done : t -> config -> bool Thread.t
   end
 
 end

@@ -24,6 +24,7 @@ val run :
   ?mem:int ->
   ?logger:Scheduler.logger ->
   ?dag_dump:string ->
+  ?keep_all:bool ->
   'a t -> 'a
 
 type repo_item

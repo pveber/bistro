@@ -10,34 +10,10 @@ let ( >>| ) = Lwt.( >|= )
 type event =
   | Started of int
   | Ended of int
+  | Not_needed_anymore of int
 
 let events : event list ref = ref []
 let performed : int list ref = ref []
-
-let check_state set =
-  Int.Set.iter set ~f:(fun i ->
-      Int.Set.iter set ~f:(fun j ->
-          if i <> j && (i mod 2 = j mod 2)
-          then failwith "Violated resource constraint" ;
-          if i <> j && (divides i j || divides j i)
-          then failwith "Violated dependency"
-        )
-    )
-
-let check_events xs =
-  List.fold xs ~init:Int.Set.empty ~f:(fun accu ev ->
-      let accu = match ev with
-        | Started i -> Int.Set.add accu i
-        | Ended i -> Int.Set.remove accu i
-      in
-      check_state accu ;
-      accu
-    )
-  |> ignore
-
-let check_performed xs =
-  if List.contains_dup xs
-  then failwith "A task has been performed twice"
 
 let log e =
   events := e :: !events
@@ -49,6 +25,8 @@ let ended i =
   log (Ended i) ;
   performed := i :: !performed
 
+let not_needed_anymore i =
+  log (Not_needed_anymore i)
 
 module Token_allocator = struct
   type 'a t = {
@@ -119,9 +97,12 @@ module Task = struct
     performed := i :: !performed ;
     t, Ok ()
 
+  let hook (Push i) _ `post_revdeps =
+    Lwt.return ()
+
   let clean _ _ = Lwt.return ()
 
-  let is_done _ (Push i) =
+  let is_done (Push i) _ =
     Lwt.return (List.mem !performed i)
 
   let failure (_, x) = x = Ok ()
@@ -164,13 +145,65 @@ module TG = struct
   end
 end
 
+
+let check_state remaining started ended not_needed_anymore =
+  Int.Set.iter started ~f:(fun i ->
+      Int.Set.iter started ~f:(fun j ->
+          if i <> j && (i mod 2 = j mod 2)
+          then failwith "Violated resource constraint" ;
+        ) ;
+    ) ;
+  Int.Set.iter started ~f:(fun i ->
+      Int.Set.iter (Int.Set.union started remaining) ~f:(fun j ->
+          if i <> j && divides j i
+          then failwithf "Violated dependency: started %d while %d is not finished" i j ()
+        ) ;
+    ) ;
+  Int.Set.iter (Int.Set.union started remaining) ~f:(fun i ->
+      Int.Set.iter not_needed_anymore ~f:(fun j ->
+          if i <> j && divides j i
+          then failwithf "Wrong post_revdep: %d is said not needed anymore but %d remains" j i ()
+        ) ;
+    )
+
+let check_events n xs =
+  let module S = Int.Set in
+  let remaining = List.range 2 n |> S.of_list in
+  List.fold xs
+    ~init:(remaining, S.empty, S.empty, S.empty)
+    ~f:(fun (remaining, started, ended, not_needed_anymore) ev ->
+        let accu = match ev with
+          | Started i ->
+            if S.mem remaining i then
+              (S.remove remaining i, S.add started i, ended, not_needed_anymore)
+            else
+              failwithf "Task %d was started twice" i ()
+        | Ended i ->
+          if S.mem started i then
+            (remaining, S.remove started i, S.add ended i, not_needed_anymore)
+          else
+            failwithf "Task %d was ended twice or ended but never started" i ()
+        | Not_needed_anymore i ->
+          (remaining, started, ended, S.add not_needed_anymore i)
+        in
+        check_state remaining started ended not_needed_anymore ;
+        accu
+      )
+  |> ignore
+
+let check_performed xs =
+  if List.contains_dup xs
+  then failwith "A task has been performed twice"
+
 let command =
   Command.basic
     ~summary:"Tests job scheduling on an integer divisor DAG"
     Command.Spec.empty
     (fun () ->
+       let n = 100 in
+       let g = TG.make n in
        Lwt_unix.run (
-         TG.run ~logger:TG.logger () (Allocator.create ()) (TG.make 100) >>| fun _ ->
+         TG.run ~logger:TG.logger () (Allocator.create ()) g >>| fun _ ->
          check_performed (List.rev !performed) ;
-         check_events (List.rev !events)
+         check_events n (List.rev !events)
        ))

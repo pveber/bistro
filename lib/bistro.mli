@@ -19,6 +19,7 @@ and step = private {
   mem : int ; (** Required memory in MB *)
   timeout : int option ; (** Maximum allowed running time in hours *)
   version : int option ; (** Version number of the wrapper *)
+  precious : bool ;
 }
 
 and command =
@@ -103,6 +104,8 @@ module EDSL : sig
     ?timeout:int ->
     ?version:int ->
     command list -> 'a workflow
+
+  val precious : 'a workflow -> 'a workflow
 
   val input : ?may_change:bool -> string -> 'a workflow
 
