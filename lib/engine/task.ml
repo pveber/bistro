@@ -104,11 +104,13 @@ type result =
 type config = {
   db : Db.t ;
   use_docker : bool ;
+  keep_all : bool ;
 }
 
-let config ~db_path ~use_docker = {
+let config ~db_path ~use_docker ~keep_all = {
   db = Db.init_exn db_path ;
   use_docker ;
+  keep_all ;
 }
 
 
@@ -467,7 +469,7 @@ let hook t config `post_revdeps =
   match t with
   | Input _ | Select _ -> Lwt.return ()
   | Step s ->
-    if not s.precious then clean t config
+    if not s.precious && not config.keep_all then clean t config
     else Lwt.return ()
 
 let failure = function

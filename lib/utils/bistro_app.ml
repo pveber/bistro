@@ -143,10 +143,11 @@ let run
     ?(mem = 1024)
     ?logger
     ?dag_dump
+    ?(keep_all = true)
     app =
   let open Lwt in
   let main =
-    let config = Task.config ~db_path:"_bistro" ~use_docker:true in
+    let config = Task.config ~db_path:"_bistro" ~use_docker:true ~keep_all in
     let allocator = Allocator.create ~np ~mem in
     let workflows = to_workflow_list app in
     let dag = Scheduler.compile workflows in

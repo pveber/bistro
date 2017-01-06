@@ -58,11 +58,13 @@ type result =
 type config = private {
   db : Db.t ;
   use_docker : bool ;
+  keep_all : bool ;
 }
 
 val config :
   db_path:string ->
   use_docker:bool ->
+  keep_all:bool ->
   config
 
 val of_workflow : Bistro.u -> t
