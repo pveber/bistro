@@ -82,8 +82,11 @@ let rec add_workflow (seen, dag) w =
   | Some u -> seen, dag, u
 
 let compile workflows =
-  List.fold workflows ~init:(String.Map.empty, DAG.empty) ~f:(fun accu (Bistro.Workflow w) ->
-      let seen, dag, _ = add_workflow accu (Bistro.Workflow.u w) in
+  workflows
+  |> List.map ~f:(fun (Bistro.Workflow w) -> Bistro.Workflow.u w)
+  |> Bistro.Workflow.precious_propagation
+  |> List.fold ~init:(String.Map.empty, DAG.empty) ~f:(fun accu u ->
+      let seen, dag, _ = add_workflow accu u in
       seen, dag
     )
   |> snd

@@ -214,6 +214,30 @@ module Workflow = struct
           fprintf oc "n%s [label = \"%s\"];\n" id_n (descr n)
       ) ;
     fprintf oc "}\n"
+
+  let rec precious_workflows = function
+    | Input _ -> String.Set.empty
+    | Select (_, dir, _) -> precious_workflows dir
+    | Step s ->
+      let precious_deps =
+        List.map s.deps ~f:precious_workflows
+        |> String.Set.union_list
+      in
+      if s.precious then String.Set.add precious_deps s.id
+      else precious_deps
+
+  let rec precious_normalization precious_ids = function
+    | Input _ as x -> x
+    | Select (id, dir, p) ->
+      Select (id, precious_normalization precious_ids dir, p)
+    | Step s ->
+      Step { s with
+             deps = List.map s.deps ~f:(precious_normalization precious_ids) ;
+             precious = s.precious || String.Set.mem precious_ids s.id }
+
+  let precious_propagation xs =
+    let ids = List.map xs ~f:precious_workflows |> String.Set.union_list in
+    List.map xs ~f:(precious_normalization ids)
 end
 
 type 'a directory = [`directory of 'a]
