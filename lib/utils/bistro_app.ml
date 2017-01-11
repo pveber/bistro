@@ -150,13 +150,13 @@ let run
     let config = Task.config ~db_path:"_bistro" ~use_docker:true ~keep_all in
     let allocator = Allocator.create ~np ~mem in
     let workflows = to_workflow_list app in
-    let dag = Scheduler.compile workflows in
+    let dag, goals = Scheduler.compile workflows in
     let () = match dag_dump with
       | None -> ()
       | Some fn ->
         Scheduler.DAG.dot_output dag fn
     in
-    Scheduler.(run ?logger config allocator dag) >>= fun traces ->
+    Scheduler.(run ?logger ~goals config allocator dag) >>= fun traces ->
     (
       match logger with
       | Some logger ->

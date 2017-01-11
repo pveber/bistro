@@ -85,11 +85,11 @@ let compile workflows =
   workflows
   |> List.map ~f:(fun (Bistro.Workflow w) -> Bistro.Workflow.u w)
   |> Bistro.Workflow.precious_propagation
-  |> List.fold ~init:(String.Map.empty, DAG.empty) ~f:(fun accu u ->
-      let seen, dag, _ = add_workflow accu u in
-      seen, dag
+  |> List.fold ~init:(String.Map.empty, DAG.empty, []) ~f:(fun (seen, dag, goals) u ->
+      let seen, dag, t = add_workflow (seen, dag) u in
+      seen, dag, t :: goals
     )
-  |> snd
+  |> fun (_, dag, goals) -> dag, goals
 
-let run ?logger alloc config dag =
-  DAG.run ?logger alloc config dag
+let run ?logger ?goals alloc config dag =
+  DAG.run ?logger ?goals alloc config dag

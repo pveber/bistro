@@ -454,7 +454,9 @@ let is_done t { db } =
   let path = match t with
     | Input (_, p) -> Bistro.string_of_path p
     | Select (_, dir, q) -> select_path db dir q
-    | Step { id } -> Db.cache db id
+    | Step { id ; descr } ->
+      let b = Db.cache db id in
+      (*      printf "%s %s\n" descr b ; *) b
   in
   Lwt.return (Sys.file_exists path = `Yes)
 

@@ -88,6 +88,7 @@ module type S = sig
 
   val run :
     ?logger:logger ->
+    ?goals:task list ->
     config ->
     allocator ->
     t ->

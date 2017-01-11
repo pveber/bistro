@@ -36,10 +36,11 @@ type trace =
                | `Missing_dep
                | `Allocation_error of string ]
 
-val compile : Bistro.any_workflow list -> DAG.t
+val compile : Bistro.any_workflow list -> DAG.t * Task.t list
 
 val run :
   ?logger:logger ->
+  ?goals:Task.t list ->
   Task.config ->
   Allocator.t ->
   DAG.t ->

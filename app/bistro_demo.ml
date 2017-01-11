@@ -26,6 +26,7 @@ let logger verbose html_report =
 let main repo outdir np mem verbose html_report () =
   let open Bistro_app in
   run
+    ~keep_all:false
     ~np ~mem:(mem * 1024)
     ~logger:(logger verbose html_report)
     (of_repo ~outdir repo)

@@ -221,13 +221,16 @@ module Make(D : Domain) = struct
     method wait4shutdown = Thread.return ()
   end
 
-  let run ?(logger = null_logger) config alloc g =
+  let run ?(logger = null_logger) ?goals config alloc g =
     if Dfs.has_cycle g then failwith "Cycle in dependency graph" ;
-    let sources = sources g in
+    let goals = match goals with
+      | None -> sources g
+      | Some tasks -> tasks
+    in
     logger#event config (Unix.gettimeofday ()) (Init g) ;
-    initial_state config g sources >>= fun (needed, already_done) ->
+    initial_state config g goals >>= fun (needed, already_done) ->
     let performance_table =
-      performance_table config logger alloc ~needed ~already_done g sources
+      performance_table config logger alloc ~needed ~already_done g goals
     in
     let ids, threads =
       performance_table
