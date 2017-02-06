@@ -202,7 +202,7 @@ let command =
     (fun () ->
        let n = 100 in
        let g = TG.make n in
-       Lwt_unix.run (
+       Lwt_main.run (
          TG.run ~logger:TG.logger () (Allocator.create ()) g >>| fun _ ->
          check_performed (List.rev !performed) ;
          check_events n (List.rev !events)

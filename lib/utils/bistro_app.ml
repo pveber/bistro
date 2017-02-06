@@ -171,7 +171,7 @@ let run
     else
       return (eval config.Task.db app)
   in
-  Lwt_unix.run main
+  Lwt_main.run main
 
 type repo_item =
   Repo_item : string list * _ workflow -> repo_item
