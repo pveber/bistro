@@ -69,8 +69,6 @@ module Workflow : sig
   type 'a t = 'a workflow
   val id : _ t -> string
   val u : _ t -> u
-
-  val precious_propagation : u list -> u list
 end
 
 
