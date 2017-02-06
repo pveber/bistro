@@ -97,7 +97,7 @@ module Task = struct
     performed := i :: !performed ;
     t, Ok ()
 
-  let hook (Push i) _ `post_revdeps =
+  let post_revdeps_hook (Push i) _ ~all_revdeps_succeeded:_ =
     Lwt.return ()
 
   let clean _ _ = Lwt.return ()

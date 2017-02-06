@@ -467,11 +467,15 @@ let clean t { db } = match t with
     remove_if_exists (Db.stdout db s.id) >>= fun () ->
     remove_if_exists (Db.stderr db s.id)
 
-let hook t config `post_revdeps =
+let post_revdeps_hook t config ~all_revdeps_succeeded =
   match t with
   | Input _ | Select _ -> Lwt.return ()
   | Step s ->
-    if not s.precious && not config.keep_all then clean t config
+    if
+      not s.precious
+      && not config.keep_all
+      && all_revdeps_succeeded
+    then clean t config
     else Lwt.return ()
 
 let failure = function

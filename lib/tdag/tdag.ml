@@ -215,12 +215,14 @@ module Make(D : Domain) = struct
     let foreach_task u accu =
       let f v accu =
         match String.Map.find thread_table (Task.id v) with
-        | Some t -> (t >>| ignore) :: accu
+        | Some t -> (t >>| successfull_trace) :: accu
         | None -> accu
       in
       let thread =
-        join (G.fold_pred f g u []) >>= fun () ->
-        Task.hook u config `post_revdeps
+        G.fold_pred f g u []
+        |> map_p ~f:ident >>= fun res ->
+        let all_revdeps_succeeded = List.for_all ~f:ident res in
+        Task.post_revdeps_hook u config ~all_revdeps_succeeded
       in
       thread :: accu
     in
