@@ -36,6 +36,7 @@ module Make(D : Domain) = struct
      [Thread]. *)
   let join (xs : unit Thread.t list) = map_p ~f:ident xs >>| ignore
 
+  (* Task as a graph vertex *)
   module V = struct
     type t = Task.t
     let compare u v = String.compare (Task.id u) (Task.id v)
@@ -44,6 +45,7 @@ module Make(D : Domain) = struct
       Task.id u = Task.id v
   end
 
+  (* Graph of tasks *)
   module G = struct
     include Graph.Persistent.Digraph.ConcreteBidirectional(V)
     let exists_pred g u ~f =
@@ -125,9 +127,14 @@ module Make(D : Domain) = struct
     in
     G.fold_vertex f g []
 
+  (* Set of tasks *)
   module S = Caml.Set.Make(V)
 
-  let initial_state config g sources =
+  (* Traverses a DAG with given goals to determine which tasks are
+     needed and which are done already. This a depth-first traversal,
+     and the set of visited tasks coincides with tasks which are
+     needed. *)
+  let initial_state config g goals =
     let rec aux ((needed, already_done) as accu) u =
       if S.mem u needed then Thread.return accu
       else
@@ -138,13 +145,16 @@ module Make(D : Domain) = struct
         if u_is_done then Thread.return accu
         else fold_s (G.successors g u) ~init:accu ~f:aux
     in
-    fold_s sources ~init:(S.empty, S.empty) ~f:aux
+    fold_s goals ~init:(S.empty, S.empty) ~f:aux
 
   let successfull_trace = function
     | Run { outcome } -> not (Task.failure outcome)
     | Skipped `Done_already -> true
     | _ -> false
 
+  (* [performance_thread config logger alloc dep_traces u] builds the
+     threads that will actually /perform/ the execution of the task
+     [u] given the results of the deps ([dep_traces]) *)
   let performance_thread config logger alloc dep_traces u =
       map_p ~f:ident dep_traces >>= fun dep_traces ->
       if List.for_all dep_traces ~f:successfull_trace then (
@@ -175,6 +185,8 @@ module Make(D : Domain) = struct
       if S.mem u seen then accu
       else
         let seen, table = G.fold_succ aux g u accu in
+        (* FIXME: this is fishy, because if [u] is not needed, why *)
+        (* recurse on its deps? *)
         let is_needed = S.mem u needed in
         let is_done = S.mem u already_done in
         let thread =
