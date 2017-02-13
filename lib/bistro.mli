@@ -3,11 +3,17 @@ open Core_kernel.Std
 
 type 'a workflow
 
+module Path : sig
+  type t = string list
+  val of_string : string -> t
+  val make_relative : ?from:string -> string -> t
+  val to_string : t -> string
+end
 
 (** Workflow representation *)
 type u = private
-  | Input of string * path
-  | Select of string * u * path
+  | Input of string * Path.t
+  | Select of string * u * Path.t
   | Step of step
 
 and step = private {
@@ -48,8 +54,6 @@ and interpreter = [
   | `sh
 ]
 
-and path = string list
-
 (** Name and version of an external dependency for a workflow *)
 and docker_image = private {
   dck_account : string ;
@@ -63,7 +67,7 @@ type 'a directory = [`directory of 'a]
 
 type any_workflow = Workflow : _ workflow -> any_workflow
 
-type (-'a, +'b) selector = private Selector of path
+type (-'a, +'b) selector = private Selector of Path.t
 
 module Workflow : sig
   type 'a t = 'a workflow
@@ -82,7 +86,7 @@ module Expr : sig
   val string : string -> t
   val int : int -> t
   val float : float -> t
-  val path : path -> t
+  val path : Path.t -> t
   val dep : _ workflow -> t
   val quote : ?using:char -> t -> t
   val option : ('a -> t) -> 'a option -> t
@@ -109,7 +113,7 @@ module EDSL : sig
 
   val input : ?may_change:bool -> string -> 'a workflow
 
-  val selector : path -> ('a, 'b) selector
+  val selector : Path.t -> ('a, 'b) selector
 
   val ( / ) : 'a directory workflow -> ('a, 'b) selector -> 'b workflow
 
@@ -200,4 +204,3 @@ module Std : sig
 end
 
 
-val string_of_path : path -> string

@@ -5,7 +5,7 @@ open Bistro_engine
 type 'a path = Path of string
 
 let ( / ) (Path p) (Bistro.Selector q) =
-  Path (p ^ (Bistro.string_of_path q))
+  Path (p ^ (Bistro.Path.to_string q))
 
 type _ t =
   | Pure : 'a -> 'a t
@@ -78,7 +78,7 @@ let error_short_descr =
   | Task.Input_check { path } ->
     sprintf "Input %s doesn't exist" path
   | Select_check { dir_path ; sel } ->
-    sprintf "Path %s doesn't exist in %s" (Bistro.string_of_path sel) dir_path
+    sprintf "Path %s doesn't exist in %s" (Bistro.Path.to_string sel) dir_path
   | Step_result { exit_code } ->
     sprintf "Ended with exit code %d" exit_code
 
@@ -186,7 +186,7 @@ type repo = normalized_repo_item list
 
 let normalized_repo_item (Repo_item (repo_path, w)) (Path cache_path) =
   {
-    repo_path = Bistro.string_of_path repo_path ;
+    repo_path = Bistro.Path.to_string repo_path ;
     file_path = Filename.concat "_files" (Bistro.Workflow.id w) ;
     cache_path ;
   }

@@ -1,14 +1,50 @@
 open Core_kernel.Std
 
-type path = string list
-[@@deriving sexp]
+module Path = struct
+  type t = string list
+  [@@deriving sexp]
 
-let rec string_of_path = function
-  | [] -> "."
-  | "" :: t -> Filename.concat "." (string_of_path t)
-  | p -> List.reduce_exn p ~f:Filename.concat
+  let rec normalize = function
+    | "." :: t
+    | "" :: t -> normalize t
+    | h :: ".." :: t ->
+      let t = normalize t in
+      if h <> ".." then t
+      else ".." :: ".." :: t
+    | h :: t -> h :: normalize t
+    | [] -> []
 
-let path_of_string s = String.split ~on:'/' s
+  let common_prefix p q =
+    let rec aux res p q =
+      match p, q with
+      | h_p :: t_p, h_q :: t_q when h_p = h_q ->
+        aux (h_p :: res) t_p t_q
+      | _ -> List.rev res, p, q
+    in
+    aux [] p q
+
+  let of_string x =
+    match String.split ~on:'/' x with
+    | "" :: t -> "/" :: t
+    | xs -> xs
+
+  let make_relative ?from:(q = Sys.getcwd ()) p =
+    if Filename.is_relative q
+    then invalid_argf "make_rel_path: base %s should be absolute" q ()
+    else if Filename.is_relative p then of_string p
+    else
+      let p = normalize (of_string p)
+      and q = normalize (of_string q) in
+      let _, p_suffix, q_suffix = common_prefix p q in
+      List.map q_suffix ~f:(const "..") @ p_suffix
+
+  let rec to_string = function
+    | [] -> "."
+    | "" :: t -> Filename.concat "." (to_string t)
+    | "/" :: t -> "/" ^ (to_string t)
+    | p -> List.reduce_exn p ~f:Filename.concat
+
+end
 
 let digest x =
   Digest.to_hex (Digest.string (Marshal.to_string x []))
@@ -40,8 +76,8 @@ type docker_image = {
 
 module T = struct
   type u =
-    | Input of string * path
-    | Select of string * u * path (* invariant: [u] is not a select *)
+    | Input of string * Path.t
+    | Select of string * u * Path.t (* invariant: [u] is not a select *)
     | Step of step
 
   and step = {
@@ -90,7 +126,7 @@ module T = struct
 
   [@@deriving sexp]
 
-  type ('a, 'b) selector = Selector of path
+  type ('a, 'b) selector = Selector of Path.t
 
 end
 
@@ -139,7 +175,8 @@ module Workflow = struct
   let input ?(may_change = false) target =
     let hash = if may_change then Some (Digest.file target) else None in
     let id = digest ("input", target, hash) in
-    Input (id, path_of_string target)
+
+    Input (id, Path.make_relative target)
 
   let rec digestable_command = function
     | Docker (im, cmd) -> `Docker (im, digestable_command cmd)
@@ -190,8 +227,8 @@ module Workflow = struct
       List.fold deps ~init:accu' ~f:collect
 
   let descr = function
-    | Input (_,p) -> (string_of_path p)
-    | Select (_, _, p) -> (string_of_path p)
+    | Input (_,p) -> (Path.to_string p)
+    | Select (_, _, p) -> (Path.to_string p)
     | Step { descr } -> descr
 
 
@@ -229,7 +266,7 @@ module Expr = struct
   let string s = [ S s ]
   let int i = [ S (string_of_int i) ]
   let float f = [ S (Float.to_string f) ]
-  let path p = [ S (string_of_path p) ]
+  let path p = [ S (Path.to_string p) ]
   let dep w = [ D w ]
 
   let quote ?(using = '"') e =

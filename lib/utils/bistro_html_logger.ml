@@ -187,12 +187,12 @@ module Render = struct
 
     | Select_check { dir_path ; sel ; pass } ->
       [ p [ k "select " ;
-            k (Bistro.string_of_path sel) ;
+            k (Bistro.Path.to_string sel) ;
             k " in " ;
             k dir_path ] ;
 
         if pass then k"" else (
-          p [ k"No path " ; k (Bistro.string_of_path sel) ; k" in " ;
+          p [ k"No path " ; k (Bistro.Path.to_string sel) ; k" in " ;
               a ~a:[a_href dir_path] [k dir_path ] ]
         ) ]
 
@@ -208,17 +208,17 @@ module Render = struct
 
   let task = function
     | Task.Input (_, path) ->
-      [ p [ k "input " ; k (Bistro.string_of_path path) ] ]
+      [ p [ k "input " ; k (Bistro.Path.to_string path) ] ]
 
     | Task.Select (_, `Input input_path, path) ->
       [ p [ k "select " ;
-            k (Bistro.string_of_path path) ;
+            k (Bistro.Path.to_string path) ;
             k " in " ;
-            k (Bistro.string_of_path input_path) ] ]
+            k (Bistro.Path.to_string input_path) ] ]
 
     | Task.Select (_, `Step id, path) ->
       [ p [ k "select " ;
-            k (Bistro.string_of_path path) ;
+            k (Bistro.Path.to_string path) ;
             k " in step " ;
             k id ] ]
 

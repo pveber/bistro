@@ -206,14 +206,14 @@ let make_execution_env { db ; use_docker } ~np ~mem step =
   let path_of_task_id tid = Db.cache db tid in
   let dep = function
     | `Input p ->
-      let p = Bistro.string_of_path p in
+      let p = Bistro.Path.to_string p in
       if Filename.is_relative p then
         Filename.concat (Sys.getcwd ()) p
       else
         p
     | `Task tid -> path_of_task_id tid
     | `Select (tid, p) ->
-      Filename.concat (path_of_task_id tid) (Bistro.string_of_path p)
+      Filename.concat (path_of_task_id tid) (Bistro.Path.to_string p)
   in
   let file_dump toks =
     Filename.concat tmp_dir (digest toks)
@@ -426,12 +426,12 @@ let perform_input path =
     )
 
 let select_dir_path db = function
-  | `Input p -> Bistro.string_of_path p
+  | `Input p -> Bistro.Path.to_string p
   | `Step id -> Db.cache db id
 
 let select_path db dir q =
   let p = select_dir_path db dir in
-  let q = Bistro.string_of_path q in
+  let q = Bistro.Path.to_string q in
   Filename.concat p q
 
 let perform_select db dir sel =
@@ -446,13 +446,13 @@ let perform_select db dir sel =
     )
 
 let perform alloc config = function
-  | Input (_, p) -> perform_input (Bistro.string_of_path p)
+  | Input (_, p) -> perform_input (Bistro.Path.to_string p)
   | Select (_, dir, q) -> perform_select config.db dir q
   | Step s -> perform_step alloc config s
 
 let is_done t { db } =
   let path = match t with
-    | Input (_, p) -> Bistro.string_of_path p
+    | Input (_, p) -> Bistro.Path.to_string p
     | Select (_, dir, q) -> select_path db dir q
     | Step { id ; descr } ->
       let b = Db.cache db id in

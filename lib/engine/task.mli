@@ -38,7 +38,7 @@ and token =
   | NP
   | MEM
 
-and path = string list
+and path = Bistro.Path.t
 [@@deriving sexp]
 
 type result =

@@ -20,10 +20,10 @@ module DAG = struct
       let open Task in
       function
       | Input (_, p) ->
-        let label = Bistro.string_of_path p in
+        let label = Bistro.Path.to_string p in
         [ `Label label ; `Color 0xFFFFFF ; `Shape `Box ]
       | Select (_, _, p) ->
-        let label = Bistro.string_of_path p in
+        let label = Bistro.Path.to_string p in
         [ `Label label ; `Color 0xFFFFFF ; `Shape `Box ]
       | Step { descr } ->
         [ `Label descr ; `Shape `Box ]
