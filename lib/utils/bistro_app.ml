@@ -228,10 +228,19 @@ let make_absolute p =
   if Filename.is_absolute p then p
   else Filename.concat (Sys.getcwd ()) p
 
+let make_relative ~from p =
+  let open Bistro.Path in
+  make_relative ~from p
+  |> to_string
+
 let link dst p_u =
-  let src = make_absolute p_u in
-  Unix.mkdir_p (Filename.dirname dst) ;
-  let cmd = sprintf "rm -rf %s && ln -r -s %s %s" dst src dst in
+  let target = make_absolute p_u in
+  let dst_dir = Filename.dirname dst in
+  let target_from_dst_dir =
+    make_relative ~from:(make_absolute dst_dir) (make_absolute target)
+  in
+  Unix.mkdir_p dst_dir ;
+  let cmd = sprintf "rm -rf %s && ln -s %s %s" dst target_from_dst_dir dst in
   ignore (Sys.command cmd)
 
 let generate outdir items =
