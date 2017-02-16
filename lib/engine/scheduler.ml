@@ -91,7 +91,7 @@ let rec add_workflow precious (seen, dag) w =
   | Some u -> seen, dag, u
 
 
-let precious_workflows w =
+let precious_workflows acc w =
   let open Bistro in
   let module S = String.Set in
   let rec traverse acc = function
@@ -104,12 +104,11 @@ let precious_workflows w =
       (S.add seen s.id,
        if s.precious then S.add precious_deps s.id else precious_deps)
   in
-  traverse (String.Set.empty, String.Set.empty) w
+  traverse (String.Set.empty, acc) w
   |> snd
 
 let precious_workflows_of_list xs =
-  List.map xs ~f:precious_workflows
-  |> String.Set.union_list
+  List.fold xs ~init:String.Set.empty ~f:precious_workflows
 
 let compile workflows =
   let workflows = List.map workflows ~f:(fun (Bistro.Workflow w) -> Bistro.Workflow.u w) in
