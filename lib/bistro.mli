@@ -44,16 +44,6 @@ and token =
   | NP
   | MEM
 
-and interpreter = [
-  | `bash
-  | `ocaml
-  | `ocamlscript
-  | `perl
-  | `python
-  | `R
-  | `sh
-]
-
 (** Name and version of an external dependency for a workflow *)
 and docker_image = private {
   dck_account : string ;

@@ -114,16 +114,6 @@ module T = struct
     | NP
     | MEM
 
-  and interpreter = [
-    | `bash
-    | `ocaml
-    | `ocamlscript
-    | `perl
-    | `python
-    | `R
-    | `sh
-  ]
-
   type ('a, 'b) selector = Selector of Path.t
 
 end
