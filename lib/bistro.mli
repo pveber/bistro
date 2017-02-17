@@ -61,7 +61,6 @@ and docker_image = private {
   dck_tag : string option ;
   dck_registry : string option ;
 }
-[@@deriving sexp]
 
 type 'a directory = [`directory of 'a]
 

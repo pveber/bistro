@@ -124,8 +124,6 @@ module T = struct
     | `sh
   ]
 
-  [@@deriving sexp]
-
   type ('a, 'b) selector = Selector of Path.t
 
 end

@@ -64,8 +64,6 @@ and token =
   | MEM
 
 and path = string list
-[@@deriving sexp]
-
 
 let rec deps_of_template tmpl =
   List.map tmpl ~f:(function

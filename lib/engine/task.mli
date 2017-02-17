@@ -39,7 +39,6 @@ and token =
   | MEM
 
 and path = Bistro.Path.t
-[@@deriving sexp]
 
 type result =
   | Input_check of { path : string ; pass : bool }
