@@ -4,17 +4,17 @@ open Bistro.EDSL
 
 let echo s =
   workflow [
-    cmd "echo" [ string s ]
+    cmd "echo" ~stdout:dest [ string s ]
   ]
 
-let double fn =
+let double_implem fn =
   let s = In_channel.read_all fn in
   s ^ s
 
 let double w =
   let open E in
   value (
-    primitive "double" double $ dep w
+    primitive "double" double_implem $ dep w
   )
 
 let main () =
