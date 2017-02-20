@@ -67,6 +67,15 @@ and docker_image = private {
 
 type 'a directory = [`directory of 'a]
 
+class type ['a,'b] file = object
+  method format : 'a
+  method encoding : [< `text | `binary] as 'b
+end
+
+class type ['a] value = object
+  inherit [ [`value of 'a], [`binary] ] file
+end
+
 type any_workflow = Workflow : _ workflow -> any_workflow
 
 type (-'a, +'b) selector = private Selector of Path.t
@@ -155,6 +164,36 @@ module EDSL : sig
     unit -> docker_image
 
   val ( % ) : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c
+
+  module E : sig
+    type 'a t
+
+    val id : 'a -> string
+    val primitive : string -> 'a -> 'a t
+    val app : ('a -> 'b) t -> 'a t -> 'b t
+    val ( $ ) : ('a -> 'b) t -> 'a t -> 'b t
+    val np : int t
+    val dest : string t
+    val dep : _ workflow -> string t
+
+    val value :
+      ?np:int ->
+      ?mem:int ->
+      'a t ->
+      'a value workflow
+
+    val file :
+      ?np:int ->
+      ?mem:int ->
+      unit t ->
+      (_, _) #file workflow
+
+    val directory :
+      ?np:int ->
+      ?mem:int ->
+      unit t ->
+      _ directory workflow
+  end
 end
 
 module Std : sig

@@ -285,6 +285,15 @@ end
 
 type 'a directory = [`directory of 'a]
 
+class type ['a,'b] file = object
+  method format : 'a
+  method encoding : [< `text | `binary] as 'b
+end
+
+class type ['a] value = object
+  inherit [ [`value of 'a], [`binary] ] file
+end
+
 module Expr = struct
   type t = token list
 
@@ -411,6 +420,25 @@ module EDSL = struct
   let precious = function
     | (Input _ | Select _ as w) -> w
     | Step s -> Step { s with precious = true }
+
+  module E = struct
+    type 'a t = 'a expr
+
+    let id x = digest x
+    let primitive id value = E_primitive { id ; value }
+    let app f x = E_app (f, x)
+    let ( $ ) = app
+    let np = E_np
+    let dest = E_dest
+    let dep w = E_dep w
+
+    let value ?np ?mem expr =
+      Workflow.make ?mem ?np (Eval expr)
+
+    let file = value
+    let directory = value
+  end
+
 end
 
 
