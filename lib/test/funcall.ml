@@ -13,8 +13,9 @@ let double fn =
 
 let double w =
   let open E in
-  primitive "double" double $ dep w
-  |> value
+  value (
+    primitive "double" double $ dep w
+  )
 
 let main () =
   let open Bistro_app in

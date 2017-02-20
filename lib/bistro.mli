@@ -29,8 +29,8 @@ and step = private {
 }
 
 and action =
-  | Command : command -> action
-  | Eval : _ expr -> action
+  | Command of command
+  | Compute of some_expr
 
 and command =
   | Docker of docker_image * command
@@ -47,6 +47,11 @@ and token =
   | TMP
   | NP
   | MEM
+
+and some_expr =
+  | Value     : _ expr    -> some_expr
+  | File      : unit expr -> some_expr
+  | Directory : unit expr -> some_expr
 
 and _ expr =
   | E_primitive : { id : string ; value : 'a } -> 'a expr

@@ -48,8 +48,13 @@ and dep = [
 and id = string
 
 and action =
-  | Command : command -> action
-  | Eval : _ expr -> action
+  | Command of command
+  | Compute of some_expr
+
+and some_expr =
+  | Value     : _ expr    -> some_expr
+  | File      : unit expr -> some_expr
+  | Directory : unit expr -> some_expr
 
 and _ expr =
   | E_primitive : { id : string ; value : 'a } -> 'a expr
@@ -177,7 +182,9 @@ let rec denormalize_expr : type s. s Bistro.expr -> s expr = function
 
 let denormalize_action = function
   | Bistro.Command cmd -> Command (denormalize_cmd cmd)
-  | Bistro.Eval expr -> Eval (denormalize_expr expr)
+  | Bistro.Compute (Bistro.Value expr) -> Compute (Value (denormalize_expr expr))
+  | Bistro.Compute (Bistro.File expr) -> Compute (File (denormalize_expr expr))
+  | Bistro.Compute (Bistro.Directory expr) -> Compute (Directory (denormalize_expr expr))
 
 let of_step { Bistro.id ; mem ; np ; descr ; action ; deps ; timeout ; version ; precious } =
   Step {
@@ -216,7 +223,7 @@ let rec command_uses_docker = function
 
 let action_uses_docker = function
   | Command cmd -> command_uses_docker cmd
-  | Eval _ -> false
+  | Compute _ -> false
 
 type execution_env = {
   use_docker : bool ;
@@ -310,7 +317,7 @@ module Concrete_task = struct
 
   let file_dumps_of_action = function
     | Command cmd -> file_dumps_of_command false cmd
-    | Eval expr -> assert false
+    | Compute expr -> []
 
   let token env =
     function
@@ -373,9 +380,30 @@ module Concrete_task = struct
 
   let of_cmd env cmd = Sh (string_of_command env cmd)
 
+  let of_compute env expr =
+    let rec aux : type s. s expr -> s = function
+      | E_primitive { value } -> value
+      | E_app (f, x) -> (aux f) (aux x)
+      | E_dest -> env.dest
+      | E_tmp -> env.tmp
+      | E_np -> env.np
+      | E_mem -> env.mem
+      | E_dep d -> env.dep d
+    in
+    let build () = match expr with
+      | Value expr ->
+        let res = aux expr in
+        Out_channel.with_file env.dest ~f:(fun oc ->
+            Marshal.to_channel oc res []
+          )
+      | File expr -> aux expr
+      | Directory expr -> aux expr
+    in
+    Eval build
+
   let of_action env = function
     | Command cmd -> of_cmd env cmd
-    | Eval expr -> assert false
+    | Compute expr -> of_compute env expr
 
   let extract_file_dumps env action =
     let file_dumps = file_dumps_of_action action in
@@ -409,11 +437,13 @@ module Concrete_task = struct
         | WSTOPPED code -> code
       )
 
-  let perform_eval ~stdout ~stderr expr = assert false
+  let perform_eval ~stdout ~stderr f =
+    Lwt_preemptive.detach f () >>= fun () ->
+    Lwt.return 0
 
   let perform ~stdout ~stderr = function
     | Sh cmd -> perform_command ~stdout ~stderr cmd
-    | Eval expr -> assert false
+    | Eval f -> perform_eval ~stdout ~stderr f
 end
 
 let docker_chown dir uid =

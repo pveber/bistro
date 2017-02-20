@@ -47,7 +47,7 @@ let translate_event config time = function
         let cmd = Task.render_step_command ~np ~mem config step cmd in
         let file_dumps = Task.render_step_dumps ~np ~mem config step in
         Some (Step_task_started { step ; action = `Sh cmd ; file_dumps })
-      | Task.Eval _ ->
+      | Task.Compute _ ->
         Some (Step_task_started { step ; action = `Eval ; file_dumps = [] })
     )
 

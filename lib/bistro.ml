@@ -93,8 +93,8 @@ module T = struct
   }
 
   and action =
-    | Command : command -> action
-    | Eval : _ expr -> action
+    | Command of command
+    | Compute of some_expr
 
   and command =
     | Docker of docker_image * command
@@ -117,6 +117,11 @@ module T = struct
     | TMP
     | NP
     | MEM
+
+  and some_expr =
+    | Value     : _ expr    -> some_expr
+    | File      : unit expr -> some_expr
+    | Directory : unit expr -> some_expr
 
   and _ expr =
     | E_primitive : { id : string ; value : 'a } -> 'a expr
@@ -167,8 +172,8 @@ end
 
 let rec expr_deps : type s. s expr -> u list = function
   | E_primitive _ -> []
-  | E_app (x, f) ->
-    List.dedup (expr_deps x @ expr_deps f)
+  | E_app (f, x) ->
+    List.dedup (expr_deps f @ expr_deps x)
   | E_dep u -> [ u ]
   | E_dest -> []
   | E_tmp -> []
@@ -219,13 +224,20 @@ module Workflow = struct
     | E_np -> `NP
     | E_mem -> `MEM
 
+  let digestable_some_expr = function
+    | Value e -> digestable_expr e
+    | File e -> digestable_expr e
+    | Directory e -> digestable_expr e
+
   let digestable_action = function
     | Command cmd -> digestable_command cmd
-    | Eval expr -> digestable_expr expr
+    | Compute expr -> digestable_some_expr expr
 
   let deps_of_action = function
     | Command cmd -> Cmd.deps cmd
-    | Eval expr -> expr_deps expr
+    | Compute (Value expr) -> expr_deps expr
+    | Compute (File expr) -> expr_deps expr
+    | Compute (Directory expr) -> expr_deps expr
 
   let make
       ?(descr = "")
@@ -433,10 +445,13 @@ module EDSL = struct
     let dep w = E_dep w
 
     let value ?np ?mem expr =
-      Workflow.make ?mem ?np (Eval expr)
+      Workflow.make ?mem ?np (Compute (Value expr))
 
-    let file = value
-    let directory = value
+    let file ?np ?mem expr =
+      Workflow.make ?mem ?np (Compute (File expr))
+
+    let directory ?np ?mem expr =
+      Workflow.make ?mem ?np (Compute (Directory expr))
   end
 
 end
