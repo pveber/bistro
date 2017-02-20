@@ -39,6 +39,7 @@ and _ expr =
   | E_np : int expr
   | E_mem : int expr
   | E_dep : dep -> string expr
+  | E_valdep : dep -> 'a expr
 
 and command =
   | Docker of Bistro.docker_image * command

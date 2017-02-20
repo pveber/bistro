@@ -74,6 +74,18 @@ type docker_image = {
 }
 [@@deriving sexp]
 
+
+type 'a directory = [`directory of 'a]
+
+class type ['a,'b] file = object
+  method format : 'a
+  method encoding : [< `text | `binary] as 'b
+end
+
+class type ['a] value = object
+  inherit [ [`value of 'a], [`binary] ] file
+end
+
 module T = struct
   type u =
     | Input of string * Path.t
@@ -130,7 +142,10 @@ module T = struct
     | E_tmp : string expr
     | E_np : int expr
     | E_mem : int expr
-    | E_dep : u -> string expr
+    | E_dep : _ workflow -> string expr
+    | E_valdep : 'a value workflow -> 'a expr
+
+  and 'a workflow = u
 
   type ('a, 'b) selector = Selector of Path.t
 
@@ -138,7 +153,6 @@ end
 
 include T
 
-type 'a workflow = u
 
 type any_workflow = Workflow : _ workflow -> any_workflow
 
@@ -175,6 +189,7 @@ let rec expr_deps : type s. s expr -> u list = function
   | E_app (f, x) ->
     List.dedup (expr_deps f @ expr_deps x)
   | E_dep u -> [ u ]
+  | E_valdep u -> [ u ]
   | E_dest -> []
   | E_tmp -> []
   | E_np -> []
@@ -219,6 +234,9 @@ module Workflow = struct
     | E_dep (Input (id, _)) -> `Dep (`Input id)
     | E_dep (Select (id, _, _)) -> `Dep (`Select id)
     | E_dep (Step { id }) -> `Dep (`Step id)
+    | E_valdep (Input (id, _)) -> `Dep (`Input id)
+    | E_valdep (Select (id, _, _)) -> `Dep (`Select id)
+    | E_valdep (Step { id }) -> `Dep (`Step id)
     | E_dest -> `DEST
     | E_tmp -> `TMP
     | E_np -> `NP
@@ -293,17 +311,6 @@ module Workflow = struct
           fprintf oc "n%s [label = \"%s\"];\n" id_n (descr n)
       ) ;
     fprintf oc "}\n"
-end
-
-type 'a directory = [`directory of 'a]
-
-class type ['a,'b] file = object
-  method format : 'a
-  method encoding : [< `text | `binary] as 'b
-end
-
-class type ['a] value = object
-  inherit [ [`value of 'a], [`binary] ] file
 end
 
 module Expr = struct
@@ -443,6 +450,7 @@ module EDSL = struct
     let np = E_np
     let dest = E_dest
     let dep w = E_dep w
+    let valdep w = E_valdep w
 
     let value ?np ?mem expr =
       Workflow.make ?mem ?np (Compute (Value expr))

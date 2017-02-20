@@ -17,9 +17,16 @@ let double w =
     primitive "double" double_implem $ dep w
   )
 
+let double2 w =
+  let open E in
+  value (
+    primitive "double2" (fun s -> s ^ s)
+    $ valdep w
+  )
+
 let main () =
   let open Bistro_app in
-  let w = double (echo "42!") in
+  let w = double2 (double (echo "42!")) in
   let app = pure ignore $ pureW w in
   run app
 

@@ -64,6 +64,7 @@ and _ expr =
   | E_np : int expr
   | E_mem : int expr
   | E_dep : dep -> string expr
+  | E_valdep : dep -> 'a expr
 
 and command =
   | Docker of Bistro.docker_image * command
@@ -174,7 +175,8 @@ let rec denormalize_cmd = function
 let rec denormalize_expr : type s. s Bistro.expr -> s expr = function
   | Bistro.E_primitive { id ; value } -> E_primitive { id ; value }
   | Bistro.E_app (x, f) -> E_app (denormalize_expr x, denormalize_expr f)
-  | Bistro.E_dep u -> E_dep (denormalize_dep u)
+  | Bistro.E_dep w -> E_dep (denormalize_dep (Bistro.Workflow.u w))
+  | Bistro.E_valdep w -> E_valdep (denormalize_dep (Bistro.Workflow.u w))
   | Bistro.E_dest -> E_dest
   | Bistro.E_tmp -> E_tmp
   | Bistro.E_np -> E_np
@@ -380,6 +382,16 @@ module Concrete_task = struct
 
   let of_cmd env cmd = Sh (string_of_command env cmd)
 
+  let load fn =
+    In_channel.with_file fn ~f:(fun ic ->
+        Marshal.from_channel ic
+      )
+
+  let save x fn =
+    Out_channel.with_file fn ~f:(fun oc ->
+        Marshal.to_channel oc x []
+      )
+
   let of_compute env expr =
     let rec aux : type s. s expr -> s = function
       | E_primitive { value } -> value
@@ -389,13 +401,12 @@ module Concrete_task = struct
       | E_np -> env.np
       | E_mem -> env.mem
       | E_dep d -> env.dep d
+      | E_valdep d -> load (env.dep d)
     in
     let build () = match expr with
       | Value expr ->
         let res = aux expr in
-        Out_channel.with_file env.dest ~f:(fun oc ->
-            Marshal.to_channel oc res []
-          )
+        save res env.dest
       | File expr -> aux expr
       | Directory expr -> aux expr
     in

@@ -3,6 +3,19 @@ open Core_kernel.Std
 
 type +'a workflow
 
+type 'a directory = [`directory of 'a]
+
+class type ['a,'b] file = object
+  method format : 'a
+  method encoding : [< `text | `binary] as 'b
+end
+
+class type ['a] value = object
+  inherit [ [`value of 'a], [`binary] ] file
+end
+
+type any_workflow = Workflow : _ workflow -> any_workflow
+
 module Path : sig
   type t = string list
   val of_string : string -> t
@@ -60,7 +73,8 @@ and _ expr =
   | E_tmp : string expr
   | E_np : int expr
   | E_mem : int expr
-  | E_dep : u -> string expr
+  | E_dep : _ workflow -> string expr
+  | E_valdep : 'a value workflow -> 'a expr
 
 (** Name and version of an external dependency for a workflow *)
 and docker_image = private {
@@ -70,18 +84,6 @@ and docker_image = private {
   dck_registry : string option ;
 }
 
-type 'a directory = [`directory of 'a]
-
-class type ['a,'b] file = object
-  method format : 'a
-  method encoding : [< `text | `binary] as 'b
-end
-
-class type ['a] value = object
-  inherit [ [`value of 'a], [`binary] ] file
-end
-
-type any_workflow = Workflow : _ workflow -> any_workflow
 
 type (-'a, +'b) selector = private Selector of Path.t
 
@@ -180,6 +182,7 @@ module EDSL : sig
     val np : int t
     val dest : string t
     val dep : _ workflow -> string t
+    val valdep : 'a value workflow -> 'a t
 
     val value :
       ?np:int ->
