@@ -7,7 +7,7 @@ type time = float
 type event =
   | Step_task_started of {
       step : Task.step ;
-      cmd : string ;
+      action : [`Sh of string | `Eval ] ;
       file_dumps : (string * string) list ;
     }
   | Task_ended of Task.result
@@ -41,9 +41,15 @@ let create path = {
 let translate_event config time = function
   | Scheduler.Task_started (Task.Step step,
                             Allocator.Resource { np ; mem }) ->
-    let cmd = Task.render_step_command ~np ~mem config step in
-    let file_dumps = Task.render_step_dumps ~np ~mem config step in
-    Some (Step_task_started { step ; cmd ; file_dumps })
+    (
+      match step.Task.action with
+      | Task.Command cmd ->
+        let cmd = Task.render_step_command ~np ~mem config step cmd in
+        let file_dumps = Task.render_step_dumps ~np ~mem config step in
+        Some (Step_task_started { step ; action = `Sh cmd ; file_dumps })
+      | Task.Eval _ ->
+        Some (Step_task_started { step ; action = `Eval ; file_dumps = [] })
+    )
 
   | Scheduler.Task_ended outcome ->
     Some (Task_ended outcome)
@@ -149,12 +155,14 @@ module Render = struct
         :: List.map modals ~f:(fun (_,_,x) -> x)
       )
 
-  let step_command cmd = div [
-      item "command" [] ;
-      pre [ k cmd ] ;
-    ]
+  let step_action = function
+    | `Sh cmd -> div [
+        item "command" [] ;
+        pre [ k cmd ] ;
+      ]
+    | `Eval -> div []
 
-  let step_result_details ~id ~cmd ~cache ~stdout ~stderr ~dumps =
+  let step_result_details ~id ~action ~cache ~stdout ~stderr ~dumps =
     let outputs = div [
         item "outcome" [
           a ~a:[a_href stdout ] [ k "stdout" ] ;
@@ -172,7 +180,7 @@ module Render = struct
       ] ;
 
       outputs ;
-      step_command cmd ;
+      step_action action ;
       step_file_dumps dumps ;
     ]
 
@@ -196,7 +204,7 @@ module Render = struct
               a ~a:[a_href dir_path] [k dir_path ] ]
         ) ]
 
-    | Step_result { exit_code ; outcome ; step ; stdout ; stderr ; cache ; dumps ; cmd } ->
+    | Step_result { exit_code ; outcome ; step ; stdout ; stderr ; cache ; dumps ; action } ->
       collapsible_panel
         ~title:[ k step.descr ]
         ~header:[
@@ -207,7 +215,7 @@ module Render = struct
           | `Missing_output ->
             p [ k "missing_output" ]
         ]
-        ~body:(step_result_details ~id:step.id ~cmd ~cache ~stderr ~stdout ~dumps)
+        ~body:(step_result_details ~id:step.id ~action ~cache ~stderr ~stdout ~dumps)
 
   let task = function
     | Task.Input (_, path) ->
@@ -231,13 +239,13 @@ module Render = struct
         ~header:[]
         ~body:[ item "id" [ k id ] ]
 
-  let task_start ~step:{ Task.descr ; id } ~cmd ~file_dumps =
+  let task_start ~step:{ Task.descr ; id } ~action ~file_dumps =
     collapsible_panel
       ~title:[ k descr ]
       ~header:[]
       ~body:[
         item "id" [ k id ] ;
-        step_command cmd ;
+        step_action action ;
       ]
 
   let cached_task t path =
@@ -286,10 +294,10 @@ module Render = struct
       ]
     in
     match evt with
-    | Step_task_started { step ; cmd ; file_dumps } ->
+    | Step_task_started { step ; action ; file_dumps } ->
       table_line
         (event_label_text `BLACK "STARTED")
-        (task_start ~step ~cmd ~file_dumps)
+        (task_start ~step ~action ~file_dumps)
 
     | Task_ended result ->
       table_line (result_label result) (task_result result)

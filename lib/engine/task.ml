@@ -32,7 +32,7 @@ and step = {
   id       : id ;
   descr    : string ;
   deps     : dep list ;
-  cmd      : command ;
+  action   : action ;
   np       : int ; (** Required number of processors *)
   mem      : int ; (** Required memory in MB *)
   timeout  : int option ; (** Maximum allowed running time in hours *)
@@ -46,6 +46,19 @@ and dep = [
   | `Input of path
 ]
 and id = string
+
+and action =
+  | Command : command -> action
+  | Eval : _ expr -> action
+
+and _ expr =
+  | E_primitive : { id : string ; value : 'a } -> 'a expr
+  | E_app : ('a -> 'b) expr * 'a expr -> 'b expr
+  | E_dest : string expr
+  | E_tmp : string expr
+  | E_np : int expr
+  | E_mem : int expr
+  | E_dep : dep -> string expr
 
 and command =
   | Docker of Bistro.docker_image * command
@@ -92,7 +105,7 @@ type result =
       outcome : [`Succeeded | `Missing_output | `Failed] ;
       step : step ;
       exit_code : int ;
-      cmd : string ;
+      action : [`Sh of string | `Eval] ;
       dumps : (string * string) list ;
       cache : string option ;
       stdout : string ;
@@ -153,13 +166,26 @@ let rec denormalize_cmd = function
   | Bistro.Docker (image, c) ->
     Docker (image, denormalize_cmd c)
 
-let of_step { Bistro.id ; mem ; np ; descr ; cmd ; deps ; timeout ; version ; precious } =
+let rec denormalize_expr : type s. s Bistro.expr -> s expr = function
+  | Bistro.E_primitive { id ; value } -> E_primitive { id ; value }
+  | Bistro.E_app (x, f) -> E_app (denormalize_expr x, denormalize_expr f)
+  | Bistro.E_dep u -> E_dep (denormalize_dep u)
+  | Bistro.E_dest -> E_dest
+  | Bistro.E_tmp -> E_tmp
+  | Bistro.E_np -> E_np
+  | Bistro.E_mem -> E_mem
+
+let denormalize_action = function
+  | Bistro.Command cmd -> Command (denormalize_cmd cmd)
+  | Bistro.Eval expr -> Eval (denormalize_expr expr)
+
+let of_step { Bistro.id ; mem ; np ; descr ; action ; deps ; timeout ; version ; precious } =
   Step {
     id ;
     descr ;
     np ;
     mem ;
-    cmd = denormalize_cmd cmd ;
+    action = denormalize_action action ;
     deps = List.map deps ~f:denormalize_dep ;
     timeout ;
     version ;
@@ -187,6 +213,10 @@ let rec command_uses_docker = function
   | And_list xs
   | Or_list xs
   | Pipe_list xs -> List.exists xs ~f:command_uses_docker
+
+let action_uses_docker = function
+  | Command cmd -> command_uses_docker cmd
+  | Eval _ -> false
 
 type execution_env = {
   use_docker : bool ;
@@ -239,7 +269,9 @@ let make_docker_execution_env env = {
 }
 
 module Concrete_task = struct
-  type t = Sh of string
+  type t =
+    | Sh of string
+    | Eval of (unit -> unit)
 
   let docker_image_url image =
     sprintf "%s%s/%s%s"
@@ -275,6 +307,10 @@ module Concrete_task = struct
       |> List.concat
       |> List.dedup
     | Docker (_, cmd) -> file_dumps_of_command true cmd
+
+  let file_dumps_of_action = function
+    | Command cmd -> file_dumps_of_command false cmd
+    | Eval expr -> assert false
 
   let token env =
     function
@@ -337,8 +373,12 @@ module Concrete_task = struct
 
   let of_cmd env cmd = Sh (string_of_command env cmd)
 
-  let extract_file_dumps env cmd =
-    let file_dumps = file_dumps_of_command false cmd in
+  let of_action env = function
+    | Command cmd -> of_cmd env cmd
+    | Eval expr -> assert false
+
+  let extract_file_dumps env action =
+    let file_dumps = file_dumps_of_action action in
     let f (`File_dump (toks, in_docker)) =
       let exec_env = if in_docker then make_docker_execution_env env else env in
       let path = env.file_dump toks in
@@ -353,7 +393,7 @@ module Concrete_task = struct
     in
     Lwt_list.iter_p f xs
 
-  let perform ~stdout ~stderr (Sh cmd) =
+  let perform_command ~stdout ~stderr cmd =
     let script_file = Filename.temp_file "guizmin" ".sh" in
     Lwt_io.(with_file
               ~mode:output script_file
@@ -368,6 +408,12 @@ module Concrete_task = struct
         | WSIGNALED code
         | WSTOPPED code -> code
       )
+
+  let perform_eval ~stdout ~stderr expr = assert false
+
+  let perform ~stdout ~stderr = function
+    | Sh cmd -> perform_command ~stdout ~stderr cmd
+    | Eval expr -> assert false
 end
 
 let docker_chown dir uid =
@@ -375,7 +421,7 @@ let docker_chown dir uid =
   |> Sys.command
   |> ignore
 
-let perform_step (Allocator.Resource { np ; mem }) ({ db } as config) ({ cmd } as step) =
+let perform_step (Allocator.Resource { np ; mem }) ({ db } as config) ({ action } as step) =
   let uid = Unix.getuid () in
   let env = make_execution_env config ~np ~mem step in
   let stdout = Db.stdout db step.id in
@@ -383,15 +429,15 @@ let perform_step (Allocator.Resource { np ; mem }) ({ db } as config) ({ cmd } a
   remove_if_exists env.tmp_dir >>= fun () ->
   Unix.mkdir_p env.tmp ;
 
-  let ccmd = Concrete_task.of_cmd env cmd in
-  let file_dumps = Concrete_task.extract_file_dumps env cmd in
+  let ct = Concrete_task.of_action env action in
+  let file_dumps = Concrete_task.extract_file_dumps env action in
   Concrete_task.write_file_dumps file_dumps >>= fun () ->
-  Concrete_task.(perform ~stdout ~stderr ccmd) >>= fun exit_code ->
+  Concrete_task.(perform ~stdout ~stderr ct) >>= fun exit_code ->
 
   let dest_exists = Sys.file_exists env.dest = `Yes in
   let cache_dest = Db.cache config.db step.id in
   let success = exit_code = 0 && dest_exists in
-  if config.use_docker && command_uses_docker cmd then (
+  if config.use_docker && action_uses_docker action then (
     docker_chown env.tmp_dir uid ;
     if dest_exists then docker_chown env.dest uid
   ) ;
@@ -402,7 +448,9 @@ let perform_step (Allocator.Resource { np ; mem }) ({ db } as config) ({ cmd } a
     else
       Lwt.return ()
   ) >>= fun () ->
-  let Concrete_task.Sh cmd = ccmd
+  let action = match ct with
+      Concrete_task.Sh cmd -> `Sh cmd
+    | Concrete_task.Eval _ -> `Eval
   and `File_dumps dumps = file_dumps
   and outcome = match exit_code = 0, dest_exists with
       true, true -> `Succeeded
@@ -414,7 +462,7 @@ let perform_step (Allocator.Resource { np ; mem }) ({ db } as config) ({ cmd } a
       outcome ;
       step ;
       exit_code ;
-      cmd ;
+      action ;
       dumps ;
       cache = if success then Some cache_dest else None ;
       stdout ;
@@ -486,12 +534,14 @@ let failure = function
   | Select_check { pass } -> not pass
   | Step_result { outcome } -> outcome <> `Succeeded
 
-let render_step_command ~np ~mem config task =
+let render_step_command ~np ~mem config task cmd =
+  let open Concrete_task in
   let env = make_execution_env ~np ~mem config task in
-  let Concrete_task.Sh cmd = Concrete_task.of_cmd env task.cmd in
-  cmd
+  match of_cmd env cmd with
+  | Sh cmd -> cmd
+  | Eval _ -> ""
 
 let render_step_dumps ~np ~mem config s =
   let env = make_execution_env ~np ~mem config s in
-  let `File_dumps res = Concrete_task.extract_file_dumps env s.cmd in
+  let `File_dumps res = Concrete_task.extract_file_dumps env s.action in
   res

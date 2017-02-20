@@ -7,7 +7,7 @@ and step = {
   id       : id ;
   descr    : string ;
   deps     : dep list ;
-  cmd      : command ;
+  action   : action ;
   np       : int ; (** Required number of processors *)
   mem      : int ; (** Required memory in MB *)
   timeout  : int option ; (** Maximum allowed running time in hours *)
@@ -21,6 +21,19 @@ and dep = [
   | `Input of path
 ]
 and id = string
+
+and action =
+  | Command : command -> action
+  | Eval : _ expr -> action
+
+and _ expr =
+  | E_primitive : { id : string ; value : 'a } -> 'a expr
+  | E_app : ('a -> 'b) expr * 'a expr -> 'b expr
+  | E_dest : string expr
+  | E_tmp : string expr
+  | E_np : int expr
+  | E_mem : int expr
+  | E_dep : dep -> string expr
 
 and command =
   | Docker of Bistro.docker_image * command
@@ -47,7 +60,7 @@ type result =
       outcome : [`Succeeded | `Missing_output | `Failed] ;
       step : step ;
       exit_code : int ;
-      cmd : string ;
+      action : [`Sh of string | `Eval] ;
       dumps : (string * string) list ;
       cache : string option ;
       stdout : string ;
@@ -80,5 +93,5 @@ val post_revdeps_hook :
 val clean : t -> config -> unit Lwt.t
 
 (* LOW-LEVEL API *)
-val render_step_command : np:int -> mem:int -> config -> step -> string
+val render_step_command : np:int -> mem:int -> config -> step -> command -> string
 val render_step_dumps : np:int -> mem:int -> config -> step -> (string * string) list

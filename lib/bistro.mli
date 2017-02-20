@@ -20,13 +20,17 @@ and step = private {
   id : string ;
   descr : string ;
   deps : u list ;
-  cmd : command ;
+  action : action ;
   np : int ; (** Required number of processors *)
   mem : int ; (** Required memory in MB *)
   timeout : int option ; (** Maximum allowed running time in hours *)
   version : int option ; (** Version number of the wrapper *)
   precious : bool ;
 }
+
+and action =
+  | Command : command -> action
+  | Eval : _ expr -> action
 
 and command =
   | Docker of docker_image * command
@@ -43,6 +47,15 @@ and token =
   | TMP
   | NP
   | MEM
+
+and _ expr =
+  | E_primitive : { id : string ; value : 'a } -> 'a expr
+  | E_app : ('a -> 'b) expr * 'a expr -> 'b expr
+  | E_dest : string expr
+  | E_tmp : string expr
+  | E_np : int expr
+  | E_mem : int expr
+  | E_dep : u -> string expr
 
 (** Name and version of an external dependency for a workflow *)
 and docker_image = private {

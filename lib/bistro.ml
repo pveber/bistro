@@ -84,13 +84,17 @@ module T = struct
     id : string ;
     descr : string ;
     deps : u list ;
-    cmd : command ;
+    action : action ;
     np : int ; (** Required number of processors *)
     mem : int ; (** Required memory in MB *)
     timeout : int option ; (** Maximum allowed running time in hours *)
     version : int option ; (** Version number of the wrapper *)
     precious : bool ;
   }
+
+  and action =
+    | Command : command -> action
+    | Eval : _ expr -> action
 
   and command =
     | Docker of docker_image * command
@@ -113,6 +117,15 @@ module T = struct
     | TMP
     | NP
     | MEM
+
+  and _ expr =
+    | E_primitive : { id : string ; value : 'a } -> 'a expr
+    | E_app : ('a -> 'b) expr * 'a expr -> 'b expr
+    | E_dest : string expr
+    | E_tmp : string expr
+    | E_np : int expr
+    | E_mem : int expr
+    | E_dep : u -> string expr
 
   type ('a, 'b) selector = Selector of Path.t
 
@@ -152,6 +165,16 @@ module Cmd = struct
     | Docker (_, c) -> deps c
 end
 
+let rec expr_deps : type s. s expr -> u list = function
+  | E_primitive _ -> []
+  | E_app (x, f) ->
+    List.dedup (expr_deps x @ expr_deps f)
+  | E_dep u -> [ u ]
+  | E_dest -> []
+  | E_tmp -> []
+  | E_np -> []
+  | E_mem -> []
+
 module Workflow = struct
   include T
   type 'a t = u
@@ -185,6 +208,25 @@ module Workflow = struct
     | NP -> `NP
     | MEM -> `MEM
 
+  let rec digestable_expr : type s. s expr -> _ = function
+    | E_primitive { id } -> `Primitive id
+    | E_app (x, f) -> `App (digestable_expr x, digestable_expr f)
+    | E_dep (Input (id, _)) -> `Dep (`Input id)
+    | E_dep (Select (id, _, _)) -> `Dep (`Select id)
+    | E_dep (Step { id }) -> `Dep (`Step id)
+    | E_dest -> `DEST
+    | E_tmp -> `TMP
+    | E_np -> `NP
+    | E_mem -> `MEM
+
+  let digestable_action = function
+    | Command cmd -> digestable_command cmd
+    | Eval expr -> digestable_expr expr
+
+  let deps_of_action = function
+    | Command cmd -> Cmd.deps cmd
+    | Eval expr -> expr_deps expr
+
   let make
       ?(descr = "")
       ?(mem = 100)
@@ -192,10 +234,10 @@ module Workflow = struct
       ?timeout
       ?version
       ?(precious = false)
-      cmd =
-    let deps = Cmd.deps cmd in
-    let id = digest ("step", version, digestable_command cmd) in
-    Step { descr ; deps ; cmd ; np ; mem ; timeout ; version ; id ; precious }
+      action =
+    let deps = deps_of_action action in
+    let id = digest ("step", version, digestable_action action) in
+    Step { descr ; deps ; action ; np ; mem ; timeout ; version ; id ; precious }
 
   let select u (Selector path) =
     let u, path =
@@ -352,7 +394,7 @@ module EDSL = struct
   let pipe xs = Pipe_list xs
 
   let workflow ?descr ?mem ?np ?timeout ?version cmds =
-    Workflow.make ?descr ?mem ?np ?timeout ?version (and_list cmds)
+    Workflow.make ?descr ?mem ?np ?timeout ?version (Command (and_list cmds))
 
   let ( % ) f g x = g (f x)
 

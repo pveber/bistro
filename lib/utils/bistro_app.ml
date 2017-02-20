@@ -87,11 +87,16 @@ let error_long_descr db tid =
   function
   | Input_check _
   | Select_check _ -> ()
-  | Step_result { cmd ; exit_code ; dumps } ->
-    fprintf stderr "+------------------------------------------------------------------------------+\n" ;
-    fprintf stderr "| Submitted script                                                             |\n" ;
-    fprintf stderr "+------------------------------------------------------------------------------+\n" ;
-    fprintf stderr "%s\n" cmd ;
+  | Step_result { action ; exit_code ; dumps } ->
+    (
+      match action with
+      | `Sh cmd ->
+        fprintf stderr "+------------------------------------------------------------------------------+\n" ;
+        fprintf stderr "| Submitted script                                                             |\n" ;
+        fprintf stderr "+------------------------------------------------------------------------------+\n" ;
+        fprintf stderr "%s\n" cmd
+      | `Eval -> ()
+    ) ;
     List.iter dumps ~f:(fun (path, text) ->
         fprintf stderr "+------------------------------------------------------------------------------+\n" ;
         fprintf stderr "|> Dumped file: %s\n" path ;
