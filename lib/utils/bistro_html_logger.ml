@@ -196,11 +196,11 @@ module Render = struct
               a ~a:[a_href dir_path] [k dir_path ] ]
         ) ]
 
-    | Step_result { exit_code ; success ; step ; stdout ; stderr ; cache ; dumps ; cmd } ->
+    | Step_result { exit_code ; outcome ; step ; stdout ; stderr ; cache ; dumps ; cmd } ->
       collapsible_panel
         ~title:[ k step.descr ]
         ~header:[
-          if success then k"" else (
+          if outcome <> `Succeeded then k"" else (
             p [ k (sprintf "Command failed with code %d" exit_code) ]
           )
         ]
@@ -265,10 +265,13 @@ module Render = struct
 
     | Input_check { pass = false }
     | Select_check { pass = false }
-    | Step_result { success = false } ->
+    | Step_result { outcome = `Failed } ->
       event_label_text `RED "FAILED"
 
-    | Step_result { success = true } ->
+    | Step_result { outcome = `Missing_output } ->
+      event_label_text `GREEN "MISSING OUTPUT"
+
+    | Step_result { outcome = `Succeeded } ->
       event_label_text `GREEN "DONE"
 
   let event time evt =

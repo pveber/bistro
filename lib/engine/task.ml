@@ -89,7 +89,7 @@ type result =
   | Input_check of { path : string ; pass : bool }
   | Select_check of { dir_path : string ; sel : string list ; pass : bool }
   | Step_result of {
-      success : bool ;
+      outcome : [`Succeeded | `Missing_output | `Failed] ;
       step : step ;
       exit_code : int ;
       cmd : string ;
@@ -390,12 +390,13 @@ let perform_step (Allocator.Resource { np ; mem }) ({ db } as config) ({ cmd } a
 
   let dest_exists = Sys.file_exists env.dest = `Yes in
   let cache_dest = Db.cache config.db step.id in
+  let success = exit_code = 0 && dest_exists in
   if config.use_docker && command_uses_docker cmd then (
     docker_chown env.tmp_dir uid ;
     if dest_exists then docker_chown env.dest uid
   ) ;
   (
-    if exit_code = 0 && dest_exists then
+    if success then
       mv env.dest cache_dest >>= fun () ->
       remove_if_exists env.tmp_dir
     else
@@ -403,10 +404,14 @@ let perform_step (Allocator.Resource { np ; mem }) ({ db } as config) ({ cmd } a
   ) >>= fun () ->
   let Concrete_task.Sh cmd = ccmd
   and `File_dumps dumps = file_dumps
-  and success = exit_code = 0 in
+  and outcome = match exit_code = 0, dest_exists with
+      true, true -> `Succeeded
+    | false, _ -> `Failed
+    | true, false -> `Missing_output
+  in
   Lwt.return (
     Step_result {
-      success ;
+      outcome ;
       step ;
       exit_code ;
       cmd ;
@@ -479,7 +484,7 @@ let post_revdeps_hook t config ~all_revdeps_succeeded =
 let failure = function
   | Input_check { pass }
   | Select_check { pass } -> not pass
-  | Step_result { success } -> not success
+  | Step_result { outcome } -> outcome <> `Succeeded
 
 let render_step_command ~np ~mem config task =
   let env = make_execution_env ~np ~mem config task in

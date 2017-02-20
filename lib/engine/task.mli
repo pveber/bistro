@@ -44,7 +44,7 @@ type result =
   | Input_check of { path : string ; pass : bool }
   | Select_check of { dir_path : string ; sel : string list ; pass : bool }
   | Step_result of {
-      success : bool ;
+      outcome : [`Succeeded | `Missing_output | `Failed] ;
       step : step ;
       exit_code : int ;
       cmd : string ;
