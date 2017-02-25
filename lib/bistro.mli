@@ -1,7 +1,7 @@
 (** A library to build scientific workflows. *)
 open Core_kernel.Std
 
-type 'a workflow
+type +'a workflow
 
 module Path : sig
   type t = string list
