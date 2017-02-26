@@ -449,8 +449,21 @@ module Concrete_task = struct
       )
 
   let perform_eval ~stdout ~stderr f =
-    Lwt_preemptive.detach f () >>= fun () ->
-    Lwt.return 0
+    match Unix.fork () with
+    | `In_the_child ->
+      let ecode =
+        try f () ; 0
+        with _ -> 1
+      in
+      exit ecode
+    | `In_the_parent pid ->
+      let k () =
+        match Unix.waitpid pid with
+        | Ok () -> 0
+        | Error (`Exit_non_zero n) -> n
+        | Error (`Signal _) -> (-1)
+      in
+      Lwt_preemptive.detach k ()
 
   let perform ~stdout ~stderr = function
     | Sh cmd -> perform_command ~stdout ~stderr cmd

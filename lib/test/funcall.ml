@@ -27,7 +27,7 @@ let double2 w =
 let main () =
   let open Bistro_app in
   let w = double2 (double (echo "42!")) in
-  let app = pure ignore $ pureW w in
+  let app = pure (function Path p -> print_endline p) $ pureW w in
   run app
 
 let command =
