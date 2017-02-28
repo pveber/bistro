@@ -19,6 +19,9 @@ let remove_if_exists fn =
   else
     Lwt.return ()
 
+let touch dst =
+  Lwt_process.exec ("", [| "touch" ; dst |]) >>| ignore
+
 let redirection filename =
   Lwt_unix.openfile filename Unix.([O_APPEND ; O_CREAT ; O_WRONLY]) 0o640 >>= fun fd ->
   Lwt.return (`FD_move (Lwt_unix.unix_file_descr fd))
@@ -449,6 +452,8 @@ module Concrete_task = struct
       )
 
   let perform_eval ~stdout ~stderr f =
+    touch stdout >>= fun () ->
+    touch stderr >>= fun () ->
     match Unix.fork () with
     | `In_the_child ->
       let ecode =
