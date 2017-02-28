@@ -185,18 +185,21 @@ module EDSL : sig
     val valdep : 'a value workflow -> 'a t
 
     val value :
+      ?descr:string ->
       ?np:int ->
       ?mem:int ->
       'a t ->
       'a value workflow
 
     val file :
+      ?descr:string ->
       ?np:int ->
       ?mem:int ->
       unit t ->
       (_, _) #file workflow
 
     val directory :
+      ?descr:string ->
       ?np:int ->
       ?mem:int ->
       unit t ->

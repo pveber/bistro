@@ -452,14 +452,14 @@ module EDSL = struct
     let dep w = E_dep w
     let valdep w = E_valdep w
 
-    let value ?np ?mem expr =
-      Workflow.make ?mem ?np (Compute (Value expr))
+    let value ?descr ?np ?mem expr =
+      Workflow.make ?descr ?mem ?np (Compute (Value expr))
 
-    let file ?np ?mem expr =
-      Workflow.make ?mem ?np (Compute (File expr))
+    let file ?descr ?np ?mem expr =
+      Workflow.make ?descr ?mem ?np (Compute (File expr))
 
-    let directory ?np ?mem expr =
-      Workflow.make ?mem ?np (Compute (Directory expr))
+    let directory ?descr ?np ?mem expr =
+      Workflow.make ?descr ?mem ?np (Compute (Directory expr))
   end
 
 end
