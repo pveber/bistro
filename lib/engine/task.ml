@@ -453,7 +453,12 @@ module Concrete_task = struct
     | `In_the_child ->
       let ecode =
         try f () ; 0
-        with _ -> 1
+        with e ->
+          Out_channel.with_file stderr ~f:(fun oc ->
+              fprintf oc "%s\n" (Exn.to_string e) ;
+              Printexc.print_backtrace oc
+            ) ;
+          1
       in
       exit ecode
     | `In_the_parent pid ->
