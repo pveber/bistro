@@ -12,6 +12,7 @@ val bamcoverage :
   ?scalefactor:float ->
   ?filterrnastrand: [ `forward | `reverse ] ->
   ?binsize:int ->
+  ?blacklistfilename: [ `bed | `gtf ] workflow ->
   ?threads:int ->
   ?normalizeto1x:int ->
   ?normalizeusingrpkm:bool ->
@@ -40,7 +41,7 @@ val bamcompare :
   ?pseudocount:int ->
   ?binsize:int ->
   ?region:string ->
-  ?blacklistfilename:string ->
+  ?blacklistfilename: [ `bed | `gtf ] workflow ->
   ?threads:int ->
   ?normalizeto1x:int ->
   ?normalizeusingrpkm:bool ->
