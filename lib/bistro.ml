@@ -143,6 +143,7 @@ module T = struct
     | E_np : int expr
     | E_mem : int expr
     | E_dep : _ workflow -> string expr
+    | E_deps : _ workflow list -> string list expr
     | E_valdep : 'a value workflow -> 'a expr
 
   and 'a workflow = u
@@ -189,6 +190,7 @@ let rec expr_deps : type s. s expr -> u list = function
   | E_app (f, x) ->
     List.dedup (expr_deps f @ expr_deps x)
   | E_dep u -> [ u ]
+  | E_deps us -> us
   | E_valdep u -> [ u ]
   | E_dest -> []
   | E_tmp -> []
@@ -231,9 +233,8 @@ module Workflow = struct
   let rec digestable_expr : type s. s expr -> _ = function
     | E_primitive { id } -> `Primitive id
     | E_app (x, f) -> `App (digestable_expr x, digestable_expr f)
-    | E_dep (Input (id, _)) -> `Dep (`Input id)
-    | E_dep (Select (id, _, _)) -> `Dep (`Select id)
-    | E_dep (Step { id }) -> `Dep (`Step id)
+    | E_dep u -> `Dep (digestable_u (u :> u))
+    | E_deps us -> `Deps (List.map (us :> u list) ~f:digestable_u)
     | E_valdep (Input (id, _)) -> `Dep (`Input id)
     | E_valdep (Select (id, _, _)) -> `Dep (`Select id)
     | E_valdep (Step { id }) -> `Dep (`Step id)
@@ -241,6 +242,11 @@ module Workflow = struct
     | E_tmp -> `TMP
     | E_np -> `NP
     | E_mem -> `MEM
+
+  and digestable_u = function
+    | Input (id, _) -> `Input id
+    | Select (id, _, _) -> `Select id
+    | Step { id } -> `Step id
 
   let digestable_some_expr = function
     | Value e -> digestable_expr e
@@ -450,6 +456,7 @@ module EDSL = struct
     let np = E_np
     let dest = E_dest
     let dep w = E_dep w
+    let deps ws = E_deps ws
     let valdep w = E_valdep w
 
     let value ?descr ?np ?mem expr =

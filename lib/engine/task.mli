@@ -39,6 +39,7 @@ and _ expr =
   | E_np : int expr
   | E_mem : int expr
   | E_dep : dep -> string expr
+  | E_deps : dep list -> string list expr
   | E_valdep : dep -> 'a expr
 
 and command =

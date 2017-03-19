@@ -67,6 +67,7 @@ and _ expr =
   | E_np : int expr
   | E_mem : int expr
   | E_dep : dep -> string expr
+  | E_deps : dep list -> string list expr
   | E_valdep : dep -> 'a expr
 
 and command =
@@ -179,6 +180,7 @@ let rec denormalize_expr : type s. s Bistro.expr -> s expr = function
   | Bistro.E_primitive { id ; value } -> E_primitive { id ; value }
   | Bistro.E_app (x, f) -> E_app (denormalize_expr x, denormalize_expr f)
   | Bistro.E_dep w -> E_dep (denormalize_dep (Bistro.Workflow.u w))
+  | Bistro.E_deps ws -> E_deps (List.map ~f:(fun w -> denormalize_dep (Bistro.Workflow.u w)) ws)
   | Bistro.E_valdep w -> E_valdep (denormalize_dep (Bistro.Workflow.u w))
   | Bistro.E_dest -> E_dest
   | Bistro.E_tmp -> E_tmp
@@ -404,6 +406,7 @@ module Concrete_task = struct
       | E_np -> env.np
       | E_mem -> env.mem
       | E_dep d -> env.dep d
+      | E_deps ds -> List.map ~f:env.dep ds
       | E_valdep d -> load (env.dep d)
     in
     let build () = match expr with

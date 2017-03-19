@@ -74,6 +74,7 @@ and _ expr =
   | E_np : int expr
   | E_mem : int expr
   | E_dep : _ workflow -> string expr
+  | E_deps : _ workflow list -> string list expr
   | E_valdep : 'a value workflow -> 'a expr
 
 (** Name and version of an external dependency for a workflow *)
@@ -183,6 +184,7 @@ module EDSL : sig
     val dest : string t
     val dep : _ workflow -> string t
     val valdep : 'a value workflow -> 'a t
+    val deps : _ workflow list -> string list t
 
     val value :
       ?descr:string ->
