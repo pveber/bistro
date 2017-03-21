@@ -4,7 +4,6 @@ open Bistro_bioinfo
 open Bistro.EDSL
 open Defs
 
-type index =  [`bowtie2_index] directory
 
 let env = docker_image ~account:"pveber" ~name:"fastq-screen" ~tag:"0.1.11" ()
 

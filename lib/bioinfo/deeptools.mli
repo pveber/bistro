@@ -70,8 +70,8 @@ val bigwigcompare :
   ?region:string ->
   ?blacklistfilename: [ `bed | `gtf ] workflow ->
   ?threads:int ->
-  [ `bigwig ] directory workflow ->
-  [ `bigwig ] directory workflow ->
+  [ `bigwig ] workflow ->
+  [ `bigwig ] workflow ->
   'a workflow
 
 

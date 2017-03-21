@@ -2,8 +2,6 @@ open Bistro.Std
 open Bistro_bioinfo
 open Defs
 
-type index = [ `bowtie2_index ] directory
-
 val fastq_screen :
   ?bowtie2_opts:string ->
   ?filter: [ `Not_map | `Uniquely | `Multi_maps | `Maps | `Not_map_or_Uniquely | `Not_map_or_Multi_maps | `Ignore ] list ->
