@@ -185,6 +185,9 @@ module EDSL : sig
     val dep : _ workflow -> string t
     val valdep : 'a value workflow -> 'a t
     val deps : _ workflow list -> string list t
+    val int : int -> int t
+    val string : string -> string t
+    val const : ('a -> string) -> 'a -> 'a t
 
     val value :
       ?descr:string ->

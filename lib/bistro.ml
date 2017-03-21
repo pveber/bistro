@@ -458,6 +458,9 @@ module EDSL = struct
     let dep w = E_dep w
     let deps ws = E_deps ws
     let valdep w = E_valdep w
+    let const to_string x = primitive (to_string x) x
+    let int = const Int.to_string
+    let string = const ident
 
     let value ?descr ?np ?mem expr =
       Workflow.make ?descr ?mem ?np (Compute (Value expr))
