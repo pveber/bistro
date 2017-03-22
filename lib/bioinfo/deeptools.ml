@@ -34,19 +34,18 @@ let ratio_expr = function
 
 (*Transform a number from French format into an US format.*)
 let normalizeto1x_expr nbr =
-  let nbr_s = String.rev (string_of_int nbr) in
+  let nbr_s = string_of_int nbr in
   let lgth = String.length nbr_s in
-  let rec compute acc idx nbr_s lgth = match idx with
-    | e when (idx = lgth) -> string (String.rev acc)
+  let rec compute acc idx nbr_s = match idx with
+    | 0 -> string acc
     | l ->
-      if lgth - l <= 3 then
-        let acc = acc ^ String.sub nbr_s l (lgth-l) in
-        compute acc lgth nbr_s lgth
+      if l <= 3 then
+        string (String.sub nbr_s 0 l ^ acc)
       else
-        let acc = acc ^ String.sub nbr_s l 3 ^ "," in
-        compute acc (l+3) nbr_s lgth
+        let acc = "," ^ String.sub nbr_s (l - 3) 3 ^ acc in
+        compute acc (l-3) nbr_s
   in
-  compute "" 0 nbr_s lgth
+  compute "" lgth nbr_s
 
 
 let bam_gen_cmd ?outfileformat ?scalefactor ?blacklistfilename ?normalizeto1x
@@ -165,7 +164,7 @@ let multibamsummary_bins ?binsize ?distancebetweenbins ?region ?blacklistfilenam
       option (opt "--binSize" int) binsize ;
       option (opt "--distanceBetweenBins" int) distancebetweenbins ;
       opt "--numberOfProcessors" ident np ;
-      opt "--bamfiles" (list dep ~sep:" ") indexed_bams ;
+      opt "--bamfiles" (list (fun bam -> dep (bam / Samtools.indexed_bam_to_bam)) ~sep:" ") indexed_bams ;
       opt "--outFileName" ident dest ;
     ]
   ]
@@ -184,7 +183,7 @@ let multibamsummary_bed ?region ?blacklistfilename ?(threads = 1)
       option (flag string "--transcript_id_designator") transcriptiddesignator ;
       opt "--numberOfProcessors" ident np ;
       string "--BED" ; (dep bed) ;
-      opt "--bamfiles" (list dep ~sep:" ") indexed_bams ;
+      opt "--bamfiles" (list (fun bam -> dep (bam / Samtools.indexed_bam_to_bam)) ~sep:" ") indexed_bams ;
       opt "--outFileName" ident dest ;
     ]
   ]
