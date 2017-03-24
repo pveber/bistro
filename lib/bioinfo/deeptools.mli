@@ -1,5 +1,4 @@
 open Bistro.Std
-open Bistro_bioinfo
 
 
 type 'a output

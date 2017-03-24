@@ -1,6 +1,5 @@
 open Core_kernel.Std
 open Bistro.EDSL
-open Bistro_bioinfo.Std
 
 let env = docker_image ~account:"pveber" ~name:"deeptools" ~tag:"2.4.1" ()
 

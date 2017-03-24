@@ -1,6 +1,5 @@
 open Core_kernel.Std
 open Bistro.Std
-open Bistro_bioinfo
 open Bistro.EDSL
 open Defs
 
