@@ -200,9 +200,12 @@ module Render = struct
       collapsible_panel
         ~title:[ k step.descr ]
         ~header:[
-          if outcome <> `Succeeded then k"" else (
+          match outcome with
+          | `Succeeded -> k""
+          | `Failed ->
             p [ k (sprintf "Command failed with code %d" exit_code) ]
-          )
+          | `Missing_output ->
+            p [ k "missing_output" ]
         ]
         ~body:(step_result_details ~id:step.id ~cmd ~cache ~stderr ~stdout ~dumps)
 

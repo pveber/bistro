@@ -14,8 +14,13 @@ let error_short_descr =
   function
   | Input_check _ -> "input doesn't exist"
   | Select_check _ -> "invalid select"
-  | Step_result { exit_code } ->
-    sprintf "ended with exit code %d" exit_code
+  | Step_result { exit_code ; outcome } ->
+    match outcome with
+    | `Succeeded -> assert false
+    | `Failed ->
+      sprintf "ended with exit code %d" exit_code
+    | `Missing_output ->
+      "missing output"
 
 let output_event t =
   let open Task in
