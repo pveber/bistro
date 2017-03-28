@@ -321,7 +321,7 @@ module Concrete_task = struct
       if env.use_docker then
         let dck_env = make_docker_execution_env env in
         sprintf
-          "docker run --log-driver=none --rm %s %s %s %s -i %s bash -c \"%s\""
+          "docker run --log-driver=none --rm %s %s %s %s -i %s bash -c '%s'"
           (deps_mount env dck_env (deps_of_command cmd))
           (file_dumps_mount env dck_env (file_dumps_of_command true cmd))
           (tmp_mount env dck_env)
