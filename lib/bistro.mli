@@ -106,7 +106,7 @@ and some_expression =
   | Directory : unit expression -> some_expression
 
 and _ expression =
-  | Expr_primitive : { id : string ; value : 'a } -> 'a expression
+  | Expr_pure : { id : string ; value : 'a } -> 'a expression
   | Expr_app : ('a -> 'b) expression * 'a expression -> 'b expression
   | Expr_dest : string expression
   | Expr_tmp : string expression
@@ -196,7 +196,7 @@ module Template : sig
       path. *)
 end
 
-(** This module provides all primitives to define new workflows that
+(** This module provides combinators to define new workflows that
     execute shell commands. *)
 module EDSL : sig
   include module type of Template with type t := Template.t
@@ -340,8 +340,8 @@ module EDSL' : sig
   (** Utility function to compute a digest of any (non-functional)
       value to a string *)
 
-  val primitive : string -> 'a -> 'a expression
-  (** [primitive id x] is an expression that evaluate in [x]. [id]
+  val pure : string -> 'a -> 'a expression
+  (** [pure id x] is an expression that evaluate in [x]. [id]
       should uniquely identify [x], meaning that no other call to pure
       should be made with arguments [id] and [y] is [y] is not equal
       to [x]. *)

@@ -135,7 +135,7 @@ module T = struct
     | Directory : unit expression -> some_expression
 
   and _ expression =
-    | Expr_primitive : { id : string ; value : 'a } -> 'a expression
+    | Expr_pure : { id : string ; value : 'a } -> 'a expression
     | Expr_app : ('a -> 'b) expression * 'a expression -> 'b expression
     | Expr_dest : string expression
     | Expr_tmp : string expression
@@ -185,7 +185,7 @@ module Cmd = struct
 end
 
 let rec expression_deps : type s. s expression -> u list = function
-  | Expr_primitive _ -> []
+  | Expr_pure _ -> []
   | Expr_app (f, x) ->
     List.dedup (expression_deps f @ expression_deps x)
   | Expr_dep u -> [ u ]
@@ -230,7 +230,7 @@ module Workflow = struct
     | MEM -> `MEM
 
   let rec digestable_expr : type s. s expression -> _ = function
-    | Expr_primitive { id } -> `Primitive id
+    | Expr_pure { id } -> `Pure id
     | Expr_app (x, f) -> `App (digestable_expr x, digestable_expr f)
     | Expr_dep u -> `Dep (digestable_u (u :> u))
     | Expr_deps us -> `Deps (List.map (us :> u list) ~f:digestable_u)
@@ -447,7 +447,7 @@ end
 
 module EDSL' = struct
   let id x = digest x
-  let primitive id value = Expr_primitive { id ; value }
+  let pure id value = Expr_pure { id ; value }
   let app f x = Expr_app (f, x)
   let ( $ ) = app
   let np = Expr_np
@@ -455,7 +455,7 @@ module EDSL' = struct
   let dep w = Expr_dep w
   let deps ws = Expr_deps ws
   let valdep w = Expr_valdep w
-  let const to_string x = primitive (to_string x) x
+  let const to_string x = pure (to_string x) x
   let int = const Int.to_string
   let string = const ident
 

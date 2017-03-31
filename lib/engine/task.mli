@@ -31,7 +31,7 @@ and some_expression =
   | Directory : unit expression -> some_expression
 
 and _ expression =
-  | Expr_primitive : { id : string ; value : 'a } -> 'a expression
+  | Expr_pure : { id : string ; value : 'a } -> 'a expression
   | Expr_app : ('a -> 'b) expression * 'a expression -> 'b expression
   | Expr_dest : string expression
   | Expr_tmp : string expression

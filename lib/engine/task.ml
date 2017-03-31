@@ -59,7 +59,7 @@ and some_expression =
   | Directory : unit expression -> some_expression
 
 and _ expression =
-  | Expr_primitive : { id : string ; value : 'a } -> 'a expression
+  | Expr_pure : { id : string ; value : 'a } -> 'a expression
   | Expr_app : ('a -> 'b) expression * 'a expression -> 'b expression
   | Expr_dest : string expression
   | Expr_tmp : string expression
@@ -176,7 +176,7 @@ let rec denormalize_cmd = function
     Docker (image, denormalize_cmd c)
 
 let rec denormalize_expression : type s. s Bistro.expression -> s expression = function
-  | Bistro.Expr_primitive { id ; value } -> Expr_primitive { id ; value }
+  | Bistro.Expr_pure { id ; value } -> Expr_pure { id ; value }
   | Bistro.Expr_app (x, f) -> Expr_app (denormalize_expression x, denormalize_expression f)
   | Bistro.Expr_dep w -> Expr_dep (denormalize_dep (Bistro.Workflow.u w))
   | Bistro.Expr_deps ws -> Expr_deps (List.map ~f:(fun w -> denormalize_dep (Bistro.Workflow.u w)) ws)
@@ -397,7 +397,7 @@ module Concrete_task = struct
 
   let of_compute env expr =
     let rec aux : type s. s expression -> s = function
-      | Expr_primitive { value } -> value
+      | Expr_pure { value } -> value
       | Expr_app (f, x) -> (aux f) (aux x)
       | Expr_dest -> env.dest
       | Expr_tmp -> env.tmp
