@@ -10,7 +10,7 @@ biology).
 - simple and lightweight wrapping of new components
 - resume-on-failure: if something fails, fix it and the workflow will
   restart from where it stopped
-- parallel workflow execution (locally or over a PBS cluster)
+- distributed workflow execution
 - development-friendly: when a script is modified, bistro
   automatically finds out what needs to be recomputed
 - automatic naming of generated files
@@ -29,7 +29,7 @@ Questions, suggestions or contributions are welcome, please file an
 I recommend installing `bistro` using
 [opam](http://opam.ocaml.org/) (see
 [installation instructions](http://opam.ocaml.org/doc/Install.html)). You
-need a recent (at least 4.02.0) installation of OCaml. Once this is
+need a recent (at least 4.03.0) installation of OCaml. Once this is
 done, simply type
 
 ```
@@ -69,5 +69,12 @@ let sample_bam =
 (* Call peaks on mapped reads *)
 let sample_peaks = Macs2.callpeak sample_bam
 
-Bistro_app.simple [ "sample_peaks", sample_peaks ]
+(** Actually run the pipeline *)
+let () =
+  let open Bistro_app in
+  let repo = [
+    [ "peaks" ] %> sample_peaks 
+    ]
+  in
+  run (of_repo ~outdir:"res" repo)
 ```
