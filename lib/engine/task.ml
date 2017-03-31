@@ -51,24 +51,24 @@ and dep = [
 and id = string
 
 and action =
-  | Command of command
-  | Compute of some_expr
+  | Exec of command
+  | Eval of some_expression
 
-and some_expr =
-  | Value     : _ expr    -> some_expr
-  | File      : unit expr -> some_expr
-  | Directory : unit expr -> some_expr
+and some_expression =
+  | Value     : _ expression    -> some_expression
+  | File      : unit expression -> some_expression
+  | Directory : unit expression -> some_expression
 
-and _ expr =
-  | E_primitive : { id : string ; value : 'a } -> 'a expr
-  | E_app : ('a -> 'b) expr * 'a expr -> 'b expr
-  | E_dest : string expr
-  | E_tmp : string expr
-  | E_np : int expr
-  | E_mem : int expr
-  | E_dep : dep -> string expr
-  | E_deps : dep list -> string list expr
-  | E_valdep : dep -> 'a expr
+and _ expression =
+  | Expr_primitive : { id : string ; value : 'a } -> 'a expression
+  | Expr_app : ('a -> 'b) expression * 'a expression -> 'b expression
+  | Expr_dest : string expression
+  | Expr_tmp : string expression
+  | Expr_np : int expression
+  | Expr_mem : int expression
+  | Expr_dep : dep -> string expression
+  | Expr_deps : dep list -> string list expression
+  | Expr_valdep : dep -> 'a expression
 
 and command =
   | Docker of Bistro.docker_image * command
@@ -176,22 +176,22 @@ let rec denormalize_cmd = function
   | Bistro.Docker (image, c) ->
     Docker (image, denormalize_cmd c)
 
-let rec denormalize_expr : type s. s Bistro.expr -> s expr = function
-  | Bistro.E_primitive { id ; value } -> E_primitive { id ; value }
-  | Bistro.E_app (x, f) -> E_app (denormalize_expr x, denormalize_expr f)
-  | Bistro.E_dep w -> E_dep (denormalize_dep (Bistro.Workflow.u w))
-  | Bistro.E_deps ws -> E_deps (List.map ~f:(fun w -> denormalize_dep (Bistro.Workflow.u w)) ws)
-  | Bistro.E_valdep w -> E_valdep (denormalize_dep (Bistro.Workflow.u w))
-  | Bistro.E_dest -> E_dest
-  | Bistro.E_tmp -> E_tmp
-  | Bistro.E_np -> E_np
-  | Bistro.E_mem -> E_mem
+let rec denormalize_expression : type s. s Bistro.expression -> s expression = function
+  | Bistro.Expr_primitive { id ; value } -> Expr_primitive { id ; value }
+  | Bistro.Expr_app (x, f) -> Expr_app (denormalize_expression x, denormalize_expression f)
+  | Bistro.Expr_dep w -> Expr_dep (denormalize_dep (Bistro.Workflow.u w))
+  | Bistro.Expr_deps ws -> Expr_deps (List.map ~f:(fun w -> denormalize_dep (Bistro.Workflow.u w)) ws)
+  | Bistro.Expr_valdep w -> Expr_valdep (denormalize_dep (Bistro.Workflow.u w))
+  | Bistro.Expr_dest -> Expr_dest
+  | Bistro.Expr_tmp -> Expr_tmp
+  | Bistro.Expr_np -> Expr_np
+  | Bistro.Expr_mem -> Expr_mem
 
 let denormalize_action = function
-  | Bistro.Command cmd -> Command (denormalize_cmd cmd)
-  | Bistro.Compute (Bistro.Value expr) -> Compute (Value (denormalize_expr expr))
-  | Bistro.Compute (Bistro.File expr) -> Compute (File (denormalize_expr expr))
-  | Bistro.Compute (Bistro.Directory expr) -> Compute (Directory (denormalize_expr expr))
+  | Bistro.Exec cmd -> Exec (denormalize_cmd cmd)
+  | Bistro.Eval (Bistro.Value expr) -> Eval (Value (denormalize_expression expr))
+  | Bistro.Eval (Bistro.File expr) -> Eval (File (denormalize_expression expr))
+  | Bistro.Eval (Bistro.Directory expr) -> Eval (Directory (denormalize_expression expr))
 
 let of_step { Bistro.id ; mem ; np ; descr ; action ; deps ; timeout ; version ; precious } =
   Step {
@@ -229,8 +229,8 @@ let rec command_uses_docker = function
   | Pipe_list xs -> List.exists xs ~f:command_uses_docker
 
 let action_uses_docker = function
-  | Command cmd -> command_uses_docker cmd
-  | Compute _ -> false
+  | Exec cmd -> command_uses_docker cmd
+  | Eval _ -> false
 
 type execution_env = {
   use_docker : bool ;
@@ -323,8 +323,8 @@ module Concrete_task = struct
     | Docker (_, cmd) -> file_dumps_of_command true cmd
 
   let file_dumps_of_action = function
-    | Command cmd -> file_dumps_of_command false cmd
-    | Compute expr -> []
+    | Exec cmd -> file_dumps_of_command false cmd
+    | Eval _ -> []
 
   let token env =
     function
@@ -398,16 +398,16 @@ module Concrete_task = struct
       )
 
   let of_compute env expr =
-    let rec aux : type s. s expr -> s = function
-      | E_primitive { value } -> value
-      | E_app (f, x) -> (aux f) (aux x)
-      | E_dest -> env.dest
-      | E_tmp -> env.tmp
-      | E_np -> env.np
-      | E_mem -> env.mem
-      | E_dep d -> env.dep d
-      | E_deps ds -> List.map ~f:env.dep ds
-      | E_valdep d -> load (env.dep d)
+    let rec aux : type s. s expression -> s = function
+      | Expr_primitive { value } -> value
+      | Expr_app (f, x) -> (aux f) (aux x)
+      | Expr_dest -> env.dest
+      | Expr_tmp -> env.tmp
+      | Expr_np -> env.np
+      | Expr_mem -> env.mem
+      | Expr_dep d -> env.dep d
+      | Expr_deps ds -> List.map ~f:env.dep ds
+      | Expr_valdep d -> load (env.dep d)
     in
     let build () = match expr with
       | Value expr ->
@@ -419,8 +419,8 @@ module Concrete_task = struct
     Eval build
 
   let of_action env = function
-    | Command cmd -> of_cmd env cmd
-    | Compute expr -> of_compute env expr
+    | Exec cmd -> of_cmd env cmd
+    | Eval expr -> of_compute env expr
 
   let extract_file_dumps env action =
     let file_dumps = file_dumps_of_action action in

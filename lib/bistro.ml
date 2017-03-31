@@ -105,8 +105,8 @@ module T = struct
   }
 
   and action =
-    | Command of command
-    | Compute of some_expr
+    | Exec of command
+    | Eval of some_expression
 
   and command =
     | Docker of docker_image * command
@@ -130,21 +130,21 @@ module T = struct
     | NP
     | MEM
 
-  and some_expr =
-    | Value     : _ expr    -> some_expr
-    | File      : unit expr -> some_expr
-    | Directory : unit expr -> some_expr
+  and some_expression =
+    | Value     : _ expression    -> some_expression
+    | File      : unit expression -> some_expression
+    | Directory : unit expression -> some_expression
 
-  and _ expr =
-    | E_primitive : { id : string ; value : 'a } -> 'a expr
-    | E_app : ('a -> 'b) expr * 'a expr -> 'b expr
-    | E_dest : string expr
-    | E_tmp : string expr
-    | E_np : int expr
-    | E_mem : int expr
-    | E_dep : _ workflow -> string expr
-    | E_deps : _ workflow list -> string list expr
-    | E_valdep : 'a value workflow -> 'a expr
+  and _ expression =
+    | Expr_primitive : { id : string ; value : 'a } -> 'a expression
+    | Expr_app : ('a -> 'b) expression * 'a expression -> 'b expression
+    | Expr_dest : string expression
+    | Expr_tmp : string expression
+    | Expr_np : int expression
+    | Expr_mem : int expression
+    | Expr_dep : _ workflow -> string expression
+    | Expr_deps : _ workflow list -> string list expression
+    | Expr_valdep : 'a value workflow -> 'a expression
 
   and 'a workflow = u
 
@@ -185,17 +185,17 @@ module Cmd = struct
     | Docker (_, c) -> deps c
 end
 
-let rec expr_deps : type s. s expr -> u list = function
-  | E_primitive _ -> []
-  | E_app (f, x) ->
-    List.dedup (expr_deps f @ expr_deps x)
-  | E_dep u -> [ u ]
-  | E_deps us -> us
-  | E_valdep u -> [ u ]
-  | E_dest -> []
-  | E_tmp -> []
-  | E_np -> []
-  | E_mem -> []
+let rec expression_deps : type s. s expression -> u list = function
+  | Expr_primitive _ -> []
+  | Expr_app (f, x) ->
+    List.dedup (expression_deps f @ expression_deps x)
+  | Expr_dep u -> [ u ]
+  | Expr_deps us -> us
+  | Expr_valdep u -> [ u ]
+  | Expr_dest -> []
+  | Expr_tmp -> []
+  | Expr_np -> []
+  | Expr_mem -> []
 
 module Workflow = struct
   include T
@@ -230,38 +230,38 @@ module Workflow = struct
     | NP -> `NP
     | MEM -> `MEM
 
-  let rec digestable_expr : type s. s expr -> _ = function
-    | E_primitive { id } -> `Primitive id
-    | E_app (x, f) -> `App (digestable_expr x, digestable_expr f)
-    | E_dep u -> `Dep (digestable_u (u :> u))
-    | E_deps us -> `Deps (List.map (us :> u list) ~f:digestable_u)
-    | E_valdep (Input (id, _)) -> `Dep (`Input id)
-    | E_valdep (Select (id, _, _)) -> `Dep (`Select id)
-    | E_valdep (Step { id }) -> `Dep (`Step id)
-    | E_dest -> `DEST
-    | E_tmp -> `TMP
-    | E_np -> `NP
-    | E_mem -> `MEM
+  let rec digestable_expr : type s. s expression -> _ = function
+    | Expr_primitive { id } -> `Primitive id
+    | Expr_app (x, f) -> `App (digestable_expr x, digestable_expr f)
+    | Expr_dep u -> `Dep (digestable_u (u :> u))
+    | Expr_deps us -> `Deps (List.map (us :> u list) ~f:digestable_u)
+    | Expr_valdep (Input (id, _)) -> `Dep (`Input id)
+    | Expr_valdep (Select (id, _, _)) -> `Dep (`Select id)
+    | Expr_valdep (Step { id }) -> `Dep (`Step id)
+    | Expr_dest -> `DEST
+    | Expr_tmp -> `TMP
+    | Expr_np -> `NP
+    | Expr_mem -> `MEM
 
   and digestable_u = function
     | Input (id, _) -> `Input id
     | Select (id, _, _) -> `Select id
     | Step { id } -> `Step id
 
-  let digestable_some_expr = function
+  let digestable_some_expression = function
     | Value e -> digestable_expr e
     | File e -> digestable_expr e
     | Directory e -> digestable_expr e
 
   let digestable_action = function
-    | Command cmd -> digestable_command cmd
-    | Compute expr -> digestable_some_expr expr
+    | Exec cmd -> digestable_command cmd
+    | Eval expr -> digestable_some_expression expr
 
   let deps_of_action = function
-    | Command cmd -> Cmd.deps cmd
-    | Compute (Value expr) -> expr_deps expr
-    | Compute (File expr) -> expr_deps expr
-    | Compute (Directory expr) -> expr_deps expr
+    | Exec cmd -> Cmd.deps cmd
+    | Eval (Value expr) -> expression_deps expr
+    | Eval (File expr) -> expression_deps expr
+    | Eval (Directory expr) -> expression_deps expr
 
   let make
       ?(descr = "")
@@ -319,7 +319,7 @@ module Workflow = struct
     fprintf oc "}\n"
 end
 
-module Expr = struct
+module Template = struct
   type t = token list
 
   let dest = [ DEST ]
@@ -362,7 +362,7 @@ module Expr = struct
 end
 
 module EDSL = struct
-  include Expr
+  include Template
 
   let input = Workflow.input
 
@@ -428,7 +428,7 @@ module EDSL = struct
   let pipe xs = Pipe_list xs
 
   let workflow ?descr ?mem ?np ?timeout ?version cmds =
-    Workflow.make ?descr ?mem ?np ?timeout ?version (Command (and_list cmds))
+    Workflow.make ?descr ?mem ?np ?timeout ?version (Exec (and_list cmds))
 
   let ( % ) f g x = g (f x)
 
@@ -445,33 +445,30 @@ module EDSL = struct
   let precious = function
     | (Input _ | Select _ as w) -> w
     | Step s -> Step { s with precious = true }
+end
 
-  module E = struct
-    type 'a t = 'a expr
+module EDSL' = struct
+  let id x = digest x
+  let primitive id value = Expr_primitive { id ; value }
+  let app f x = Expr_app (f, x)
+  let ( $ ) = app
+  let np = Expr_np
+  let dest = Expr_dest
+  let dep w = Expr_dep w
+  let deps ws = Expr_deps ws
+  let valdep w = Expr_valdep w
+  let const to_string x = primitive (to_string x) x
+  let int = const Int.to_string
+  let string = const ident
 
-    let id x = digest x
-    let primitive id value = E_primitive { id ; value }
-    let app f x = E_app (f, x)
-    let ( $ ) = app
-    let np = E_np
-    let dest = E_dest
-    let dep w = E_dep w
-    let deps ws = E_deps ws
-    let valdep w = E_valdep w
-    let const to_string x = primitive (to_string x) x
-    let int = const Int.to_string
-    let string = const ident
+  let value ?descr ?np ?mem expr =
+    Workflow.make ?descr ?mem ?np (Eval (Value expr))
 
-    let value ?descr ?np ?mem expr =
-      Workflow.make ?descr ?mem ?np (Compute (Value expr))
+  let file ?descr ?np ?mem expr =
+    Workflow.make ?descr ?mem ?np (Eval (File expr))
 
-    let file ?descr ?np ?mem expr =
-      Workflow.make ?descr ?mem ?np (Compute (File expr))
-
-    let directory ?descr ?np ?mem expr =
-      Workflow.make ?descr ?mem ?np (Compute (Directory expr))
-  end
-
+  let directory ?descr ?np ?mem expr =
+    Workflow.make ?descr ?mem ?np (Eval (Directory expr))
 end
 
 

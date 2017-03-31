@@ -43,11 +43,11 @@ let translate_event config time = function
                             Allocator.Resource { np ; mem }) ->
     (
       match step.Task.action with
-      | Task.Command cmd ->
+      | Task.Exec cmd ->
         let cmd = Task.render_step_command ~np ~mem config step cmd in
         let file_dumps = Task.render_step_dumps ~np ~mem config step in
         Some (Step_task_started { step ; action = `Sh cmd ; file_dumps })
-      | Task.Compute _ ->
+      | Task.Eval _ ->
         Some (Step_task_started { step ; action = `Eval ; file_dumps = [] })
     )
 

@@ -23,24 +23,24 @@ and dep = [
 and id = string
 
 and action =
-  | Command of command
-  | Compute of some_expr
+  | Exec of command
+  | Eval of some_expression
 
-and some_expr =
-  | Value     : _ expr    -> some_expr
-  | File      : unit expr -> some_expr
-  | Directory : unit expr -> some_expr
+and some_expression =
+  | Value     : _ expression    -> some_expression
+  | File      : unit expression -> some_expression
+  | Directory : unit expression -> some_expression
 
-and _ expr =
-  | E_primitive : { id : string ; value : 'a } -> 'a expr
-  | E_app : ('a -> 'b) expr * 'a expr -> 'b expr
-  | E_dest : string expr
-  | E_tmp : string expr
-  | E_np : int expr
-  | E_mem : int expr
-  | E_dep : dep -> string expr
-  | E_deps : dep list -> string list expr
-  | E_valdep : dep -> 'a expr
+and _ expression =
+  | Expr_primitive : { id : string ; value : 'a } -> 'a expression
+  | Expr_app : ('a -> 'b) expression * 'a expression -> 'b expression
+  | Expr_dest : string expression
+  | Expr_tmp : string expression
+  | Expr_np : int expression
+  | Expr_mem : int expression
+  | Expr_dep : dep -> string expression
+  | Expr_deps : dep list -> string list expression
+  | Expr_valdep : dep -> 'a expression
 
 and command =
   | Docker of Bistro.docker_image * command

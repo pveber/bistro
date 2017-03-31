@@ -12,13 +12,13 @@ let double_implem fn =
   s ^ s
 
 let double w =
-  let open E in
+  let open Bistro.EDSL' in
   value (
     primitive "double" double_implem $ dep w
   )
 
 let double2 w =
-  let open E in
+  let open Bistro.EDSL' in
   value (
     primitive "double2" (fun s -> s ^ s)
     $ valdep w
