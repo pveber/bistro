@@ -74,6 +74,18 @@ type docker_image = {
 }
 [@@deriving sexp]
 
+
+type 'a directory = [`directory of 'a]
+
+class type ['a,'b] file = object
+  method format : 'a
+  method encoding : [< `text | `binary] as 'b
+end
+
+class type ['a] value = object
+  inherit [ [`value of 'a], [`binary] ] file
+end
+
 module T = struct
   type u =
     | Input of string * Path.t
@@ -84,13 +96,17 @@ module T = struct
     id : string ;
     descr : string ;
     deps : u list ;
-    cmd : command ;
+    action : action ;
     np : int ; (** Required number of processors *)
     mem : int ; (** Required memory in MB *)
     timeout : int option ; (** Maximum allowed running time in hours *)
     version : int option ; (** Version number of the wrapper *)
     precious : bool ;
   }
+
+  and action =
+    | Exec of command
+    | Eval of some_expression
 
   and command =
     | Docker of docker_image * command
@@ -114,13 +130,30 @@ module T = struct
     | NP
     | MEM
 
+  and some_expression =
+    | Value     : _ expression    -> some_expression
+    | File      : unit expression -> some_expression
+    | Directory : unit expression -> some_expression
+
+  and _ expression =
+    | Expr_primitive : { id : string ; value : 'a } -> 'a expression
+    | Expr_app : ('a -> 'b) expression * 'a expression -> 'b expression
+    | Expr_dest : string expression
+    | Expr_tmp : string expression
+    | Expr_np : int expression
+    | Expr_mem : int expression
+    | Expr_dep : _ workflow -> string expression
+    | Expr_deps : _ workflow list -> string list expression
+    | Expr_valdep : 'a value workflow -> 'a expression
+
+  and 'a workflow = u
+
   type ('a, 'b) selector = Selector of Path.t
 
 end
 
 include T
 
-type 'a workflow = u
 
 type any_workflow = Workflow : _ workflow -> any_workflow
 
@@ -151,6 +184,18 @@ module Cmd = struct
     | Simple_command tokens -> deps_of_template tokens
     | Docker (_, c) -> deps c
 end
+
+let rec expression_deps : type s. s expression -> u list = function
+  | Expr_primitive _ -> []
+  | Expr_app (f, x) ->
+    List.dedup (expression_deps f @ expression_deps x)
+  | Expr_dep u -> [ u ]
+  | Expr_deps us -> us
+  | Expr_valdep u -> [ u ]
+  | Expr_dest -> []
+  | Expr_tmp -> []
+  | Expr_np -> []
+  | Expr_mem -> []
 
 module Workflow = struct
   include T
@@ -185,6 +230,39 @@ module Workflow = struct
     | NP -> `NP
     | MEM -> `MEM
 
+  let rec digestable_expr : type s. s expression -> _ = function
+    | Expr_primitive { id } -> `Primitive id
+    | Expr_app (x, f) -> `App (digestable_expr x, digestable_expr f)
+    | Expr_dep u -> `Dep (digestable_u (u :> u))
+    | Expr_deps us -> `Deps (List.map (us :> u list) ~f:digestable_u)
+    | Expr_valdep (Input (id, _)) -> `Dep (`Input id)
+    | Expr_valdep (Select (id, _, _)) -> `Dep (`Select id)
+    | Expr_valdep (Step { id }) -> `Dep (`Step id)
+    | Expr_dest -> `DEST
+    | Expr_tmp -> `TMP
+    | Expr_np -> `NP
+    | Expr_mem -> `MEM
+
+  and digestable_u = function
+    | Input (id, _) -> `Input id
+    | Select (id, _, _) -> `Select id
+    | Step { id } -> `Step id
+
+  let digestable_some_expression = function
+    | Value e -> digestable_expr e
+    | File e -> digestable_expr e
+    | Directory e -> digestable_expr e
+
+  let digestable_action = function
+    | Exec cmd -> digestable_command cmd
+    | Eval expr -> digestable_some_expression expr
+
+  let deps_of_action = function
+    | Exec cmd -> Cmd.deps cmd
+    | Eval (Value expr) -> expression_deps expr
+    | Eval (File expr) -> expression_deps expr
+    | Eval (Directory expr) -> expression_deps expr
+
   let make
       ?(descr = "")
       ?(mem = 100)
@@ -192,10 +270,10 @@ module Workflow = struct
       ?timeout
       ?version
       ?(precious = false)
-      cmd =
-    let deps = Cmd.deps cmd in
-    let id = digest ("step", version, digestable_command cmd) in
-    Step { descr ; deps ; cmd ; np ; mem ; timeout ; version ; id ; precious }
+      action =
+    let deps = deps_of_action action in
+    let id = digest ("step", version, digestable_action action) in
+    Step { descr ; deps ; action ; np ; mem ; timeout ; version ; id ; precious }
 
   let select u (Selector path) =
     let u, path =
@@ -241,9 +319,7 @@ module Workflow = struct
     fprintf oc "}\n"
 end
 
-type 'a directory = [`directory of 'a]
-
-module Expr = struct
+module Template = struct
   type t = token list
 
   let dest = [ DEST ]
@@ -286,7 +362,7 @@ module Expr = struct
 end
 
 module EDSL = struct
-  include Expr
+  include Template
 
   let input = Workflow.input
 
@@ -352,7 +428,7 @@ module EDSL = struct
   let pipe xs = Pipe_list xs
 
   let workflow ?descr ?mem ?np ?timeout ?version cmds =
-    Workflow.make ?descr ?mem ?np ?timeout ?version (and_list cmds)
+    Workflow.make ?descr ?mem ?np ?timeout ?version (Exec (and_list cmds))
 
   let ( % ) f g x = g (f x)
 
@@ -369,6 +445,30 @@ module EDSL = struct
   let precious = function
     | (Input _ | Select _ as w) -> w
     | Step s -> Step { s with precious = true }
+end
+
+module EDSL' = struct
+  let id x = digest x
+  let primitive id value = Expr_primitive { id ; value }
+  let app f x = Expr_app (f, x)
+  let ( $ ) = app
+  let np = Expr_np
+  let dest = Expr_dest
+  let dep w = Expr_dep w
+  let deps ws = Expr_deps ws
+  let valdep w = Expr_valdep w
+  let const to_string x = primitive (to_string x) x
+  let int = const Int.to_string
+  let string = const ident
+
+  let value ?descr ?np ?mem expr =
+    Workflow.make ?descr ?mem ?np (Eval (Value expr))
+
+  let file ?descr ?np ?mem expr =
+    Workflow.make ?descr ?mem ?np (Eval (File expr))
+
+  let directory ?descr ?np ?mem expr =
+    Workflow.make ?descr ?mem ?np (Eval (Directory expr))
 end
 
 

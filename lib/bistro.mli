@@ -3,6 +3,19 @@ open Core_kernel.Std
 
 type +'a workflow
 
+type 'a directory = [`directory of 'a]
+
+class type ['a,'b] file = object
+  method format : 'a
+  method encoding : [< `text | `binary] as 'b
+end
+
+class type ['a] value = object
+  inherit [ [`value of 'a], [`binary] ] file
+end
+
+type any_workflow = Workflow : _ workflow -> any_workflow
+
 module Path : sig
   type t = string list
   val of_string : string -> t
@@ -20,13 +33,17 @@ and step = private {
   id : string ;
   descr : string ;
   deps : u list ;
-  cmd : command ;
+  action : action ;
   np : int ; (** Required number of processors *)
   mem : int ; (** Required memory in MB *)
   timeout : int option ; (** Maximum allowed running time in hours *)
   version : int option ; (** Version number of the wrapper *)
   precious : bool ;
 }
+
+and action =
+  | Exec of command
+  | Eval of some_expression
 
 and command =
   | Docker of docker_image * command
@@ -44,6 +61,22 @@ and token =
   | NP
   | MEM
 
+and some_expression =
+  | Value     : _ expression    -> some_expression
+  | File      : unit expression -> some_expression
+  | Directory : unit expression -> some_expression
+
+and _ expression =
+  | Expr_primitive : { id : string ; value : 'a } -> 'a expression
+  | Expr_app : ('a -> 'b) expression * 'a expression -> 'b expression
+  | Expr_dest : string expression
+  | Expr_tmp : string expression
+  | Expr_np : int expression
+  | Expr_mem : int expression
+  | Expr_dep : _ workflow -> string expression
+  | Expr_deps : _ workflow list -> string list expression
+  | Expr_valdep : 'a value workflow -> 'a expression
+
 (** Name and version of an external dependency for a workflow *)
 and docker_image = private {
   dck_account : string ;
@@ -52,9 +85,6 @@ and docker_image = private {
   dck_registry : string option ;
 }
 
-type 'a directory = [`directory of 'a]
-
-type any_workflow = Workflow : _ workflow -> any_workflow
 
 type (-'a, +'b) selector = private Selector of Path.t
 
@@ -65,7 +95,7 @@ module Workflow : sig
 end
 
 
-module Expr : sig
+module Template : sig
   type t
 
   val dest : t
@@ -88,7 +118,7 @@ end
 
 
 module EDSL : sig
-  include module type of Expr with type t := Expr.t
+  include module type of Template with type t := Template.t
 
   val workflow :
     ?descr:string ->
@@ -109,30 +139,30 @@ module EDSL : sig
   val cmd :
     string ->
     ?env:docker_image ->
-    ?stdin:Expr.t -> ?stdout:Expr.t -> ?stderr:Expr.t ->
-    Expr.t list -> command
+    ?stdin:Template.t -> ?stdout:Template.t -> ?stderr:Template.t ->
+    Template.t list -> command
 
-  val opt : string -> ('a -> Expr.t) -> 'a -> Expr.t
-  val opt' : string -> ('a -> Expr.t) -> 'a -> Expr.t
-  val flag : ('a -> Expr.t) -> 'a -> bool -> Expr.t
-  val ( // ) : Expr.t -> string -> Expr.t
+  val opt : string -> ('a -> Template.t) -> 'a -> Template.t
+  val opt' : string -> ('a -> Template.t) -> 'a -> Template.t
+  val flag : ('a -> Template.t) -> 'a -> bool -> Template.t
+  val ( // ) : Template.t -> string -> Template.t
 
   val docker : docker_image -> command -> command
   val or_list : command list -> command
   val and_list : command list -> command
   val pipe : command list -> command
 
-  val mkdir : Expr.t -> command
-  val mkdir_p : Expr.t -> command
+  val mkdir : Template.t -> command
+  val mkdir_p : Template.t -> command
   val wget :
     ?no_check_certificate:bool ->
     ?user:string ->
     ?password:string ->
-    ?dest:Expr.t ->
+    ?dest:Template.t ->
     string -> command
-  val cd : Expr.t -> command
-  val rm_rf : Expr.t -> command
-  val mv : Expr.t -> Expr.t -> command
+  val cd : Template.t -> command
+  val rm_rf : Template.t -> command
+  val mv : Template.t -> Template.t -> command
 
   val docker_image :
     ?tag:string ->
@@ -142,6 +172,42 @@ module EDSL : sig
     unit -> docker_image
 
   val ( % ) : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c
+end
+
+module EDSL' : sig
+  val value :
+    ?descr:string ->
+    ?np:int ->
+    ?mem:int ->
+    'a expression ->
+    'a value workflow
+
+  val file :
+    ?descr:string ->
+    ?np:int ->
+    ?mem:int ->
+    unit expression ->
+    (_, _) #file workflow
+
+  val directory :
+    ?descr:string ->
+    ?np:int ->
+    ?mem:int ->
+    unit expression ->
+    _ directory workflow
+
+  val id : 'a -> string
+  val primitive : string -> 'a -> 'a expression
+  val app : ('a -> 'b) expression -> 'a expression -> 'b expression
+  val ( $ ) : ('a -> 'b) expression -> 'a expression -> 'b expression
+  val np : int expression
+  val dest : string expression
+  val dep : _ workflow -> string expression
+  val valdep : 'a value workflow -> 'a expression
+  val deps : _ workflow list -> string list expression
+  val int : int -> int expression
+  val string : string -> string expression
+  val const : ('a -> string) -> 'a -> 'a expression
 end
 
 module Std : sig
@@ -191,5 +257,3 @@ module Std : sig
     val crlf2lf : (_,[`text]) file workflow -> (_,[`text]) file workflow
   end
 end
-
-
