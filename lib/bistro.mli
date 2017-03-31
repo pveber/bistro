@@ -76,7 +76,6 @@ and step = private {
   action : action ;
   np : int ; (** Required number of processors *)
   mem : int ; (** Required memory in MB *)
-  timeout : int option ; (** Maximum allowed running time in hours *)
   version : int option ; (** Version number of the wrapper *)
   precious : bool ;
 }
@@ -206,7 +205,6 @@ module EDSL : sig
     ?descr:string ->
     ?mem:int ->
     ?np:int ->
-    ?timeout:int ->
     ?version:int ->
     command list -> 'a workflow
   (** Workflow constructor, taking a list of commands in input. Other arguments are:

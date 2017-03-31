@@ -99,7 +99,6 @@ module T = struct
     action : action ;
     np : int ; (** Required number of processors *)
     mem : int ; (** Required memory in MB *)
-    timeout : int option ; (** Maximum allowed running time in hours *)
     version : int option ; (** Version number of the wrapper *)
     precious : bool ;
   }
@@ -267,13 +266,12 @@ module Workflow = struct
       ?(descr = "")
       ?(mem = 100)
       ?(np = 1)
-      ?timeout
       ?version
       ?(precious = false)
       action =
     let deps = deps_of_action action in
     let id = digest ("step", version, digestable_action action) in
-    Step { descr ; deps ; action ; np ; mem ; timeout ; version ; id ; precious }
+    Step { descr ; deps ; action ; np ; mem ; version ; id ; precious }
 
   let select u (Selector path) =
     let u, path =
@@ -427,8 +425,8 @@ module EDSL = struct
   let and_list xs = And_list xs
   let pipe xs = Pipe_list xs
 
-  let workflow ?descr ?mem ?np ?timeout ?version cmds =
-    Workflow.make ?descr ?mem ?np ?timeout ?version (Exec (and_list cmds))
+  let workflow ?descr ?mem ?np ?version cmds =
+    Workflow.make ?descr ?mem ?np ?version (Exec (and_list cmds))
 
   let ( % ) f g x = g (f x)
 

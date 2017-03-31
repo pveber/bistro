@@ -38,7 +38,6 @@ and step = {
   action   : action ;
   np       : int ; (** Required number of processors *)
   mem      : int ; (** Required memory in MB *)
-  timeout  : int option ; (** Maximum allowed running time in hours *)
   version  : int option ; (** Version number of the wrapper *)
   precious : bool ;
 }
@@ -193,7 +192,7 @@ let denormalize_action = function
   | Bistro.Eval (Bistro.File expr) -> Eval (File (denormalize_expression expr))
   | Bistro.Eval (Bistro.Directory expr) -> Eval (Directory (denormalize_expression expr))
 
-let of_step { Bistro.id ; mem ; np ; descr ; action ; deps ; timeout ; version ; precious } =
+let of_step { Bistro.id ; mem ; np ; descr ; action ; deps ; version ; precious } =
   Step {
     id ;
     descr ;
@@ -201,7 +200,6 @@ let of_step { Bistro.id ; mem ; np ; descr ; action ; deps ; timeout ; version ;
     mem ;
     action = denormalize_action action ;
     deps = List.map deps ~f:denormalize_dep ;
-    timeout ;
     version ;
     precious ;
   }

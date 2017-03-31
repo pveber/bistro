@@ -10,7 +10,6 @@ and step = {
   action   : action ;
   np       : int ; (** Required number of processors *)
   mem      : int ; (** Required memory in MB *)
-  timeout  : int option ; (** Maximum allowed running time in hours *)
   version  : int option ; (** Version number of the wrapper *)
   precious : bool ;
 }
