@@ -58,10 +58,9 @@ let sample_bam =                                        (* Convert SAM file to B
 let sample_peaks = Macs2.callpeak sample_bam            (* Call peaks on mapped reads *)
 
 let () =                                                (** Actually run the pipeline *)
-  let open Bistro_app in
-  let repo = [
+  let repo = Bistro_repo.[
     [ "peaks" ] %> sample_peaks 
     ]
   in
-  run (of_repo ~outdir:"res" repo)
+  Bistro_repo.build ~outdir:"res" repo
 ```
