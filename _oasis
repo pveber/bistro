@@ -73,7 +73,11 @@ Library bistro_engine
 
 Library bistro_utils
   Path:             lib/utils
-  Modules:          Bistro_app, Bistro_console_logger, Bistro_html_logger, Bistro_logger
+  Modules:          Bistro_app,
+                    Bistro_console_logger,
+                    Bistro_html_logger,
+                    Bistro_logger,
+                    Bistro_repo
   FindlibName:      utils
   FindlibParent:    bistro
   BuildDepends:     bistro.engine, tyxml

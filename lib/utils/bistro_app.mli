@@ -27,12 +27,6 @@ val run :
   ?keep_all:bool ->
   'a t -> 'a
 
-type repo_item
-
-val ( %> ) : string list -> _ workflow -> repo_item
-
-val of_repo : outdir:string -> repo_item list -> unit t
-
 module Syntax : sig
   module Let_syntax : sig
     type nonrec 'a t = 'a t

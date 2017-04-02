@@ -24,12 +24,12 @@ let logger verbose html_report =
 
 
 let main repo outdir np mem verbose html_report () =
-  let open Bistro_app in
-  run
+  let open Bistro_repo in
+  build
     ~keep_all:false
     ~np ~mem:(mem * 1024)
     ~logger:(logger verbose html_report)
-    (of_repo ~outdir repo)
+    ~outdir repo
 
 module ChIP_seq = struct
   let chIP_pho4_noPi = List.map ~f:Sra.fetch_srr [ "SRR217304" ; "SRR217305" ]
@@ -46,7 +46,7 @@ module ChIP_seq = struct
 
   let chIP_pho4_noPi_macs2 = Macs2.callpeak ~mfold:(1,100) Macs2.bam [ chIP_pho4_noPi_bam ]
 
-  let repo = Bistro_app.[
+  let repo = Bistro_repo.[
     [ "chIP_pho4_noPi_macs2.peaks" ] %> chIP_pho4_noPi_macs2
   ]
 
@@ -116,7 +116,7 @@ module RNA_seq = struct
       [ [   "0" ], counts (`WT, `High_Pi) ;
         [ "360" ], counts (`WT, `No_Pi 360) ; ]
 
-  let repo = Bistro_app.[
+  let repo = Bistro_repo.[
     [ "deseq2" ; "0_vs_360" ] %> deseq2#effect_table ;
   ]
 
