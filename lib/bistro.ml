@@ -440,8 +440,9 @@ module EDSL = struct
     dck_registry = registry ;
   }
 
-  let precious = function
-    | (Input _ | Select _ as w) -> w
+  let rec precious = function
+    | (Input _ as w) -> w
+    | Select (id, u, p) -> Select (id, precious u, p)
     | Step s -> Step { s with precious = true }
 end
 
