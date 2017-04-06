@@ -6,6 +6,8 @@ open Bistro_engine
 type item =
   Repo_item : string list * _ workflow -> item
 
+type t = item list
+
 type normalized_repo_item = {
   repo_path  : string ;
   file_path  : string ;
