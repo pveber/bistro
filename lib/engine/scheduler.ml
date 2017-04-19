@@ -104,11 +104,11 @@ let precious_workflows acc w =
       (S.add seen s.id,
        if s.precious then S.add precious_deps s.id else precious_deps)
   in
-  traverse (String.Set.empty, acc) w
-  |> snd
+  traverse acc w
 
 let precious_workflows_of_list xs =
-  List.fold xs ~init:String.Set.empty ~f:precious_workflows
+  List.fold xs ~init:(String.Set.empty, String.Set.empty) ~f:precious_workflows
+  |> snd
 
 let compile workflows =
   let workflows = List.map workflows ~f:(fun (Bistro.Workflow w) -> Bistro.Workflow.u w) in
