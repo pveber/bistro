@@ -28,27 +28,39 @@ let assoc xs =
   pure (fun values -> List.zip_exn keys values)
   $ list terms
 
-let rec to_workflow_list
-  : type s. s t -> Bistro.any_workflow list
-  = function
-    | Pure _ -> []
-    | PureW w ->
-      let open Bistro in
-      (* If [w] is a select, we need to add its parent dir as a
-         workflow of the app so that it is marked as precious. [w]
-         only performs a side effect, the real contents is in the
-         result of [dir]. *)
-      let opt_dir = match Workflow.u w with
-        | Select (_, dir, _) ->
-          [ Workflow (EDSL.precious w) ]
-        | Input _ | Step _ -> []
-      in
-      opt_dir @ [ Workflow (EDSL.precious w) ]
-    | App (f, x) ->
-      to_workflow_list f @ to_workflow_list x
-    | List xs ->
-      List.map xs ~f:to_workflow_list
-      |> List.concat
+module WHS = Hash_set.Make(
+  struct
+    open Bistro
+    type t = any_workflow
+    let hash (Workflow u) = String.hash (Workflow.id u)
+    let compare (Workflow u) (Workflow v) =
+      String.compare (Workflow.id u) (Workflow.id v)
+    let sexp_of_t _ = assert false
+    let t_of_sexp _ = assert false
+  end
+  )
+
+let rec to_workflow_list term =
+  let acc = WHS.create () in
+  let rec aux
+    : type s. s t -> unit
+    = fun t ->
+      match t with
+      | Pure _ -> ()
+      | PureW w ->
+        let open Bistro in
+        (* If [w] is a select, we need to ensure its parent dir is
+           marked as precious. [w] only performs a side effect, the
+           real contents is in the result of selected workflow. This
+           is done by the inner logic of [EDSL.precious] *)
+        Hash_set.add acc (Workflow (EDSL.precious w))
+      | App (f, x) ->
+        aux f ; aux x
+      | List xs ->
+        List.iter xs ~f:aux
+  in
+  aux term ;
+  Hash_set.to_list acc
 
 let rec eval : type s. Db.t -> s t -> s
   = fun db app ->
