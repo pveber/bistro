@@ -17,18 +17,20 @@ let append (xs : txt workflow list) id =
           echo_cmd ;
         ])
 
-let pipeline n =
+let pipeline n debug =
   let root = append [] "root" in
   let l1 = List.init n ~f:(fun i -> append [ root ] (sprintf "l1_%d" i)) in
   let middle = append l1 "middle" in
   let l2 = List.init n ~f:(fun i -> append [ middle ] (sprintf "l2_%d" i)) in
   let final = append l2 "final" in
-  final
+  let open Bistro_app in
+  List.map (final :: if debug then l2 else []) ~f:(fun x -> pureW x)
+  |> list
 
-let main n () =
+let main n debug () =
   let open Bistro_app in
   let logger = Bistro_console_logger.create () in
-  run ~logger (pureW (pipeline n))
+  run ~logger (pipeline n debug)
   |> ignore
 
 let command =
@@ -37,5 +39,6 @@ let command =
     Command.Spec.(
       empty
       +> flag "-n" (required int) ~doc:"INT size of the pipeline"
+      +> flag "--debug" no_arg ~doc:" sets many targets in the final repo"
     )
     main
