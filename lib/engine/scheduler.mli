@@ -12,7 +12,7 @@ end
 type time = float
 
 type event =
-  | Init of DAG.t
+  | Init of { dag : DAG.t ; needed : Task.t list ; already_done : Task.t list }
   | Task_ready of Task.t
   | Task_started of Task.t * Allocator.resource
   | Task_ended of Task.result

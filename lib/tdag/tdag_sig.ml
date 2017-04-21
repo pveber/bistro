@@ -64,7 +64,7 @@ module type S = sig
   and time = float
 
   type event =
-    | Init of t
+    | Init of { dag : t ; needed : task list ; already_done : task list }
     | Task_ready of task
     | Task_started of task * resource
     | Task_ended of task_result

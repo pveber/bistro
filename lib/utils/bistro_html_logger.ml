@@ -67,7 +67,7 @@ let update model config time evt =
   {
     dag = (
       match evt with
-      | Scheduler.Init dag -> Some dag
+      | Scheduler.Init { dag } -> Some dag
       | _ -> model.dag
     ) ;
     events = (

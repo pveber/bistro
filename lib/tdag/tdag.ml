@@ -80,7 +80,7 @@ module Make(D : Domain) = struct
   and time = float
 
   type event =
-    | Init of t
+    | Init of { dag : t ; needed : task list ; already_done : task list }
     | Task_ready of task
     | Task_started of task * resource
     | Task_ended of task_result
@@ -241,8 +241,10 @@ module Make(D : Domain) = struct
       | None -> sources g
       | Some tasks -> tasks
     in
-    logger#event config (Unix.gettimeofday ()) (Init g) ;
     initial_state config g goals >>= fun (needed, already_done) ->
+    logger#event config (Unix.gettimeofday ()) (Init { dag = g ;
+                                                       needed = S.elements needed ;
+                                                       already_done = S.elements already_done }) ;
     let performance_table =
       performance_table config logger alloc ~needed ~already_done g goals
     in
