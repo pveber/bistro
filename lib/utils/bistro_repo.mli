@@ -13,6 +13,5 @@ val build  :
   ?np:int ->
   ?mem:int ->
   ?logger:Scheduler.logger ->
-  ?dag_dump:string ->
   ?keep_all:bool ->
   outdir:string -> t -> unit

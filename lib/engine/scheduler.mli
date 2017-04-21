@@ -1,12 +1,8 @@
 open Core_kernel.Std
 open Rresult
 
-module DAG : sig
-  type t
-  type task = Task.t
-
-  val dot_output : t -> string -> unit
-end
+module DAG : Tdag_sig.S
+  with type task = Task.t
 
 
 type time = float

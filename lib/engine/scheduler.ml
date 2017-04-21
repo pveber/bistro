@@ -12,31 +12,7 @@ module Domain = struct
   module Task = Task
 end
 
-module DAG = struct
-  include Tdag.Make(Domain)
-
-  let dot_output dag fn =
-    let vertex_attribute =
-      let open Task in
-      function
-      | Input (_, p) ->
-        let label = Bistro.Path.to_string p in
-        [ `Label label ; `Color 0xFFFFFF ; `Shape `Box ]
-      | Select (_, _, p) ->
-        let label = Bistro.Path.to_string p in
-        [ `Label label ; `Color 0xFFFFFF ; `Shape `Box ]
-      | Step { descr } ->
-        [ `Label descr ; `Shape `Box ]
-    in
-    let edge_attribute =
-      let open Task in
-      function
-      | Select _, Step _ -> [ `Style `Dotted ]
-      | _ -> []
-    in
-    dot_output dag vertex_attribute edge_attribute fn
-end
-
+module DAG = Tdag.Make(Domain)
 include DAG
 
 let workflow_deps =

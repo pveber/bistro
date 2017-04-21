@@ -94,5 +94,5 @@ let to_app ~outdir items =
   |> app (pure remove_redundancies)
   |> app (pure (generate outdir))
 
-let build ?np ?mem ?logger ?dag_dump ?keep_all ~outdir repo =
-  Bistro_app.run ?np ?mem ?logger ?dag_dump ?keep_all (to_app ~outdir repo)
+let build ?np ?mem ?logger ?keep_all ~outdir repo =
+  Bistro_app.run ?np ?mem ?logger ?keep_all (to_app ~outdir repo)
