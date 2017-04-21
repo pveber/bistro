@@ -1,3 +1,24 @@
+v0.2.0 2017-04-21 Lyon
+----------------------
+
+Major rewrite:
+- new execution engine
+  + generic notion of task graph (DAG)
+  + compilation of workflow representation to a task DAG
+  + logging facilities
+  + transparent execution of commands through docker container
+  + removal of intermediate targets during execution
+  + notion of precious workflow (that should be kept no matter what)
+- call of regular ocaml function as new type of workflow
+- applicative term to express an action that should be performed after a
+  set of workflows has been successfully executed
+- text logging
+- logging as HTML report
+- added a collection of Dockerfile scripts
+
+and (too) many bug fixes.
+
+
 v0.1.0 2016-05-19 Lyon
 ----------------------
 
