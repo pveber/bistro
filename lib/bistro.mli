@@ -133,6 +133,7 @@ type (-'a, +'b) selector = private Selector of Path.t
 module Workflow : sig
   type 'a t = 'a workflow
   val id : _ t -> string
+  val id' : u -> string
   val u : _ t -> u
 end
 
