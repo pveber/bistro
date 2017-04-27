@@ -1,3 +1,5 @@
+open Core.Std
+
 type t =
   | Input of string * path
   | Select of string * [`Input of path | `Step of string] * path
@@ -85,7 +87,7 @@ val config :
   keep_all:bool ->
   config
 
-val of_workflow : Bistro.u -> t
+val of_workflow : precious:bool -> Bistro.u -> t
 val id : t -> string
 val requirement : t -> Allocator.request
 val perform : Allocator.resource -> config -> t -> result Lwt.t

@@ -86,13 +86,17 @@ let generate outdir items =
       link file_path cache_path
     )
 
-let to_app ~outdir items =
+let use t (Bistro.Workflow w) =
+  pure (fun x _ -> x) $ t $ pureW w
+
+let to_app ?(precious = []) ~outdir items =
   List.map items ~f:(function (Repo_item (p, w) as item) ->
       pure (normalized_repo_item item) $ (pureW w)
     )
   |> list
   |> app (pure remove_redundancies)
   |> app (pure (generate outdir))
+  |> fun init -> List.fold precious ~init ~f:use
 
-let build ?np ?mem ?logger ?keep_all ~outdir repo =
-  Bistro_app.run ?np ?mem ?logger ?keep_all (to_app ~outdir repo)
+let build ?np ?mem ?logger ?keep_all ?precious ~outdir repo =
+  Bistro_app.run ?np ?mem ?logger ?keep_all (to_app ~outdir ?precious repo)

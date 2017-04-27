@@ -32,7 +32,13 @@ type trace =
                | `Missing_dep
                | `Allocation_error of string ]
 
-val compile : Bistro.any_workflow list -> DAG.t * Task.t list
+(* Parameter [precious] is used to tell an execution engine that the
+   target takes a long time to be generated and should be kept in
+   cache whenever possible.*)
+val compile :
+  ?precious:Bistro.any_workflow list ->
+  Bistro.any_workflow list ->
+  DAG.t * Task.t list
 
 val run :
   ?logger:logger ->

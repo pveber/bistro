@@ -100,7 +100,6 @@ module T = struct
     np : int ; (** Required number of processors *)
     mem : int ; (** Required memory in MB *)
     version : int option ; (** Version number of the wrapper *)
-    precious : bool ;
   }
 
   and action =
@@ -267,11 +266,10 @@ module Workflow = struct
       ?(mem = 100)
       ?(np = 1)
       ?version
-      ?(precious = false)
       action =
     let deps = deps_of_action action in
     let id = digest ("step", version, digestable_action action) in
-    Step { descr ; deps ; action ; np ; mem ; version ; id ; precious }
+    Step { descr ; deps ; action ; np ; mem ; version ; id }
 
   let select u (Selector path) =
     let u, path =
@@ -440,10 +438,6 @@ module EDSL = struct
     dck_registry = registry ;
   }
 
-  let rec precious = function
-    | (Input _ as w) -> w
-    | Select (id, u, p) -> Select (id, precious u, p)
-    | Step s -> Step { s with precious = true }
 end
 
 module EDSL' = struct

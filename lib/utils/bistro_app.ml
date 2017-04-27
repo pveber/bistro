@@ -49,11 +49,7 @@ let rec to_workflow_list term =
       | Pure _ -> ()
       | PureW w ->
         let open Bistro in
-        (* If [w] is a select, we need to ensure its parent dir is
-           marked as precious. [w] only performs a side effect, the
-           real contents is in the result of selected workflow. This
-           is done by the inner logic of [EDSL.precious] *)
-        Hash_set.add acc (Workflow (EDSL.precious w))
+        Hash_set.add acc (Workflow w)
       | App (f, x) ->
         aux f ; aux x
       | List xs ->

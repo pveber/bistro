@@ -77,7 +77,6 @@ and step = private {
   np : int ; (** Required number of processors *)
   mem : int ; (** Required memory in MB *)
   version : int option ; (** Version number of the wrapper *)
-  precious : bool ;
 }
 
 and action =
@@ -226,13 +225,6 @@ module EDSL : sig
   val ( / ) : 'a directory workflow -> ('a, 'b) selector -> 'b workflow
   (** Constructs a workflow by selecting a dir or file from a
       directory workflow *)
-
-  val precious : 'a workflow -> 'a workflow
-  (** [precious w] is [w] plus its [precious] attribute set to
-      [true]. This is to tell an execution engine that the target
-      takes a long time to be generated and should be kept in cache
-      whenever possible.*)
-
 
   val cmd :
     string ->

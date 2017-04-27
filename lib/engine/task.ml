@@ -192,7 +192,7 @@ let denormalize_action = function
   | Bistro.Eval (Bistro.File expr) -> Eval (File (denormalize_expression expr))
   | Bistro.Eval (Bistro.Directory expr) -> Eval (Directory (denormalize_expression expr))
 
-let of_step { Bistro.id ; mem ; np ; descr ; action ; deps ; version ; precious } =
+let of_step ~precious { Bistro.id ; mem ; np ; descr ; action ; deps ; version } =
   Step {
     id ;
     descr ;
@@ -204,14 +204,14 @@ let of_step { Bistro.id ; mem ; np ; descr ; action ; deps ; version ; precious 
     precious ;
   }
 
-let of_workflow = function
+let of_workflow ~precious = function
   | Bistro.Input (id, p) -> Input (id, p)
   | Bistro.Select (id, Bistro.Step { Bistro.id = dir_id }, p) ->
     Select (id, `Step dir_id, p)
   | Bistro.Select (id, Bistro.Input (_, dir_p), p) ->
     Select (id, `Input dir_p, p)
   | Bistro.Select (_, Bistro.Select _, _) -> assert false
-  | Bistro.Step s -> of_step s
+  | Bistro.Step s -> of_step ~precious s
 
 let requirement = function
   | Input _
