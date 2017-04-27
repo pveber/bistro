@@ -18,9 +18,11 @@ let common_spec =
 let logger verbose html_report =
   Bistro_logger.tee
     (if verbose then Bistro_console_logger.create () else Bistro_logger.null)
-    (match html_report with
-     | Some path -> Bistro_html_logger.create path
-     | None -> Bistro_logger.null)
+    (Bistro_logger.tee
+       (Bistro_dot_output.create "dag.dot")
+       (match html_report with
+        | Some path -> Bistro_html_logger.create path
+        | None -> Bistro_logger.null))
 
 
 let main repo outdir np mem verbose html_report () =

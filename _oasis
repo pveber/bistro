@@ -75,6 +75,7 @@ Library bistro_utils
   Path:             lib/utils
   Modules:          Bistro_app,
                     Bistro_console_logger,
+                    Bistro_dot_output,
                     Bistro_html_logger,
                     Bistro_logger,
                     Bistro_repo
