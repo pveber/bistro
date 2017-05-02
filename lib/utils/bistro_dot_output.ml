@@ -14,24 +14,25 @@ let light_gray = 0xC0C0C0
 let black = 0
 
 let dot_output dag ~needed ~already_done fn =
-  let vertex_attribute =
+  let vertex_attribute u =
     let open Task in
-    function
+    let needed = List.mem needed u in
+    let color = if needed then black else light_gray in
+    match u with
     | Input (_, p) ->
       let label = Bistro.Path.to_string p in
-      [ `Label label ; `Color 0xFFFFFF ; `Shape `Box ]
+      [ `Label label ; `Color color ; `Fontcolor color ; `Shape `Box ]
     | Select (_, _, p) ->
       let label = Bistro.Path.to_string p in
-      [ `Label label ; `Color 0xFFFFFF ; `Shape `Box ]
-    | Step { descr } as u ->
-      let needed = List.mem needed u in
+      [ `Label label ; `Fontcolor color ; `Color color ; `Shape `Box ]
+    | Step { descr ; precious } as u ->
       let already_done  = List.mem already_done u in
-      let color = if needed then black else light_gray in
-      [ `Label descr ;
+      let label_suffix = if precious then "*" else "" in
+      [ `Label (descr ^ label_suffix) ;
         `Shape `Box ;
         `Peripheries (if already_done then 2 else 1) ;
         `Color color ;
-        `Fontcolor color
+        `Fontcolor color ;
       ]
   in
   let edge_attribute (u, v) =
