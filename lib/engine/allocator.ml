@@ -59,7 +59,8 @@ let release p (Resource { np ; mem }) =
       if np <= p.current_np && mem <= p.current_mem then (
         decr p ~np ~mem ;
         Lwt.wakeup u (Resource { np ; mem }) ;
-        t
+        if np = 0 || mem = 0 then t
+        else wake_guys_up p t
       )
       else h :: (wake_guys_up p t)
   in
