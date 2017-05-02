@@ -85,12 +85,13 @@ let compile workflows =
     |> List.map ~f:Bistro.Workflow.id'
     |> String.Set.of_list
   in
-  workflows
-  |> List.fold ~init:(String.Map.empty, DAG.empty) ~f:(fun (seen, dag) u ->
-      let seen, dag, _ = add_workflow precious_ids (seen, dag) u in
-      seen, dag
+  let _, dag, goals =
+    List.fold workflows ~init:(String.Map.empty, DAG.empty, []) ~f:(fun (seen, dag, goals) u ->
+        let seen, dag, t = add_workflow precious_ids (seen, dag) u in
+        seen, dag, t :: goals
     )
-  |> snd
+  in
+  dag, goals
 
-let run ?logger alloc config dag =
-  DAG.run ?logger alloc config dag
+let run ?logger ?goals alloc config dag =
+  DAG.run ?logger ?goals alloc config dag
