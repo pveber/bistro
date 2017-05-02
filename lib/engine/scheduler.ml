@@ -75,21 +75,22 @@ let rec add_workflow precious_set (seen, dag) w =
   | Some u -> seen, dag, u
 
 
-let compile ?(precious = []) workflows =
-  let workflows = List.map workflows ~f:(fun (Bistro.Workflow w) -> Bistro.Workflow.u w) in
-  let precious_workflows =
-    precious
-    |> Bistro.(List.map ~f:(fun (Workflow w) -> Workflow.u w))
+let compile workflows =
+  let workflows =
+    List.map workflows ~f:(fun (Bistro.Workflow w) -> Bistro.Workflow.u w)
+  in
+  let precious_ids =
+    workflows
     |> precious_expansion
     |> List.map ~f:Bistro.Workflow.id'
     |> String.Set.of_list
   in
   workflows
-  |> List.fold ~init:(String.Map.empty, DAG.empty, []) ~f:(fun (seen, dag, goals) u ->
-      let seen, dag, t = add_workflow precious_workflows (seen, dag) u in
-      seen, dag, t :: goals
+  |> List.fold ~init:(String.Map.empty, DAG.empty) ~f:(fun (seen, dag) u ->
+      let seen, dag, _ = add_workflow precious_ids (seen, dag) u in
+      seen, dag
     )
-  |> fun (_, dag, goals) -> dag, goals
+  |> snd
 
-let run ?logger ?goals alloc config dag =
-  DAG.run ?logger ?goals alloc config dag
+let run ?logger alloc config dag =
+  DAG.run ?logger alloc config dag
