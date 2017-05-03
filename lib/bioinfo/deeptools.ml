@@ -79,6 +79,8 @@ let bam_gen_cmd ?outfileformat ?scalefactor ?blacklistfilename ?normalizeto1x
       other_args
   )
 
+let ( /// ) x (Bistro.Selector s) = x // Bistro.Path.to_string s
+
 let bamcoverage ?scalefactor ?filterrnastrand ?binsize ?blacklistfilename
     ?(threads = 1) ?normalizeto1x ?normalizeusingrpkm ?ignorefornormalization
     ?skipnoncoveredregions ?smoothlength ?extendreads ?ignoreduplicates
@@ -89,7 +91,7 @@ let bamcoverage ?scalefactor ?filterrnastrand ?binsize ?blacklistfilename
       option (opt "--filterRNAstrand" filterRNAstrand_expr) filterrnastrand ;
       option (opt "--binSize" int) binsize ;
       opt "--numberOfProcessors" ident np ;
-      opt "--bam" dep (indexed_bam / Samtools.indexed_bam_to_bam) ;
+      opt "--bam" ident (dep indexed_bam /// Samtools.indexed_bam_to_bam) ;
       opt "--outFileName" ident dest ;
       opt "--outFileFormat" file_format_expr outfileformat ;
     ]
@@ -111,8 +113,8 @@ let bamcompare ?scalefactormethod ?samplelength ?numberofsamples
       option (opt "--binSize" int) binsize ;
       option (opt "--region" string) region ;
       opt "--numberOfProcessors" ident np ;
-      opt "--bamfile1" dep (indexed_bam1 / Samtools.indexed_bam_to_bam) ;
-      opt "--bamfile2" dep (indexed_bam2 / Samtools.indexed_bam_to_bam) ;
+      opt "--bamfile1" ident (dep indexed_bam1 /// Samtools.indexed_bam_to_bam) ;
+      opt "--bamfile2" ident (dep indexed_bam2 /// Samtools.indexed_bam_to_bam) ;
       opt "--outFileName" ident dest ;
       opt "--outFileFormat" file_format_expr outfileformat ;
     ]
@@ -169,7 +171,7 @@ let multibamsummary_bins ?binsize ?distancebetweenbins ?region ?blacklistfilenam
       option (opt "--binSize" int) binsize ;
       option (opt "--distanceBetweenBins" int) distancebetweenbins ;
       opt "--numberOfProcessors" ident np ;
-      opt "--bamfiles" (list (fun bam -> dep (bam / Samtools.indexed_bam_to_bam)) ~sep:" ") indexed_bams ;
+      opt "--bamfiles" (list (fun bam -> dep bam /// Samtools.indexed_bam_to_bam) ~sep:" ") indexed_bams ;
       opt "--outFileName" ident dest ;
     ]
   ]
@@ -188,7 +190,7 @@ let multibamsummary_bed ?region ?blacklistfilename ?(threads = 1)
       option (flag string "--transcript_id_designator") transcriptiddesignator ;
       opt "--numberOfProcessors" ident np ;
       string "--BED" ; (dep bed) ;
-      opt "--bamfiles" (list (fun bam -> dep (bam / Samtools.indexed_bam_to_bam)) ~sep:" ") indexed_bams ;
+      opt "--bamfiles" (list (fun bam -> dep bam /// Samtools.indexed_bam_to_bam) ~sep:" ") indexed_bams ;
       opt "--outFileName" ident dest ;
     ]
   ]
