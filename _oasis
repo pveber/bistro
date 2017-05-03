@@ -36,6 +36,7 @@ Library bistro_bioinfo
                     Bedtools,
                     Bowtie,
                     Bowtie2,
+                    ChIPQC,
                     Deeptools,
                     Deseq2,
                     Defs,
