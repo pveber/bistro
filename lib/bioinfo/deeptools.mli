@@ -1,5 +1,5 @@
 open Bistro.Std
-
+open Defs
 
 type 'a output
 
@@ -7,7 +7,6 @@ val bigwig : Ucsc_gb.bigWig output
 val bedgraph : Ucsc_gb.bedGraph output
 
 val bamcoverage :
-  ?outfileformat: 'a output ->
   ?scalefactor:float ->
   ?filterrnastrand: [ `forward | `reverse ] ->
   ?binsize:int ->
@@ -26,12 +25,12 @@ val bamcoverage :
   ?samflagexclude:int ->
   ?minfragmentlength:int ->
   ?maxfragmentlength:int ->
+  'a output ->
   [ `indexed_bam ] directory workflow ->
   'a workflow
 
 
 val bamcompare :
-  ?outfileformat: 'a output ->
   ?scalefactormethod : [ `readcount | `ses ] ->
   ?samplelength:int ->
   ?numberofsamples:int ->
@@ -55,13 +54,13 @@ val bamcompare :
   ?samflagexclude:int ->
   ?minfragmentlength:int ->
   ?maxfragmentlength:int ->
+  'a output ->
   [ `indexed_bam ] directory workflow ->
   [ `indexed_bam ] directory workflow ->
   'a workflow
 
 
 val bigwigcompare :
-  ?outfileformat: 'a output ->
   ?scalefactor:string ->
   ?ratio: [ `log2 | `ratio | `subtract | `add | `mean | `reciprocal_ratio | `first | `second ] ->
   ?pseudocount:int ->
@@ -69,10 +68,14 @@ val bigwigcompare :
   ?region:string ->
   ?blacklistfilename: [ `bed | `gtf ] workflow ->
   ?threads:int ->
+  'a output ->
   [ `bigwig ] workflow ->
   [ `bigwig ] workflow ->
   'a workflow
 
+class type compressed_numpy_array = object
+  inherit [ [`compressed_numpy_array], [`binary] ] file
+end
 
 val multibamsummary_bins :
   ?binsize:int ->
@@ -89,8 +92,8 @@ val multibamsummary_bins :
   ?samflagexclude:int ->
   ?minfragmentlength:int ->
   ?maxfragmentlength:int ->
-  [ `indexed_bam ] directory workflow list ->
-  'a workflow
+  indexed_bam workflow list ->
+  compressed_numpy_array workflow
 
 
 val multibamsummary_bed :
@@ -110,6 +113,6 @@ val multibamsummary_bed :
   ?transcriptid:bool ->
   ?exonid:bool ->
   ?transcriptiddesignator:bool->
-  [ `bed ] workflow ->
-  [ `indexed_bam ] directory workflow list ->
-  'a workflow
+  #bed3 workflow ->
+  indexed_bam workflow list ->
+  compressed_numpy_array workflow

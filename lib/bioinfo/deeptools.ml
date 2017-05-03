@@ -1,9 +1,14 @@
 open Core_kernel.Std
+open Bistro.Std
 open Bistro.EDSL
 
 let env = docker_image ~account:"pveber" ~name:"deeptools" ~tag:"2.4.1" ()
 
 type 'a output = [ `bigWig | `bedGraph ]
+
+class type compressed_numpy_array = object
+  inherit [ [`compressed_numpy_array], [`binary] ] file
+end
 
 let bigwig = `bigWig
 let bedgraph = `bedGraph
@@ -74,12 +79,11 @@ let bam_gen_cmd ?outfileformat ?scalefactor ?blacklistfilename ?normalizeto1x
       other_args
   )
 
-
-let bamcoverage ?outfileformat ?scalefactor ?filterrnastrand ?binsize ?blacklistfilename
+let bamcoverage ?scalefactor ?filterrnastrand ?binsize ?blacklistfilename
     ?(threads = 1) ?normalizeto1x ?normalizeusingrpkm ?ignorefornormalization
     ?skipnoncoveredregions ?smoothlength ?extendreads ?ignoreduplicates
     ?minmappingquality ?centerreads ?samflaginclude ?samflagexclude
-    ?minfragmentlength ?maxfragmentlength indexed_bam =
+    ?minfragmentlength ?maxfragmentlength outfileformat indexed_bam =
   workflow ~descr:"bamcoverage" ~np:threads ~mem:(3 * 1024) [
     bam_gen_cmd "bamCoverage" [
       option (opt "--filterRNAstrand" filterRNAstrand_expr) filterrnastrand ;
@@ -87,15 +91,16 @@ let bamcoverage ?outfileformat ?scalefactor ?filterrnastrand ?binsize ?blacklist
       opt "--numberOfProcessors" ident np ;
       opt "--bam" dep (indexed_bam / Samtools.indexed_bam_to_bam) ;
       opt "--outFileName" ident dest ;
+      opt "--outFileFormat" file_format_expr outfileformat ;
     ]
   ]
 
-let bamcompare ?outfileformat ?scalefactormethod ?samplelength ?numberofsamples
+let bamcompare ?scalefactormethod ?samplelength ?numberofsamples
     ?scalefactor ?ratio ?pseudocount ?binsize ?region ?blacklistfilename ?(threads = 1)
     ?normalizeto1x ?normalizeusingrpkm ?ignorefornormalization ?skipnoncoveredregions
     ?smoothlength ?extendreads ?ignoreduplicates ?minmappingquality
     ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
-    ?maxfragmentlength indexed_bam1 indexed_bam2 =
+    ?maxfragmentlength outfileformat indexed_bam1 indexed_bam2 =
   workflow ~descr:"bamcompare" ~np:threads ~mem:(3 * 1024) [
     bam_gen_cmd "bamCompare" [
       option (opt "--scaleFactorMethod" scalefactormethod_expr) scalefactormethod ;
@@ -109,16 +114,16 @@ let bamcompare ?outfileformat ?scalefactormethod ?samplelength ?numberofsamples
       opt "--bamfile1" dep (indexed_bam1 / Samtools.indexed_bam_to_bam) ;
       opt "--bamfile2" dep (indexed_bam2 / Samtools.indexed_bam_to_bam) ;
       opt "--outFileName" ident dest ;
+      opt "--outFileFormat" file_format_expr outfileformat ;
     ]
   ]
 
 
-let bigwigcompare ?outfileformat ?scalefactor ?ratio ?pseudocount ?binsize
+let bigwigcompare ?scalefactor ?ratio ?pseudocount ?binsize
     ?region ?blacklistfilename ?(threads = 1)
-    bigwig1 bigwig2 =
+    outfileformat bigwig1 bigwig2 =
   workflow ~descr:"bigwigcompare" ~np:threads ~mem:(3 * 1024) [
     cmd "bigwigCompare" ~env [
-      option (opt "--outFileFormat" file_format_expr) outfileformat ;
       option (opt "--scaleFactor" string) scalefactor ;
       option (opt "--ratio" ratio_expr) ratio ;
       option (opt "--pseudocount" int) pseudocount ;
@@ -129,6 +134,7 @@ let bigwigcompare ?outfileformat ?scalefactor ?ratio ?pseudocount ?binsize
       opt "--bigwig1" dep bigwig1 ;
       opt "--bigwig2" dep bigwig2 ;
       opt "--outFileName" ident dest ;
+      opt "--outFileFormat" file_format_expr outfileformat ;
     ]
   ]
 
