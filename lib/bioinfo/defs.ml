@@ -39,3 +39,5 @@ type 'a fastq = ([`fastq of 'a], [`text]) file
 type sam = ([`sam],[`text]) file
 
 type sra = ([`sra], [`binary]) file
+
+type indexed_bam = [`indexed_bam] directory
