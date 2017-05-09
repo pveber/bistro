@@ -45,6 +45,7 @@ Library bistro_bioinfo
                     Fastq_screen,
                     FastQC,
                     Htseq,
+                    Macs,
                     Macs2,
                     Meme_suite,
                     Samtools,
