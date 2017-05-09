@@ -1,75 +1,104 @@
-(* open Core_kernel.Std *)
-(* open Bistro_workflow.Defs *)
+open Core_kernel.Std
+open Bistro.EDSL
+open Defs
 
-(* let package = Bistro_workflow.make <:script< *)
-(* URL=https://github.com/downloads/taoliu/MACS/MACS-1.4.2-1.tar.gz *)
-(* ARCHIVE=`basename ${URL}` *)
-(* PACKAGE=macs *)
-
-(* PREFIX=`readlink -f #DEST` *)
-(* mkdir -p #TMP *)
-(* cd #TMP *)
-
-(* wget ${URL} || (echo "failed to fetch ${PACKAGE}" && exit 1) *)
-(* tar xvfz ${ARCHIVE} *)
-(* cd ${ARCHIVE%-1\.tar.gz} *)
-(* python setup.py install --prefix ${PREFIX} || (echo "failed to install ${PACKAGE}" && exit 1) *)
-
-(* >> *)
-
-(* type gsize = [`hs | `mm | `ce | `dm | `gsize of int] *)
-
-(* let run ~gsize ?tagsize ?bandwidth ~pvalue ?control chIP = *)
-(*   let gsize = match gsize with *)
-(*     | `hs -> "hs" *)
-(*     | `mm -> "mm" *)
-(*     | `dm -> "dm" *)
-(*     | `ce -> "ce" *)
-(*     | `gsize n -> Int.to_string n *)
-(*   in *)
-(*   Bistro_workflow.make <:script< *)
-(* export PATH=#w:package#/bin:$PATH *)
-(* export PYTHON_PATH=#w:package#/lib/python2.7/site-packages *)
-
-(* mkdir -p #DEST *)
-(* macs14 --name=#DEST/macs --gsize=#s:gsize# \ *)
-(*                      #? ts <- tagsize#[--tsize=#i:ts#] \ *)
-(*                      #? bw <- bandwidth#[--bw=#i:bw#] \ *)
-(*                      --pvalue=#f:pvalue# \ *)
-(*                      -t #w:chIP# \ *)
-(*                      #? c <- control#[-c #w:c#] *)
-(*   >> *)
+let env = docker_image ~account:"pveber" ~name:"macs" ~tag:"1.4.2" ()
 
 
-(* module Xls = struct *)
-(*   type 'a header = (string * (int * (int * (int * (int * (int * (float * (float * 'a)))))))) *)
+type _ format =
+  | Sam
+  | Bam
 
-(*   type 'a format = ('a header, [`yes], [`sharp]) tsv *)
-(*   type without_fdr = unit format *)
-(*   type with_fdr = (float * unit) format *)
-(* end *)
+let sam = Sam
+let bam = Bam
 
-(* type 'a output = [`macs_output of 'a] directory *)
+let opt_of_format = function
+  | Sam -> "SAM"
+  | Bam -> "BAM"
 
-(* module No_control = struct *)
+type gsize = [ `hs | `mm | `ce | `dm | `gsize of int ]
 
-(*   type workflow = Xls.without_fdr output Bistro_workflow.t *)
+let gsize_expr = function
+  | `hs -> string "hs"
+  | `mm -> string "mm"
+  | `dm -> string "dm"
+  | `ce -> string "ce"
+  | `gsize n -> int n
 
-(*   let run ?tagsize ?bandwidth ~gsize ~pvalue chIP = *)
-(*     run ~gsize ?tagsize ?bandwidth ~pvalue chIP *)
+type keep_dup = [ `all | `auto | `int of int ]
 
-(* end *)
+let keep_dup_expr = function
+  | `all -> string "all"
+  | `auto -> string "auto"
+  | `int n -> int n
 
-(* module With_control = struct *)
+let name = "macs"
 
-(*   type workflow = Xls.with_fdr output Bistro_workflow.t *)
+let run ?control ?petdist ?gsize ?tsize ?bw ?pvalue ?mfold ?nolambda
+    ?slocal ?llocal ?on_auto ?nomodel ?shiftsize ?keep_dup
+    ?to_large ?wig ?bdg ?single_profile ?space ?call_subpeaks
+    ?diag ?fe_min ?fe_max ?fe_step format treatment =
+  workflow ~descr:"macs" ~mem:(3 * 1024) ~np:8  [
+    mkdir_p dest ;
+    cmd "macs14" ~env [
+      option (opt "--control" (list ~sep:"," dep)) control ;
+      opt "--name" seq [ dest ; string "/" ; string name ] ;
+      opt "--format" (fun x -> x |> opt_of_format |> string) format ;
+      option (opt "--petdist" int) petdist ;
+      option (opt "--gsize" gsize_expr) gsize ;
+      option (opt "--tsize" int) tsize ;
+      option (opt "--bw" int) bw ;
+      option (opt "--pvalue" float) pvalue ;
+      option (opt "--mfold" (fun (i, j) -> seq ~sep:"," [int i ; int j])) mfold ;
+      option (flag string "--nolambda") nolambda ;
+      option (opt "--slocal" int) slocal ;
+      option (opt "--llocal" int) llocal ;
+      option (flag string "--on-auto") on_auto ;
+      option (flag string "--nomodel") nomodel ;
+      option (opt "--shiftsize" int) shiftsize ;
+      option (opt "--keep-dup" keep_dup_expr) keep_dup ;
+      option (flag string "--to-large") to_large ;
+      option (flag string "--wig") wig ;
+      option (flag string "--bdg") bdg ;
+      option (flag string "--single-profile") single_profile ;
+      option (opt "--space" int) space ;
+      option (flag string "--call-subpeaks") call_subpeaks ;
+      option (flag string "--diag") diag ;
+      option (opt "--fe-min" int) fe_min ;
+      option (opt "--fe-max" int) fe_max ;
+      option (opt "--fe-step" int) fe_step ;
+      opt "--treatment" (list ~sep:"," dep) treatment ;
+      ident dest ;
+    ]
+  ]
 
-(*   let run ?tagsize ?bandwidth ~gsize ~pvalue ~control chIP = *)
-(*     run ~gsize ?tagsize ?bandwidth ~pvalue ~control chIP *)
+class type peaks_xls = object
+  inherit bed3
+  method f4 : int
+  method f5 : int
+  method f6 : int
+  method f7 : float
+  method f8 : float
+  method f9 : float
+end
 
-(* end *)
+let peaks_xls = selector [ name ^ "_peaks.xls" ]
 
-(* let peaks mo = Bistro_workflow.select mo "macs_peaks.xls" *)
+class type narrow_peaks = object
+  inherit bed5
+  method f6 : string
+  method f7 : float
+  method f8 : float
+  method f9 : float
+  method f10 : int
+end
 
-(* let bed mo = Bistro_workflow.select mo "macs_peaks.bed" *)
+let narrow_peaks =
+  selector [ name ^ "_peaks.narrowPeak" ]
 
+class type peak_summits = object
+  inherit bed4
+  method f5 : float
+end
+
+let peak_summits = selector [ name ^ "_summits.bed" ]

@@ -1,38 +1,73 @@
-open Bistro.Std(* open Bistro_workflow.Defs *)
+open Bistro.Std
+open Defs
 
-(* val package : [`package] workflow *)
 
-(* module Xls : sig *)
-(*   type 'a header = (string * (int * (int * (int * (int * (int * (float * (float * 'a)))))))) *)
+type gsize = [`hs | `mm | `ce | `dm | `gsize of int]
+type keep_dup = [ `all | `auto | `int of int ]
 
-(*   type 'a format = ('a header, [`yes], [`sharp]) tsv *)
-(*   type without_fdr = unit format *)
-(*   type with_fdr = (float * unit) format *)
-(* end *)
+type _ format
 
-(* type 'a output = [`macs_output of 'a] directory *)
-(* type gsize = [`hs | `mm | `ce | `dm | `gsize of int] *)
+val sam : sam format
+val bam : bam format
 
-(* module No_control : sig *)
-(*   type workflow = Xls.without_fdr output Bistro_workflow.t *)
+val run :
+  ?control: 'a workflow list ->
+  ?petdist:int ->
+  ?gsize:gsize ->
+  ?tsize:int ->
+  ?bw:int ->
+  ?pvalue:float ->
+  ?mfold:int * int ->
+  ?nolambda:bool ->
+  ?slocal:int ->
+  ?llocal:int ->
+  ?on_auto:bool ->
+  ?nomodel:bool ->
+  ?shiftsize:int ->
+  ?keep_dup:keep_dup ->
+  ?to_large:bool ->
+  ?wig:bool ->
+  ?bdg:bool ->
+  ?single_profile:bool ->
+  ?space:int ->
+  ?call_subpeaks:bool ->
+  ?diag:bool ->
+  ?fe_min:int ->
+  ?fe_max:int ->
+  ?fe_step:int ->
+  'a format ->
+  'a workflow list ->
+  [`macs_output] directory workflow
 
-(*   val run : *)
-(*     ?tagsize:int -> ?bandwidth:int -> *)
-(*     gsize:gsize -> pvalue:float -> *)
-(*     bam workflow -> workflow *)
-(* end *)
+class type peaks_xls = object
+  inherit bed3
+  method f4 : int
+  method f5 : int
+  method f6 : int
+  method f7 : float
+  method f8 : float
+  method f9 : float
+end
 
-(* module With_control : sig *)
-(*   type workflow = Xls.with_fdr output Bistro_workflow.t *)
+val peaks_xls :
+  ([`macs_output], peaks_xls) selector
 
-(*   val run : *)
-(*     ?tagsize:int -> ?bandwidth:int -> *)
-(*     gsize:gsize -> *)
-(*     pvalue:float -> *)
-(*     control:bam workflow -> *)
-(*     bam workflow -> workflow *)
-(* end *)
+class type narrow_peaks = object
+  inherit bed5
+  method f6 : string
+  method f7 : float
+  method f8 : float
+  method f9 : float
+  method f10 : int
+end
 
-(* val peaks : 'a output workflow -> 'a workflow *)
+val narrow_peaks :
+  ([`macs_output], narrow_peaks) selector
 
-(* val bed : 'a output workflow -> Bed.bed3 workflow *)
+class type peak_summits = object
+  inherit bed4
+  method f5 : float
+end
+
+val peak_summits :
+  ([`macs_output], peak_summits) selector
