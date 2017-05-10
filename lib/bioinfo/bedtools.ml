@@ -39,3 +39,34 @@ let slop ?strand ?header ~mode format input chrom_size =
   workflow ~descr:"bedtools.slop" [
     Cmd.slop ?strand ?header ~mode format input chrom_size
   ]
+
+let intersect ?ubam ?wa ?wb ?loj ?wo ?wao ?u ?c ?v ?f ?_F ?r ?e ?s ?_S
+    ?split ?sorted ?g ?header ?filenames ?sortout file files =
+    workflow ~descr:"bedtools.intersect" ~mem:(3 * 1024) ~np:8 [
+      cmd "bedtools intersect" ~env [
+        option (flag string "-ubam") ubam ;
+        option (flag string "-wa") wa ;
+        option (flag string "-wb") wb ;
+        option (flag string "-loj") loj ;
+        option (flag string "-wo") wo ;
+        option (flag string "-wao") wao ;
+        option (flag string "-u") u ;
+        option (flag string "-c") c ;
+        option (flag string "-v") v ;
+        option (opt "-f" float) f ;
+        option (opt "-F" float) _F ;
+        option (flag string "-r") r ;
+        option (flag string "-e") e ;
+        option (flag string "-s") s ;
+        option (flag string "-S") _S ;
+        option (flag string "-split") split ;
+        option (flag string "-sorted") sorted ;
+        option (opt "-g" dep) g ;
+        option (flag string "-header") header ;
+        option (flag string "-filenames") filenames ;
+        option (flag string "-sortout") sortout ;
+        opt "-a" dep file ;
+        opt "-b" (list dep ~sep:" ") files ;
+        ident dest
+      ]
+    ]
