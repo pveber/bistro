@@ -1,4 +1,4 @@
-v0.2.0 2017-04-21 Lyon
+v0.2.0 2017-05-10 Lyon
 ----------------------
 
 Major rewrite:
@@ -15,8 +15,9 @@ Major rewrite:
 - text logging
 - logging as HTML report
 - added a collection of Dockerfile scripts
+- new bioinfomatics wrappers (many contributed by Sylvere Bastien)
 
-and (too) many bug fixes.
+and many bug fixes.
 
 
 v0.1.0 2016-05-19 Lyon
