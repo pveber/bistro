@@ -19,6 +19,13 @@ val list : 'a t list -> 'a list t
 
 val assoc : ('a * 'b t) list -> ('a * 'b) list t
 
+val create :
+  ?np:int ->
+  ?mem:int ->
+  ?logger:Scheduler.logger ->
+  ?keep_all:bool ->
+  'a t -> ('a, string) result Lwt.t
+
 val run :
   ?np:int ->
   ?mem:int ->

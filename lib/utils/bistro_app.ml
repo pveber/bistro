@@ -90,7 +90,7 @@ let error_short_descr =
   | Step_result { exit_code } ->
     sprintf "Ended with exit code %d" exit_code
 
-let error_long_descr db tid =
+let error_long_descr db buf tid =
   let open Task in
   function
   | Input_check _
@@ -99,49 +99,51 @@ let error_long_descr db tid =
     (
       match action with
       | `Sh cmd ->
-        fprintf stderr "+------------------------------------------------------------------------------+\n" ;
-        fprintf stderr "| Submitted script                                                             |\n" ;
-        fprintf stderr "+------------------------------------------------------------------------------+\n" ;
-        fprintf stderr "%s\n" cmd
+        bprintf buf "+------------------------------------------------------------------------------+\n" ;
+        bprintf buf "| Submitted script                                                             |\n" ;
+        bprintf buf "+------------------------------------------------------------------------------+\n" ;
+        bprintf buf "%s\n" cmd
       | `Eval -> ()
     ) ;
     List.iter dumps ~f:(fun (path, text) ->
-        fprintf stderr "+------------------------------------------------------------------------------+\n" ;
-        fprintf stderr "|> Dumped file: %s\n" path ;
-        fprintf stderr "+------------------------------------------------------------------------------+\n" ;
-        fprintf stderr "%s\n" text ;
+        bprintf buf "+------------------------------------------------------------------------------+\n" ;
+        bprintf buf "|> Dumped file: %s\n" path ;
+        bprintf buf "+------------------------------------------------------------------------------+\n" ;
+        bprintf buf "%s\n" text ;
       ) ;
-    fprintf stderr "#\n" ;
-    fprintf stderr "+------------------------------------------------------------------------------+\n" ;
-    fprintf stderr "| STDOUT                                                                       |\n" ;
-    fprintf stderr "+------------------------------------------------------------------------------+\n" ;
-    fprintf stderr "%s\n" (In_channel.read_all (Db.stdout db tid)) ;
-    fprintf stderr "+------------------------------------------------------------------------------+\n" ;
-    fprintf stderr "| STDERR                                                                       |\n" ;
-    fprintf stderr "+------------------------------------------------------------------------------+\n" ;
-    fprintf stderr "%s\n" (In_channel.read_all (Db.stderr db tid))
+    bprintf buf "#\n" ;
+    bprintf buf "+------------------------------------------------------------------------------+\n" ;
+    bprintf buf "| STDOUT                                                                       |\n" ;
+    bprintf buf "+------------------------------------------------------------------------------+\n" ;
+    bprintf buf "%s\n" (In_channel.read_all (Db.stdout db tid)) ;
+    bprintf buf "+------------------------------------------------------------------------------+\n" ;
+    bprintf buf "| BUF                                                                       |\n" ;
+    bprintf buf "+------------------------------------------------------------------------------+\n" ;
+    bprintf buf "%s\n" (In_channel.read_all (Db.stderr db tid))
 
-let error_report_aux db = function
+let error_report_aux db buf = function
   | tid, Scheduler.Run { outcome } when Task.failure outcome ->
     let short_descr = error_short_descr outcome in
-    fprintf stderr "################################################################################\n" ;
-    fprintf stderr "#                                                                              #\n" ;
-    fprintf stderr "#  Task %s failed\n" tid ;
-    fprintf stderr "#                                                                               \n" ;
-    fprintf stderr "#------------------------------------------------------------------------------#\n" ;
-    fprintf stderr "#                                                                               \n" ;
-    fprintf stderr "# %s\n" short_descr ;
-    fprintf stderr "#                                                                              #\n" ;
-    fprintf stderr "################################################################################\n" ;
-    fprintf stderr "###\n" ;
-    fprintf stderr "##\n" ;
-    fprintf stderr "#\n" ;
-    error_long_descr db tid outcome
+    bprintf buf "################################################################################\n" ;
+    bprintf buf "#                                                                              #\n" ;
+    bprintf buf "#  Task %s failed\n" tid ;
+    bprintf buf "#                                                                               \n" ;
+    bprintf buf "#------------------------------------------------------------------------------#\n" ;
+    bprintf buf "#                                                                               \n" ;
+    bprintf buf "# %s\n" short_descr ;
+    bprintf buf "#                                                                              #\n" ;
+    bprintf buf "################################################################################\n" ;
+    bprintf buf "###\n" ;
+    bprintf buf "##\n" ;
+    bprintf buf "#\n" ;
+    error_long_descr db buf tid outcome
   | _ -> ()
 
 let error_report db traces =
+  let buf = Buffer.create 1024 in
   String.Map.to_alist traces
-  |> List.iter ~f:(error_report_aux db)
+  |> List.iter ~f:(error_report_aux db buf) ;
+  Buffer.contents buf
 
 
 let has_error traces =
@@ -151,31 +153,33 @@ let has_error traces =
       | Skipped `Done_already -> false
     )
 
-let run
-    ?(np = 1)
-    ?(mem = 1024)
-    ?logger
-    ?(keep_all = true)
-    app =
+let create
+    ?(np = 1) ?(mem = 1024) ?logger ?(keep_all = true)
+    app
+  =
   let open Lwt in
-  let main =
-    let config = Task.config ~db_path:"_bistro" ~use_docker:true ~keep_all in
-    let allocator = Allocator.create ~np ~mem in
-    let workflows = to_workflow_list app in
-    let dag, goals = Scheduler.compile workflows in
-    Scheduler.(run ?logger ~goals config allocator dag) >>= fun traces ->
-    (
-      match logger with
-      | Some logger ->
-        logger#stop ;
-        logger#wait4shutdown
-      | None -> Lwt.return ()
-    ) >>= fun () ->
-    if has_error traces then (
-      error_report config.Task.db traces ;
-      fail (Failure "Some workflow failed!")
-    )
-    else
-      return (eval config.Task.db app)
-  in
-  Lwt_main.run main
+  let config = Task.config ~db_path:"_bistro" ~use_docker:true ~keep_all in
+  let allocator = Allocator.create ~np ~mem in
+  let workflows = to_workflow_list app in
+  let dag, goals = Scheduler.compile workflows in
+  Scheduler.(run ?logger ~goals config allocator dag) >>= fun traces ->
+  (
+    match logger with
+    | Some logger ->
+      logger#stop ;
+      logger#wait4shutdown
+    | None -> Lwt.return ()
+  ) >|= fun () ->
+  if has_error traces then (
+    Pervasives.Error (error_report config.Task.db traces)
+  )
+  else Ok (eval config.Task.db app)
+
+let run ?np ?mem ?logger ?keep_all app =
+  let thread = create ?np ?mem ?logger ?keep_all app in
+  match Lwt_main.run thread with
+  | Ok x -> x
+  | Error msg ->
+    prerr_endline msg ;
+    failwith "Some workflow failed!"
+
