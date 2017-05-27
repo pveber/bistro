@@ -1,6 +1,6 @@
 #require "ppx_tools.metaquot"
 
-open Core.Std
+open Core
 open Bistro.Std
 open Bistro_bioinfo.Std
 open Bistro.EDSL

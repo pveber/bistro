@@ -1,10 +1,12 @@
-open Core.Std
+open Core
 open Bistro_engine
 open Lwt
 
+let zone = Lazy.force Time.Zone.local
+
 let msg t fmt =
   let k s =
-    let t = Time.(to_string (of_float t)) in
+    let t = Time.(to_string (of_tm ~zone (Unix.localtime t))) in
     printf "[%s] %s\n%!" t s
   in
   ksprintf k fmt

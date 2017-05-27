@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Rresult
 
 let divides i j =
@@ -103,7 +103,7 @@ module Task = struct
   let clean _ _ = Lwt.return ()
 
   let is_done (Push i) _ =
-    Lwt.return (List.mem !performed i)
+    Lwt.return (List.mem ~equal:( = ) !performed i)
 
   let failure (_, x) = x = Ok ()
 end
@@ -132,9 +132,11 @@ module TG = struct
     S.range 2 n
     |> S.fold ~init:empty ~f:add_task
 
+  let zone = Lazy.force Time.Zone.local
+
   let logger = object
     method event _ t evt =
-      let t = Time.to_string (Time.of_float t) in
+      let t = Time.(to_string (of_tm ~zone (Unix.localtime t))) in
       match evt with
       | Task_ready (Task.Push i) -> printf "[%s] ready push %d\n%!" t i
       | Task_started (Task.Push i, _) -> printf "[%s] started push %d\n%!" t i

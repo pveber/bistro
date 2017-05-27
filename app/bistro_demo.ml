@@ -1,6 +1,6 @@
 (** {:{http://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE29506}GEO Series GSE29506} *)
 
-open Core.Std
+open Core
 open Bistro.Std
 open Bistro.EDSL
 open Bistro_bioinfo.Std

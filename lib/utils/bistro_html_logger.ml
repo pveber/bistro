@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Bistro_engine
 open Rresult
 
@@ -23,6 +23,8 @@ type model = {
 
 let ( >>= ) = Lwt.( >>= )
 let ( >>| ) = Lwt.( >|= )
+
+let zone = Lazy.force Time.Zone.local
 
 type t = {
   path : string ;
@@ -288,7 +290,7 @@ module Render = struct
   let event time evt =
     let table_line label details =
       [
-        td [ k Time.(to_string_trimmed ~zone:Zone.local (of_float time)) ] ;
+        td [ k Time.(to_string_trimmed ~zone (of_tm ~zone (Unix.localtime time))) ] ;
         td [ label ] ;
         td details
       ]

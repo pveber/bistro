@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 
 (* let main tmpdir outdir np mem fn () = *)
 (*   let plan = In_channel.with_file fn ~f:Bistro_app.plan_of_channel in *)

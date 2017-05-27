@@ -1,5 +1,5 @@
 open Bistro_engine
-open Core.Std
+open Core
 
 module T = struct
   include Task

@@ -290,7 +290,7 @@ module Workflow = struct
     Select (id, u, path)
 
   let rec collect accu u =
-    let accu' = List.Assoc.add accu (id u) u in
+    let accu' = List.Assoc.add ~equal:String.equal accu (id u) u in
     match u with
     | Input _ -> accu'
     | Select (_, v, _) -> collect accu' v
@@ -358,7 +358,7 @@ module Template = struct
     in
     List.concat (format xs)
 
-  let enum dic x = [ S (List.Assoc.find_exn dic x) ]
+  let enum dic x = [ S (List.Assoc.find_exn ~equal:( = ) dic x) ]
 
   let file_dump contents = [ F contents ] (* FIXME: should check that there is no file_dump in contents *)
 

@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Bistro.Std
 open Bistro.EDSL
 
