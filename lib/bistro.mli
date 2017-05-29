@@ -135,6 +135,8 @@ module Workflow : sig
   val id : _ t -> string
   val id' : u -> string
   val u : _ t -> u
+  val compare : 'a t -> 'a t -> int
+  val compare' : u -> u -> int
 end
 
 (** Represents a text with special symbols *)

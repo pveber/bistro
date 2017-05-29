@@ -161,6 +161,9 @@ let workflow_id = function
   | Select (id, _, _)
   | Step { id } -> id
 
+let workflow_compare u v =
+  String.compare (workflow_id u) (workflow_id v)
+
 module Cmd = struct
   type t = command
 
@@ -187,7 +190,7 @@ end
 let rec expression_deps : type s. s expression -> u list = function
   | Expr_pure _ -> []
   | Expr_app (f, x) ->
-    List.dedup (expression_deps f @ expression_deps x)
+    List.dedup ~compare:workflow_compare (expression_deps f @ expression_deps x)
   | Expr_dep u -> [ u ]
   | Expr_valdep u -> [ u ]
   | Expr_deps us -> us
@@ -204,6 +207,9 @@ module Workflow = struct
   let id = workflow_id
 
   let id' = workflow_id
+
+  let compare = workflow_compare
+  let compare' = compare
 
   let input ?(may_change = false) target =
     let hash = if may_change then Some (Digest.file target) else None in
