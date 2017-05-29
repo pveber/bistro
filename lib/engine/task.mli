@@ -42,6 +42,7 @@ and _ expression =
   | Expr_dep : dep -> string expression
   | Expr_deps : dep list -> string list expression
   | Expr_valdep : dep -> 'a expression
+  | Expr_valdeps : dep list -> 'a list expression
 
 and command =
   | Docker of Bistro.docker_image * command

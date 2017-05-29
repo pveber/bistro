@@ -114,6 +114,7 @@ and _ expression =
   | Expr_dep : _ workflow -> string expression
   | Expr_deps : _ workflow list -> string list expression
   | Expr_valdep : 'a value workflow -> 'a expression
+  | Expr_valdeps : 'a value workflow list -> 'a list expression
 
 (** Name and version of an external dependency for a workflow *)
 and docker_image = private {
@@ -362,6 +363,9 @@ module EDSL' : sig
       workflow [w] *)
 
   val deps : _ workflow list -> string list expression
+  (** Expression for list of dependencies *)
+
+  val valdeps : _ value workflow list -> 'a list expression
   (** Expression for list of dependencies *)
 
   val int : int -> int expression

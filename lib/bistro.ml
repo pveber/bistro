@@ -143,6 +143,7 @@ module T = struct
     | Expr_dep : _ workflow -> string expression
     | Expr_deps : _ workflow list -> string list expression
     | Expr_valdep : 'a value workflow -> 'a expression
+    | Expr_valdeps : 'a value workflow list -> 'a list expression
 
   and 'a workflow = u
 
@@ -188,8 +189,9 @@ let rec expression_deps : type s. s expression -> u list = function
   | Expr_app (f, x) ->
     List.dedup (expression_deps f @ expression_deps x)
   | Expr_dep u -> [ u ]
-  | Expr_deps us -> us
   | Expr_valdep u -> [ u ]
+  | Expr_deps us -> us
+  | Expr_valdeps us -> us
   | Expr_dest -> []
   | Expr_tmp -> []
   | Expr_np -> []
@@ -233,9 +235,8 @@ module Workflow = struct
     | Expr_app (x, f) -> `App (digestable_expr x, digestable_expr f)
     | Expr_dep u -> `Dep (digestable_u (u :> u))
     | Expr_deps us -> `Deps (List.map (us :> u list) ~f:digestable_u)
-    | Expr_valdep (Input (id, _)) -> `Dep (`Input id)
-    | Expr_valdep (Select (id, _, _)) -> `Dep (`Select id)
-    | Expr_valdep (Step { id }) -> `Dep (`Step id)
+    | Expr_valdep u -> `Dep (digestable_u (u :> u))
+    | Expr_valdeps us -> `Deps (List.map (us :> u list) ~f:digestable_u)
     | Expr_dest -> `DEST
     | Expr_tmp -> `TMP
     | Expr_np -> `NP
@@ -450,6 +451,7 @@ module EDSL' = struct
   let dep w = Expr_dep w
   let deps ws = Expr_deps ws
   let valdep w = Expr_valdep w
+  let valdeps ws = Expr_valdeps ws
   let const to_string x = pure (to_string x) x
   let int = const Int.to_string
   let string = const ident

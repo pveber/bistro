@@ -68,6 +68,7 @@ and _ expression =
   | Expr_dep : dep -> string expression
   | Expr_deps : dep list -> string list expression
   | Expr_valdep : dep -> 'a expression
+  | Expr_valdeps : dep list -> 'a list expression
 
 and command =
   | Docker of Bistro.docker_image * command
@@ -181,6 +182,7 @@ let rec denormalize_expression : type s. s Bistro.expression -> s expression = f
   | Bistro.Expr_dep w -> Expr_dep (denormalize_dep (Bistro.Workflow.u w))
   | Bistro.Expr_deps ws -> Expr_deps (List.map ~f:(fun w -> denormalize_dep (Bistro.Workflow.u w)) ws)
   | Bistro.Expr_valdep w -> Expr_valdep (denormalize_dep (Bistro.Workflow.u w))
+  | Bistro.Expr_valdeps ws -> Expr_valdeps (List.map ~f:(fun w -> denormalize_dep (Bistro.Workflow.u w)) ws)
   | Bistro.Expr_dest -> Expr_dest
   | Bistro.Expr_tmp -> Expr_tmp
   | Bistro.Expr_np -> Expr_np
@@ -406,6 +408,7 @@ module Concrete_task = struct
       | Expr_dep d -> env.dep d
       | Expr_deps ds -> List.map ~f:env.dep ds
       | Expr_valdep d -> load (env.dep d)
+      | Expr_valdeps ds -> List.map ds ~f:(fun d -> load (env.dep d))
     in
     let build () = match expr with
       | Value expr ->
