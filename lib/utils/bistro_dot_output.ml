@@ -16,7 +16,7 @@ let black = 0
 let dot_output dag ~needed ~already_done fn =
   let vertex_attribute u =
     let open Task in
-    let needed = List.mem needed u in
+    let needed = List.mem ~equal:Task.equal needed u in
     let color = if needed then black else light_gray in
     match u with
     | Input (_, p) ->
@@ -26,7 +26,7 @@ let dot_output dag ~needed ~already_done fn =
       let label = Bistro.Path.to_string p in
       [ `Label label ; `Fontcolor color ; `Color color ; `Shape `Box ]
     | Step { descr ; precious } as u ->
-      let already_done  = List.mem already_done u in
+      let already_done  = List.mem ~equal:Task.equal already_done u in
       let label_suffix = if precious then "*" else "" in
       [ `Label (descr ^ label_suffix) ;
         `Shape `Box ;
@@ -41,7 +41,10 @@ let dot_output dag ~needed ~already_done fn =
       | Select _, Step _ -> [ `Style `Dotted ]
       | _ -> []
     in
-    let color = if List.mem needed u && not (List.mem already_done u) then black else light_gray in
+    let color =
+      if List.mem ~equal:Task.equal needed u
+      && not (List.mem ~equal:Task.equal already_done u)
+      then black else light_gray in
     style @ [ `Color color ]
   in
   Scheduler.DAG.dot_output dag vertex_attribute edge_attribute fn

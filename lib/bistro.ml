@@ -210,6 +210,8 @@ module Workflow = struct
 
   let compare = workflow_compare
   let compare' = compare
+  let equal x y = workflow_compare x y = 0
+  let equal' = equal
 
   let input ?(may_change = false) target =
     let hash = if may_change then Some (Digest.file target) else None in

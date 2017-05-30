@@ -90,6 +90,8 @@ val config :
 
 val of_workflow : precious:bool -> Bistro.u -> t
 val id : t -> string
+val equal : t -> t -> bool
+val compare : t -> t -> int
 val requirement : t -> Allocator.request
 val perform : Allocator.resource -> config -> t -> result Lwt.t
 val failure : result -> bool

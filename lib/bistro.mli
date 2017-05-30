@@ -137,6 +137,8 @@ module Workflow : sig
   val u : _ t -> u
   val compare : 'a t -> 'a t -> int
   val compare' : u -> u -> int
+  val equal : 'a t -> 'a t -> bool
+  val equal' : u -> u -> bool
 end
 
 (** Represents a text with special symbols *)

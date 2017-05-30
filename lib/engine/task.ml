@@ -140,8 +140,10 @@ let id = function
   | Select (id, _, _)
   | Step { id } -> id
 
+let compare u v =
+  String.compare (id u) (id v)
 
-
+let equal x y = compare x y = 0
 
 let denormalize_dep =
   let open Bistro in
