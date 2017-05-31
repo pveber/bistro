@@ -87,8 +87,12 @@ let error_short_descr =
     sprintf "Input %s doesn't exist" path
   | Select_check { dir_path ; sel } ->
     sprintf "Path %s doesn't exist in %s" (Bistro.Path.to_string sel) dir_path
-  | Step_result { exit_code } ->
-    sprintf "Ended with exit code %d" exit_code
+  | Step_result { exit_code ; outcome } ->
+    match outcome with
+    | `Missing_output -> "Missing output"
+    | `Failed ->
+      sprintf "Ended with exit code %d" exit_code
+    | `Succeeded -> assert false
 
 let error_long_descr db buf tid =
   let open Task in
