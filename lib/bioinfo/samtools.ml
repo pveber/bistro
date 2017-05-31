@@ -2,6 +2,12 @@ open Core_kernel.Std
 open Defs
 open Bistro.EDSL
 
+type 'a input = Bam | Sam
+
+let bam = Bam
+let sam = Sam
+
+
 let env = docker_image ~account:"pveber" ~name:"samtools" ~tag:"1.3.1" ()
 
 let samtools subcmd args =
@@ -53,3 +59,25 @@ let indexed_bam_of_bam bam =
 
 let indexed_bam_to_bam =
   selector ["reads.bam"]
+
+let view ?b ?_1 ?u ?h ?_H ?c ?_L ?q ?m ?f ?_F ?_B ?s ?_S file =
+  workflow ~descr:"samtools.view" ~mem:(3 * 1024) ~np:8 [
+    cmd "samtools view" ~env [
+      option (flag string "-b") b ;
+      option (flag string "-1") _1 ;
+      option (flag string "-u") u ;
+      option (flag string "-h") h ;
+      option (flag string "-H") _H ;
+      option (flag string "-c") c ;
+      option (opt "-L" dep) _L ;
+      option (opt "-q" int) q ;
+      option (opt "-m" int) m ;
+      option (opt "-f" int) f ;
+      option (opt "-F" int) _F ;
+      option (flag string "-B") _B ;
+      option (opt "-s" float) s ;
+      option (flag string "-S") _S ;
+      dep file ;
+      opt "-o" ident dest ;
+    ]
+  ]
