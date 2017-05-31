@@ -70,3 +70,13 @@ val intersect :
   #bed3 workflow ->
   #bed3 workflow list ->
   #bed3 workflow
+
+val bamtobed :
+  ?bed12:bool ->
+  ?split:bool ->
+  ?splitD:bool ->
+  ?ed:bool ->
+  ?tag:bool ->
+  ?cigar:bool ->
+  bam workflow ->
+  #bed6 workflow
