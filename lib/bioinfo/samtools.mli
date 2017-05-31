@@ -2,10 +2,10 @@ open Bistro.Std
 open Defs
 
 
-type 'a input
+type 'a format
 
-val bam : bam input
-val sam : sam input
+val bam : bam format
+val sam : sam format
 
 val sort :
   ?on:[`name | `position] ->
@@ -13,13 +13,14 @@ val sort :
 val indexed_bam_of_sam : sam workflow -> indexed_bam workflow
 val indexed_bam_of_bam : bam workflow -> indexed_bam workflow
 val indexed_bam_to_bam : ([ `indexed_bam ], bam) selector
-(* val bam_of_sam : sam workflow -> bam workflow *)
+val bam_of_sam : sam workflow -> bam workflow
 val sam_of_bam : bam workflow -> sam workflow
 
 (* val rmdup : ?single_end_mode:bool -> bam workflow -> bam workflow *)
-
+(*
 val view :
-  ?b:bool ->
+  input_format:'i format ->
+  output_format:'o format ->
   ?_1:bool ->
   ?u:bool ->
   ?h:bool ->
@@ -32,6 +33,6 @@ val view :
   ?_F:int ->
   ?_B:bool ->
   ?s:float ->
-  ?_S:bool ->
-  'a workflow ->
-  sam workflow
+  'i workflow ->
+  'o workflow
+*)

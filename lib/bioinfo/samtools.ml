@@ -2,7 +2,7 @@ open Core_kernel.Std
 open Defs
 open Bistro.EDSL
 
-type 'a input = Bam | Sam
+type 'a format = Bam | Sam
 
 let bam = Bam
 let sam = Sam
@@ -18,6 +18,15 @@ let sam_of_bam bam =
     samtools "view" [
       opt "-o" ident dest ;
       dep bam ;
+    ]
+  ]
+
+let bam_of_sam sam =
+  workflow ~descr:"samtools.bam_of_sam" [
+    samtools "view" [
+      string "-S -b" ;
+      opt "-o" ident dest ;
+      dep sam ;
     ]
   ]
 
@@ -60,10 +69,15 @@ let indexed_bam_of_bam bam =
 let indexed_bam_to_bam =
   selector ["reads.bam"]
 
-let view ?b ?_1 ?u ?h ?_H ?c ?_L ?q ?m ?f ?_F ?_B ?s ?_S file =
+let output_format_expr = function
+  | Bam -> string "-b"
+  | Sam -> string ""
+
+(*
+let view ?input_format ?output_format ?_1 ?u ?h ?_H ?c ?_L ?q ?m ?f ?_F ?_B ?s file =
   workflow ~descr:"samtools.view" ~mem:(3 * 1024) ~np:8 [
     cmd "samtools view" ~env [
-      option (flag string "-b") b ;
+      option output_format_expr output_format ;
       option (flag string "-1") _1 ;
       option (flag string "-u") u ;
       option (flag string "-h") h ;
@@ -76,8 +90,8 @@ let view ?b ?_1 ?u ?h ?_H ?c ?_L ?q ?m ?f ?_F ?_B ?s ?_S file =
       option (opt "-F" int) _F ;
       option (flag string "-B") _B ;
       option (opt "-s" float) s ;
-      option (flag string "-S") _S ;
       dep file ;
       opt "-o" ident dest ;
     ]
   ]
+*)

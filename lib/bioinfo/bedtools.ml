@@ -73,7 +73,7 @@ let intersect ?ubam ?wa ?wb ?loj ?wo ?wao ?u ?c ?v ?f ?_F ?r ?e ?s ?_S
 
 let bamtobed ?bed12 ?split ?splitD ?ed ?tag ?cigar bam =
   workflow ~descr:"bedtools.bamtobed" ~mem:(3 * 1024) ~np:8 [
-    cmd "bedtools intersect" ~env [
+    cmd "bedtools bamtobed" ~stdout:dest ~env [
       option (flag string "-bed12") bed12 ;
       option (flag string "-split") split ;
       option (flag string "-splitD") splitD ;
@@ -81,6 +81,5 @@ let bamtobed ?bed12 ?split ?splitD ?ed ?tag ?cigar bam =
       option (flag string "-tag") tag ;
       option (flag string "-cigar") cigar ;
       opt "-i" dep bam ;
-      ident dest
     ]
   ]
