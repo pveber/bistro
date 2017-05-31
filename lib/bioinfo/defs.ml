@@ -19,6 +19,11 @@ class type bed5 = object
   method f5 : int
 end
 
+class type bed6 = object
+  inherit bed5
+  method f6 : [ `Plus | `Minus | `Unknown ]
+end
+
 type fasta = ([`fasta],[`text]) file
 
 class type gff = object
