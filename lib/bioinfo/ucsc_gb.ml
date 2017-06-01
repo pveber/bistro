@@ -41,9 +41,22 @@ let env = docker_image ~account:"pveber" ~name:"ucsc-kent" ~tag:"330" ()
 
 (** {5 Dealing with genome sequences} *)
 
+let chromosome_sequence org chr =
+  let org = string_of_genome org in
+  let url =
+    sprintf
+      "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/chromosomes/%s.fa.gz"
+      org chr
+  in
+  let descr = sprintf "ucsc_gb.chromosome_sequence(%s,%s)" org chr in
+  workflow ~descr [
+    wget ~dest url ;
+    cmd "gunzip" [ string "*.gz" ]
+  ]
+
 let chromosome_sequences org =
   let org = string_of_genome org in
-  workflow ~descr:(sprintf "ucsc_gb.chromosome_sequence(%s)" org) [
+  workflow ~descr:(sprintf "ucsc_gb.chromosome_sequences(%s)" org) [
     mkdir_p dest ;
     cd dest ;
     wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/chromosomes/*" org) ;

@@ -25,6 +25,10 @@ val string_of_genome : [< genome] -> string
 
 
 (** {5 Dealing with genome sequences} *)
+val chromosome_sequence :
+  [< genome] ->
+  string ->
+  [`ucsc_chromosome_sequences] directory workflow
 val chromosome_sequences : [< genome] -> [`ucsc_chromosome_sequences] directory workflow
 val genome_sequence : [< genome] -> fasta workflow
 val genome_2bit_sequence : [< genome] -> twobit workflow
