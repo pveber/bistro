@@ -50,7 +50,6 @@ let chromosome_sequence org chr =
   in
   let descr = sprintf "ucsc_gb.chromosome_sequence(%s,%s)" org chr in
   workflow ~descr [
-    mkdir tmp ;
     wget ~dest:(tmp // "seq.fa.gz") url ;
     cmd "gunzip" [ tmp // "seq.fa.gz" ] ;
     cmd "mv" [ tmp // "seq.fa.gz" ; dest ] ;
