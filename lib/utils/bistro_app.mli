@@ -24,6 +24,7 @@ val create :
   ?mem:int ->
   ?logger:Scheduler.logger ->
   ?keep_all:bool ->
+  ?bistro_dir:string ->
   'a t -> ('a, string) result Lwt.t
 
 val run :
@@ -31,6 +32,7 @@ val run :
   ?mem:int ->
   ?logger:Scheduler.logger ->
   ?keep_all:bool ->
+  ?bistro_dir:string ->
   'a t -> 'a
 
 module Syntax : sig

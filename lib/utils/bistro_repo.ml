@@ -98,5 +98,5 @@ let to_app ?(precious = []) ~outdir items =
   |> app (pure (generate outdir))
   |> fun init -> List.fold precious ~init ~f:use
 
-let build ?np ?mem ?logger ?keep_all ?precious ~outdir repo =
-  Bistro_app.run ?np ?mem ?logger ?keep_all (to_app ~outdir ?precious repo)
+let build ?np ?mem ?logger ?keep_all ?precious ?bistro_dir ~outdir repo =
+  Bistro_app.run ?np ?mem ?logger ?keep_all ?bistro_dir (to_app ~outdir ?precious repo)
