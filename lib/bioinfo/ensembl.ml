@@ -54,7 +54,7 @@ let gff ?(chr_name = `ensembl) ~release ~species =
 
 let gtf ?(chr_name = `ensembl) ~release ~species =
   let url =
-    sprintf "ftp://ftp.ensembl.org/pub/release-%d/gtf3/%s/%s.%s.%d.gtf.gz"
+    sprintf "ftp://ftp.ensembl.org/pub/release-%d/gtf/%s/%s.%s.%d.gtf.gz"
       release (string_of_species species)
       (String.capitalize (string_of_species species))
       (lab_label_of_genome (ucsc_reference_genome ~release ~species)) release
