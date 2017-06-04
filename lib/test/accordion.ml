@@ -29,7 +29,11 @@ let pipeline n debug =
 
 let main n debug () =
   let open Bistro_app in
-  let logger = Bistro_console_logger.create () in
+  let logger =
+    Bistro_logger.tee
+      (Bistro_dot_output.create "accordion.dot")
+      (Bistro_console_logger.create ())
+  in
   run ~logger (pipeline n debug)
   |> ignore
 
