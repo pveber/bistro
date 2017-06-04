@@ -1,5 +1,6 @@
 open Core
 open Rresult
+open Bistro_tdag
 
 let divides i j =
   j mod i = 0
