@@ -5,6 +5,7 @@ open Bistro.Std
 open Bistro.EDSL
 open Bistro_bioinfo.Std
 open Bistro_engine
+open Bistro_utils
 
 let common_spec =
   let open Command.Spec in

@@ -1,4 +1,5 @@
 open Core
+open Bistro_test
 
 let () =
   Command.group ~summary:"Bistro test app" [

@@ -1,7 +1,6 @@
 (jbuild_version 1)
 
-(executables
- ((names (accordion funcall prime_tdag))
-  (modules (accordion funcall prime_tdag))
-  (libraries (bistro.bioinfo bistro.utils))
+(library
+ ((name bistro_test)
+  (libraries (bistro.utils))
 ))
