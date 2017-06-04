@@ -3,6 +3,7 @@ open Lwt
 open Bistro.Std
 open Bistro.EDSL
 open Bistro_engine
+open Bistro_utils
 
 module Workflow = Bistro.Workflow
 

@@ -1,0 +1,7 @@
+(jbuild_version 1)
+
+(library
+ ((name bistro_utils)
+  (public_name bistro.utils)
+  (libraries (bistro.engine tyxml))
+))

@@ -1,0 +1,7 @@
+(jbuild_version 1)
+
+(executables
+ ((names (accordion))
+  (modules (accordion))
+  (libraries (bistro.bioinfo bistro.utils))
+))
