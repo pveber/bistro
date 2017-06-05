@@ -27,11 +27,11 @@ let pipeline n debug =
   List.map (final :: if debug then l2 else []) ~f:(fun x -> pureW x)
   |> list
 
-let main n debug () =
+let main n debug dot_output () =
   let open Bistro_app in
   let logger =
     Bistro_logger.tee
-      (Bistro_dot_output.create "accordion.dot")
+      (if dot_output then Bistro_dot_output.create "accordion.dot" else Bistro_logger.null)
       (Bistro_console_logger.create ())
   in
   run ~logger (pipeline n debug)
@@ -44,5 +44,6 @@ let command =
       empty
       +> flag "-n" (required int) ~doc:"INT size of the pipeline"
       +> flag "--debug" no_arg ~doc:" sets many targets in the final repo"
+      +> flag "--dot-output" no_arg ~doc:" produces a dot file"
     )
     main
