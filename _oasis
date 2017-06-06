@@ -49,6 +49,7 @@ Library bistro_bioinfo
                     Macs2,
                     Meme_suite,
                     Samtools,
+                    Spades,
                     Sra,
                     Sra_toolkit,
                     Std,
