@@ -4,7 +4,7 @@ open Bistro.EDSL
 open Defs
 
 
-let env = docker_image ~account:"pveber" ~name:"fastq-screen" ~tag:"0.1.11" ()
+let env = docker_image ~account:"pveber" ~name:"fastq-screen" ~tag:"0.11.1" ()
 
 let rec filter_expr res = function
     [] -> string res
