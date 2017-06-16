@@ -52,6 +52,7 @@ Library bistro_bioinfo
                     Spades,
                     Sra,
                     Sra_toolkit,
+                    Srst2,
                     Std,
                     Tophat,
                     Ucsc_gb

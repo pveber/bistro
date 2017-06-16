@@ -27,5 +27,6 @@ module Meme_suite = Meme_suite
 module Samtools = Samtools
 module Sra = Sra
 module Sra_toolkit = Sra_toolkit
+module Srst2 = Srst2
 module Tophat = Tophat
 module Ucsc_gb = Ucsc_gb
