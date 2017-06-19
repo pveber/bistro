@@ -24,6 +24,7 @@ module Htseq = Htseq
 module Macs = Macs
 module Macs2 = Macs2
 module Meme_suite = Meme_suite
+module Prokka = Prokka
 module Samtools = Samtools
 module Sra = Sra
 module Sra_toolkit = Sra_toolkit

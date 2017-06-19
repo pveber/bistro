@@ -48,6 +48,7 @@ Library bistro_bioinfo
                     Macs,
                     Macs2,
                     Meme_suite,
+                    Prokka,
                     Samtools,
                     Spades,
                     Sra,
