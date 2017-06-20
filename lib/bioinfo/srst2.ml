@@ -2,16 +2,11 @@ open Core_kernel.Std
 open Defs
 open Bistro.EDSL
 
+
 let env = docker_image ~account:"pveber" ~name:"srst2" ~tag:"0.2.0" ()
 
 
-let read_type_expr = function
-  | `fastq -> string "q"
-  | `fasta -> string "f"
-  | `solexa -> string "qseq"
-
-
-let run_gen_cmd ?read_type ?mlst_db ?mlst_delimiter ?mlst_definitions
+let run_gen_cmd ?mlst_db ?mlst_delimiter ?mlst_definitions
     ?mlst_max_mismatch ?gene_db ?no_gene_details ?gene_max_mismatch
     ?min_coverage ?max_divergence ?min_depth ?min_edge_depth ?prob_err
     ?truncation_score_tolerance ?other ?max_unaligned_overlap ?mapq
@@ -19,7 +14,6 @@ let run_gen_cmd ?read_type ?mlst_db ?mlst_delimiter ?mlst_definitions
     ?report_all_consensus cmd_name other_args =
   cmd cmd_name ~env (
     List.append [
-        option (opt "--read_type" read_type_expr) read_type ;
         option (opt "--mlst_db" dep) mlst_db ;
         option (opt "--mlst_delimiter" string) mlst_delimiter ;
         option (opt "--mlst_definitions" dep) mlst_definitions ;
@@ -44,22 +38,32 @@ let run_gen_cmd ?read_type ?mlst_db ?mlst_delimiter ?mlst_definitions
       other_args
   )
 
-let run_se ?(threads = 1) fq =
+let run_se ?mlst_db ?mlst_delimiter ?mlst_definitions
+    ?mlst_max_mismatch ?gene_db ?no_gene_details ?gene_max_mismatch
+    ?min_coverage ?max_divergence ?min_depth ?min_edge_depth ?prob_err
+    ?truncation_score_tolerance ?other ?max_unaligned_overlap ?mapq
+    ?baseq ?samtools_args ?report_new_consensus
+    ?report_all_consensus ?(threads = 1) fq =
   workflow ~descr:"srst2" ~np:threads ~mem:(3 * 1024) [
     mkdir_p dest ;
     run_gen_cmd "srst2" [
       opt "--threads" ident np ;
       opt "--input_se" (list ~sep:" " dep) fq ;
-      opt "--outdir" ident dest ;
+      opt "--output" ident dest ;
     ] ;
   ]
 
-let run_pe ?(threads = 1) fq =
+let run_pe ?mlst_db ?mlst_delimiter ?mlst_definitions
+    ?mlst_max_mismatch ?gene_db ?no_gene_details ?gene_max_mismatch
+    ?min_coverage ?max_divergence ?min_depth ?min_edge_depth ?prob_err
+    ?truncation_score_tolerance ?other ?max_unaligned_overlap ?mapq
+    ?baseq ?samtools_args ?report_new_consensus
+    ?report_all_consensus ?(threads = 1) fq =
   workflow ~descr:"srst2" ~np:threads ~mem:(3 * 1024) [
     mkdir_p dest ;
     run_gen_cmd "srst2" [
       opt "--threads" ident np ;
       opt "--input_pe" (list ~sep:" " dep) fq ;
-      opt "--outdir" ident dest ;
+      opt "--output" ident dest ;
     ] ;
   ]
