@@ -1,3 +1,11 @@
+v0.3.0 2017-06-21 Lyon
+----------------------
+
+- Compilation via jbuilder
+- more docker images and wrappers
+- various bug fixes
+
+
 v0.2.0 2017-05-10 Lyon
 ----------------------
 
