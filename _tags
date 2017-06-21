@@ -1,5 +1,0 @@
-# OASIS_START
-# OASIS_STOP
-true: annot, debug, use_menhir
-<lib/bioinfo/*.ml>: ppx_bistro
-<test/*.ml>: ppx_bistro

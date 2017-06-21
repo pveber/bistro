@@ -1,0 +1,13 @@
+(jbuild_version 1)
+
+(executable
+ ((name bistro_demo)
+  (modules (bistro_demo))
+  (libraries (bistro.bioinfo bistro.utils))
+))
+
+(executable
+ ((name bistro_test_app)
+  (modules (bistro_test_app))
+  (libraries (bistro.bioinfo bistro_test bistro.utils))
+))

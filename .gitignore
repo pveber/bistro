@@ -5,3 +5,5 @@ _build
 _bistro
 *.byte
 *.native
+.merlin
+bistro.install

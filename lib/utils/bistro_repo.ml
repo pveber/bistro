@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Bistro.Std
 open Bistro_app
 open Bistro_engine

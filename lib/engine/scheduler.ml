@@ -1,4 +1,5 @@
 open Core_kernel.Std
+open Bistro_tdag
 
 let ( >>= ) = Lwt.( >>= )
 let ( >>| ) = Lwt.( >|= )

@@ -1,6 +1,6 @@
 (* FIXME: implement prefix subdirs to avoid too many objects in one
    dir, like aa/aa545 *)
-open Core.Std
+open Core
 open Rresult
 
 type 'a result = ('a, [`Msg of string]) Pervasives.result

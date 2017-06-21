@@ -174,7 +174,7 @@ let unique xs =
   let rec aux seen = function
     | [] -> []
     | h :: t ->
-      if List.mem seen h then
+      if List.mem ~equal:( = ) seen h then
         aux seen t
       else
         h :: aux (h :: seen) t

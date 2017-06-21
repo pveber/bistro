@@ -1,0 +1,7 @@
+(jbuild_version 1)
+
+(library
+ ((name bistro_engine)
+  (public_name bistro.engine)
+  (libraries (bistro bistro.tdag core lwt.preemptive lwt.unix rresult))
+))
