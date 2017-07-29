@@ -85,6 +85,7 @@ and token =
   | TMP
   | NP
   | MEM
+  | EXE
 
 and path = string list
 
@@ -92,7 +93,7 @@ let rec deps_of_template tmpl =
   List.map tmpl ~f:(function
       | D r -> [ r ]
       | F toks -> deps_of_template toks
-      | S _ | DEST | TMP | NP | MEM -> []
+      | S _ | DEST | TMP | NP | MEM | EXE -> []
     )
   |> List.concat
   |> List.dedup
@@ -162,6 +163,7 @@ let rec denormalize_token = function
   | Bistro.TMP -> TMP
   | Bistro.NP -> NP
   | Bistro.MEM -> MEM
+  | Bistro.EXE -> EXE
   | Bistro.D d -> D (denormalize_dep d)
   | Bistro.F toks -> F (List.map toks ~f:denormalize_token)
 
@@ -308,7 +310,8 @@ module Concrete_task = struct
     | TMP
     | S _
     | D _
-    | MEM -> []
+    | MEM
+    | EXE -> []
     | F f ->
       (`File_dump (f, in_docker)) :: file_dumps_of_tokens in_docker f
       |> List.dedup
@@ -337,6 +340,7 @@ module Concrete_task = struct
     | TMP -> env.tmp
     | NP -> string_of_int env.np
     | MEM -> string_of_int env.mem
+    | EXE -> Sys.argv.(0)
 
   let string_of_tokens env xs =
     List.map ~f:(token env) xs

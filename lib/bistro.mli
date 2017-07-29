@@ -98,6 +98,7 @@ and token =
   | TMP
   | NP
   | MEM
+  | EXE
 
 and some_expression =
   | Value     : _ expression    -> some_expression
@@ -160,6 +161,10 @@ module Template : sig
   val mem : t
   (** Symbol representing the memory size allocated to the workflow,
       in GB. *)
+
+  val exe : t
+  (** Symbol representing the path of the current executable, as
+      specified by [Sys.argv.(0)] *)
 
   val string : string -> t
   (** A chunk of text *)
@@ -243,6 +248,16 @@ module EDSL : sig
       - @param stdin adds a ["< /some/path"] token at the end of the command
       - @param stdout adds a ["> /some/path"] token at the end of the command
       - @param stderr adds a ["2> /some/path"] token at the end of the command *)
+
+  val internal_cmd :
+    string ->
+    ?stdin:Template.t -> ?stdout:Template.t -> ?stderr:Template.t ->
+    Template.t list ->
+    command
+  (** Alternative command-line constructor, calling the current
+      executable as specified by [Sys.argv.(0)]. More precisely
+      [internal_cmd subcmd] calls [Sys.argv.(0)] with subcommand
+      [subcmd]. *)
 
   val opt : string -> ('a -> Template.t) -> 'a -> Template.t
   (** Command-line option formatting, e.g.: [opt "--output" dep dest]

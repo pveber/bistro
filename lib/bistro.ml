@@ -127,6 +127,7 @@ module T = struct
     | TMP
     | NP
     | MEM
+    | EXE
 
   and some_expression =
     | Value     : _ expression    -> some_expression
@@ -171,7 +172,7 @@ module Cmd = struct
     List.map tmpl ~f:(function
         | D r -> [ r ]
         | F toks -> deps_of_template toks
-        | S _ | DEST | TMP | NP | MEM -> []
+        | S _ | DEST | TMP | NP | MEM | EXE -> []
       )
     |> List.concat
     |> List.dedup
@@ -237,6 +238,7 @@ module Workflow = struct
     | TMP -> `TMP
     | NP -> `NP
     | MEM -> `MEM
+    | EXE -> `EXE
 
   let rec digestable_expr : type s. s expression -> _ = function
     | Expr_pure { id } -> `Pure id
@@ -331,6 +333,7 @@ module Template = struct
   let tmp = [ TMP ]
   let np = [ NP ]
   let mem = [ MEM ]
+  let exe = [ EXE ]
 
   let string s = [ S s ]
   let int i = [ S (string_of_int i) ]
@@ -373,8 +376,7 @@ module EDSL = struct
 
   let docker image cmd = Docker (image, cmd)
 
-  let cmd p ?env ?stdin ?stdout ?stderr args =
-    let prog_expr = [ S p ] in
+  let gen_cmd prog_expr ?env ?stdin ?stdout ?stderr args =
     let stdout_expr =
       match stdout with
       | None -> []
@@ -400,6 +402,10 @@ module EDSL = struct
     match env with
     | None -> cmd
     | Some image -> docker image cmd
+
+  let cmd p = gen_cmd [ S p ]
+
+  let internal_cmd subcmd = gen_cmd [ EXE ; S subcmd ] ?env:None
 
   let opt o f x = S o :: S " " :: f x
 

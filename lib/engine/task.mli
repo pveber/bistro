@@ -59,6 +59,7 @@ and token =
   | TMP
   | NP
   | MEM
+  | EXE
 
 and path = Bistro.Path.t
 
