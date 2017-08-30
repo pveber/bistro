@@ -22,7 +22,6 @@
     order to run the workflow, you have to run it using an execution
     engine like the one provided by [bistro.engine].
  *)
-open Core_kernel.Std
 
 type +'a workflow
 (** The type representing a set of actions (shell scripts or
