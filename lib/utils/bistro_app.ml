@@ -121,7 +121,7 @@ let error_long_descr db buf tid =
     bprintf buf "+------------------------------------------------------------------------------+\n" ;
     bprintf buf "%s\n" (In_channel.read_all (Db.stdout db tid)) ;
     bprintf buf "+------------------------------------------------------------------------------+\n" ;
-    bprintf buf "| BUF                                                                       |\n" ;
+    bprintf buf "| STDERR                                                                       |\n" ;
     bprintf buf "+------------------------------------------------------------------------------+\n" ;
     bprintf buf "%s\n" (In_channel.read_all (Db.stderr db tid))
 
