@@ -405,7 +405,7 @@ module EDSL = struct
 
   let cmd p = gen_cmd [ S p ]
 
-  let internal_cmd subcmd = gen_cmd [ EXE ; S subcmd ] ?env:None
+  let internal_cmd subcmd = gen_cmd [ EXE ; S " " ; S subcmd ] ?env:None
 
   let opt o f x = S o :: S " " :: f x
 
