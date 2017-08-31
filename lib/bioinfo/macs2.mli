@@ -78,3 +78,14 @@ val callpeak_broad :
   'a format ->
   'a workflow list ->
   [`macs2_callpeak_broad_output] directory workflow
+
+class type broad_peaks = object
+  inherit bed5
+  method f6 : string
+  method f7 : float
+  method f8 : float
+  method f9 : float
+end
+
+val broad_peaks :
+  ([`macs2_callpeak_broad_output], broad_peaks) selector

@@ -115,3 +115,14 @@ let callpeak_broad
   =
   callpeak_gen ~broad:true ?pvalue ?qvalue ?gsize ?call_summits
     ?fix_bimodal ?mfold ?extsize ?nomodel ?bdg ?control ?keep_dup format treatment
+
+class type broad_peaks = object
+  inherit bed5
+  method f6 : string
+  method f7 : float
+  method f8 : float
+  method f9 : float
+end
+
+let broad_peaks =
+  selector [ name ^ "_peaks.broadPeak" ]
