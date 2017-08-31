@@ -62,3 +62,19 @@ end
 
 val peak_summits :
   ([`macs2_callpeak_output], peak_summits) selector
+
+val callpeak_broad :
+  ?pvalue:float ->
+  ?qvalue:float ->
+  ?gsize:gsize ->
+  ?call_summits:bool ->
+  ?fix_bimodal:bool ->
+  ?mfold:int * int ->
+  ?extsize:int ->
+  ?nomodel:bool ->
+  ?bdg:bool ->
+  ?control:'a workflow list ->
+  ?keep_dup:keep_dup ->
+  'a format ->
+  'a workflow list ->
+  [`macs2_callpeak_broad_output] directory workflow

@@ -46,10 +46,12 @@ let keep_dup_expr = function
   | `auto -> string "auto"
   | `int n -> int n
 
-let callpeak ?pvalue ?qvalue ?gsize ?call_summits
-             ?fix_bimodal ?mfold ?extsize ?nomodel ?bdg ?control ?keep_dup format treatment =
+let callpeak_gen
+    ?broad ?pvalue ?qvalue ?gsize ?call_summits
+    ?fix_bimodal ?mfold ?extsize ?nomodel ?bdg ?control ?keep_dup format treatment =
   workflow ~descr:"macs2.callpeak" [
     macs2 "callpeak" [
+      option (flag string "--broad") broad ;
       opt "--outdir" ident dest ;
       opt "--name" string name ;
       opt "--format" (fun x -> x |> opt_of_format |> string) format ;
@@ -67,6 +69,14 @@ let callpeak ?pvalue ?qvalue ?gsize ?call_summits
       opt "--treatment" (list ~sep:" " dep) treatment ;
     ]
   ]
+
+let callpeak
+    ?pvalue ?qvalue ?gsize ?call_summits
+    ?fix_bimodal ?mfold ?extsize ?nomodel ?bdg ?control ?keep_dup format treatment
+  =
+  callpeak_gen ~broad:false ?pvalue ?qvalue ?gsize ?call_summits
+    ?fix_bimodal ?mfold ?extsize ?nomodel ?bdg ?control ?keep_dup format treatment
+
 
 class type peaks_xls = object
   inherit bed3
@@ -98,3 +108,10 @@ class type peak_summits = object
   end
 
 let peak_summits = selector [ name ^ "_summits.bed" ]
+
+let callpeak_broad
+    ?pvalue ?qvalue ?gsize ?call_summits
+    ?fix_bimodal ?mfold ?extsize ?nomodel ?bdg ?control ?keep_dup format treatment
+  =
+  callpeak_gen ~broad:true ?pvalue ?qvalue ?gsize ?call_summits
+    ?fix_bimodal ?mfold ?extsize ?nomodel ?bdg ?control ?keep_dup format treatment
