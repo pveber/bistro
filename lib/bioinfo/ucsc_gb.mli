@@ -47,14 +47,14 @@ val bedGraphToBigWig : [< genome] -> bedGraph workflow -> bigWig workflow
 
 val bedToBigBed :
   [< genome] ->
-  [ `bed3 of bed3 workflow | `bed5 of bed5 workflow ] ->
+  [ `bed3 of #bed3 workflow | `bed5 of #bed5 workflow ] ->
   bigBed workflow
 (** {v bedToBigBed v} utility. Fails when given an empty BED file on
     input. *)
 
 val bedToBigBed_failsafe :
   [< genome] ->
-  [ `bed3 of bed3 workflow | `bed5 of bed5 workflow ] ->
+  [ `bed3 of #bed3 workflow | `bed5 of #bed5 workflow ] ->
   bigBed workflow
 (** sam  as {! Ucsc_gb.bedToBigBed} but produces an empty file when
     given an empty BED on input. *)
