@@ -41,6 +41,18 @@ let payload_rewriter acc =
             [%expr env#dep (`Dep [%e Exp.lid (id ^ "_id")])]
           | _ -> failwith "expected a workflow expression"
         )
+      | { pexp_desc = Pexp_extension ({txt = ("dest" | "np" | "mem" | "tmp" as ext)}, payload) ; pexp_loc = loc } -> (
+          match payload with
+          | PStr [] -> (
+              match ext with
+              | "dest" -> [%expr env#dest]
+              | "tmp" -> [%expr env#tmp]
+              | "np" -> [%expr env#np]
+              | "mem" -> [%expr env#mem]
+              | _ -> assert false
+            )
+          | _ -> failwith "expected empty payload"
+        )
       | _ -> default_mapper.expr mapper expr
   }
 
