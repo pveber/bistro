@@ -6,3 +6,4 @@ let comment_filter bed = [%bistro_fun
   |> List.filter ~f:(String.is_prefix ~prefix:"#")
   |> Out_channel.write_lines [%dest]
 ] (* ~descr:"comment_filter" ~np:1 () *)
+
