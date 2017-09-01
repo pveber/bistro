@@ -15,7 +15,21 @@ let str ?(loc= !default_loc) str =
 module Exp = struct
   include Exp
   let string s = constant (Const.string s)
+  let constr_args args = function
+    | [] -> None
+    | [x] -> Some x
+    | l -> Some (args l)
+  let constr s args =
+    construct (lid s) (constr_args Exp.tuple args)
   let lid ?loc s = ident (lid ?loc s)
+  let nil () = constr "[]" []
+  let unit () = constr "()" []
+  let tuple = function
+    | [] -> unit ()
+    | [x] -> x
+    | xs -> Exp.tuple xs
+  let cons hd tl = constr "::" [hd; tl]
+  let list l = List.fold_right ~f:(cons) l ~init:(nil ())
 end
 
 let ( += ) r v = r := v :: !r
@@ -38,7 +52,7 @@ let payload_rewriter acc =
           | PStr [ { pstr_desc = Pstr_eval (e, _) ; pstr_loc = loc } ] ->
             let id = new_id () in
             acc += (id, e) ;
-            [%expr env#dep (`Dep [%e Exp.lid (id ^ "_id")])]
+            [%expr env#dep [%e Exp.lid (id ^ "_id")]]
           | _ -> failwith "expected a workflow expression"
         )
       | { pexp_desc = Pexp_extension ({txt = ("dest" | "np" | "mem" | "tmp" as ext)}, payload) ; pexp_loc = loc } -> (
@@ -70,14 +84,20 @@ let rewriter _config _cookies =
             let add_bindings body = List.fold !deps ~init:body ~f:(fun acc (tmpvar, expr) ->
                 [%expr
                   let [%p Pat.var (str tmpvar)] = [%e expr] in
-                  let [%p Pat.var (str (tmpvar ^ "_id"))] = Bistro.Workflow.id [%e Exp.lid tmpvar] in
+                  let [%p Pat.var (str (tmpvar ^ "_id"))] = Bistro.Workflow.to_dep [%e Exp.lid tmpvar] in
                   [%e acc]]
               )
+            in
+            let dep_list =
+              List.map !deps ~f:(fun (v, _) ->
+                  [%expr Bistro.Workflow.u [%e Exp.lid v]]
+                )
+              |> Exp.list
             in
             [%expr
               let id = [%e Exp.string id] in
               let f env = [%e code] in
-              (id, f) ]
+              Bistro.Workflow.of_fun ~id ~f ~deps:[%e dep_list] ]
             |> add_bindings
           | _ -> failwith "bistro_fun extension expects a single expression as payload"
         )

@@ -245,7 +245,7 @@ module Workflow = struct
     let id = digest ("step", version, digestable_action action) in
     Step { descr ; deps ; action ; np ; mem ; version ; id }
 
-  let of_fun ?descr ?mem ?np ?version id f deps =
+  let of_fun ?descr ?mem ?np ?version id f deps () =
     make ?descr ?mem ?np ?version (Eval { id ; f }) deps
 
   let select u (Selector path) =
@@ -272,6 +272,15 @@ module Workflow = struct
 
 
   let u x = x
+
+  let to_dep = function
+    | Step s -> `Task s.id
+    | Input (_, p) -> `Input p
+    | Select (_, Input (_, p), q) ->
+      `Input (p @ q)
+    | Select (_, Step s, p) ->
+      `Select (s.id, p)
+    | Select (_, Select _, _) -> assert false
 
   let to_dot u oc =
     let nodes = collect [] u in

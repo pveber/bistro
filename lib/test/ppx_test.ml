@@ -5,5 +5,5 @@ let comment_filter bed = [%bistro_fun
   In_channel.read_lines [%dep bed]
   |> List.filter ~f:(String.is_prefix ~prefix:"#")
   |> Out_channel.write_lines [%dest]
-] (* ~descr:"comment_filter" ~np:1 () *)
+] ~descr:"comment_filter" ~np:1 ()
 

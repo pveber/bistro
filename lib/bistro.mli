@@ -138,17 +138,18 @@ module Workflow : sig
   val compare' : u -> u -> int
   val equal : 'a t -> 'a t -> bool
   val equal' : u -> u -> bool
+  val to_dep : _ t -> dep
 
   val of_fun :
     ?descr:string ->
     ?mem:int ->
     ?np:int ->
     ?version:int ->
-    id ->
-    (env -> unit) ->
-    u list ->
-    'a workflow
-  (** [of_fun id f deps] builds a workflow step by executing [f]. [f]
+    id:id ->
+    f:(env -> unit) ->
+    deps:u list ->
+    unit -> 'a workflow
+  (** [of_fun ~id ~f ~deps ()] builds a workflow step by executing [f]. [f]
       is passed an [env] object that can be asked where to find
       dependencies in the cache and where to put the result. [id] is a
       string uniquely identifying [f] and [deps] is the list of
