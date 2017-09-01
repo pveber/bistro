@@ -1,0 +1,9 @@
+(library
+ ((name ppx_bistro)
+  (public_name bistro.ppx)
+  (kind ppx_rewriter)
+  (libraries (ocaml-migrate-parsetree))
+  (preprocess no_preprocessing)
+  ))
+
+(jbuild_version 1)
