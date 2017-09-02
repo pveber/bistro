@@ -86,6 +86,64 @@ class type ['a] value = object
   inherit [ [`value of 'a], [`binary] ] file
 end
 
+module Command = struct
+  type 'a t =
+    | Docker of docker_image * 'a t
+    | Simple_command of 'a token list
+    | And_list of 'a t list
+    | Or_list of 'a t list
+    | Pipe_list of 'a t list
+
+  and 'a token =
+    | S of string
+    | D of 'a
+    | F of 'a token list
+    | DEST
+    | TMP
+    | NP
+    | MEM
+    | EXE
+
+  let rec deps_of_template tmpl =
+    List.map tmpl ~f:(function
+        | D r -> [ r ]
+        | F toks -> deps_of_template toks
+        | S _ | DEST | TMP | NP | MEM | EXE -> []
+      )
+    |> List.concat
+    |> List.dedup
+
+  let rec deps = function
+    | And_list xs
+    | Or_list xs
+    | Pipe_list xs ->
+      List.map xs ~f:deps
+      |> List.concat
+      |> List.dedup
+    | Simple_command tokens -> deps_of_template tokens
+    | Docker (_, c) -> deps c
+
+  let rec map ~f = function
+    | Docker (im, cmd) -> Docker (im, map ~f cmd)
+    | Simple_command toks ->
+      Simple_command (List.map ~f:(map_token ~f) toks)
+    | And_list cmds -> And_list (List.map cmds ~f:(map ~f))
+    | Or_list cmds -> Or_list (List.map cmds ~f:(map ~f))
+    | Pipe_list cmds -> Pipe_list (List.map cmds ~f:(map ~f))
+
+  and map_token ~f x = match x with
+    | S s -> S s
+    | D dep -> D (f dep)
+    | F toks -> F (List.map toks ~f:(map_token ~f))
+    | DEST -> DEST
+    | TMP -> TMP
+    | NP -> NP
+    | MEM -> MEM
+    | EXE -> EXE
+
+
+end
+
 module T = struct
   type u =
     | Input of string * Path.t
@@ -103,34 +161,11 @@ module T = struct
   }
 
   and action =
-    | Exec of command
+    | Exec of dep Command.t
     | Eval of {
         id : string ;
         f : env -> unit ;
       }
-
-  and command =
-    | Docker of docker_image * command
-    | Simple_command of token list
-    | And_list of command list
-    | Or_list of command list
-    | Pipe_list of command list
-
-  and dump = {
-    dest : token list ;
-    contents : token list ;
-    for_container : bool ;
-  }
-
-  and token =
-    | S of string
-    | D of u
-    | F of token list
-    | DEST
-    | TMP
-    | NP
-    | MEM
-    | EXE
 
   and env = < dep : dep -> string ;
               np : int ;
@@ -164,29 +199,6 @@ let workflow_id = function
 let workflow_compare u v =
   String.compare (workflow_id u) (workflow_id v)
 
-module Cmd = struct
-  type t = command
-
-  let rec deps_of_template tmpl =
-    List.map tmpl ~f:(function
-        | D r -> [ r ]
-        | F toks -> deps_of_template toks
-        | S _ | DEST | TMP | NP | MEM | EXE -> []
-      )
-    |> List.concat
-    |> List.dedup
-
-  let rec deps = function
-    | And_list xs
-    | Or_list xs
-    | Pipe_list xs ->
-      List.map xs ~f:deps
-      |> List.concat
-      |> List.dedup
-    | Simple_command tokens -> deps_of_template tokens
-    | Docker (_, c) -> deps c
-end
-
 module Workflow = struct
   include T
   type 'a t = u
@@ -203,36 +215,10 @@ module Workflow = struct
   let input ?(may_change = false) target =
     let hash = if may_change then Some (Digest.file target) else None in
     let id = digest ("input", target, hash) in
-
     Input (id, Path.make_relative target)
 
-  let rec digestable_command = function
-    | Docker (im, cmd) -> `Docker (im, digestable_command cmd)
-    | Simple_command toks ->
-      `Simple_command (List.map ~f:digestable_token toks)
-    | And_list cmds -> `And_list (List.map cmds ~f:digestable_command)
-    | Or_list cmds -> `Or_list (List.map cmds ~f:digestable_command)
-    | Pipe_list cmds -> `Pipe_list (List.map cmds ~f:digestable_command)
-
-  and digestable_token = function
-    | S s -> `S s
-    | D (Input (id, _)) -> `D (`Input id)
-    | D (Select (id, _, _)) -> `D (`Select id)
-    | D (Step s) -> `D (`Step s.id)
-    | F toks -> `F (List.map toks ~f:digestable_token)
-    | DEST -> `DEST
-    | TMP -> `TMP
-    | NP -> `NP
-    | MEM -> `MEM
-    | EXE -> `EXE
-
-  and digestable_u = function
-    | Input (id, _) -> `Input id
-    | Select (id, _, _) -> `Select id
-    | Step { id } -> `Step id
-
-  let digestable_action = function
-    | Exec cmd -> digestable_command cmd
+  let digestible_action = function
+    | Exec cmd -> `Exec cmd
     | Eval { id } -> `Eval id
 
   let make
@@ -242,7 +228,7 @@ module Workflow = struct
       ?version
       action
       deps =
-    let id = digest ("step", version, digestable_action action) in
+    let id = digest ("step", version, digestible_action action) in
     Step { descr ; deps ; action ; np ; mem ; version ; id }
 
   let of_fun ?descr ?mem ?np ?version ~id ~f ~deps () =
@@ -302,23 +288,24 @@ module Workflow = struct
 end
 
 module Template = struct
-  type t = token list
+  type t = u Command.token list
 
-  let dest = [ DEST ]
-  let tmp = [ TMP ]
-  let np = [ NP ]
-  let mem = [ MEM ]
-  let exe = [ EXE ]
+  let dest = [ Command.DEST ]
+  let tmp = [ Command.TMP ]
+  let np = [ Command.NP ]
+  let mem = [ Command.MEM ]
+  let exe = [ Command.EXE ]
 
-  let string s = [ S s ]
-  let int i = [ S (string_of_int i) ]
-  let float f = [ S (Float.to_string f) ]
-  let path p = [ S (Path.to_string p) ]
-  let dep w = [ D w ]
+  let string s = [ Command.S s ]
+  let int i = string (string_of_int i)
+  let float f = string (Float.to_string f)
+  let path p = string (Path.to_string p)
+  let dep w = [ Command.D w ]
 
-  let quote ?(using = '"') e =
-    let quote_symbol = Char.to_string using in
-    S quote_symbol :: e @ [ S quote_symbol ]
+  let f ?a:(c = 1) () = c
+  let quote ?using:(c = '"') e =
+    let quote_symbol = Command.S (Char.to_string c) in
+    quote_symbol :: e @ [ quote_symbol ]
 
   let option f = function
     | None -> []
@@ -326,7 +313,7 @@ module Template = struct
 
   let list f ?(sep = ",") l =
     List.map l ~f
-    |> List.intersperse ~sep:[ S sep ]
+    |> List.intersperse ~sep:(string sep)
     |> List.concat
 
   let seq ?sep xs =
@@ -336,44 +323,43 @@ module Template = struct
     in
     List.concat (format xs)
 
-  let enum dic x = [ S (List.Assoc.find_exn ~equal:( = ) dic x) ]
+  let enum dic x = string (List.Assoc.find_exn ~equal:( = ) dic x)
 
-  let file_dump contents = [ F contents ] (* FIXME: should check that there is no file_dump in contents *)
-
-  (* FIXME: remove this?
-     let use s = s.tokens *)
+  let file_dump contents = [ Command.F contents ] (* FIXME: should check that there is no file_dump in contents *)
 end
 
 module EDSL = struct
   include Template
 
+  type command = u Command.t
+
   let input = Workflow.input
 
-  let docker image cmd = Docker (image, cmd)
+  let docker image cmd = Command.Docker (image, cmd)
 
   let gen_cmd prog_expr ?env ?stdin ?stdout ?stderr args =
     let stdout_expr =
       match stdout with
       | None -> []
-      | Some e -> S " > " :: e
+      | Some e -> Command.S " > " :: e
     in
     let stdin_expr =
       match stdin with
       | None -> []
-      | Some e -> S " < " :: e
+      | Some e -> Command.S " < " :: e
     in
     let stderr_expr =
       match stderr with
       | None -> []
-      | Some e -> S " 2> " :: e
+      | Some e -> Command.S " 2> " :: e
     in
     let tokens =
       [ prog_expr ] @ args @ [ stdin_expr ; stdout_expr ; stderr_expr ]
       |> List.filter ~f:(( <> ) [])
-      |> List.intersperse ~sep:[S " "]
+      |> List.intersperse ~sep:(string " ")
       |> List.concat
     in
-    let cmd = Simple_command tokens in
+    let cmd = Command.Simple_command tokens in
     match env with
     | None -> cmd
     | Some image -> docker image cmd
@@ -382,9 +368,9 @@ module EDSL = struct
 
   let internal_cmd subcmd = gen_cmd [ EXE ; S " " ; S subcmd ] ?env:None
 
-  let opt o f x = S o :: S " " :: f x
+  let opt o f x = Command.(S o :: S " " :: f x)
 
-  let opt' o f x = S o :: S "=" :: f x
+  let opt' o f x = Command.(S o :: S "=" :: f x)
 
   let flag f x b = if b then f x else []
 
@@ -407,15 +393,17 @@ module EDSL = struct
       string url ;
     ]
 
-  let ( // ) x y = x @ [ S "/" ; S y ]
+  let ( // ) x y = Command.(x @ [ S "/" ; S y ])
 
-  let or_list xs = Or_list xs
-  let and_list xs = And_list xs
-  let pipe xs = Pipe_list xs
+  let or_list xs = Command.Or_list xs
+  let and_list xs = Command.And_list xs
+  let pipe xs = Command.Pipe_list xs
 
   let workflow ?descr ?mem ?np ?version cmds =
     let cmd = and_list cmds in
-    Workflow.make ?descr ?mem ?np ?version (Exec cmd) (Cmd.deps cmd)
+    let deps = Command.deps cmd in
+    let action = Exec (Command.map cmd ~f:Workflow.to_dep) in
+    Workflow.make ?descr ?mem ?np ?version action deps
 
   let ( % ) f g x = g (f x)
 

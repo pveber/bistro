@@ -6,7 +6,7 @@ type time = float
 
 type event =
   | Step_task_started of {
-      step : Task.step ;
+      step : Bistro.step ;
       action : [`Sh of string | `Eval ] ;
       file_dumps : (string * string) list ;
     }
@@ -41,15 +41,15 @@ let create path = {
 }
 
 let translate_event config time = function
-  | Scheduler.Task_started (Task.Step step,
+  | Scheduler.Task_started (Bistro.Step step,
                             Allocator.Resource { np ; mem }) ->
     (
-      match step.Task.action with
-      | Task.Exec cmd ->
+      match step.Bistro.action with
+      | Bistro.Exec cmd ->
         let cmd = Task.render_step_command ~np ~mem config step cmd in
         let file_dumps = Task.render_step_dumps ~np ~mem config step in
         Some (Step_task_started { step ; action = `Sh cmd ; file_dumps })
-      | Task.Eval _ ->
+      | Bistro.Eval _ ->
         Some (Step_task_started { step ; action = `Eval ; file_dumps = [] })
     )
 
@@ -63,7 +63,7 @@ let translate_event config time = function
   | Scheduler.Init _
   | Scheduler.Task_ready _
   | Scheduler.Task_skipped (_, (`Allocation_error _ | `Missing_dep))
-  | Scheduler.Task_started ((Task.Input _ | Task.Select _), _) -> None
+  | Scheduler.Task_started ((Bistro.Input _ | Bistro.Select _), _) -> None
 
 let update model config time evt =
   {
@@ -219,29 +219,33 @@ module Render = struct
         ]
         ~body:(step_result_details ~id:step.id ~action ~cache ~stderr ~stdout ~dumps)
 
-  let task = function
-    | Task.Input (_, path) ->
-      [ p [ k "input " ; k (Bistro.Path.to_string path) ] ]
+  let task =
+    let open Bistro in
+    function
+    | Input (_, path) ->
+      [ p [ k "input " ; k (Path.to_string path) ] ]
 
-    | Task.Select (_, `Input input_path, path) ->
+    | Select (_, Input (_, input_path), path) ->
       [ p [ k "select " ;
-            k (Bistro.Path.to_string path) ;
+            k (Path.to_string path) ;
             k " in " ;
-            k (Bistro.Path.to_string input_path) ] ]
+            k (Path.to_string input_path) ] ]
 
-    | Task.Select (_, `Step id, path) ->
+    | Select (_, Step { id }, path) ->
       [ p [ k "select " ;
-            k (Bistro.Path.to_string path) ;
+            k (Path.to_string path) ;
             k " in step " ;
             k id ] ]
 
-    | Task.Step { Task.descr ; id } ->
+    | Select (_, Select _, path) -> assert false
+
+    | Step { descr ; id } ->
       collapsible_panel
         ~title:[ k descr ]
         ~header:[]
         ~body:[ item "id" [ k id ] ]
 
-  let task_start ~step:{ Task.descr ; id } ~action ~file_dumps =
+  let task_start ~step:{ Bistro.descr ; id } ~action ~file_dumps =
     collapsible_panel
       ~title:[ k descr ]
       ~header:[]
@@ -251,10 +255,11 @@ module Render = struct
       ]
 
   let cached_task t path =
+    let open Bistro in
     match t with
-    | Task.Input _
-    | Task.Select _ -> task t
-    | Task.Step { Task.descr ; id } ->
+    | Input _
+    | Select _ -> task t
+    | Step { descr ; id } ->
       collapsible_panel
         ~title:[ k descr ]
         ~header:[]

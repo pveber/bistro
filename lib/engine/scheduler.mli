@@ -35,7 +35,7 @@ type trace =
 
 val compile :
   Bistro.any_workflow list ->
-  DAG.t * Task.t list
+  DAG.t * Task.t list * String.Set.t
 
 val run :
   ?logger:logger ->

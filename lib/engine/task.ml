@@ -26,87 +26,14 @@ let redirection filename =
   Lwt_unix.openfile filename Unix.([O_APPEND ; O_CREAT ; O_WRONLY]) 0o640 >>= fun fd ->
   Lwt.return (`FD_move (Lwt_unix.unix_file_descr fd))
 
-type t =
-  | Input of string * path
-  | Select of string * [`Input of path | `Step of string] * path
-  | Step of step
-
-and step = {
-  id       : id ;
-  descr    : string ;
-  deps     : dep list ;
-  action   : action ;
-  np       : int ; (** Required number of processors *)
-  mem      : int ; (** Required memory in MB *)
-  version  : int option ; (** Version number of the wrapper *)
-  precious : bool ;
-}
-
-and dep = [
-    `Task of id
-  | `Select of id * path
-  | `Input of path
-]
-and id = string
-
-and action =
-  | Exec of command
-  | Eval of {
-      id : string ;
-      f : env -> unit ;
-    }
-
-and env = < dep : dep -> string ;
-            np : int ;
-            mem : int ;
-            tmp : string ;
-            dest : string >
-
-and command =
-  | Docker of Bistro.docker_image * command
-  | Simple_command of token list
-  | And_list of command list
-  | Or_list of command list
-  | Pipe_list of command list
-
-and token =
-  | S of string
-  | D of dep
-  | F of token list
-  | DEST
-  | TMP
-  | NP
-  | MEM
-  | EXE
-
-and path = string list
-
-let rec deps_of_template tmpl =
-  List.map tmpl ~f:(function
-      | D r -> [ r ]
-      | F toks -> deps_of_template toks
-      | S _ | DEST | TMP | NP | MEM | EXE -> []
-    )
-  |> List.concat
-  |> List.dedup
-
-let rec deps_of_command =
-  function
-  | And_list xs
-  | Or_list xs
-  | Pipe_list xs ->
-    List.map xs ~f:deps_of_command
-    |> List.concat
-    |> List.dedup
-  | Simple_command tokens -> deps_of_template tokens
-  | Docker (_, c) -> deps_of_command c
+type t = Bistro.u
 
 type result =
   | Input_check of { path : string ; pass : bool }
   | Select_check of { dir_path : string ; sel : string list ; pass : bool }
   | Step_result of {
       outcome : [`Succeeded | `Missing_output | `Failed] ;
-      step : step ;
+      step : Bistro.step ;
       exit_code : int ;
       action : [`Sh of string | `Eval] ;
       dumps : (string * string) list ;
@@ -119,98 +46,41 @@ type config = {
   db : Db.t ;
   use_docker : bool ;
   keep_all : bool ;
+  precious : String.Set.t ;
 }
 
-let config ~db_path ~use_docker ~keep_all = {
+let config ~db_path ~use_docker ~keep_all ~precious = {
   db = Db.init_exn db_path ;
   use_docker ;
   keep_all ;
+  precious ;
 }
 
 
-let id = function
-  | Input (id, _)
-  | Select (id, _, _)
-  | Step { id } -> id
+let id t = Bistro.Workflow.id' t
+let compare = Bistro.Workflow.compare'
+let equal = Bistro.Workflow.equal'
 
-let compare u v =
-  String.compare (id u) (id v)
-
-let equal x y = compare x y = 0
-
-let denormalize_dep =
+let requirement =
   let open Bistro in
   function
-  | Step s -> `Task s.id
-  | Input (_, p) -> `Input p
-  | Select (_, Input (_, p), q) ->
-    `Input (p @ q)
-  | Select (_, Step s, p) ->
-    `Select (s.id, p)
-  | Select (_, Select _, _) -> assert false
-
-let rec denormalize_token = function
-  | Bistro.S s -> S s
-  | Bistro.DEST -> DEST
-  | Bistro.TMP -> TMP
-  | Bistro.NP -> NP
-  | Bistro.MEM -> MEM
-  | Bistro.EXE -> EXE
-  | Bistro.D d -> D (denormalize_dep d)
-  | Bistro.F toks -> F (List.map toks ~f:denormalize_token)
-
-let denormalize_template tmpl =
-  List.map tmpl ~f:denormalize_token
-
-let rec denormalize_cmd = function
-  | Bistro.Simple_command tokens ->
-    let tokens = denormalize_template tokens in
-    Simple_command tokens
-  | Bistro.And_list xs -> And_list (List.map xs ~f:denormalize_cmd)
-  | Bistro.Or_list xs -> Or_list (List.map xs ~f:denormalize_cmd)
-  | Bistro.Pipe_list xs -> Pipe_list (List.map xs ~f:denormalize_cmd)
-  | Bistro.Docker (image, c) ->
-    Docker (image, denormalize_cmd c)
-
-let denormalize_action = function
-  | Bistro.Exec cmd -> Exec (denormalize_cmd cmd)
-  | Bistro.Eval { id ; f } -> Eval { id ; f }
-
-let of_step ~precious { Bistro.id ; mem ; np ; descr ; action ; deps ; version } =
-  Step {
-    id ;
-    descr ;
-    np ;
-    mem ;
-    action = denormalize_action action ;
-    deps = List.map deps ~f:denormalize_dep ;
-    version ;
-    precious ;
-  }
-
-let of_workflow ~precious = function
-  | Bistro.Input (id, p) -> Input (id, p)
-  | Bistro.Select (id, Bistro.Step { Bistro.id = dir_id }, p) ->
-    Select (id, `Step dir_id, p)
-  | Bistro.Select (id, Bistro.Input (_, dir_p), p) ->
-    Select (id, `Input dir_p, p)
-  | Bistro.Select (_, Bistro.Select _, _) -> assert false
-  | Bistro.Step s -> of_step ~precious s
-
-let requirement = function
   | Input _
   | Select _ -> Allocator.Request { np = 0 ; mem = 0 }
   | Step { np ; mem } ->
     Allocator.Request { np ; mem }
 
-let rec command_uses_docker = function
+let rec command_uses_docker =
+  let open Bistro.Command in
+  function
   | Docker (_, _) -> true
   | Simple_command _ -> false
   | And_list xs
   | Or_list xs
   | Pipe_list xs -> List.exists xs ~f:command_uses_docker
 
-let action_uses_docker = function
+let action_uses_docker =
+  let open Bistro in
+  function
   | Exec cmd -> command_uses_docker cmd
   | Eval _ -> false
 
@@ -219,14 +89,14 @@ type execution_env = {
   tmp_dir : string ;
   dest : string ;
   tmp : string ;
-  dep : dep -> string ;
-  file_dump : token list -> string ;
+  dep : Bistro.dep -> string ;
+  file_dump : Bistro.dep Bistro.Command.token list -> string ;
   np : int ;
   mem : int ;
 }
 
 let make_execution_env { db ; use_docker } ~np ~mem step =
-  let tmp_dir = Db.tmp db step.id in
+  let tmp_dir = Db.tmp db step.Bistro.id in
   let path_of_task_id tid = Db.cache db tid in
   let dep = function
     | `Input p ->
@@ -282,6 +152,7 @@ module Concrete_task = struct
     |> List.dedup
 
   and file_dumps_of_token in_docker =
+    let open Bistro.Command in
     function
     | NP
     | DEST
@@ -295,6 +166,7 @@ module Concrete_task = struct
       |> List.dedup
 
   let rec file_dumps_of_command in_docker =
+    let open Bistro.Command in
     function
     | Simple_command toks -> file_dumps_of_tokens in_docker toks
     | And_list xs
@@ -305,11 +177,14 @@ module Concrete_task = struct
       |> List.dedup
     | Docker (_, cmd) -> file_dumps_of_command true cmd
 
-  let file_dumps_of_action = function
+  let file_dumps_of_action =
+    let open Bistro in
+    function
     | Exec cmd -> file_dumps_of_command false cmd
     | Eval _ -> []
 
   let token env =
+    let open Bistro.Command in
     function
     | S s -> s
     | D d -> env.dep d
@@ -346,6 +221,7 @@ module Concrete_task = struct
   let par x = "(" ^ x ^ ")"
 
   let rec string_of_command env =
+    let open Bistro.Command in
     function
     | Simple_command tokens -> string_of_tokens env tokens
     | And_list xs -> par (string_of_command_aux env " && " xs)
@@ -356,7 +232,7 @@ module Concrete_task = struct
         let dck_env = make_docker_execution_env env in
         sprintf
           "docker run --log-driver=none --rm %s %s %s %s -i %s bash -c '%s'"
-          (deps_mount env dck_env (deps_of_command cmd))
+          (deps_mount env dck_env (deps cmd))
           (file_dumps_mount env dck_env (file_dumps_of_command true cmd))
           (tmp_mount env dck_env)
           (dest_mount env dck_env)
@@ -381,7 +257,9 @@ module Concrete_task = struct
         Marshal.to_channel oc x []
       )
 
-  let of_action env = function
+  let of_action env =
+    let open Bistro in
+    function
     | Exec cmd -> of_cmd env cmd
     | Eval { f } ->
       let env = object
@@ -460,7 +338,10 @@ let docker_chown dir uid =
   |> Sys.command
   |> ignore
 
-let perform_step (Allocator.Resource { np ; mem }) ({ db } as config) ({ action } as step) =
+let perform_step
+    (Allocator.Resource { np ; mem })
+    ({ db } as config)
+    ({ Bistro.action } as step) =
   let uid = Unix.getuid () in
   let env = make_execution_env config ~np ~mem step in
   let stdout = Db.stdout db step.id in
@@ -535,22 +416,34 @@ let perform_select db dir sel =
       }
     )
 
-let perform alloc config = function
+let dep_of_select_child =
+  let open Bistro in
+  function
+  | Input (_, p) -> `Input p
+  | Step { id } -> `Step id
+  | Select _ -> assert false
+
+let perform alloc config =
+  let open Bistro in
+  function
   | Input (_, p) -> perform_input (Bistro.Path.to_string p)
-  | Select (_, dir, q) -> perform_select config.db dir q
+  | Select (_, dir, q) -> perform_select config.db (dep_of_select_child dir) q
   | Step s -> perform_step alloc config s
 
 let is_done t { db } =
+  let open Bistro in
   let path = match t with
     | Input (_, p) -> Bistro.Path.to_string p
-    | Select (_, dir, q) -> select_path db dir q
+    | Select (_, dir, q) -> select_path db (dep_of_select_child dir) q
     | Step { id ; descr } ->
       let b = Db.cache db id in
       (*      printf "%s %s\n" descr b ; *) b
   in
   Lwt.return (Sys.file_exists path = `Yes)
 
-let clean t { db } = match t with
+let clean t { db } =
+  let open Bistro in
+  match t with
   | Input _ | Select _ -> Lwt.return ()
   | Step s ->
     remove_if_exists (Db.cache db s.id) >>= fun () ->
@@ -558,12 +451,13 @@ let clean t { db } = match t with
     remove_if_exists (Db.stderr db s.id)
 
 let post_revdeps_hook t config ~all_revdeps_succeeded =
+  let open Bistro in
   match t with
   | Input _ | Select _ -> Lwt.return ()
   | Step s ->
     if
-      not s.precious
-      && not config.keep_all
+      not config.keep_all
+      && not (String.Set.mem config.precious s.id)
       && all_revdeps_succeeded
     then clean t config
     else Lwt.return ()

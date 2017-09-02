@@ -25,7 +25,7 @@ val run_gen_cmd :
   ?report_all_consensus:bool ->
   string ->
   Bistro.Template.t list ->
-  Bistro.command
+  Bistro.EDSL.command
 
 
 val run_se :

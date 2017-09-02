@@ -22,9 +22,9 @@ let color r g b a =
 let light_gray = 0xC0C0C0
 let black = 0
 
-let dot_output dag ~needed ~already_done fn =
+let dot_output dag ~needed ~already_done ~precious fn =
   let vertex_attribute u =
-    let open Task in
+    let open Bistro in
     let needed = Hash_set.mem needed u in
     let color = if needed then black else light_gray in
     match u with
@@ -34,8 +34,9 @@ let dot_output dag ~needed ~already_done fn =
     | Select (_, _, p) ->
       let label = Bistro.Path.to_string p in
       [ `Label label ; `Fontcolor color ; `Color color ; `Shape `Box ]
-    | Step { descr ; precious } as u ->
+    | Step { descr ; id } as u ->
       let already_done  = Hash_set.mem already_done u in
+      let precious = String.Set.mem precious id in
       let label_suffix = if precious then "*" else "" in
       [ `Label (descr ^ label_suffix) ;
         `Shape `Box ;
@@ -45,7 +46,7 @@ let dot_output dag ~needed ~already_done fn =
       ]
   in
   let edge_attribute (u, v) =
-    let open Task in
+    let open Bistro in
     let style = match u, v with
       | Select _, Step _ -> [ `Style `Dotted ]
       | _ -> []
@@ -60,11 +61,11 @@ let dot_output dag ~needed ~already_done fn =
 
 class logger path : Scheduler.logger =
   object
-    method event _ _ = function
+    method event config _ = function
       | Scheduler.Init { dag ; needed ; already_done } ->
         let needed = S.of_list needed in
         let already_done = S.of_list already_done in
-        dot_output dag ~needed ~already_done path
+        dot_output dag ~needed ~already_done path ~precious:config.Task.precious
       | _ -> ()
 
     method stop = ()

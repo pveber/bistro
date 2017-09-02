@@ -24,7 +24,7 @@ module Cmd : sig
     'a input ->
     'a workflow ->
     Ucsc_gb.chrom_sizes workflow ->
-    Bistro.command
+    Bistro.EDSL.command
 end
 
 

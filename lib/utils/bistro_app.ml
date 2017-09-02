@@ -163,10 +163,10 @@ let create
     app
   =
   let open Lwt in
-  let config = Task.config ~db_path:bistro_dir ~use_docker:true ~keep_all in
   let allocator = Allocator.create ~np ~mem in
   let workflows = to_workflow_list app in
-  let dag, goals = Scheduler.compile workflows in
+  let dag, goals, precious = Scheduler.compile workflows in
+  let config = Task.config ~db_path:bistro_dir ~use_docker:true ~keep_all ~precious in
   Scheduler.(run ?logger ~goals config allocator dag) >>= fun traces ->
   (
     match logger with

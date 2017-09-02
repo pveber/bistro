@@ -62,10 +62,39 @@ module Path : sig
   val make_relative : ?from:string -> string -> t
 end
 
+(** Name and version of an external dependency for a workflow *)
+type docker_image = private {
+  dck_account : string ;
+  dck_name : string ;
+  dck_tag : string option ;
+  dck_registry : string option ;
+}
+
+module Command : sig
+  type 'a t =
+    | Docker of docker_image * 'a t
+    | Simple_command of 'a token list
+    | And_list of 'a t list
+    | Or_list of 'a t list
+    | Pipe_list of 'a t list
+
+  and 'a token =
+    | S of string
+    | D of 'a
+    | F of 'a token list
+    | DEST
+    | TMP
+    | NP
+    | MEM
+    | EXE
+
+  val deps : 'a t -> 'a list
+end
+
 (** Workflow representation *)
 type u = private
   | Input of string * Path.t
-  | Select of string * u * Path.t
+  | Select of string * u * Path.t (** invariant: [u] cannot be a [Select] *)
   | Step of step
 
 and step = private {
@@ -79,28 +108,11 @@ and step = private {
 }
 
 and action =
-  | Exec of command
+  | Exec of dep Command.t
   | Eval of {
       id : string ;
       f : env -> unit ;
     }
-
-and command =
-  | Docker of docker_image * command
-  | Simple_command of token list
-  | And_list of command list
-  | Or_list of command list
-  | Pipe_list of command list
-
-and token =
-  | S of string
-  | D of u
-  | F of token list
-  | DEST
-  | TMP
-  | NP
-  | MEM
-  | EXE
 
 and env = < dep : dep -> string ;
             np : int ;
@@ -115,13 +127,6 @@ and dep = [
 ]
 and id = string
 
-(** Name and version of an external dependency for a workflow *)
-and docker_image = private {
-  dck_account : string ;
-  dck_name : string ;
-  dck_tag : string option ;
-  dck_registry : string option ;
-}
 
 (** Describes the (relative) path from a ['a directory workflow]
     target to some ['b workflow] target. This is useful to construct
@@ -235,6 +240,7 @@ end
     execute shell commands. *)
 module EDSL : sig
   include module type of Template with type t := Template.t
+  type command
 
   val workflow :
     ?descr:string ->

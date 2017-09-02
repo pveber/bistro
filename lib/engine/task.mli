@@ -1,66 +1,13 @@
 open Core
 
-type t =
-  | Input of string * path
-  | Select of string * [`Input of path | `Step of string] * path
-  | Step of step
-
-and step = {
-  id       : id ;
-  descr    : string ;
-  deps     : dep list ;
-  action   : action ;
-  np       : int ; (** Required number of processors *)
-  mem      : int ; (** Required memory in MB *)
-  version  : int option ; (** Version number of the wrapper *)
-  precious : bool ;
-}
-
-and dep = [
-    `Task of id
-  | `Select of id * path
-  | `Input of path
-]
-and id = string
-
-and action =
-  | Exec of command
-  | Eval of {
-      id : string ;
-      f : env -> unit ;
-    }
-
-and env = < dep : dep -> string ;
-            np : int ;
-            mem : int ;
-            tmp : string ;
-            dest : string >
-
-and command =
-  | Docker of Bistro.docker_image * command
-  | Simple_command of token list
-  | And_list of command list
-  | Or_list of command list
-  | Pipe_list of command list
-
-and token =
-  | S of string
-  | D of dep
-  | F of token list
-  | DEST
-  | TMP
-  | NP
-  | MEM
-  | EXE
-
-and path = Bistro.Path.t
+type t = Bistro.u
 
 type result =
   | Input_check of { path : string ; pass : bool }
   | Select_check of { dir_path : string ; sel : string list ; pass : bool }
   | Step_result of {
       outcome : [`Succeeded | `Missing_output | `Failed] ;
-      step : step ;
+      step : Bistro.step ;
       exit_code : int ;
       action : [`Sh of string | `Eval] ;
       dumps : (string * string) list ;
@@ -73,15 +20,16 @@ type config = private {
   db : Db.t ;
   use_docker : bool ;
   keep_all : bool ;
+  precious : String.Set.t ;
 }
 
 val config :
   db_path:string ->
   use_docker:bool ->
   keep_all:bool ->
+  precious:String.Set.t ->
   config
 
-val of_workflow : precious:bool -> Bistro.u -> t
 val id : t -> string
 val equal : t -> t -> bool
 val compare : t -> t -> int
@@ -97,5 +45,17 @@ val post_revdeps_hook :
 val clean : t -> config -> unit Lwt.t
 
 (* LOW-LEVEL API *)
-val render_step_command : np:int -> mem:int -> config -> step -> command -> string
-val render_step_dumps : np:int -> mem:int -> config -> step -> (string * string) list
+val render_step_command :
+  np:int ->
+  mem:int ->
+  config ->
+  Bistro.step ->
+  Bistro.dep Bistro.Command.t ->
+  string
+
+val render_step_dumps :
+  np:int ->
+  mem:int ->
+  config ->
+  Bistro.step ->
+  (string * string) list
