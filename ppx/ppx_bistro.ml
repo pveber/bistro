@@ -15,6 +15,7 @@ let str ?(loc= !default_loc) str =
 module Exp = struct
   include Exp
   let string s = constant (Const.string s)
+  let int i = constant (Const.int i)
   let constr_args args = function
     | [] -> None
     | [x] -> Some x
@@ -79,12 +80,28 @@ let rec replace_body new_body = function
     { expr with pexp_desc = Pexp_fun (lab, e1, p, replace_body new_body e2) }
   | _ -> new_body
 
+let get_attr attributes =
+  let attributes = List.map attributes ~f:(fun ({ txt = attr }, payload) ->
+      attr, payload
+    )
+  in
+  fun k ->
+    match List.Assoc.find ~equal:String.equal attributes k with
+    | None -> None
+    | Some (PStr [ { pstr_desc = Pstr_eval (expr, _) } ]) ->
+      Some expr
+    | _ ->
+      let msg =
+        Printf.sprintf "Expected payload for attribute %s is an expression" k
+      in
+      failwith msg
+
+
 let rewriter _config _cookies =
   { default_mapper with
     structure_item = fun mapper stri ->
       match stri with
-      | { pstr_desc = Pstr_extension (({txt = "bistro"}, payload),
-                                      attributes) } -> (
+      | { pstr_desc = Pstr_extension (({txt = "bistro"}, payload), _) } -> (
           match payload with
           | PStr [ { pstr_desc =
                        Pstr_value (Nonrecursive,
@@ -92,8 +109,14 @@ let rewriter _config _cookies =
                                      pvb_pat = {
                                        ppat_desc = Ppat_var { txt = var }
                                      } as pat ;
+                                     pvb_attributes = attributes ;
                                      pvb_expr = expr ;
                                      pvb_loc = loc  }]) } ] ->
+            let get_attr = get_attr attributes in
+            let np = Option.value (get_attr "np") ~default:(Exp.int 1) in
+            let mem = Option.value (get_attr "mem") ~default:(Exp.int 100) in
+            let descr = Option.value (get_attr "descr") ~default:(Exp.string var) in
+            let version = Option.value (get_attr "version") ~default:(Exp.int 0) in
             let body = extract_body expr in
             let deps = ref [] in
             let rewriter = payload_rewriter deps in
@@ -112,12 +135,14 @@ let rewriter _config _cookies =
                 )
               |> Exp.list
             in
-            let descr = var in
             let new_body = [%expr
               let id = [%e Exp.string id] in
               let f env : unit = [%e code] in
               Bistro.Workflow.of_fun
-                ~descr:[%e Exp.string descr]
+                ~descr:[%e descr]
+                ~np:[%e np]
+                ~mem:[%e mem]
+                ~version:[%e version]
                 ~id ~deps:[%e dep_list] f
             ] |> add_bindings
             in
@@ -150,4 +175,3 @@ let () =
 (*       ^:: nil) *)
 (*   in *)
 (*   Extension.declare "bistro_fun" Extension.Context.structure_item ast_pattern transformer *)
-

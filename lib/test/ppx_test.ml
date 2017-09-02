@@ -2,7 +2,8 @@ open Core
 open Bistro.EDSL
 open Bistro_utils
 
-let%bistro [@mem 1] [@descr "foobar"] comment_filter bed =
+let%bistro [@version 42] [@mem 1] [@descr "foobar"]
+    comment_filter bed =
   In_channel.read_lines [%dep bed]
   |> List.filter ~f:(fun l -> not (String.is_prefix ~prefix:"#" l))
   |> Out_channel.write_lines [%dest]
@@ -14,10 +15,19 @@ let create_file =
   ]
 
 let main () =
+  let bed = comment_filter create_file in
+  Bistro.(
+    match Workflow.u bed with
+    | Step { descr ; version ; mem } ->
+      assert (descr = "foobar") ;
+      assert (version = Some 42) ;
+      assert (mem = 1)
+    | _ -> assert false
+  ) ;
   Bistro_app.(
     run (
       pure (fun (Path p) -> print_endline (In_channel.read_all p))
-      $ pureW (comment_filter create_file)
+      $ pureW bed
     )
   )
 
