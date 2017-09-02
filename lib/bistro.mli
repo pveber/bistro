@@ -133,12 +133,12 @@ end
 
 (** Describes the (relative) path from a ['a directory workflow]
     target to some ['b workflow] target. This is useful to construct
-    new workflows by selecting a file or surdirectory in the result of
-    a directory workflow. *)
+    new workflows by selecting a file or a subdirectory in the result
+    of a directory workflow. *)
 type (-'a, +'b) selector = private Selector of Path.t
 
 (** The type representing a set of actions (shell scripts or
-    (evaluations of OCaml expressions) to build a target of type
+    evaluations of OCaml expressions) to build a target of type
     ['a]. The type ['a] is a phantom type, which can be used to
     enforce static invariants. *)
 module Workflow : sig
