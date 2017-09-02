@@ -151,9 +151,9 @@ module Workflow : sig
     ?np:int ->
     ?version:int ->
     id:id ->
-    f:(env -> unit) ->
     deps:u list ->
-    unit -> 'a workflow
+    (env -> unit) ->
+    'a workflow
   (** [of_fun ~id ~f ~deps ()] builds a workflow step by executing [f]. [f]
       is passed an [env] object that can be asked where to find
       dependencies in the cache and where to put the result. [id] is a

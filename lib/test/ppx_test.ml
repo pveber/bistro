@@ -2,12 +2,10 @@ open Core
 open Bistro.EDSL
 open Bistro_utils
 
-let comment_filter bed = [%bistro_fun
-  let open Core_kernel in
+let%bistro [@mem 1] [@descr "foobar"] comment_filter bed =
   In_channel.read_lines [%dep bed]
   |> List.filter ~f:(fun l -> not (String.is_prefix ~prefix:"#" l))
   |> Out_channel.write_lines [%dest]
-] ~descr:"comment_filter" ~np:1 ()
 
 let create_file =
   let file = string "# comment\nchr1\t42\t100\n" in

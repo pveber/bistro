@@ -231,7 +231,7 @@ module Workflow = struct
     let id = digest ("step", version, digestible_action action) in
     Step { descr ; deps ; action ; np ; mem ; version ; id }
 
-  let of_fun ?descr ?mem ?np ?version ~id ~f ~deps () =
+  let of_fun ?descr ?mem ?np ?version ~id ~deps f =
     make ?descr ?mem ?np ?version (Eval { id ; f }) deps
 
   let select u (Selector path) =
