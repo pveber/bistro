@@ -40,7 +40,7 @@ let precious_expansion = List.concat_map ~f:precious_expand
 
 
 let rec add_workflow (seen, dag) u =
-  let id = Bistro.Workflow.id' u in
+  let id = Bistro.U.id u in
   match String.Map.find seen id with
   | None ->
     let seen', dag' =
@@ -69,12 +69,12 @@ let rec add_workflow (seen, dag) u =
 
 let compile workflows =
   let workflows =
-    List.map workflows ~f:(fun (Bistro.Workflow w) -> Bistro.Workflow.u w)
+    List.map workflows ~f:(fun (Bistro.Any_workflow w) -> Bistro.Workflow.u w)
   in
   let precious =
     workflows
     |> precious_expansion
-    |> List.map ~f:Bistro.Workflow.id'
+    |> List.map ~f:Bistro.U.id
     |> String.Set.of_list
   in
   let _, dag, goals =

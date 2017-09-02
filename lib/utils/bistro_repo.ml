@@ -86,7 +86,7 @@ let generate outdir items =
       link file_path cache_path
     )
 
-let use t (Bistro.Workflow w) =
+let use t (Bistro.Any_workflow w) =
   pure (fun x _ -> x) $ t $ pureW w
 
 let to_app ?(precious = []) ~outdir items =

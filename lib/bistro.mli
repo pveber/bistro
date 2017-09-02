@@ -23,12 +23,6 @@
     engine like the one provided by [bistro.engine].
  *)
 
-type +'a workflow
-(** The type representing a set of actions (shell scripts or
-    (evaluations of OCaml expressions) to build a target of type
-    ['a]. The type ['a] is a phantom type, which can be used to
-    enforce static invariants. *)
-
 type 'a directory = [`directory of 'a]
 (** Conventional type to represent directory targets *)
 
@@ -46,9 +40,6 @@ class type ['a] value = object
   inherit [ [`value of 'a], [`binary] ] file
 end
 
-type any_workflow = Workflow : _ workflow -> any_workflow
-(** Encapsulate a workflow target type *)
-
 (** Helper functions to represent paths as string lists. For absolute
     paths, the first element of the list is ["/"]. *)
 module Path : sig
@@ -61,6 +52,23 @@ module Path : sig
       [Invalid_argument] if [dirA] is relative. *)
   val make_relative : ?from:string -> string -> t
 end
+
+type id = string
+
+type dep = [
+    `Task of id
+  | `Select of id * Path.t
+  | `Input of Path.t
+]
+
+type env = <
+  dep : dep -> string ;
+  np : int ;
+  mem : int ;
+  tmp : string ;
+  dest : string
+>
+
 
 (** Name and version of an external dependency for a workflow *)
 type docker_image = private {
@@ -91,7 +99,7 @@ module Command : sig
   val deps : 'a t -> 'a list
 end
 
-(** Workflow representation *)
+(** Workflow untyped representation *)
 type u = private
   | Input of string * Path.t
   | Select of string * u * Path.t (** invariant: [u] cannot be a [Select] *)
@@ -114,18 +122,13 @@ and action =
       f : env -> unit ;
     }
 
-and env = < dep : dep -> string ;
-            np : int ;
-            mem : int ;
-            tmp : string ;
-            dest : string >
+module U : sig
+  type t = u
+  val id : t -> string
+  val compare : t -> t -> int
+  val equal : t -> t -> bool
+end
 
-and dep = [
-    `Task of id
-  | `Select of id * Path.t
-  | `Input of Path.t
-]
-and id = string
 
 
 (** Describes the (relative) path from a ['a directory workflow]
@@ -134,15 +137,17 @@ and id = string
     a directory workflow. *)
 type (-'a, +'b) selector = private Selector of Path.t
 
+(** The type representing a set of actions (shell scripts or
+    (evaluations of OCaml expressions) to build a target of type
+    ['a]. The type ['a] is a phantom type, which can be used to
+    enforce static invariants. *)
 module Workflow : sig
-  type 'a t = 'a workflow
+  type +'a t
+
+  val u : _ t -> U.t
   val id : _ t -> string
-  val id' : u -> string
-  val u : _ t -> u
   val compare : 'a t -> 'a t -> int
-  val compare' : u -> u -> int
   val equal : 'a t -> 'a t -> bool
-  val equal' : u -> u -> bool
   val to_dep : _ t -> dep
 
   val of_fun :
@@ -151,9 +156,9 @@ module Workflow : sig
     ?np:int ->
     ?version:int ->
     id:id ->
-    deps:u list ->
+    deps:U.t list ->
     (env -> unit) ->
-    'a workflow
+    'a t
   (** [of_fun ~id ~f ~deps ()] builds a workflow step by executing [f]. [f]
       is passed an [env] object that can be asked where to find
       dependencies in the cache and where to put the result. [id] is a
@@ -171,6 +176,9 @@ module Workflow : sig
       error-prone. Use the PPX extension instead. *)
 
 end
+
+type any_workflow = Any_workflow : _ Workflow.t -> any_workflow
+
 
 (** Represents a text with special symbols *)
 module Template : sig
@@ -208,7 +216,7 @@ module Template : sig
   val path : Path.t -> t
   (** Path formatting *)
 
-  val dep : _ workflow -> t
+  val dep : _ Workflow.t -> t
   (** [dep w] is interpreted as the path where to find the result of
       workflow [w] *)
 
@@ -247,14 +255,14 @@ module EDSL : sig
     ?mem:int ->
     ?np:int ->
     ?version:int ->
-    command list -> 'a workflow
+    command list -> 'a Workflow.t
   (** Workflow constructor, taking a list of commands in input. Other arguments are:
       - @param descr description of the workflow, used for logging
       - @param mem required memory
       - @param np maximum number of cores (could be given less at execution)
       - @param version version number, used to force the rebuild of a workflow *)
 
-  val input : ?may_change:bool -> string -> 'a workflow
+  val input : ?may_change:bool -> string -> 'a Workflow.t
   (** Constructs a workflow from an existing file on the
       filesystem. The argument [may_change] indicates that the file
       may be modified, which is detected by giving the workflow a
@@ -263,7 +271,7 @@ module EDSL : sig
   val selector : Path.t -> ('a, 'b) selector
   (** Selector constructor *)
 
-  val ( / ) : 'a directory workflow -> ('a, 'b) selector -> 'b workflow
+  val ( / ) : 'a directory Workflow.t -> ('a, 'b) selector -> 'b Workflow.t
   (** Constructs a workflow by selecting a dir or file from a
       directory workflow *)
 
@@ -348,7 +356,7 @@ end
 
 (** Standard definitions *)
 module Std : sig
-  type nonrec 'a workflow = 'a workflow
+  type 'a workflow = 'a Workflow.t
   type nonrec ('a, 'b) selector = ('a, 'b) selector
 
   class type ['a,'b] file = object

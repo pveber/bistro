@@ -26,7 +26,7 @@ let redirection filename =
   Lwt_unix.openfile filename Unix.([O_APPEND ; O_CREAT ; O_WRONLY]) 0o640 >>= fun fd ->
   Lwt.return (`FD_move (Lwt_unix.unix_file_descr fd))
 
-type t = Bistro.u
+include Bistro.U
 
 type result =
   | Input_check of { path : string ; pass : bool }
@@ -55,11 +55,6 @@ let config ~db_path ~use_docker ~keep_all ~precious = {
   keep_all ;
   precious ;
 }
-
-
-let id t = Bistro.Workflow.id' t
-let compare = Bistro.Workflow.compare'
-let equal = Bistro.Workflow.equal'
 
 let requirement =
   let open Bistro in

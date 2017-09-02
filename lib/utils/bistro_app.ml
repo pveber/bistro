@@ -32,8 +32,8 @@ module WHS = Hash_set.Make(
   struct
     open Bistro
     type t = any_workflow
-    let hash (Workflow u) = String.hash (Workflow.id u)
-    let compare (Workflow u) (Workflow v) =
+    let hash (Any_workflow u) = String.hash (Workflow.id u)
+    let compare (Any_workflow u) (Any_workflow v) =
       String.compare (Workflow.id u) (Workflow.id v)
     let sexp_of_t _ = assert false
     let t_of_sexp _ = assert false
@@ -49,7 +49,7 @@ let rec to_workflow_list term =
       | Pure _ -> ()
       | PureW w ->
         let open Bistro in
-        Hash_set.add acc (Workflow w)
+        Hash_set.add acc (Any_workflow w)
       | App (f, x) ->
         aux f ; aux x
       | List xs ->

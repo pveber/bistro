@@ -1,5 +1,8 @@
 open Core_kernel.Std
 
+let digest x =
+  Digest.to_hex (Digest.string (Marshal.to_string x []))
+
 module Path = struct
   type t = string list
   [@@deriving sexp]
@@ -46,25 +49,6 @@ module Path = struct
 
 end
 
-let digest x =
-  Digest.to_hex (Digest.string (Marshal.to_string x []))
-
-let ( % ) f g x = g (f x)
-
-let ok = function
-  | `Ok x -> x
-  | `Error e -> raise e
-
-module Utils = struct
-  let python_version fmt =
-    let regexp = match fmt with
-      | `M_m -> "[0-9]\\.[0-9]"
-    in
-    let ic = Unix.open_process_in (sprintf "python --version 2>&1 | grep -o '%s'" regexp) in
-    let r = In_channel.input_line ic in
-    In_channel.close ic ;
-    r
-end
 
 type docker_image = {
   dck_account : string ;
@@ -73,6 +57,22 @@ type docker_image = {
   dck_registry : string option ;
 }
 [@@deriving sexp]
+
+type id = string
+
+type dep = [
+    `Task of id
+  | `Select of id * Path.t
+  | `Input of Path.t
+]
+
+type env = <
+  dep : dep -> string ;
+  np : int ;
+  mem : int ;
+  tmp : string ;
+  dest : string
+>
 
 
 type 'a directory = [`directory of 'a]
@@ -144,73 +144,56 @@ module Command = struct
 
 end
 
-module T = struct
-  type u =
-    | Input of string * Path.t
-    | Select of string * u * Path.t (* invariant: [u] is not a select *)
-    | Step of step
+type u =
+  | Input of string * Path.t
+  | Select of string * u * Path.t (* invariant: [u] is not a select *)
+  | Step of step
 
-  and step = {
-    id : string ;
-    descr : string ;
-    deps : u list ;
-    action : action ;
-    np : int ; (** Required number of processors *)
-    mem : int ; (** Required memory in MB *)
-    version : int option ; (** Version number of the wrapper *)
-  }
+and step = {
+  id : string ;
+  descr : string ;
+  deps : u list ;
+  action : action ;
+  np : int ; (** Required number of processors *)
+  mem : int ; (** Required memory in MB *)
+  version : int option ; (** Version number of the wrapper *)
+}
 
-  and action =
-    | Exec of dep Command.t
-    | Eval of {
-        id : string ;
-        f : env -> unit ;
-      }
+and action =
+  | Exec of dep Command.t
+  | Eval of {
+      id : string ;
+      f : env -> unit ;
+    }
 
-  and env = < dep : dep -> string ;
-              np : int ;
-              mem : int ;
-              tmp : string ;
-              dest : string >
+module U_impl = struct
+  
+  let id = function
+    | Input (id, _)
+    | Select (id, _, _)
+    | Step { id } -> id
 
-  and dep = [
-      `Task of id
-    | `Select of id * Path.t
-    | `Input of Path.t
-  ]
-  and id = string
+  let compare u v =
+    String.compare (id u) (id v)
 
-  and 'a workflow = u
-
-  type ('a, 'b) selector = Selector of Path.t
+  let equal x y =
+    compare x y = 0
 
 end
 
-include T
+module U = struct
+  type t = u
+  include U_impl
+end
+
+type ('a, 'b) selector = Selector of Path.t
 
 
-type any_workflow = Workflow : _ workflow -> any_workflow
-
-let workflow_id = function
-  | Input (id, _)
-  | Select (id, _, _)
-  | Step { id } -> id
-
-let workflow_compare u v =
-  String.compare (workflow_id u) (workflow_id v)
 
 module Workflow = struct
-  include T
-  type 'a t = u
+  type 'a t = U.t
 
-  let id = workflow_id
-
-  let id' = workflow_id
-
-  let compare = workflow_compare
-  let compare' = compare
-  let equal x y = workflow_compare x y = 0
-  let equal' = equal
+  include U_impl
 
   let input ?(may_change = false) target =
     let hash = if may_change then Some (Digest.file target) else None in
@@ -287,8 +270,10 @@ module Workflow = struct
     fprintf oc "}\n"
 end
 
+type any_workflow = Any_workflow : _ Workflow.t -> any_workflow
+
 module Template = struct
-  type t = u Command.token list
+  type t = U.t Command.token list
 
   let dest = [ Command.DEST ]
   let tmp = [ Command.TMP ]
@@ -331,7 +316,7 @@ end
 module EDSL = struct
   include Template
 
-  type command = u Command.t
+  type command = U.t Command.t
 
   let input = Workflow.input
 
@@ -407,7 +392,7 @@ module EDSL = struct
 
   let ( % ) f g x = g (f x)
 
-  let selector x = Workflow.Selector x
+  let selector x = Selector x
   let ( / ) = Workflow.select
 
   let docker_image ?tag ?registry ~account ~name () = {
@@ -422,7 +407,7 @@ end
 
 module Std = struct
   type 'a workflow = 'a Workflow.t
-  type ('a, 'b) selector = ('a, 'b) Workflow.selector
+  type nonrec ('a, 'b) selector = ('a, 'b) selector
 
   class type ['a,'b] file = object
     method format : 'a
