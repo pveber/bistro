@@ -25,24 +25,16 @@ and id = string
 
 and action =
   | Exec of command
-  | Eval of some_expression
+  | Eval of {
+      id : string ;
+      f : env -> unit ;
+    }
 
-and some_expression =
-  | Value     : _ expression    -> some_expression
-  | File      : unit expression -> some_expression
-  | Directory : unit expression -> some_expression
-
-and _ expression =
-  | Expr_pure : { id : string ; value : 'a } -> 'a expression
-  | Expr_app : ('a -> 'b) expression * 'a expression -> 'b expression
-  | Expr_dest : string expression
-  | Expr_tmp : string expression
-  | Expr_np : int expression
-  | Expr_mem : int expression
-  | Expr_dep : dep -> string expression
-  | Expr_deps : dep list -> string list expression
-  | Expr_valdep : dep -> 'a expression
-  | Expr_valdeps : dep list -> 'a list expression
+and env = < dep : dep -> string ;
+            np : int ;
+            mem : int ;
+            tmp : string ;
+            dest : string >
 
 and command =
   | Docker of Bistro.docker_image * command

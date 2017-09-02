@@ -51,24 +51,16 @@ and id = string
 
 and action =
   | Exec of command
-  | Eval of some_expression
+  | Eval of {
+      id : string ;
+      f : env -> unit ;
+    }
 
-and some_expression =
-  | Value     : _ expression    -> some_expression
-  | File      : unit expression -> some_expression
-  | Directory : unit expression -> some_expression
-
-and _ expression =
-  | Expr_pure : { id : string ; value : 'a } -> 'a expression
-  | Expr_app : ('a -> 'b) expression * 'a expression -> 'b expression
-  | Expr_dest : string expression
-  | Expr_tmp : string expression
-  | Expr_np : int expression
-  | Expr_mem : int expression
-  | Expr_dep : dep -> string expression
-  | Expr_deps : dep list -> string list expression
-  | Expr_valdep : dep -> 'a expression
-  | Expr_valdeps : dep list -> 'a list expression
+and env = < dep : dep -> string ;
+            np : int ;
+            mem : int ;
+            tmp : string ;
+            dest : string >
 
 and command =
   | Docker of Bistro.docker_image * command
@@ -180,23 +172,9 @@ let rec denormalize_cmd = function
   | Bistro.Docker (image, c) ->
     Docker (image, denormalize_cmd c)
 
-let rec denormalize_expression : type s. s Bistro.expression -> s expression = function
-  | Bistro.Expr_pure { id ; value } -> Expr_pure { id ; value }
-  | Bistro.Expr_app (x, f) -> Expr_app (denormalize_expression x, denormalize_expression f)
-  | Bistro.Expr_dep w -> Expr_dep (denormalize_dep (Bistro.Workflow.u w))
-  | Bistro.Expr_deps ws -> Expr_deps (List.map ~f:(fun w -> denormalize_dep (Bistro.Workflow.u w)) ws)
-  | Bistro.Expr_valdep w -> Expr_valdep (denormalize_dep (Bistro.Workflow.u w))
-  | Bistro.Expr_valdeps ws -> Expr_valdeps (List.map ~f:(fun w -> denormalize_dep (Bistro.Workflow.u w)) ws)
-  | Bistro.Expr_dest -> Expr_dest
-  | Bistro.Expr_tmp -> Expr_tmp
-  | Bistro.Expr_np -> Expr_np
-  | Bistro.Expr_mem -> Expr_mem
-
 let denormalize_action = function
   | Bistro.Exec cmd -> Exec (denormalize_cmd cmd)
-  | Bistro.Eval (Bistro.Value expr) -> Eval (Value (denormalize_expression expr))
-  | Bistro.Eval (Bistro.File expr) -> Eval (File (denormalize_expression expr))
-  | Bistro.Eval (Bistro.Directory expr) -> Eval (Directory (denormalize_expression expr))
+  | Bistro.Eval { id ; f } -> Eval { id ; f }
 
 let of_step ~precious { Bistro.id ; mem ; np ; descr ; action ; deps ; version } =
   Step {
@@ -403,31 +381,18 @@ module Concrete_task = struct
         Marshal.to_channel oc x []
       )
 
-  let of_compute env expr =
-    let rec aux : type s. s expression -> s = function
-      | Expr_pure { value } -> value
-      | Expr_app (f, x) -> (aux f) (aux x)
-      | Expr_dest -> env.dest
-      | Expr_tmp -> env.tmp
-      | Expr_np -> env.np
-      | Expr_mem -> env.mem
-      | Expr_dep d -> env.dep d
-      | Expr_deps ds -> List.map ~f:env.dep ds
-      | Expr_valdep d -> load (env.dep d)
-      | Expr_valdeps ds -> List.map ds ~f:(fun d -> load (env.dep d))
-    in
-    let build () = match expr with
-      | Value expr ->
-        let res = aux expr in
-        save res env.dest
-      | File expr -> aux expr
-      | Directory expr -> aux expr
-    in
-    Eval build
-
   let of_action env = function
     | Exec cmd -> of_cmd env cmd
-    | Eval expr -> of_compute env expr
+    | Eval { f } ->
+      let env = object
+        method dep = env.dep
+        method np = env.np
+        method mem = env.mem
+        method tmp = env.tmp
+        method dest = env.dest
+      end
+      in
+      Eval (fun () -> f env)
 
   let extract_file_dumps env action =
     let file_dumps = file_dumps_of_action action in

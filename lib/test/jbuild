@@ -3,4 +3,5 @@
 (library
  ((name bistro_test)
   (libraries (bistro.utils))
+  (preprocess (pps (ppx_bistro)))
 ))

@@ -104,7 +104,10 @@ module T = struct
 
   and action =
     | Exec of command
-    | Eval of some_expression
+    | Eval of {
+        id : string ;
+        f : env -> unit ;
+      }
 
   and command =
     | Docker of docker_image * command
@@ -129,22 +132,18 @@ module T = struct
     | MEM
     | EXE
 
-  and some_expression =
-    | Value     : _ expression    -> some_expression
-    | File      : unit expression -> some_expression
-    | Directory : unit expression -> some_expression
+  and env = < dep : dep -> string ;
+              np : int ;
+              mem : int ;
+              tmp : string ;
+              dest : string >
 
-  and _ expression =
-    | Expr_pure : { id : string ; value : 'a } -> 'a expression
-    | Expr_app : ('a -> 'b) expression * 'a expression -> 'b expression
-    | Expr_dest : string expression
-    | Expr_tmp : string expression
-    | Expr_np : int expression
-    | Expr_mem : int expression
-    | Expr_dep : _ workflow -> string expression
-    | Expr_deps : _ workflow list -> string list expression
-    | Expr_valdep : 'a value workflow -> 'a expression
-    | Expr_valdeps : 'a value workflow list -> 'a list expression
+  and dep = [
+      `Task of id
+    | `Select of id * Path.t
+    | `Input of Path.t
+  ]
+  and id = string
 
   and 'a workflow = u
 
@@ -188,19 +187,6 @@ module Cmd = struct
     | Docker (_, c) -> deps c
 end
 
-let rec expression_deps : type s. s expression -> u list = function
-  | Expr_pure _ -> []
-  | Expr_app (f, x) ->
-    List.dedup ~compare:workflow_compare (expression_deps f @ expression_deps x)
-  | Expr_dep u -> [ u ]
-  | Expr_valdep u -> [ u ]
-  | Expr_deps us -> us
-  | Expr_valdeps us -> us
-  | Expr_dest -> []
-  | Expr_tmp -> []
-  | Expr_np -> []
-  | Expr_mem -> []
-
 module Workflow = struct
   include T
   type 'a t = u
@@ -240,47 +226,27 @@ module Workflow = struct
     | MEM -> `MEM
     | EXE -> `EXE
 
-  let rec digestable_expr : type s. s expression -> _ = function
-    | Expr_pure { id } -> `Pure id
-    | Expr_app (x, f) -> `App (digestable_expr x, digestable_expr f)
-    | Expr_dep u -> `Dep (digestable_u (u :> u))
-    | Expr_deps us -> `Deps (List.map (us :> u list) ~f:digestable_u)
-    | Expr_valdep u -> `Dep (digestable_u (u :> u))
-    | Expr_valdeps us -> `Deps (List.map (us :> u list) ~f:digestable_u)
-    | Expr_dest -> `DEST
-    | Expr_tmp -> `TMP
-    | Expr_np -> `NP
-    | Expr_mem -> `MEM
-
   and digestable_u = function
     | Input (id, _) -> `Input id
     | Select (id, _, _) -> `Select id
     | Step { id } -> `Step id
 
-  let digestable_some_expression = function
-    | Value e -> digestable_expr e
-    | File e -> digestable_expr e
-    | Directory e -> digestable_expr e
-
   let digestable_action = function
     | Exec cmd -> digestable_command cmd
-    | Eval expr -> digestable_some_expression expr
-
-  let deps_of_action = function
-    | Exec cmd -> Cmd.deps cmd
-    | Eval (Value expr) -> expression_deps expr
-    | Eval (File expr) -> expression_deps expr
-    | Eval (Directory expr) -> expression_deps expr
+    | Eval { id } -> `Eval id
 
   let make
       ?(descr = "")
       ?(mem = 100)
       ?(np = 1)
       ?version
-      action =
-    let deps = deps_of_action action in
+      action
+      deps =
     let id = digest ("step", version, digestable_action action) in
     Step { descr ; deps ; action ; np ; mem ; version ; id }
+
+  let of_fun ?descr ?mem ?np ?version ~id ~f ~deps () =
+    make ?descr ?mem ?np ?version (Eval { id ; f }) deps
 
   let select u (Selector path) =
     let u, path =
@@ -306,6 +272,15 @@ module Workflow = struct
 
 
   let u x = x
+
+  let to_dep = function
+    | Step s -> `Task s.id
+    | Input (_, p) -> `Input p
+    | Select (_, Input (_, p), q) ->
+      `Input (p @ q)
+    | Select (_, Step s, p) ->
+      `Select (s.id, p)
+    | Select (_, Select _, _) -> assert false
 
   let to_dot u oc =
     let nodes = collect [] u in
@@ -439,7 +414,8 @@ module EDSL = struct
   let pipe xs = Pipe_list xs
 
   let workflow ?descr ?mem ?np ?version cmds =
-    Workflow.make ?descr ?mem ?np ?version (Exec (and_list cmds))
+    let cmd = and_list cmds in
+    Workflow.make ?descr ?mem ?np ?version (Exec cmd) (Cmd.deps cmd)
 
   let ( % ) f g x = g (f x)
 
@@ -454,32 +430,6 @@ module EDSL = struct
   }
 
 end
-
-module EDSL' = struct
-  let id x = digest x
-  let pure id value = Expr_pure { id ; value }
-  let app f x = Expr_app (f, x)
-  let ( $ ) = app
-  let np = Expr_np
-  let dest = Expr_dest
-  let dep w = Expr_dep w
-  let deps ws = Expr_deps ws
-  let valdep w = Expr_valdep w
-  let valdeps ws = Expr_valdeps ws
-  let const to_string x = pure (to_string x) x
-  let int = const Int.to_string
-  let string = const ident
-
-  let value ?descr ?np ?mem expr =
-    Workflow.make ?descr ?mem ?np (Eval (Value expr))
-
-  let file ?descr ?np ?mem expr =
-    Workflow.make ?descr ?mem ?np (Eval (File expr))
-
-  let directory ?descr ?np ?mem expr =
-    Workflow.make ?descr ?mem ?np (Eval (Directory expr))
-end
-
 
 
 module Std = struct

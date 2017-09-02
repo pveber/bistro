@@ -80,7 +80,10 @@ and step = private {
 
 and action =
   | Exec of command
-  | Eval of some_expression
+  | Eval of {
+      id : string ;
+      f : env -> unit ;
+    }
 
 and command =
   | Docker of docker_image * command
@@ -99,22 +102,18 @@ and token =
   | MEM
   | EXE
 
-and some_expression =
-  | Value     : _ expression    -> some_expression
-  | File      : unit expression -> some_expression
-  | Directory : unit expression -> some_expression
+and env = < dep : dep -> string ;
+            np : int ;
+            mem : int ;
+            tmp : string ;
+            dest : string >
 
-and _ expression =
-  | Expr_pure : { id : string ; value : 'a } -> 'a expression
-  | Expr_app : ('a -> 'b) expression * 'a expression -> 'b expression
-  | Expr_dest : string expression
-  | Expr_tmp : string expression
-  | Expr_np : int expression
-  | Expr_mem : int expression
-  | Expr_dep : _ workflow -> string expression
-  | Expr_deps : _ workflow list -> string list expression
-  | Expr_valdep : 'a value workflow -> 'a expression
-  | Expr_valdeps : 'a value workflow list -> 'a list expression
+and dep = [
+    `Task of id
+  | `Select of id * Path.t
+  | `Input of Path.t
+]
+and id = string
 
 (** Name and version of an external dependency for a workflow *)
 and docker_image = private {
@@ -139,6 +138,33 @@ module Workflow : sig
   val compare' : u -> u -> int
   val equal : 'a t -> 'a t -> bool
   val equal' : u -> u -> bool
+  val to_dep : _ t -> dep
+
+  val of_fun :
+    ?descr:string ->
+    ?mem:int ->
+    ?np:int ->
+    ?version:int ->
+    id:id ->
+    f:(env -> unit) ->
+    deps:u list ->
+    unit -> 'a workflow
+  (** [of_fun ~id ~f ~deps ()] builds a workflow step by executing [f]. [f]
+      is passed an [env] object that can be asked where to find
+      dependencies in the cache and where to put the result. [id] is a
+      string uniquely identifying [f] and [deps] is the list of
+      workflows that will be used during the evaluation of [f].
+
+      Other arguments are:
+      - @param descr description of the workflow, used for logging
+      - @param mem required memory
+      - @param np maximum number of cores (could be given less at execution)
+      - @param version version number, used to force the rebuild of a workflow
+
+      This function is not meant to be used directly because for a
+      given [f] specifying [id] and [deps] manually is
+      error-prone. Use the PPX extension instead. *)
+
 end
 
 (** Represents a text with special symbols *)
@@ -313,88 +339,6 @@ module EDSL : sig
   (** Function composition *)
 end
 
-
-(** This module provides an alternative DSL to construct workflows
-    whose action is to evaluate an OCaml expression. *)
-module EDSL' : sig
-  val value :
-    ?descr:string ->
-    ?np:int ->
-    ?mem:int ->
-    'a expression ->
-    'a value workflow
-  (** [value e] is a workflow that produces an OCaml value by
-      evaluating [e]. This value is saved automatically in {!val:dest}
-      using functions from the {!module:Marshal} module.
-      - @param descr description of the workflow, used for logging
-      - @param mem required memory
-      - @param np maximum number of cores (could be given less at execution) *)
-
-  val file :
-    ?descr:string ->
-    ?np:int ->
-    ?mem:int ->
-    unit expression ->
-    (_, _) #file workflow
-  (** Same as {!val:value}, the expression describes a side-effet
-      which is supposed to create a file at location {!val:dest}. *)
-
-  val directory :
-    ?descr:string ->
-    ?np:int ->
-    ?mem:int ->
-    unit expression ->
-    _ directory workflow
-  (** Same as {!val:value}, the expression describes a side-effet
-      which is supposed to create a directory at location {!val:dest}. *)
-
-  val id : 'a -> string
-  (** Utility function to compute a digest of any (non-functional)
-      value to a string *)
-
-  val pure : string -> 'a -> 'a expression
-  (** [pure id x] is an expression that evaluate in [x]. [id]
-      should uniquely identify [x], meaning that no other call to pure
-      should be made with arguments [id] and [y] is [y] is not equal
-      to [x]. *)
-
-  val app : ('a -> 'b) expression -> 'a expression -> 'b expression
-  (** Function application *)
-
-  val ( $ ) : ('a -> 'b) expression -> 'a expression -> 'b expression
-  (** Function application (operator style) *)
-
-  val np : int expression
-  (** Expression evaluated to the number of cores attributed to the
-      workflow *)
-
-  val dest : string expression
-  (** Expression evaluated to the location where the workflow has to
-      store its result *)
-
-  val dep : _ workflow -> string expression
-  (** Expression evaluated to the location where the workflow has to
-      store its result *)
-
-  val valdep : 'a value workflow -> 'a expression
-  (** [valdep w] is evaluated to the value produced by the value
-      workflow [w] *)
-
-  val deps : _ workflow list -> string list expression
-  (** Expression for list of dependencies *)
-
-  val valdeps : _ value workflow list -> 'a list expression
-  (** Expression for list of dependencies *)
-
-  val int : int -> int expression
-  (** Expression for ints *)
-
-  val string : string -> string expression
-  (** Expression for strings *)
-
-  val const : ('a -> string) -> 'a -> 'a expression
-  (** Expression for constants, given an id function *)
-end
 
 (** Standard definitions *)
 module Std : sig
