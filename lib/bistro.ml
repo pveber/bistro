@@ -270,6 +270,7 @@ module Workflow = struct
     fprintf oc "}\n"
 end
 
+type 'a workflow = 'a Workflow.t
 type any_workflow = Any_workflow : _ Workflow.t -> any_workflow
 
 module Template = struct
@@ -408,6 +409,7 @@ end
 module Std = struct
   type 'a workflow = 'a Workflow.t
   type nonrec ('a, 'b) selector = ('a, 'b) selector
+  type nonrec docker_image = docker_image
 
   class type ['a,'b] file = object
     method format : 'a
