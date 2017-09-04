@@ -2,7 +2,8 @@ open Bistro.Std
 open Defs
 
 class type table = object
-  inherit [ < header : [`yes] ; .. > ] tsv
+  inherit tsv
+  method header : [`yes]
 end
 
 type output =

@@ -74,7 +74,8 @@ val bigwigcompare :
   'a workflow
 
 class type compressed_numpy_array = object
-  inherit [ [`compressed_numpy_array], [`binary] ] file
+  inherit binary_file
+  method format : [`compressed_numpy_array]
 end
 
 val multibamsummary_bins :

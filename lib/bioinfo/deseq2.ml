@@ -4,7 +4,8 @@ open Defs
 open Bistro.EDSL
 
 class type table = object
-  inherit [ < header : [`yes] ; .. > ] tsv
+  inherit tsv
+  method header : [`yes]
 end
 
 type output =

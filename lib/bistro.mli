@@ -23,22 +23,6 @@
     engine like the one provided by [bistro.engine].
  *)
 
-type 'a directory = [`directory of 'a]
-(** Conventional type to represent directory targets *)
-
-(** Conventional type to represent file targets. The object type is to
-    represent properties of the file, like the type of encoding (text
-    or binary) or the format. *)
-class type ['a,'b] file = object
-  method format : 'a
-  method encoding : [< `text | `binary] as 'b
-end
-
-(** Conventional type to represent OCaml values saved with the
-    {!module:Marshal} module. *)
-class type ['a] value = object
-  inherit [ [`value of 'a], [`binary] ] file
-end
 
 (** Helper functions to represent paths as string lists. For absolute
     paths, the first element of the list is ["/"]. *)
@@ -177,9 +161,6 @@ module Workflow : sig
 
 end
 
-type 'a workflow = 'a Workflow.t
-type any_workflow = Any_workflow : _ Workflow.t -> any_workflow
-
 
 (** Represents a text with special symbols *)
 module Template : sig
@@ -245,6 +226,17 @@ module Template : sig
       path. *)
 end
 
+
+type 'a workflow = 'a Workflow.t
+type any_workflow = Any_workflow : _ Workflow.t -> any_workflow
+
+(** Conventional type to represent directory targets *)
+class type ['a] directory = object
+  method kind : [`directory]
+  method contents : 'a
+end
+
+
 (** This module provides combinators to define new workflows that
     execute shell commands. *)
 module EDSL : sig
@@ -256,14 +248,14 @@ module EDSL : sig
     ?mem:int ->
     ?np:int ->
     ?version:int ->
-    command list -> 'a Workflow.t
+    command list -> 'a workflow
   (** Workflow constructor, taking a list of commands in input. Other arguments are:
       - @param descr description of the workflow, used for logging
       - @param mem required memory
       - @param np maximum number of cores (could be given less at execution)
       - @param version version number, used to force the rebuild of a workflow *)
 
-  val input : ?may_change:bool -> string -> 'a Workflow.t
+  val input : ?may_change:bool -> string -> 'a workflow
   (** Constructs a workflow from an existing file on the
       filesystem. The argument [may_change] indicates that the file
       may be modified, which is detected by giving the workflow a
@@ -272,7 +264,7 @@ module EDSL : sig
   val selector : Path.t -> ('a, 'b) selector
   (** Selector constructor *)
 
-  val ( / ) : 'a directory Workflow.t -> ('a, 'b) selector -> 'b Workflow.t
+  val ( / ) : _ #directory workflow -> ('a, 'b) selector -> 'b workflow
   (** Constructs a workflow by selecting a dir or file from a
       directory workflow *)
 
@@ -361,33 +353,86 @@ module Std : sig
   type nonrec ('a, 'b) selector = ('a, 'b) selector
   type nonrec docker_image = docker_image
 
-  class type ['a,'b] file = object
-    method format : 'a
-    method encoding : [< `text | `binary] as 'b
+  (** Conventional type to represent directory targets *)
+  class type ['a] directory = object
+    method kind : [`directory]
+    method contents : 'a
   end
 
-  type 'a directory = [`directory of 'a]
-  type 'a zip = ([`zip of 'a], [`binary]) file
-  type 'a gz = ([`gz of 'a], [`binary]) file constraint 'a = (_,_) #file
-  type 'a bz2 = ([`bz2 of 'a], [`binary]) file constraint 'a = (_,_) #file
-  type 'a tar'gz = ([`tar'gz of 'a],[`binary]) file
-  type pdf = ([`pdf],[`text]) file
-  type html = ([`html], [`text]) file
-  type bash_script = ([`bash_script], [`text]) file
-
-  type png = ([`png],[`binary]) file
-  type svg = ([`png],[`text]) file
-
-  class type ['a] tabular = object ('a)
-    constraint 'a = < header : 'b ; sep : 'c ; comment : 'd ; .. >
-    inherit [[`tabular], [`text]] file
-    method header : 'b
-    method sep : 'c
-    method comment : 'd
+  (** Conventional type to represent file targets. The object type is to
+      represent properties of the file, like the type of encoding (text
+      or binary) or the format. *)
+  class type file = object
+    method kind : [`file]
   end
 
-  class type ['a] tsv = object
-    inherit [ < sep : [`tab] ; comment : [`sharp] ; .. > as 'a ] tabular
+  class type binary_file = object
+    inherit file
+    method encoding : [`binary]
+  end
+
+  (** Conventional type to represent OCaml values saved with the
+      {!module:Marshal} module. *)
+  class type ['a] marshalled_value = object
+    inherit binary_file
+    method format : [`marshalled_value]
+    method content_type : 'a
+  end
+
+  class type ['a] zip = object
+    inherit binary_file
+    method format : [`zip]
+    method content_format : 'a
+  end
+
+  class type ['a] gz = object
+    constraint 'a = #file
+    inherit binary_file
+    method format : [`gz]
+    method content_format : 'a
+  end
+
+  class type ['a] bz2 = object
+    constraint 'a = #file
+    inherit binary_file
+    method format : [`bz2]
+    method content_format : 'a
+  end
+
+  class type ['a] tar = object
+    inherit binary_file
+    method format : [`tar]
+    method content_format : 'a
+  end
+
+  class type text_file = object
+    inherit file
+    method encoding : [`text]
+  end
+
+  class type pdf = object
+    inherit text_file
+    method format : [`pdf]
+  end
+
+  class type html = object
+    inherit text_file
+    method format : [`html]
+  end
+
+  class type png = object
+    inherit binary_file
+    method format : [`png]
+  end
+
+  class type svg = object
+    inherit text_file
+    method format : [`svg]
+  end
+
+  class type tsv = object
+    inherit text_file
+    method colum_separator : [`tab]
   end
 
   module Unix_tools : sig
@@ -396,11 +441,11 @@ module Std : sig
       ?no_check_certificate:bool ->
       ?user:string ->
       ?password:string ->
-      string -> (_,_) #file workflow
+      string -> #file workflow
     val gunzip : 'a gz workflow -> 'a workflow
     val bunzip2 : 'a bz2 workflow -> 'a workflow
     val unzip : 'a zip workflow -> 'a workflow
-    val tar_xfz : 'a tar'gz workflow -> 'a workflow
-    val crlf2lf : (_,[`text]) file workflow -> (_,[`text]) file workflow
+    val tar_xfz : 'a tar gz workflow -> 'a workflow
+    val crlf2lf : (#text_file as 'a) workflow -> 'a workflow
   end
 end

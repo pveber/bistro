@@ -1,24 +1,37 @@
 open Bistro.Std
 open Defs
 
-type twobit = ([`twobit], [`binary]) file
+class type twobit = object
+  method format : [`twobit]
+  inherit binary_file
+end
 
 class type chrom_sizes = object
-  inherit [ < header : [`no] ; .. > ] tsv
+  inherit tsv
+  method header : [`none]
   method f1 : string
   method f2 : int
 end
 
-type bigBed = ([`bigBed], [`binary]) file
+class type bigBed = object
+  method format : [`bigBed]
+  inherit binary_file
+end
 
 class type bedGraph = object
   inherit bed3
   method f4 : float
 end
 
-type wig = ([`wig], [`text]) file
+class type wig = object
+  method format : [`wig]
+  inherit text_file
+end
 
-type bigWig = ([`bigWig], [`binary]) file
+class type bigWig = object
+  method format : [`bigWig]
+  inherit binary_file
+end
 
 type genome = [ `dm3 | `hg18 | `hg19 | `hg38 | `mm8 | `mm9 | `mm10 | `sacCer2 ]
 val string_of_genome : [< genome] -> string

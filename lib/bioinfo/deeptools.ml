@@ -7,7 +7,8 @@ let env = docker_image ~account:"pveber" ~name:"deeptools" ~tag:"2.4.1" ()
 type 'a output = [ `bigWig | `bedGraph ]
 
 class type compressed_numpy_array = object
-  inherit [ [`compressed_numpy_array], [`binary] ] file
+  inherit binary_file
+  method format : [`compressed_numpy_array]
 end
 
 let bigwig = `bigWig

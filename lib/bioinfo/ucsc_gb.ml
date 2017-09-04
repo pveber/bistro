@@ -17,24 +17,37 @@ let string_of_genome = function
 | `sacCer2 -> "sacCer2"
 
 
-type twobit = ([`twobit], [`binary]) file
+class type twobit = object
+  method format : [`twobit]
+  inherit binary_file
+end
 
 class type chrom_sizes = object
-  inherit [ < header : [`no] ; .. > ] tsv
+  inherit tsv
+  method header : [`none]
   method f1 : string
   method f2 : int
 end
 
-type bigBed = ([`bigBed], [`binary]) file
+class type bigBed = object
+  method format : [`bigBed]
+  inherit binary_file
+end
 
 class type bedGraph = object
   inherit bed3
   method f4 : float
 end
 
-type wig = ([`wig], [`text]) file
+class type wig = object
+  method format : [`wig]
+  inherit text_file
+end
 
-type bigWig = ([`bigWig], [`binary]) file
+class type bigWig = object
+  method format : [`bigWig]
+  inherit binary_file
+end
 
 let env = docker_image ~account:"pveber" ~name:"ucsc-kent" ~tag:"330" ()
 

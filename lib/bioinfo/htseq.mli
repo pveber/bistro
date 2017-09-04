@@ -2,7 +2,8 @@ open Bistro.Std
 open Defs
 
 class type count_tsv = object
-  inherit [ < header : [`no] ; .. > ] tsv
+  inherit tsv
+  method header : [`none]
   method f1 : string
   method f2 : int
 end

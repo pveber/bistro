@@ -1,9 +1,13 @@
 open Bistro.Std
 
-type bam = ([`bam],[`binary]) file
+class type bam = object
+  inherit binary_file
+  method format : [`bam]
+end
 
 class type bed3 = object
-  inherit [ < header : [`no] ; .. > ] tsv
+  inherit tsv
+  method header : [`none]
   method f1 : string
   method f2 : int
   method f3 : int
@@ -24,25 +28,49 @@ class type bed6 = object
   method f6 : [ `Plus | `Minus | `Unknown ]
 end
 
-type fasta = ([`fasta],[`text]) file
+class type fasta = object
+  inherit text_file
+  method format : [`fasta]
+end
+
+class type ['a] fastq = object
+  inherit text_file
+  method format : [`fastq]
+  method phred_encoding : 'a
+end
 
 class type gff = object
-  inherit [ < header : [`no] ; .. > ] tsv
+  inherit tsv
+  method header : [`none]
   method f1 : string
   method f2 : string
   method f3 : string
   method f4 : int
   method f5 : int
   method f6 : float
-  method f7 : string
-  method f8 : string
+  method f7 : [`Plus | `Minus]
+  method f8 : [`frame0 | `frame1 | `frame2]
   method f9 : string
 end
 
-type 'a fastq = ([`fastq of 'a], [`text]) file
+class type gff2 = object
+  inherit gff
+  method version : [`v2]
+end
 
-type sam = ([`sam],[`text]) file
-
-type sra = ([`sra], [`binary]) file
+class type gff3 = object
+  inherit gff
+  method version : [`v3]
+end
 
 type indexed_bam = [`indexed_bam] directory
+
+class type sam = object
+  inherit text_file
+  method format : [`sam]
+end
+
+class type sra = object
+  inherit binary_file
+  method format : [`sra]
+end

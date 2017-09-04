@@ -6,7 +6,8 @@ open Defs
 let env = docker_image ~account:"pveber" ~name:"htseq" ~tag:"0.6.1" ()
 
 class type count_tsv = object
-  inherit [ < header : [`no] ; .. > ] tsv
+  inherit tsv
+  method header : [`none]
   method f1 : string
   method f2 : int
 end

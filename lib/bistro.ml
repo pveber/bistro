@@ -74,17 +74,12 @@ type env = <
   dest : string
 >
 
-
-type 'a directory = [`directory of 'a]
-
-class type ['a,'b] file = object
-  method format : 'a
-  method encoding : [< `text | `binary] as 'b
+(** Conventional type to represent directory targets *)
+class type ['a] directory = object
+  method kind : [`directory]
+  method contents : 'a
 end
 
-class type ['a] value = object
-  inherit [ [`value of 'a], [`binary] ] file
-end
 
 module Command = struct
   type 'a t =
@@ -167,7 +162,7 @@ and action =
     }
 
 module U_impl = struct
-  
+
   let id = function
     | Input (id, _)
     | Select (id, _, _)
@@ -411,33 +406,86 @@ module Std = struct
   type nonrec ('a, 'b) selector = ('a, 'b) selector
   type nonrec docker_image = docker_image
 
-  class type ['a,'b] file = object
-    method format : 'a
-    method encoding : [< `text | `binary] as 'b
+  (** Conventional type to represent directory targets *)
+  class type ['a] directory = object
+    method kind : [`directory]
+    method contents : 'a
   end
 
-  type 'a directory = [`directory of 'a]
-  type 'a zip = ([`zip of 'a], [`binary]) file
-  type 'a gz = ([`gz of 'a], [`binary]) file constraint 'a = (_,_) #file
-  type 'a bz2 = ([`bz2 of 'a], [`binary]) file constraint 'a = (_,_) #file
-  type 'a tar'gz = ([`tar'gz of 'a],[`binary]) file
-  type pdf = ([`pdf],[`text]) file
-  type html = ([`html], [`text]) file
-  type bash_script = ([`bash_script], [`text]) file
-
-  type png = ([`png],[`binary]) file
-  type svg = ([`png],[`text]) file
-
-  class type ['a] tabular = object ('a)
-    constraint 'a = < header : 'b ; sep : 'c ; comment : 'd ; .. >
-    inherit [[`tabular], [`text]] file
-    method header : 'b
-    method sep : 'c
-    method comment : 'd
+  (** Conventional type to represent file targets. The object type is to
+      represent properties of the file, like the type of encoding (text
+      or binary) or the format. *)
+  class type file = object
+    method kind : [`file]
   end
 
-  class type ['a] tsv = object
-    inherit [ < sep : [`tab] ; comment : [`sharp] ; .. > as 'a ] tabular
+  class type binary_file = object
+    inherit file
+    method encoding : [`binary]
+  end
+
+  (** Conventional type to represent OCaml values saved with the
+      {!module:Marshal} module. *)
+  class type ['a] marshalled_value = object
+    inherit binary_file
+    method format : [`marshalled_value]
+    method content_type : 'a
+  end
+
+  class type ['a] zip = object
+    inherit binary_file
+    method format : [`zip]
+    method content_format : 'a
+  end
+
+  class type ['a] gz = object
+    constraint 'a = #file
+    inherit binary_file
+    method format : [`gz]
+    method content_format : 'a
+  end
+
+  class type ['a] bz2 = object
+    constraint 'a = #file
+    inherit binary_file
+    method format : [`bz2]
+    method content_format : 'a
+  end
+
+  class type ['a] tar = object
+    inherit binary_file
+    method format : [`tar]
+    method content_format : 'a
+  end
+
+  class type text_file = object
+    inherit file
+    method encoding : [`text]
+  end
+
+  class type pdf = object
+    inherit text_file
+    method format : [`pdf]
+  end
+
+  class type html = object
+    inherit text_file
+    method format : [`html]
+  end
+
+  class type png = object
+    inherit binary_file
+    method format : [`png]
+  end
+
+  class type svg = object
+    inherit text_file
+    method format : [`svg]
+  end
+
+  class type tsv = object
+    inherit text_file
+    method colum_separator : [`tab]
   end
 
   module Unix_tools = struct
