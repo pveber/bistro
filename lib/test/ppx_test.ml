@@ -8,14 +8,15 @@ let%bistro [@np 2] [@mem 1] [@descr "foobar"] [@version 42]
   |> List.filter ~f:(fun l -> not (String.is_prefix ~prefix:"#" l))
   |> Out_channel.write_lines [%dest]
 
-let create_file =
-  let file = string "# comment\nchr1\t42\t100\n" in
+let create_file contents =
+  let file = string contents in
   workflow ~descr:"create_file" [
     cmd "cp" [ file_dump file ; dest ]
   ]
 
 let main () =
-  let bed = comment_filter create_file in
+  let bed = comment_filter (create_file "# comment\nchr1\t42\t100\n") in
+  let bed2 = comment_filter (create_file "# comment\n# comment\nchr10\t42\t100\n") in
   Bistro.(
     match Workflow.u bed with
     | Step { descr ; version ; mem } ->
@@ -26,8 +27,12 @@ let main () =
   ) ;
   Bistro_app.(
     run (
-      pure (fun (Path p) -> print_endline (In_channel.read_all p))
-      $ pureW bed
+      pure (fun xs ->
+          List.iter xs ~f:(fun (Path p) ->
+              print_endline (In_channel.read_all p)
+            )
+        )
+      $ list [ pureW bed ; pureW bed2 ]
     )
   )
 

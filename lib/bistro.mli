@@ -410,6 +410,14 @@ module Std : sig
     method encoding : [`text]
   end
 
+  (** Conventional type to represent OCaml values saved as
+      S-expressions. *)
+  class type ['a] sexp_value = object
+    inherit text_file
+    method format : [`sexp_value]
+    method content_type : 'a
+  end
+
   class type pdf = object
     inherit text_file
     method format : [`pdf]

@@ -195,9 +195,22 @@ module Workflow = struct
     let id = digest ("input", target, hash) in
     Input (id, Path.make_relative target)
 
+  let to_dep = function
+    | Step s -> `Task s.id
+    | Input (_, p) -> `Input p
+    | Select (_, Input (_, p), q) ->
+      `Input (p @ q)
+    | Select (_, Step s, p) ->
+      `Select (s.id, p)
+    | Select (_, Select _, _) -> assert false
+
+
   let digestible_action = function
     | Exec cmd -> `Exec cmd
     | Eval { id } -> `Eval id
+
+  let digestible_deps xs =
+    List.map xs ~f:to_dep
 
   let make
       ?(descr = "")
@@ -206,7 +219,7 @@ module Workflow = struct
       ?version
       action
       deps =
-    let id = digest ("step", version, digestible_action action) in
+    let id = digest ("step", version, digestible_action action, digestible_deps deps) in
     Step { descr ; deps ; action ; np ; mem ; version ; id }
 
   let of_fun ?descr ?mem ?np ?version ~id ~deps f =
@@ -236,15 +249,6 @@ module Workflow = struct
 
 
   let u x = x
-
-  let to_dep = function
-    | Step s -> `Task s.id
-    | Input (_, p) -> `Input p
-    | Select (_, Input (_, p), q) ->
-      `Input (p @ q)
-    | Select (_, Step s, p) ->
-      `Select (s.id, p)
-    | Select (_, Select _, _) -> assert false
 
   let to_dot u oc =
     let nodes = collect [] u in
@@ -461,6 +465,12 @@ module Std = struct
   class type text_file = object
     inherit file
     method encoding : [`text]
+  end
+
+  class type ['a] sexp_value = object
+    inherit text_file
+    method format : [`sexp_value]
+    method content_type : 'a
   end
 
   class type pdf = object
