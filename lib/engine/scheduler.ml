@@ -52,19 +52,19 @@ let rec add_workflow (seen, dag) u =
           let accu = Bistro.(
               match dep with
               | Select (_, dep_dir, _) ->
-                let seen, dag, dep_dir_v = add_workflow accu dep_dir in
-                seen, DAG.add_dep dag u ~on:dep_dir_v
+                let seen, dag = add_workflow accu dep_dir in
+                seen, DAG.add_dep dag u ~on:dep_dir
               | Input _ | Step _ -> accu
             )
           in
-          let seen, dag, dep_v = add_workflow accu dep in
+          let seen, dag = add_workflow accu dep in
           String.Map.add seen id u,
-          DAG.add_dep dag u ~on:dep_v
+          DAG.add_dep dag u ~on:dep
         )
     in
-    seen', dag', u
+    seen', dag'
 
-  | Some u -> seen, dag, u
+  | Some u -> seen, dag
 
 
 let compile workflows =
@@ -77,13 +77,13 @@ let compile workflows =
     |> List.map ~f:Bistro.U.id
     |> String.Set.of_list
   in
-  let _, dag, goals =
-    List.fold workflows ~init:(String.Map.empty, DAG.empty, []) ~f:(fun (seen, dag, goals) u ->
-        let seen, dag, t = add_workflow (seen, dag) u in
-        seen, dag, t :: goals
+  let _, dag =
+    List.fold workflows ~init:(String.Map.empty, DAG.empty) ~f:(fun (seen, dag) u ->
+        let seen, dag = add_workflow (seen, dag) u in
+        seen, dag
     )
   in
-  dag, goals, precious
+  dag, workflows, precious
 
 let run ?logger ?goals alloc config dag =
   DAG.run ?logger ?goals alloc config dag
