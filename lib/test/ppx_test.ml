@@ -2,7 +2,7 @@ open Core
 open Bistro.EDSL
 open Bistro_utils
 
-let%bistro [@version 42] [@mem 1] [@descr "foobar"]
+let%bistro [@np 2] [@mem 1] [@descr "foobar"] [@version 42]
     comment_filter bed =
   In_channel.read_lines [%dep bed]
   |> List.filter ~f:(fun l -> not (String.is_prefix ~prefix:"#" l))

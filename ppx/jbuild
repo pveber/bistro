@@ -2,7 +2,7 @@
  ((name ppx_bistro)
   (public_name bistro.ppx)
   (kind ppx_rewriter)
-  (libraries (ocaml-migrate-parsetree ppx_core))
+  (libraries (ppx_driver))
   (preprocess (pps (ppx_metaquot ppx_driver.runner)))
   ))
 
