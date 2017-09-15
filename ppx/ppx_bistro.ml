@@ -16,7 +16,7 @@ let digest x =
 
 let new_id =
   let c = ref 0 in
-  fun () -> "v" ^ (Int.to_string !c)
+  fun () -> Caml.incr c ; "v" ^ (Int.to_string !c)
 
 module B = struct
   include Ast_builder.Make(struct let loc = Location.none end)
