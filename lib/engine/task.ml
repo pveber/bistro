@@ -299,11 +299,19 @@ module Concrete_task = struct
         | WSTOPPED code -> code
       )
 
+  let rec waitpid pid =
+    try Unix.waitpid pid
+    with Unix.Unix_error (Unix.EINTR, _, _) -> waitpid pid
+
   let perform_eval ~stdout ~stderr f =
     touch stdout >>= fun () ->
     touch stderr >>= fun () ->
+    let (read_from_child, write_to_parent) = Unix.pipe () in
+    let (read_from_parent, write_to_child) = Unix.pipe () in
     match Unix.fork () with
     | `In_the_child ->
+      Unix.close read_from_child ;
+      Unix.close write_to_child ;
       let ecode =
         try f () ; 0
         with e ->
@@ -313,15 +321,22 @@ module Concrete_task = struct
             ) ;
           1
       in
-      exit ecode
+      let oc = Unix.out_channel_of_descr write_to_parent in
+      Marshal.to_channel oc ecode [] ;
+      Caml.flush oc ;
+      Unix.close write_to_parent ;
+      ignore (Caml.input_value (Unix.in_channel_of_descr read_from_parent)) ;
+      assert false
     | `In_the_parent pid ->
-      let k () =
-        match Unix.waitpid pid with
-        | Ok () -> 0
-        | Error (`Exit_non_zero n) -> n
-        | Error (`Signal _) -> (-1)
-      in
-      Lwt_preemptive.detach k ()
+      Unix.close write_to_parent ;
+      Unix.close read_from_parent ;
+      let ic = Lwt_io.of_unix_fd ~mode:Lwt_io.input read_from_child in
+      Lwt_io.read_value ic >>= fun (ecode : int) ->
+      Caml.Unix.kill (Pid.to_int pid) Caml.Sys.sigkill;
+      ignore (waitpid pid) ;
+      Unix.close read_from_child ;
+      Unix.close write_to_child ;
+      Lwt.return ecode
 
   let perform ~stdout ~stderr = function
     | Sh cmd -> perform_command ~stdout ~stderr cmd
