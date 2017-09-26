@@ -33,7 +33,7 @@ class type bigWig = object
   inherit binary_file
 end
 
-type genome = [ `dm3 | `hg18 | `hg19 | `hg38 | `mm8 | `mm9 | `mm10 | `sacCer2 ]
+type genome = [ `dm3 | `droSim1 | `hg18 | `hg19 | `hg38 | `mm8 | `mm9 | `mm10 | `sacCer2 ]
 val string_of_genome : [< genome] -> string
 
 
