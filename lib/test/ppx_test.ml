@@ -8,6 +8,13 @@ let%bistro [@np 2] [@mem 1] [@descr "foobar"] [@version 42]
   |> List.filter ~f:(fun l -> not (String.is_prefix ~prefix:"#" l))
   |> Out_channel.write_lines [%dest]
 
+let%bistro cat files =
+  List.map [%deps files] ~f:(fun file ->
+      In_channel.read_all file
+    )
+  |> String.concat ~sep:"\n"
+  |> fun data -> Out_channel.write_all [%dest] ~data
+
 let create_file contents =
   let file = string contents in
   workflow ~descr:"create_file" [
