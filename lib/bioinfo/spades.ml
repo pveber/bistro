@@ -2,6 +2,8 @@ open Core_kernel.Std
 open Bistro.Std
 open Bistro.EDSL
 
+let env = docker_image ~account:"pveber" ~name:"spades" ~tag:"3.9.1" ()
+
 let pe_args (ones, twos) =
   let opt side i x =
     opt (sprintf "--pe%d-%d" (i + 1) side) dep x
@@ -22,7 +24,7 @@ let spades
   =
   workflow ~np:threads ~mem:(memory * 1024) ~descr:"spades" [
     mkdir_p dest ;
-    cmd "spades.py" [
+    cmd "spades.py" ~env [
       option (flag string "--sc") single_cell ;
       option (flag string "--iontorrent") iontorrent ;
       opt "--threads" ident np ;
