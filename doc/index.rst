@@ -10,11 +10,3 @@ Welcome to bistro's documentation!
    :maxdepth: 3
 
    getting-started
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`

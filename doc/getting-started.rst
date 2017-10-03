@@ -14,7 +14,7 @@ manager. You can install ``opam`` following these `instructions
 <https://opam.ocaml.org/doc/Install.html>`__. Typically, under
 Debian/Ubuntu just
 
-.. code:: bash
+.. code-block:: bash
 
    $ apt update && apt install opam
 
@@ -23,7 +23,7 @@ Debian/Ubuntu just
 
 .. code:: sh
    
-   $ opam init --comp=4.04.2
+   $ opam init --comp=4.05.0
 
 Take good care to follow the instructions given by ``opam`` after this
 command ends. Now you're ready to install `bistro`, and ``utop`` which
@@ -50,27 +50,29 @@ A simple example
 Using your favorite editor, create a file named ``pipeline.ml`` and
 paste the following program:
 
-.. code:: ocaml
+.. code-block:: ocaml
 
    #require "bistro.bioinfo bistro.utils"
 
-   open Bistro.Std
+   open Bistro.EDSL
    open Bistro_bioinfo.Std
+   open Bistro_utils
 
-   let sample = Sra.fetch_srr "SRR217304"                         (* Fetch a sample from the SRA database *)
-   let sample_fq = Sra_toolkit.fastq_dump sample                  (* Convert it to FASTQ format *)
-   let genome = Ucsc_gb.genome_sequence `sacCer2                  (* Fetch a reference genome *)
-   let bowtie2_index = Bowtie2.bowtie2_build genome               (* Build a Bowtie2 index from it *)
-   let sample_sam =                                               (* Map the reads on the reference genome *)
+   let sample = Sra.fetch_srr "SRR217304"           (* Fetch a sample from the SRA database *)
+   let sample_fq = Sra_toolkit.fastq_dump sample    (* Convert it to FASTQ format *)
+   let genome = Ucsc_gb.genome_sequence `sacCer2    (* Fetch a reference genome *)
+   let bowtie2_index = Bowtie2.bowtie2_build genome (* Build a Bowtie2 index from it *)
+   let sample_sam =                                 (* Map the reads on the reference genome *)
      Bowtie2.bowtie2 bowtie2_index (`single_end [ sample_fq ])
-   let sample_peaks = Macs2.callpeak sam [ sample_sam ]           (* Call peaks on mapped reads *)
+   let sample_peaks =                               (* Call peaks on mapped reads *)
+     Macs2.(callpeak sam [ sample_sam ])
 
    let repo = Bistro_repo.[
      [ "peaks" ] %> sample_peaks
    ]
 
    (** Actually run the pipeline *)
-   let () = Bistro_repo.build ~outdir:"res" ~np:2 ~mem:(4 * 1024) repo
+   let () = Bistro_repo.build ~outdir:"res" ~np:2 ~mem:(`GB 4) repo
 
 Running a pipeline
 ==================
@@ -81,7 +83,7 @@ a single system is particularly time-consuming and might become
 extremely tricky (e.g. to have several versions of the same tool, or
 tools that have incompatible dependencies on very basic pieces of the
 system, like the C compiler). To avoid this problem, ``bistro`` uses
-`Docker <https://www.docker.com/>` to run each tool of the workflow in
+`Docker <https://www.docker.com/>`__ to run each tool of the workflow in
 an isolated environment (a Docker container) containing a proper
 installation of the tool. In practice, you don't have to install
 anything: for each step of a workflow ``bistro`` will invoke
@@ -91,9 +93,9 @@ practice to deploy a pipeline on a new machine.
 
 To get there you have to install ``docker`` on your machine and add
 your user in the ``docker`` group. Follow instructions on `this page
-<https://docs.docker.com/engine/installation/#supported-platforms>` to
-do so. Note that ``bistro`` can be used without ``docker``, but in
-that case, you must make each command used in the pipeline available
+<https://docs.docker.com/engine/installation/#supported-platforms>`__
+to do so. Note that ``bistro`` can be used without ``docker``, but in
+that case, you must make each program used in the pipeline available
 on your system.
 
 Assuming ``docker`` is installed on your machine, you can simply run
@@ -105,3 +107,6 @@ your pipeline by:
 
 At the end you should obtain a ``res`` directory where you will find
 the output files of the pipeline.
+
+In the remainder of this section we'll look at the code in more
+details, but first we'll need to learn a bit of the OCaml language.
