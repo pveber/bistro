@@ -63,16 +63,14 @@ paste the following program:
    let bowtie2_index = Bowtie2.bowtie2_build genome               (* Build a Bowtie2 index from it *)
    let sample_sam =                                               (* Map the reads on the reference genome *)
      Bowtie2.bowtie2 bowtie2_index (`single_end [ sample_fq ])
-   let sample_bam =                                               (* Convert SAM file to BAM format *)
-     Samtools.(indexed_bam_of_sam sample_sam / indexed_bam_to_bam)
-   let sample_peaks = Macs2.callpeak sample_bam                   (* Call peaks on mapped reads *)
+   let sample_peaks = Macs2.callpeak sam [ sample_sam ]           (* Call peaks on mapped reads *)
 
    let repo = Bistro_repo.[
      [ "peaks" ] %> sample_peaks
    ]
 
    (** Actually run the pipeline *)
-   let () = Bistro_repo.build ~outdir:"res" repo
+   let () = Bistro_repo.build ~outdir:"res" ~np:2 ~mem:(4 * 1024) repo
 
 Running a pipeline
 ==================
