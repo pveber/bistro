@@ -158,7 +158,7 @@ let has_error traces =
     )
 
 let create
-    ?(np = 1) ?(mem = 1024) ?logger ?(keep_all = true)
+    ?(np = 1) ?mem:(`GB mem = `GB 1) ?logger ?(keep_all = true)
     ?(bistro_dir = "_bistro")
     app
   =

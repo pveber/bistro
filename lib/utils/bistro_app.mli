@@ -21,7 +21,7 @@ val assoc : ('a * 'b t) list -> ('a * 'b) list t
 
 val create :
   ?np:int ->
-  ?mem:int ->
+  ?mem:[`GB of int] ->
   ?logger:Scheduler.logger ->
   ?keep_all:bool ->
   ?bistro_dir:string ->
@@ -29,7 +29,7 @@ val create :
 
 val run :
   ?np:int ->
-  ?mem:int ->
+  ?mem:[`GB of int] ->
   ?logger:Scheduler.logger ->
   ?keep_all:bool ->
   ?bistro_dir:string ->

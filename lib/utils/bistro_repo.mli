@@ -15,7 +15,7 @@ val to_app :
 
 val build  :
   ?np:int ->
-  ?mem:int ->
+  ?mem:[`GB of int] ->
   ?logger:Scheduler.logger ->
   ?keep_all:bool ->
   ?precious:Bistro.any_workflow list ->
