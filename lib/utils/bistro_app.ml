@@ -163,7 +163,7 @@ let create
     app
   =
   let open Lwt in
-  let allocator = Allocator.create ~np ~mem in
+  let allocator = Allocator.create ~np ~mem:(mem * 1024) in
   let workflows = to_workflow_list app in
   let dag, goals, precious = Scheduler.compile workflows in
   let config = Task.config ~db_path:bistro_dir ~use_docker:true ~keep_all ~precious in
