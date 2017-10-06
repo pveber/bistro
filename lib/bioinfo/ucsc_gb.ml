@@ -17,6 +17,17 @@ let string_of_genome = function
 | `mm10 -> "mm10"
 | `sacCer2 -> "sacCer2"
 
+let genome_of_string = function
+| "dm3" -> Some `dm3
+| "droSim1" -> Some `droSim1
+| "hg18" -> Some `hg18
+| "hg19" -> Some `hg19
+| "hg38" -> Some `hg38
+| "mm8" -> Some `mm8
+| "mm9" -> Some `mm9
+| "mm10" -> Some `mm10
+| "sacCer2" -> Some `sacCer2
+| _ -> None
 
 class type twobit = object
   method format : [`twobit]

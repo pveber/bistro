@@ -35,7 +35,7 @@ end
 
 type genome = [ `dm3 | `droSim1 | `hg18 | `hg19 | `hg38 | `mm8 | `mm9 | `mm10 | `sacCer2 ]
 val string_of_genome : [< genome] -> string
-
+val genome_of_string : string -> genome option
 
 (** {5 Dealing with genome sequences} *)
 val chromosome_sequence :
