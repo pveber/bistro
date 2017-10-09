@@ -21,7 +21,17 @@ let create_file contents =
     cmd "cp" [ file_dump file ; dest ]
   ]
 
+let%bistro test_id =
+  let a = 1 in
+  ignore a
+
+let%bistro test_id' =
+  let a = 1 in
+  ignore a
+
+
 let main () =
+  assert Bistro.Workflow.(id test_id = id test_id') ;
   let bed = comment_filter (create_file "# comment\nchr1\t42\t100\n") in
   let bed2 = comment_filter (create_file "# comment\n# comment\nchr10\t42\t100\n") in
   Bistro.(
