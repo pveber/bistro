@@ -14,6 +14,10 @@ let rec replace_body new_body = function
 let digest x =
   Caml.Digest.to_hex (Caml.Digest.string (Caml.Marshal.to_string x []))
 
+let string_of_expression e =
+  let buf = Buffer.create 251 in
+  Pprintast.expression (Caml.Format.formatter_of_buffer buf) e
+
 let new_id =
   let c = ref 0 in
   fun () -> Caml.incr c ; "v" ^ (Int.to_string !c)
@@ -88,7 +92,7 @@ let rewriter ~loc ~path descr version mem np var expr =
   let body = extract_body expr in
   let rewriter = new payload_rewriter in
   let code, deps = rewriter#expression body [] in
-  let id = digest code in
+  let id = digest (string_of_expression code) in
   let add_bindings body = List.fold deps ~init:body ~f:(fun acc (tmpvar, payload) ->
       match payload with
       | Dep expr ->
