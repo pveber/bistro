@@ -16,7 +16,8 @@ let digest x =
 
 let string_of_expression e =
   let buf = Buffer.create 251 in
-  Pprintast.expression (Caml.Format.formatter_of_buffer buf) e
+  Pprintast.expression (Caml.Format.formatter_of_buffer buf) e ;
+  Buffer.contents buf
 
 let new_id =
   let c = ref 0 in
