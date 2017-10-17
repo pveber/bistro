@@ -30,7 +30,7 @@ let string_of_species = function
 let ucsc_chr_names_gtf gff =
   workflow ~descr:"ensembl.ucsc_chr_names_gtf" [
     pipe [
-      cmd "gawk" [
+      cmd "awk" [
         string "'{print \"chr\" $0}'" ;
         dep gff
       ] ;
