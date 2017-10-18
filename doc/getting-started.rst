@@ -26,7 +26,21 @@ Debian/Ubuntu just
    $ opam init --comp=4.05.0
 
 Take good care to follow the instructions given by ``opam`` after this
-command ends. Now you're ready to install `bistro`, and ``utop`` which
+command ends. Typically you will need to add this line:
+
+.. code:: sh
+   
+   $ . /home/pveber/.opam/opam-init/init.sh > /dev/null 2> /dev/null || true
+
+to your ``.bashrc`` and execute
+
+.. code:: sh
+   
+   $ eval `opam config env`
+
+for OPAM to be configured in your current console.
+
+Now you're ready to install `bistro`, and ``utop`` which
 is a nice interactive interpreter for OCaml:
 
 .. code:: sh
@@ -94,9 +108,10 @@ practice to deploy a pipeline on a new machine.
 To get there you have to install ``docker`` on your machine and add
 your user in the ``docker`` group. Follow instructions on `this page
 <https://docs.docker.com/engine/installation/#supported-platforms>`__
-to do so. Note that ``bistro`` can be used without ``docker``, but in
-that case, you must make each program used in the pipeline available
-on your system.
+to do so. Summarized instructions are also available `there
+<installing-docker.html>`_. Note that ``bistro`` can be used without
+``docker``, but in that case, you must make each program used in the
+pipeline available on your system.
 
 Assuming ``docker`` is installed on your machine, you can simply run
 your pipeline by:
