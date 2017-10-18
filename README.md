@@ -35,7 +35,7 @@ opam install bistro
 to install the library, or:
 
 ```
-opam pin add -y install --dev-repo
+opam pin add -y bistro --dev-repo
 ```
 to get the current development version.
 
