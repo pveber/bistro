@@ -26,17 +26,18 @@ Questions, suggestions or contributions are welcome, please file an
 
 ## Installation
 
-I recommend installing `bistro` using
-[opam](http://opam.ocaml.org/) (see
-[installation instructions](http://opam.ocaml.org/doc/Install.html)). You
-need a recent (at least 4.03.0) installation of OCaml. Once this is
-done, simply type
+Detailed instructions are available in the [manual](bistro.readthedocs.io/en/latest/getting-started.html). In a nutshell, `bistro` can be installed using [opam](http://opam.ocaml.org/). You need a recent (at least 4.03.0) installation of OCaml. Once this is done, simply type
 
 ```
 opam install bistro
 ```
 
-to install the library.
+to install the library, or:
+
+```
+opam pin add -y install --dev-repo
+```
+to get the current development version.
 
 ## Usage
 
