@@ -26,7 +26,7 @@ Questions, suggestions or contributions are welcome, please file an
 
 ## Installation
 
-Detailed instructions are available in the [manual](bistro.readthedocs.io/en/latest/getting-started.html). In a nutshell, `bistro` can be installed using [opam](http://opam.ocaml.org/). You need a recent (at least 4.03.0) installation of OCaml. Once this is done, simply type
+Detailed instructions are available in the [manual](http://bistro.readthedocs.io/en/latest/getting-started.html). In a nutshell, `bistro` can be installed using [opam](http://opam.ocaml.org/). You need a recent (at least 4.03.0) installation of OCaml. Once this is done, simply type
 
 ```
 opam install bistro
