@@ -81,22 +81,23 @@ val bedToBigBed_failsafe :
 (* val wg_encode_crg_mappability_100 : [`mm9 | `hg18 | `hg19] -> bigWig file *)
 
 
-(* module Lift_over : sig *)
-(*   open Fungen *)
+module Lift_over : sig
+  class type chain_file = object
+    inherit file
+    method format : [`lift_over_chain_file]
+  end
+  val chain_file :
+    org_from:[< genome] ->
+    org_to:[< genome] ->
+    chain_file workflow
 
-(*   type chain_file = [`lift_over_chain] file *)
-(*   val chain_file : org_from:[< genome] -> org_to:[< genome] -> chain_file *)
+  val bed :
+    org_from:[< genome] ->
+    org_to:[< genome] ->
+    (* chain_file workflow -> *)
+    (#bed3 as 'a) workflow ->
+    [`ucsc_lift_over of 'a] directory workflow
 
-(*   (\** [conversion fp xs] returns a pair of location lists, mapped and *)
-(*       unmapped locations. *\) *)
-(*   val conversion : *)
-(*     [`lift_over_chain] file_path -> *)
-(*     Location.t Stream.t -> *)
-(*     Location.t list * Location.t list *)
-
-(*   (\** liftOver preserves {b more or less} the input BED: columns are *)
-(*       conserved but fields may be changed (floats truncated to integers) *\) *)
-(*   val bed_conversion : org_from:[< genome] -> org_to:[< genome] -> 'a Bed.file -> [`ucsc_lift_over of 'a] dir *)
-(*   val mapped : [`ucsc_lift_over of 'a] dir -> 'a Bed.file *)
-(*   val unmapped : [`ucsc_lift_over of 'a] dir -> 'a Bed.file *)
-(* end *)
+  val mapped : ([`ucsc_lift_over of 'a], 'a) selector
+  val unmapped : ([`ucsc_lift_over of 'a], 'a) selector
+end

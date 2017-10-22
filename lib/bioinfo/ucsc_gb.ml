@@ -180,14 +180,6 @@ let bedClip org bed =
   ]
 
 
-(* (\* let bedClip org bed = *\) *)
-(* (\*   let chrom_info = chrom_info org in *\) *)
-(* (\*   f2 *\) *)
-(* (\*     "guizmin.bioinfo.ucsc.bedClip[r1]" [] *\) *)
-(* (\*     chrom_info bed *\) *)
-(* (\*     (fun env (File chrom_info) (File bed) path -> *\) *)
-(* (\*        env.sh "bedClip -verbose=2 %s %s %s" bed chrom_info path) *\) *)
-
 
 
 (** {5 Conversion between annotation file formats} *)
@@ -274,72 +266,34 @@ let bedToBigBed_failsafe org =
   | `bed5 bed -> f bed
 
 
-(* (\* module Lift_over = struct *\) *)
-(* (\*   open Printf *\) *)
-(* (\*   open Core_kernel.Std *\) *)
-(* (\*   open CFStream *\) *)
-(* (\*   open Stream.Infix *\) *)
-(* (\*   open Fungen *\) *)
+module Lift_over = struct
+  class type chain_file = object
+    inherit file
+    method format : [`lift_over_chain_file]
+  end
 
-(* (\*   type chain_file = [`lift_over_chain] file *\) *)
+  let chain_file ~org_from ~org_to =
+    let org_from = string_of_genome org_from
+    and org_to = string_of_genome org_to in
+    let url =
+      sprintf
+        "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/liftOver/%sTo%s.over.chain.gz"
+        org_from org_from (String.capitalize org_to)
+    in
+    Unix_tools.(gunzip (wget url))
 
-(* (\*   let chain_file ~org_from ~org_to = *\) *)
-(* (\*     let org_from = string_of_genome org_from *\) *)
-(* (\*     and org_to = string_of_genome org_to in *\) *)
-(* (\*     let url = *\) *)
-(* (\*       sprintf *\) *)
-(* (\*         "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/liftOver/%sTo%s.over.chain.gz" *\) *)
-(* (\*         org_from org_from (String.capitalize org_to) *\) *)
-(* (\*     in *\) *)
-(* (\*     Guizmin_unix.(gunzip (wget url)) *\) *)
+  let bed ~org_from ~org_to bed =
+    let chain_file = chain_file ~org_from ~org_to in
+    workflow ~descr:"ucsc.liftOver" [
+      mkdir_p dest ;
+      cmd "liftOver" ~env [
+        dep bed ;
+        dep chain_file ;
+        dest // "mapped.bed" ;
+        dest // "unmapped.bed" ;
+      ] ;
+    ]
 
-(* (\*   let create_input_file xs = *\) *)
-(* (\*     let fn = Filename.temp_file "gzm" ".locations" in *\) *)
-(* (\*     xs /@ Location.to_string *\) *)
-(* (\*     |! lines_to_file fn ; *\) *)
-(* (\*     fn *\) *)
-
-(* (\*   let liftOver_cmd ~output ~chain_file ~old_locs ~new_locs ~unmapped_locs = *\) *)
-(* (\*     let string_of_output = function *\) *)
-(* (\*     | `bed -> "" *\) *)
-(* (\*     | `position -> "-positions" *\) *)
-(* (\*     in *\) *)
-(* (\*     sprintf *\) *)
-(* (\*       "liftOver %s %s %s %s %s" *\) *)
-(* (\*       (string_of_output output) *\) *)
-(* (\*       old_locs chain_file new_locs unmapped_locs *\) *)
-
-(* (\*   let conversion (File chain_file) xs = *\) *)
-(* (\*     let old_locs_fn = create_input_file xs in *\) *)
-(* (\*     let new_locs_fn = Filename.temp_file "gzm" ".locations" *\) *)
-(* (\*     and unmapped_locs_fn = (\\* unmapped locations *\\) *\) *)
-(* (\*       Filename.temp_file "gzm" ".locations" in *\) *)
-(* (\*     let cmd = liftOver_cmd ~output:`position ~chain_file ~old_locs:old_locs_fn ~new_locs:new_locs_fn ~unmapped_locs:unmapped_locs_fn in *\) *)
-(* (\*     sh "%s 2> /dev/null" cmd ; *\) *)
-(* (\*     let new_locs = *\) *)
-(* (\*       List.map (lines_of_file new_locs_fn) ~f:Location.of_string *\) *)
-(* (\*     and unmp_locs = *\) *)
-(* (\*       List.map (lines_of_file unmapped_locs_fn) ~f:Location.of_string *\) *)
-(* (\*     in *\) *)
-(* (\*     sh "rm -f %s %s %s liftOver_*" old_locs_fn new_locs_fn unmapped_locs_fn ; *\) *)
-(* (\*     new_locs, unmp_locs *\) *)
-
-(* (\*   let bed_conversion ~org_from ~org_to bed = *\) *)
-(* (\*     let chain_file = chain_file ~org_from ~org_to in *\) *)
-(* (\*     d2 *\) *)
-(* (\*       "guizmin.bioinfo.ucsc.bed_conversion[r2]" [] *\) *)
-(* (\*       chain_file bed *\) *)
-(* (\*       (fun env (File chain_file) (File bed) path -> *\) *)
-(* (\*         env.sh "mkdir -p %s" path ; *\) *)
-(* (\*         env.sh "%s" ( *\) *)
-(* (\*           liftOver_cmd *\) *)
-(* (\*             ~output:`bed *\) *)
-(* (\*             ~chain_file *\) *)
-(* (\*             ~old_locs:bed *\) *)
-(* (\*             ~new_locs:(path ^ "/mapped.bed") *\) *)
-(* (\*             ~unmapped_locs:(path ^ "/unmapped.bed") *\) *)
-(* (\*         )) *\) *)
-
-(* (\*   let mapped x = select x "mapped.bed" *\) *)
-(* (\*   let unmapped x = select x "unmapped.bed" *\) *)
-(* (\* end *\) *)
+  let mapped = selector ["mapped.bed"]
+  let unmapped = selector ["unmapped.bed"]
+end
