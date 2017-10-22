@@ -65,7 +65,7 @@ let normalizeto1x_expr nbr =
   compute "" lgth nbr_s
 
 
-let bam_gen_cmd ?outfileformat ?scalefactor ?blacklistfilename ?normalizeto1x
+let bam_gen_cmd ?outfileformat ?scalefactor ?blacklist ?normalizeto1x
     ?centerreads ?normalizeusingrpkm ?ignorefornormalization ?skipnoncoveredregions
     ?smoothlength ?extendreads ?ignoreduplicates ?minmappingquality
     ?samflaginclude ?samflagexclude ?minfragmentlength ?maxfragmentlength
@@ -74,7 +74,7 @@ let bam_gen_cmd ?outfileformat ?scalefactor ?blacklistfilename ?normalizeto1x
     List.append [
       option (opt "--outFileFormat" file_format_expr) outfileformat ;
       option (opt "--scaleFactor" float) scalefactor ;
-      option (opt "--blackListFileName" string) blacklistfilename ;
+      option (opt "--blackListFileName" dep) blacklist ;
       option (opt "--normalizeTo1x" normalizeto1x_expr) normalizeto1x ;
       option (flag string "--normalizeUsingRPKM") normalizeusingrpkm ;
       option (opt "--ignoreForNormalization" (list string ~sep:" ")) ignorefornormalization ;
@@ -94,13 +94,17 @@ let bam_gen_cmd ?outfileformat ?scalefactor ?blacklistfilename ?normalizeto1x
 
 let ( /// ) x (Bistro.Selector s) = x // Bistro.Path.to_string s
 
-let bamcoverage ?scalefactor ?filterrnastrand ?binsize ?blacklistfilename
+let bamcoverage ?scalefactor ?filterrnastrand ?binsize ?blacklist
     ?(threads = 1) ?normalizeto1x ?normalizeusingrpkm ?ignorefornormalization
     ?skipnoncoveredregions ?smoothlength ?extendreads ?ignoreduplicates
     ?minmappingquality ?centerreads ?samflaginclude ?samflagexclude
     ?minfragmentlength ?maxfragmentlength outfileformat indexed_bam =
   workflow ~descr:"bamcoverage" ~np:threads ~mem:(3 * 1024) [
-    bam_gen_cmd "bamCoverage" [
+    bam_gen_cmd "bamCoverage" ?scalefactor ?blacklist
+    ?normalizeto1x ?normalizeusingrpkm ?ignorefornormalization
+    ?skipnoncoveredregions ?smoothlength ?extendreads ?ignoreduplicates
+    ?minmappingquality ?centerreads ?samflaginclude ?samflagexclude
+    ?minfragmentlength ?maxfragmentlength [
       option (opt "--filterRNAstrand" filterRNAstrand_expr) filterrnastrand ;
       option (opt "--binSize" int) binsize ;
       opt "--numberOfProcessors" ident np ;
@@ -111,13 +115,18 @@ let bamcoverage ?scalefactor ?filterrnastrand ?binsize ?blacklistfilename
   ]
 
 let bamcompare ?scalefactormethod ?samplelength ?numberofsamples
-    ?scalefactor ?ratio ?pseudocount ?binsize ?region ?blacklistfilename ?(threads = 1)
+    ?scalefactor ?ratio ?pseudocount ?binsize ?region ?blacklist ?(threads = 1)
     ?normalizeto1x ?normalizeusingrpkm ?ignorefornormalization ?skipnoncoveredregions
     ?smoothlength ?extendreads ?ignoreduplicates ?minmappingquality
     ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
     ?maxfragmentlength outfileformat indexed_bam1 indexed_bam2 =
   workflow ~descr:"bamcompare" ~np:threads ~mem:(3 * 1024) [
-    bam_gen_cmd "bamCompare" [
+    bam_gen_cmd "bamCompare"
+      ?scalefactor ?blacklist
+      ?normalizeto1x ?normalizeusingrpkm ?ignorefornormalization ?skipnoncoveredregions
+      ?smoothlength ?extendreads ?ignoreduplicates ?minmappingquality
+      ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
+      ?maxfragmentlength [
       option (opt "--scaleFactorMethod" scalefactormethod_expr) scalefactormethod ;
       option (opt "--sampleLength" int) samplelength ;
       option (opt "--numberOfSamples" int) numberofsamples ;
@@ -135,16 +144,16 @@ let bamcompare ?scalefactormethod ?samplelength ?numberofsamples
 
 
 let bigwigcompare ?scalefactor ?ratio ?pseudocount ?binsize
-    ?region ?blacklistfilename ?(threads = 1)
+    ?region ?blacklist ?(threads = 1)
     outfileformat bigwig1 bigwig2 =
   workflow ~descr:"bigwigcompare" ~np:threads ~mem:(3 * 1024) [
     cmd "bigwigCompare" ~env [
-      option (opt "--scaleFactor" string) scalefactor ;
+      option (opt "--scaleFactor" float) scalefactor ;
       option (opt "--ratio" ratio_expr) ratio ;
       option (opt "--pseudocount" int) pseudocount ;
       option (opt "--binSize" int) binsize ;
       option (opt "--region" string) region ;
-      option (opt "--blackListFileName" dep) blacklistfilename ;
+      option (opt "--blackListFileName" dep) blacklist ;
       opt "--numberOfProcessors" ident np ;
       opt "--bigwig1" dep bigwig1 ;
       opt "--bigwig2" dep bigwig2 ;
@@ -156,7 +165,7 @@ let bigwigcompare ?scalefactor ?ratio ?pseudocount ?binsize
 
 let multibamsum_gen_cmd ?(threads = 1) ?outrawcounts ?extendreads ?ignoreduplicates
     ?minmappingquality ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
-    ?maxfragmentlength ?blacklistfilename ?region cmd_name other_args =
+    ?maxfragmentlength ?blacklist ?region cmd_name other_args =
   cmd cmd_name ~env (
     List.append [
       option (opt "--region" string) region ;
@@ -169,18 +178,22 @@ let multibamsum_gen_cmd ?(threads = 1) ?outrawcounts ?extendreads ?ignoreduplica
       option (opt "--samFlagExclude" int) samflagexclude ;
       option (opt "--minFragmentLength" int) minfragmentlength ;
       option (opt "--maxfragmentLength" int) maxfragmentlength ;
-      option (opt "--blackListFileName" dep) blacklistfilename ;
+      option (opt "--blackListFileName" dep) blacklist ;
     ]
       other_args
   )
 
 
-let multibamsummary_bins ?binsize ?distancebetweenbins ?region ?blacklistfilename
+let multibamsummary_bins ?binsize ?distancebetweenbins ?region ?blacklist
     ?(threads = 1) ?outrawcounts ?extendreads ?ignoreduplicates ?minmappingquality
     ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
     ?maxfragmentlength indexed_bams =
   workflow ~descr:"multibamsummary_bins" ~np:threads ~mem:(3 * 1024) [
-    multibamsum_gen_cmd "multiBamSummary bins" [
+    multibamsum_gen_cmd "multiBamSummary bins"
+      ?region ?blacklist
+      ?outrawcounts ?extendreads ?ignoreduplicates ?minmappingquality
+      ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
+      ?maxfragmentlength [
       option (opt "--binSize" int) binsize ;
       option (opt "--distanceBetweenBins" int) distancebetweenbins ;
       opt "--numberOfProcessors" ident np ;
@@ -190,20 +203,27 @@ let multibamsummary_bins ?binsize ?distancebetweenbins ?region ?blacklistfilenam
   ]
 
 
-let multibamsummary_bed ?region ?blacklistfilename ?(threads = 1)
+let multibamsummary_bed ?region ?blacklist ?(threads = 1)
     ?outrawcounts ?extendreads ?ignoreduplicates ?minmappingquality
     ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
     ?maxfragmentlength ?metagene ?transcriptid ?exonid ?transcriptiddesignator bed
     indexed_bams =
   workflow ~descr:"multibamsummary_bed" ~np:threads ~mem:(3 * 1024) [
-    multibamsum_gen_cmd "multiBamSummary BED-file" [
+    multibamsum_gen_cmd "multiBamSummary BED-file"
+      ?region ?blacklist
+      ?outrawcounts ?extendreads ?ignoreduplicates ?minmappingquality
+      ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
+      ?maxfragmentlength [
       option (flag string "--metagene") metagene ;
       option (flag string "--transcriptID") transcriptid ;
       option (flag string "--exonID") exonid ;
       option (flag string "--transcript_id_designator") transcriptiddesignator ;
       opt "--numberOfProcessors" ident np ;
-      string "--BED" ; (dep bed) ;
-      opt "--bamfiles" (list (fun bam -> dep bam /// Samtools.indexed_bam_to_bam) ~sep:" ") indexed_bams ;
+      string "--BED" ;
+      (dep bed) ;
+      opt "--bamfiles"
+        (list (fun bam -> dep bam /// Samtools.indexed_bam_to_bam) ~sep:" ")
+        indexed_bams ;
       opt "--outFileName" ident dest ;
     ]
   ]

@@ -14,7 +14,7 @@ val bamcoverage :
   ?scalefactor:float ->
   ?filterrnastrand: [ `forward | `reverse ] ->
   ?binsize:int ->
-  ?blacklistfilename: [ `bed | `gtf ] workflow ->
+  ?blacklist:#bed3 workflow ->
   ?threads:int ->
   ?normalizeto1x:int ->
   ?normalizeusingrpkm:bool ->
@@ -38,12 +38,12 @@ val bamcompare :
   ?scalefactormethod : [ `readcount | `ses ] ->
   ?samplelength:int ->
   ?numberofsamples:int ->
-  ?scalefactor:string ->
+  ?scalefactor:float ->
   ?ratio: [ `log2 | `ratio | `subtract | `add | `mean | `reciprocal_ratio | `first | `second ] ->
   ?pseudocount:int ->
   ?binsize:int ->
   ?region:string ->
-  ?blacklistfilename: [ `bed | `gtf ] workflow ->
+  ?blacklist:#bed3 workflow ->
   ?threads:int ->
   ?normalizeto1x:int ->
   ?normalizeusingrpkm:bool ->
@@ -65,12 +65,12 @@ val bamcompare :
 
 
 val bigwigcompare :
-  ?scalefactor:string ->
+  ?scalefactor:float ->
   ?ratio: [ `log2 | `ratio | `subtract | `add | `mean | `reciprocal_ratio | `first | `second ] ->
   ?pseudocount:int ->
   ?binsize:int ->
   ?region:string ->
-  ?blacklistfilename: [ `bed | `gtf ] workflow ->
+  ?blacklist:#bed3 workflow ->
   ?threads:int ->
   'a signal_format ->
   Ucsc_gb.bigWig workflow ->
@@ -86,7 +86,7 @@ val multibamsummary_bins :
   ?binsize:int ->
   ?distancebetweenbins:int ->
   ?region:string ->
-  ?blacklistfilename: [ `bed | `gtf ] workflow ->
+  ?blacklist:#bed3 workflow ->
   ?threads:int ->
   ?outrawcounts:bool ->
   ?extendreads:int ->
@@ -103,7 +103,7 @@ val multibamsummary_bins :
 
 val multibamsummary_bed :
   ?region:string ->
-  ?blacklistfilename: [ `bed | `gtf ] workflow ->
+  ?blacklist:#bed3 workflow ->
   ?threads:int ->
   ?outrawcounts:bool ->
   ?extendreads:int ->
