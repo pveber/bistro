@@ -122,7 +122,7 @@ end
     target to some ['b workflow] target. This is useful to construct
     new workflows by selecting a file or a subdirectory in the result
     of a directory workflow. *)
-type (-'a, +'b) selector = private Selector of Path.t
+type (+'a, +'b) selector = private Selector of Path.t
 
 (** The type representing a set of actions (shell scripts or
     evaluations of OCaml expressions) to build a target of type
