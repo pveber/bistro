@@ -99,7 +99,7 @@ let bamcoverage ?scalefactor ?filterrnastrand ?binsize ?blacklist
     ?skipnoncoveredregions ?smoothlength ?extendreads ?ignoreduplicates
     ?minmappingquality ?centerreads ?samflaginclude ?samflagexclude
     ?minfragmentlength ?maxfragmentlength outfileformat indexed_bam =
-  workflow ~descr:"bamcoverage" ~np:threads ~mem:(3 * 1024) [
+  workflow ~descr:"bamcoverage" ~np:threads [
     bam_gen_cmd "bamCoverage" ?scalefactor ?blacklist
     ?normalizeto1x ?normalizeusingrpkm ?ignorefornormalization
     ?skipnoncoveredregions ?smoothlength ?extendreads ?ignoreduplicates
@@ -120,7 +120,7 @@ let bamcompare ?scalefactormethod ?samplelength ?numberofsamples
     ?smoothlength ?extendreads ?ignoreduplicates ?minmappingquality
     ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
     ?maxfragmentlength outfileformat indexed_bam1 indexed_bam2 =
-  workflow ~descr:"bamcompare" ~np:threads ~mem:(3 * 1024) [
+  workflow ~descr:"bamcompare" ~np:threads [
     bam_gen_cmd "bamCompare"
       ?scalefactor ?blacklist
       ?normalizeto1x ?normalizeusingrpkm ?ignorefornormalization ?skipnoncoveredregions
@@ -146,7 +146,7 @@ let bamcompare ?scalefactormethod ?samplelength ?numberofsamples
 let bigwigcompare ?scalefactor ?ratio ?pseudocount ?binsize
     ?region ?blacklist ?(threads = 1)
     outfileformat bigwig1 bigwig2 =
-  workflow ~descr:"bigwigcompare" ~np:threads ~mem:(3 * 1024) [
+  workflow ~descr:"bigwigcompare" ~np:threads [
     cmd "bigwigCompare" ~env [
       option (opt "--scaleFactor" float) scalefactor ;
       option (opt "--ratio" ratio_expr) ratio ;
@@ -188,7 +188,7 @@ let multibamsummary_bins ?binsize ?distancebetweenbins ?region ?blacklist
     ?(threads = 1) ?outrawcounts ?extendreads ?ignoreduplicates ?minmappingquality
     ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
     ?maxfragmentlength indexed_bams =
-  workflow ~descr:"multibamsummary_bins" ~np:threads ~mem:(3 * 1024) [
+  workflow ~descr:"multibamsummary_bins" ~np:threads [
     multibamsum_gen_cmd "multiBamSummary bins"
       ?region ?blacklist
       ?outrawcounts ?extendreads ?ignoreduplicates ?minmappingquality
@@ -208,7 +208,7 @@ let multibamsummary_bed ?region ?blacklist ?(threads = 1)
     ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
     ?maxfragmentlength ?metagene ?transcriptid ?exonid ?transcriptiddesignator bed
     indexed_bams =
-  workflow ~descr:"multibamsummary_bed" ~np:threads ~mem:(3 * 1024) [
+  workflow ~descr:"multibamsummary_bed" ~np:threads [
     multibamsum_gen_cmd "multiBamSummary BED-file"
       ?region ?blacklist
       ?outrawcounts ?extendreads ?ignoreduplicates ?minmappingquality
