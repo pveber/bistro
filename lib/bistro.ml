@@ -7,6 +7,7 @@ module Path = struct
   type t = string list
   [@@deriving sexp]
 
+  let compare = List.compare String.compare
   let rec normalize = function
     | "." :: t
     | "" :: t -> normalize t

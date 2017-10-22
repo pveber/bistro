@@ -4,4 +4,5 @@
  ((name bistro)
   (public_name bistro)
   (libraries (core))
+  (preprocess (pps (ppx_sexp_conv)))
 ))

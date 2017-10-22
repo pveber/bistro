@@ -28,6 +28,9 @@
     paths, the first element of the list is ["/"]. *)
 module Path : sig
   type t = string list
+  [@@deriving sexp]
+
+  val compare : t -> t -> int
   val of_string : string -> t
   val to_string : t -> string
 
