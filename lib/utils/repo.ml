@@ -1,6 +1,5 @@
 open Core
 open Bistro.Std
-open Bistro_app
 open Bistro_engine
 
 type item =
@@ -16,7 +15,7 @@ type normalized_repo_item = {
 
 type repo = normalized_repo_item list
 
-let normalized_repo_item (Repo_item (repo_path, w)) (Path cache_path) =
+let normalized_repo_item (Repo_item (repo_path, w)) (Term.Path cache_path) =
   {
     repo_path = Bistro.Path.to_string repo_path ;
     file_path = Filename.concat "_files" (Bistro.Workflow.id w) ;
@@ -87,9 +86,10 @@ let generate outdir items =
     )
 
 let use t (Bistro.Any_workflow w) =
-  pure (fun x _ -> x) $ t $ pureW w
+  Term.(pure (fun x _ -> x) $ t $ pureW w)
 
-let to_app ?(precious = []) ~outdir items =
+let to_term ?(precious = []) ~outdir items =
+  let open Term in
   List.map items ~f:(function (Repo_item (p, w) as item) ->
       pure (normalized_repo_item item) $ (pureW w)
     )
@@ -99,4 +99,4 @@ let to_app ?(precious = []) ~outdir items =
   |> fun init -> List.fold precious ~init ~f:use
 
 let build ?np ?mem ?logger ?keep_all ?precious ?bistro_dir ~outdir repo =
-  Bistro_app.run ?np ?mem ?logger ?keep_all ?bistro_dir (to_app ~outdir ?precious repo)
+  Term.run ?np ?mem ?logger ?keep_all ?bistro_dir (to_term ~outdir ?precious repo)
