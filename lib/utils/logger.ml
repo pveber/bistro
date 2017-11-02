@@ -4,14 +4,13 @@ let null = object
   method wait4shutdown = Lwt.return ()
 end
 
-let tee l1 l2 = object
+let tee loggers = object
   method event x y z =
-    l1#event x y z ;
-    l2#event x y z
+    List.iter (fun l -> l#event x y z) loggers
 
   method stop =
-    l1#stop ; l2#stop
+    List.iter (fun l -> l#stop) loggers
 
   method wait4shutdown =
-    Lwt.join [ l1#wait4shutdown ; l2#wait4shutdown ]
+    Lwt.join (List.map (fun l -> l#wait4shutdown) loggers)
 end
