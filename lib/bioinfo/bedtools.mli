@@ -21,7 +21,6 @@ module Cmd : sig
       | `left_pct of float
       | `right_pct of float
     ] ->
-    'a input ->
     'a workflow ->
     Ucsc_gb.chrom_sizes workflow ->
     Bistro.EDSL.command

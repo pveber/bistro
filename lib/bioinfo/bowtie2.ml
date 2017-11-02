@@ -91,7 +91,7 @@ let bowtie2
       option (opt "--maxins" int) maxins ;
       option (flag_of_orientation % string) orientation ;
       option (flag string "--no-mixed") no_mixed  ;
-      option (flag string "--no-discordant") no_overlap  ;
+      option (flag string "--no-discordant") no_discordant  ;
       option (flag string "--dovetail") dovetail ;
       option (flag string "--no-contain") no_contain ;
       option (flag string "--no-overlap") no_overlap ;

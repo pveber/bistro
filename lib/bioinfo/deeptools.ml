@@ -57,9 +57,9 @@ let normalizeto1x_expr nbr =
     | 0 -> string acc
     | l ->
       if l <= 3 then
-        string (String.sub nbr_s 0 l ^ acc)
+        string (String.sub nbr_s ~pos:0 ~len:l ^ acc)
       else
-        let acc = "," ^ String.sub nbr_s (l - 3) 3 ^ acc in
+        let acc = "," ^ String.sub nbr_s ~pos:(l - 3) ~len:3 ^ acc in
         compute acc (l-3) nbr_s
   in
   compute "" lgth nbr_s
@@ -163,7 +163,7 @@ let bigwigcompare ?scalefactor ?ratio ?pseudocount ?binsize
   ]
 
 
-let multibamsum_gen_cmd ?(threads = 1) ?outrawcounts ?extendreads ?ignoreduplicates
+let multibamsum_gen_cmd ?outrawcounts ?extendreads ?ignoreduplicates
     ?minmappingquality ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
     ?maxfragmentlength ?blacklist ?region cmd_name other_args =
   cmd cmd_name ~env (

@@ -39,7 +39,7 @@ let spades
             option (flag string "--sc") single_cell ;
             option (flag string "--iontorrent") iontorrent ;
             opt "--threads" ident np ;
-            opt "--memory" (fun m -> seq [ string "$((" ; mem ; string " / 1024))" ]) mem ;
+            opt "--memory" ident (seq [ string "$((" ; mem ; string " / 1024))" ]) ;
             option ident pe_args ;
             opt "-o" ident dest ;
           ]

@@ -1,5 +1,4 @@
 open Core_kernel.Std
-open Defs
 open Bistro.EDSL
 
 let env = docker_image ~account:"pveber" ~name:"bedtools" ~tag:"2.21.0" ()
@@ -27,7 +26,7 @@ module Cmd = struct
     )
   ]
 
-  let slop ?strand ?header ~mode format input chrom_size =
+  let slop ?strand ?header ~mode input chrom_size =
     bedtools "slop" ~stdout:dest [
       seq (slop_args ?strand ?header ~mode) ;
       opt "-i" dep input ;
@@ -35,9 +34,9 @@ module Cmd = struct
     ]
 end
 
-let slop ?strand ?header ~mode format input chrom_size =
+let slop ?strand ?header ~mode _ input chrom_size =
   workflow ~descr:"bedtools.slop" [
-    Cmd.slop ?strand ?header ~mode format input chrom_size
+    Cmd.slop ?strand ?header ~mode input chrom_size
   ]
 
 let intersect ?ubam ?wa ?wb ?loj ?wo ?wao ?u ?c ?v ?f ?_F ?r ?e ?s ?_S

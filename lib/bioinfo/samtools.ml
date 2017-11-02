@@ -1,5 +1,4 @@
 open Core_kernel.Std
-open Defs
 open Bistro.EDSL
 
 type 'a format = Bam | Sam
@@ -69,9 +68,9 @@ let indexed_bam_of_bam bam =
 let indexed_bam_to_bam =
   selector ["reads.bam"]
 
-let output_format_expr = function
-  | Bam -> string "-b"
-  | Sam -> string ""
+(* let output_format_expr = function *)
+(*   | Bam -> string "-b" *)
+(*   | Sam -> string "" *)
 
 (*
 let view ?input_format ?output_format ?_1 ?u ?h ?_H ?c ?_L ?q ?m ?f ?_F ?_B ?s file =

@@ -1,5 +1,4 @@
 open Core_kernel.Std
-open Defs
 open Bistro.EDSL
 
 
@@ -46,7 +45,12 @@ let run_se ?mlst_db ?mlst_delimiter ?mlst_definitions
     ?report_all_consensus ?(threads = 1) fq =
   workflow ~descr:"srst2" ~np:threads ~mem:(3 * 1024) [
     mkdir_p dest ;
-    run_gen_cmd "srst2" [
+    run_gen_cmd "srst2" ?mlst_db ?mlst_delimiter ?mlst_definitions
+    ?mlst_max_mismatch ?gene_db ?no_gene_details ?gene_max_mismatch
+    ?min_coverage ?max_divergence ?min_depth ?min_edge_depth ?prob_err
+    ?truncation_score_tolerance ?other ?max_unaligned_overlap ?mapq
+    ?baseq ?samtools_args ?report_new_consensus
+    ?report_all_consensus [
       opt "--threads" ident np ;
       opt "--input_se" (list ~sep:" " dep) fq ;
       opt "--output" ident dest ;
@@ -61,7 +65,12 @@ let run_pe ?mlst_db ?mlst_delimiter ?mlst_definitions
     ?report_all_consensus ?(threads = 1) fq =
   workflow ~descr:"srst2" ~np:threads ~mem:(3 * 1024) [
     mkdir_p dest ;
-    run_gen_cmd "srst2" [
+    run_gen_cmd "srst2" ?mlst_db ?mlst_delimiter ?mlst_definitions
+    ?mlst_max_mismatch ?gene_db ?no_gene_details ?gene_max_mismatch
+    ?min_coverage ?max_divergence ?min_depth ?min_edge_depth ?prob_err
+    ?truncation_score_tolerance ?other ?max_unaligned_overlap ?mapq
+    ?baseq ?samtools_args ?report_new_consensus
+    ?report_all_consensus [
       opt "--threads" ident np ;
       opt "--input_pe" (list ~sep:" " dep) fq ;
       opt "--output" ident dest ;

@@ -167,7 +167,7 @@ module U_impl = struct
   let id = function
     | Input (id, _)
     | Select (id, _, _)
-    | Step { id } -> id
+    | Step { id ; _ } -> id
 
   let compare u v =
     String.compare (id u) (id v)
@@ -208,7 +208,7 @@ module Workflow = struct
 
   let digestible_action = function
     | Exec cmd -> `Exec cmd
-    | Eval { id } -> `Eval id
+    | Eval { id ; _ } -> `Eval id
 
   let digestible_deps xs =
     List.map xs ~f:to_dep
@@ -235,39 +235,7 @@ module Workflow = struct
     let id = digest ("select", id u, path) in
     Select (id, u, path)
 
-  let rec collect accu u =
-    let accu' = List.Assoc.add ~equal:String.equal accu (id u) u in
-    match u with
-    | Input _ -> accu'
-    | Select (_, v, _) -> collect accu' v
-    | Step { deps } ->
-      List.fold deps ~init:accu' ~f:collect
-
-  let descr = function
-    | Input (_,p) -> (Path.to_string p)
-    | Select (_, _, p) -> (Path.to_string p)
-    | Step { descr } -> descr
-
-
   let u x = x
-
-  let to_dot u oc =
-    let nodes = collect [] u in
-    fprintf oc "digraph workflow {\n" ;
-    List.iter nodes ~f:(fun (id_n, n) ->
-        match n with
-        | Step { deps } ->
-          fprintf oc "n%s [shape=box,label = \"%s\"];\n" id_n (descr n) ;
-          List.iter deps ~f:(fun m ->
-              fprintf oc "n%s -> n%s;\n" id_n (id m)
-            )
-        | Select (_,m,_) ->
-          fprintf oc "n%s [shape=box,label = \"%s\",shape=plaintext];\n" id_n (descr n) ;
-          fprintf oc "n%s -> n%s [style=dotted];\n" id_n (id m)
-        | Input _ ->
-          fprintf oc "n%s [label = \"%s\"];\n" id_n (descr n)
-      ) ;
-    fprintf oc "}\n"
 end
 
 type 'a workflow = 'a Workflow.t
@@ -288,7 +256,6 @@ module Template = struct
   let path p = string (Path.to_string p)
   let dep w = [ Command.D w ]
 
-  let f ?a:(c = 1) () = c
   let quote ?using:(c = '"') e =
     let quote_symbol = Command.S (Char.to_string c) in
     quote_symbol :: e @ [ quote_symbol ]

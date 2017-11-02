@@ -1,5 +1,4 @@
 open Core_kernel.Std
-open Defs
 open Bistro.EDSL
 
 
@@ -15,7 +14,8 @@ let run ?prefix ?addgenes ?locustag ?increment ?gffver ?compliant
     ?mincontiglen ?evalue ?rfam ?norrna ?notrna ?rnammer fa =
   workflow ~descr:"prokka" ~np:threads ~mem:(3 * 1024) [
     mkdir_p dest ;
-    cmd "prokka --force" [
+    cmd "prokka" ~env [
+      string "--force" ;
       option (opt "--prefix" string) prefix ;
       option (flag string "--addgenes") addgenes ;
       option (opt "--locustag" string) locustag ;

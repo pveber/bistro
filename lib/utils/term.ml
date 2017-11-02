@@ -40,7 +40,7 @@ module WHS = Hash_set.Make(
   end
   )
 
-let rec to_workflow_list term =
+let to_workflow_list term =
   let acc = WHS.create () in
   let rec aux
     : type s. s t -> unit
@@ -83,11 +83,11 @@ end
 let error_short_descr =
   let open Task in
   function
-  | Task.Input_check { path } ->
+  | Task.Input_check { path ; _ } ->
     sprintf "Input %s doesn't exist" path
-  | Select_check { dir_path ; sel } ->
+  | Select_check { dir_path ; sel ; _ } ->
     sprintf "Path %s doesn't exist in %s" (Bistro.Path.to_string sel) dir_path
-  | Step_result { exit_code ; outcome } ->
+  | Step_result { exit_code ; outcome ; _ } ->
     match outcome with
     | `Missing_output -> "Missing output"
     | `Failed ->
@@ -99,7 +99,7 @@ let error_long_descr db buf tid =
   function
   | Input_check _
   | Select_check _ -> ()
-  | Step_result { action ; exit_code ; dumps } ->
+  | Step_result { action ; dumps ; _ } ->
     (
       match action with
       | `Sh cmd ->
@@ -126,7 +126,7 @@ let error_long_descr db buf tid =
     bprintf buf "%s\n" (In_channel.read_all (Db.stderr db tid))
 
 let error_report_aux db buf = function
-  | tid, Scheduler.Run { outcome } when Task.failure outcome ->
+  | tid, Scheduler.Run { outcome ; _ } when Task.failure outcome ->
     let short_descr = error_short_descr outcome in
     bprintf buf "################################################################################\n" ;
     bprintf buf "#                                                                              #\n" ;
@@ -152,7 +152,7 @@ let error_report db traces =
 
 let has_error traces =
   String.Map.exists traces ~f:Scheduler.(function
-      | Run { outcome } -> Task.failure outcome
+      | Run { outcome ; _ } -> Task.failure outcome
       | Skipped (`Missing_dep | `Allocation_error _) -> true
       | Skipped `Done_already -> false
     )

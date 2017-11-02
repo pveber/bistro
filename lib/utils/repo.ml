@@ -1,6 +1,5 @@
 open Core
 open Bistro.Std
-open Bistro_engine
 
 type item =
   Repo_item : string list * _ workflow -> item
@@ -13,8 +12,6 @@ type normalized_repo_item = {
   cache_path : string ;
 }
 
-type repo = normalized_repo_item list
-
 let normalized_repo_item (Repo_item (repo_path, w)) (Term.Path cache_path) =
   {
     repo_path = Bistro.Path.to_string repo_path ;
@@ -23,11 +20,6 @@ let normalized_repo_item (Repo_item (repo_path, w)) (Term.Path cache_path) =
   }
 
 let ( %> ) path w = Repo_item (path, w)
-
-let make_repo items =
-  List.map items ~f:(fun (item, cache_path) ->
-      normalized_repo_item item cache_path
-    )
 
 let is_strict_prefix ~prefix u =
   String.length prefix < String.length u
@@ -90,7 +82,7 @@ let use t (Bistro.Any_workflow w) =
 
 let to_term ?(precious = []) ~outdir items =
   let open Term in
-  List.map items ~f:(function (Repo_item (p, w) as item) ->
+  List.map items ~f:(function (Repo_item (_, w) as item) ->
       pure (normalized_repo_item item) $ (pureW w)
     )
   |> list

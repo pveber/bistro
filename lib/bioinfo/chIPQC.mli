@@ -1,5 +1,4 @@
 open Bistro.Std
-open Bistro.EDSL
 open Defs
 
 type 'a sample = {

@@ -1,6 +1,5 @@
 open Core
 open Bistro_engine
-open Rresult
 
 type time = float
 
@@ -22,7 +21,6 @@ type model = {
 }
 
 let ( >>= ) = Lwt.( >>= )
-let ( >>| ) = Lwt.( >|= )
 
 let zone = Lazy.force Time.Zone.local
 
@@ -40,7 +38,7 @@ let create path = {
   changed = true ;
 }
 
-let translate_event config time = function
+let translate_event config _ = function
   | Scheduler.Task_started (Bistro.Step step,
                             Allocator.Resource { np ; mem }) ->
     (
@@ -69,7 +67,7 @@ let update model config time evt =
   {
     dag = (
       match evt with
-      | Scheduler.Init { dag } -> Some dag
+      | Scheduler.Init { dag ; _ } -> Some dag
       | _ -> model.dag
     ) ;
     events = (
@@ -231,21 +229,21 @@ module Render = struct
             k " in " ;
             k (Path.to_string input_path) ] ]
 
-    | Select (_, Step { id }, path) ->
+    | Select (_, Step { id ; _ }, path) ->
       [ p [ k "select " ;
             k (Path.to_string path) ;
             k " in step " ;
             k id ] ]
 
-    | Select (_, Select _, path) -> assert false
+    | Select (_, Select _, _) -> assert false
 
-    | Step { descr ; id } ->
+    | Step { descr ; id ; _ } ->
       collapsible_panel
         ~title:[ k descr ]
         ~header:[]
         ~body:[ item "id" [ k id ] ]
 
-  let task_start ~step:{ Bistro.descr ; id } ~action ~file_dumps =
+  let task_start ~step:{ Bistro.descr ; id ; _ } ~action ~file_dumps:_ =
     collapsible_panel
       ~title:[ k descr ]
       ~header:[]
@@ -259,7 +257,7 @@ module Render = struct
     match t with
     | Input _
     | Select _ -> task t
-    | Step { descr ; id } ->
+    | Step { descr ; id ; _ } ->
       collapsible_panel
         ~title:[ k descr ]
         ~header:[]
@@ -277,19 +275,19 @@ module Render = struct
   let result_label =
     let open Task in
     function
-    | Input_check { pass = true }
-    | Select_check { pass = true } ->
+    | Input_check { pass = true ; _ }
+    | Select_check { pass = true ; _ } ->
       event_label_text `BLACK "CHECKED"
 
-    | Input_check { pass = false }
-    | Select_check { pass = false }
-    | Step_result { outcome = `Failed } ->
+    | Input_check { pass = false ; _ }
+    | Select_check { pass = false ; _ }
+    | Step_result { outcome = `Failed ; _ } ->
       event_label_text `RED "FAILED"
 
-    | Step_result { outcome = `Missing_output } ->
+    | Step_result { outcome = `Missing_output ; _ } ->
       event_label_text `GREEN "MISSING OUTPUT"
 
-    | Step_result { outcome = `Succeeded } ->
+    | Step_result { outcome = `Succeeded ; _ } ->
       event_label_text `GREEN "DONE"
 
   let event time evt =

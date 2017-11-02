@@ -1,13 +1,11 @@
-open Base
 open! Ppx_core
-open Ast_builder.Default
 
 let rec extract_body = function
-  | { pexp_desc = Pexp_fun (_,_,_,body) } -> extract_body body
+  | { pexp_desc = Pexp_fun (_,_,_,body) ; _ } -> extract_body body
   | expr -> expr
 
 let rec replace_body new_body = function
-  | ({ pexp_desc = Pexp_fun (lab, e1, p, e2) } as expr) ->
+  | ({ pexp_desc = Pexp_fun (lab, e1, p, e2) ; _ } as expr) ->
     { expr with pexp_desc = Pexp_fun (lab, e1, p, replace_body new_body e2) }
   | _ -> new_body
 
@@ -47,7 +45,7 @@ class payload_rewriter = object
   inherit [(string * payload) list] Ast_traverse.fold_map as super
   method! expression expr acc =
     match expr with
-    | { pexp_desc = Pexp_extension ({txt = "dep"}, payload) ; pexp_loc = loc } -> (
+    | { pexp_desc = Pexp_extension ({txt = "dep" ; _}, payload) ; _ } -> (
         match payload with
         | PStr [ { pstr_desc = Pstr_eval (e, _) ; pstr_loc = loc } ] ->
           let id = new_id () in
@@ -56,7 +54,7 @@ class payload_rewriter = object
           expr', acc'
         | _ -> failwith "expected a workflow expression"
       )
-    | { pexp_desc = Pexp_extension ({txt = "deps"}, payload) ; pexp_loc = loc } -> (
+    | { pexp_desc = Pexp_extension ({txt = "deps" ; _ }, payload) ;  _ } -> (
         match payload with
         | PStr [ { pstr_desc = Pstr_eval (e, _) ; pstr_loc = loc } ] ->
           let id = new_id () in
@@ -65,7 +63,7 @@ class payload_rewriter = object
           expr', acc'
         | _ -> failwith "expected a workflow list expression"
       )
-    | { pexp_desc = Pexp_extension ({txt = ("dest" | "np" | "mem" | "tmp" as ext)}, payload) ; pexp_loc = loc } -> (
+    | { pexp_desc = Pexp_extension ({txt = ("dest" | "np" | "mem" | "tmp" as ext) ; _ }, payload) ; pexp_loc = loc ; _ } -> (
         match payload with
         | PStr [] -> (
             let expr' = match ext with
@@ -84,8 +82,7 @@ class payload_rewriter = object
 
 end
 
-let rewriter ~loc ~path descr version mem np var expr =
-  let open Ast_builder.Default in
+let rewriter ~loc ~path:_ descr version mem np var expr =
   let np = Option.value np ~default:(B.eint 1) in
   let mem = Option.value mem ~default:(B.eint 100) in
   let descr = Option.value descr ~default:(B.estring var) in

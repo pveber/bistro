@@ -1,14 +1,10 @@
 open Core
-open Rresult
 
 let digest x =
   Digest.to_hex (Digest.string (Marshal.to_string x []))
 
 let ( >>= ) = Lwt.( >>= )
 let ( >>| ) = Lwt.( >|= )
-let ( >>=? ) x f = x >>= function
-  | Ok x -> f x
-  | Error _ as e -> Lwt.return e
 
 let mv src dst =
   Lwt_process.exec ("", [| "mv" ; src ; dst |]) >>| ignore
@@ -61,7 +57,7 @@ let requirement =
   function
   | Input _
   | Select _ -> Allocator.Request { np = 0 ; mem = 0 }
-  | Step { np ; mem } ->
+  | Step { np ; mem ; _ } ->
     Allocator.Request { np ; mem }
 
 let rec command_uses_docker =
@@ -90,7 +86,7 @@ type execution_env = {
   mem : int ;
 }
 
-let make_execution_env { db ; use_docker } ~np ~mem step =
+let make_execution_env { db ; use_docker ; _ } ~np ~mem step =
   let tmp_dir = Db.tmp db step.Bistro.id in
   let path_of_task_id tid = Db.cache db tid in
   let dep = function
@@ -194,9 +190,6 @@ module Concrete_task = struct
     List.map ~f:(token env) xs
     |> String.concat
 
-  let digest x =
-    Digest.to_hex (Digest.string (Marshal.to_string x []))
-
   let deps_mount env dck_env deps =
     let f d = sprintf "-v %s:%s" (env.dep d) (dck_env.dep d) in
     List.map deps ~f
@@ -242,21 +235,11 @@ module Concrete_task = struct
 
   let of_cmd env cmd = Sh (string_of_command env cmd)
 
-  let load fn =
-    In_channel.with_file fn ~f:(fun ic ->
-        Marshal.from_channel ic
-      )
-
-  let save x fn =
-    Out_channel.with_file fn ~f:(fun oc ->
-        Marshal.to_channel oc x []
-      )
-
   let of_action env =
     let open Bistro in
     function
     | Exec cmd -> of_cmd env cmd
-    | Eval { f } ->
+    | Eval { f ; _ } ->
       let env = object
         method dep = env.dep
         method np = env.np
@@ -350,8 +333,8 @@ let docker_chown dir uid =
 
 let perform_step
     (Allocator.Resource { np ; mem })
-    ({ db } as config)
-    ({ Bistro.action } as step) =
+    ({ db ; _ } as config)
+    ({ Bistro.action ; _ } as step) =
   let uid = Unix.getuid () in
   let env = make_execution_env config ~np ~mem step in
   let stdout = Db.stdout db step.id in
@@ -430,7 +413,7 @@ let dep_of_select_child =
   let open Bistro in
   function
   | Input (_, p) -> `Input p
-  | Step { id } -> `Step id
+  | Step { id ; _ } -> `Step id
   | Select _ -> assert false
 
 let perform alloc config =
@@ -440,18 +423,18 @@ let perform alloc config =
   | Select (_, dir, q) -> perform_select config.db (dep_of_select_child dir) q
   | Step s -> perform_step alloc config s
 
-let is_done t { db } =
+let is_done t { db ; _ } =
   let open Bistro in
   let path = match t with
     | Input (_, p) -> Bistro.Path.to_string p
     | Select (_, dir, q) -> select_path db (dep_of_select_child dir) q
-    | Step { id ; descr } ->
+    | Step { id ; _ } ->
       let b = Db.cache db id in
       (*      printf "%s %s\n" descr b ; *) b
   in
   Lwt.return (Sys.file_exists path = `Yes)
 
-let clean t { db } =
+let clean t { db ; _ } =
   let open Bistro in
   match t with
   | Input _ | Select _ -> Lwt.return ()
@@ -473,9 +456,9 @@ let post_revdeps_hook t config ~all_revdeps_succeeded =
     else Lwt.return ()
 
 let failure = function
-  | Input_check { pass }
-  | Select_check { pass } -> not pass
-  | Step_result { outcome } -> outcome <> `Succeeded
+  | Input_check { pass ; _ }
+  | Select_check { pass ; _ } -> not pass
+  | Step_result { outcome ; _ } -> outcome <> `Succeeded
 
 let render_step_command ~np ~mem config task cmd =
   let open Concrete_task in

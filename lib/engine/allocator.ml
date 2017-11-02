@@ -1,4 +1,3 @@
-open Lwt
 open Rresult
 
 type request = Request of {

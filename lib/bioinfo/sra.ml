@@ -1,7 +1,5 @@
 open Core_kernel.Std
-open Bistro
 open Bistro.EDSL
-open Defs
 
 let input x = input x
 

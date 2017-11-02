@@ -16,7 +16,7 @@ let error_short_descr =
   function
   | Input_check _ -> "input doesn't exist"
   | Select_check _ -> "invalid select"
-  | Step_result { exit_code ; outcome } ->
+  | Step_result { exit_code ; outcome ; _ } ->
     match outcome with
     | `Succeeded -> assert false
     | `Failed ->
@@ -31,7 +31,7 @@ let output_event t =
     let id = String.prefix s.id 6 in
     msg t "started %s.%s" s.descr id
 
-  | Scheduler.Task_ended (Step_result { step } as res) ->
+  | Scheduler.Task_ended (Step_result { step ; _ } as res) ->
     let id = String.prefix step.id 6 in
     let outcome =
       if Task.failure res then

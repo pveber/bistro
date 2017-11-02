@@ -10,15 +10,6 @@ end
 
 module S = Hash_set.Make(T)
 
-let color r g b a =
-  let r = Int32.of_int_exn (r land 0xFF) in
-  let g = g land 0xFF in
-  let b = b land 0xFF in
-  let a = a land 0xFF in
-  Int32.bit_or
-    (Int32.shift_left r 24)
-    (Int32.of_int_exn (g lor b lor a))
-
 let light_gray = 0xC0C0C0
 let black = 0
 
@@ -34,7 +25,7 @@ let dot_output dag ~needed ~already_done ~precious fn =
     | Select (_, _, p) ->
       let label = Bistro.Path.to_string p in
       [ `Label label ; `Fontcolor color ; `Color color ; `Shape `Box ]
-    | Step { descr ; id } as u ->
+    | Step { descr ; id ; _ } as u ->
       let already_done  = Hash_set.mem already_done u in
       let precious = String.Set.mem precious id in
       let label_suffix = if precious then "*" else "" in

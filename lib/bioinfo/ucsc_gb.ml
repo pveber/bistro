@@ -1,5 +1,4 @@
 open Core_kernel.Std
-open Bistro
 open Bistro.Std
 open Bistro.EDSL
 open Defs

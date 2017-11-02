@@ -1,5 +1,4 @@
 open Bistro.Std
-open Defs
 
 class type table = object
   inherit tsv

@@ -1,12 +1,6 @@
 open Core_kernel.Std
 open Bistro_tdag
 
-let ( >>= ) = Lwt.( >>= )
-let ( >>| ) = Lwt.( >|= )
-let ( >>=? ) x f = x >>= function
-  | Ok x -> f x
-  | Error _ as e -> Lwt.return e
-
 module Domain = struct
   module Thread = Lwt
   module Allocator = Allocator
@@ -58,13 +52,13 @@ let rec add_workflow (seen, dag) u =
             )
           in
           let seen, dag = add_workflow accu dep in
-          String.Map.add seen id u,
+          String.Map.add seen ~key:id ~data:u,
           DAG.add_dep dag u ~on:dep
         )
     in
     seen', dag'
 
-  | Some u -> seen, dag
+  | Some _ -> seen, dag
 
 
 let compile workflows =

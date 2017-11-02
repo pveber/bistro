@@ -15,3 +15,4 @@ val tophat2 :
   [`tophat_output] directory workflow
 
 val accepted_hits : ([`tophat_output], bam) selector
+val junctions : ([`tophat_output], bed6) selector

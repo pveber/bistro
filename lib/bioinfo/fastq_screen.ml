@@ -1,8 +1,5 @@
 open Core_kernel.Std
-open Bistro.Std
 open Bistro.EDSL
-open Defs
-
 
 let env = docker_image ~account:"pveber" ~name:"fastq-screen" ~tag:"0.11.1" ()
 

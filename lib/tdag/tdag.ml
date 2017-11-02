@@ -48,11 +48,6 @@ module Make(D : Domain) = struct
   (* Graph of tasks *)
   module G = struct
     include Graph.Persistent.Digraph.ConcreteBidirectional(V)
-    let exists_pred g u ~f =
-      let f v accu = accu || f v in
-      fold_pred f g u false
-
-    let predecessors g u = fold_pred (fun h t -> h :: t) g u []
     let successors   g u = fold_succ (fun h t -> h :: t) g u []
   end
 
@@ -148,7 +143,7 @@ module Make(D : Domain) = struct
     fold_s goals ~init:(S.empty, S.empty) ~f:aux
 
   let successfull_trace = function
-    | Run { outcome } -> not (Task.failure outcome)
+    | Run { outcome ; _ } -> not (Task.failure outcome)
     | Skipped `Done_already -> true
     | _ -> false
 
@@ -181,7 +176,7 @@ module Make(D : Domain) = struct
 
   let performance_table config logger alloc ~needed ~already_done g sources =
     let module M = String.Map in
-    let rec aux u ((seen, table) as accu) =
+    let rec aux u ((seen, _) as accu) =
       if S.mem u seen then accu
       else
         let seen, table = G.fold_succ aux g u accu in

@@ -89,7 +89,6 @@ let db_is_well_formed path =
   dirs_of_db_exist path
 
 let path_has_valid_db path =
-  let open R in
   R.reword_error_msg
     (fun _ -> R.msg "Failed to obtain a valid bistro database")
     (
