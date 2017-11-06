@@ -8,6 +8,6 @@ RUN \
   tar xf silix-1.2.11.tar.gz && \
   rm silix-1.2.11.tar.gz && \
   cd silix-1.2.11 && \
-  ./configure --enable-hash && \
+  ./configure --enable-hash --enable-verbose && \
   make && \
   make install
