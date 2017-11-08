@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml"><head><title>Bistro (bistro.Bistro)</title><link rel="stylesheet" href="../../odoc.css"/><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><meta name="generator" content="doc-ock-html v1.0.0-1-g1fc9bf0"/></head><body><nav id="top"><a href="../index.html">Up</a> &mdash; <span class="package">package <a href="../index.html">bistro</a></span></nav><header><h1><span class="keyword">Module</span> <span class="module-path">Bistro</span></h1></header><p>A library to build scientific workflows.</p><p>This module introduces a type <code class="code">'a worfklow</code> that describe a set of
 inter-dependent actions that will eventually generate a target
-(file or directory). The <code class="code">'a</code> type represents the format of the
-file or the layout of the directory. Actions may be either command
-lines to be executed, or OCaml expressions to be evaluated.</p><p>To build workflows, use the <a href="EDSL/index.html">EDSL</a> module, that provide a set of
+(file or directory). The <code class="code">'a</code> type variable represents the format
+of the file or the layout of the directory. Actions may be either
+command lines to be executed, or OCaml expressions to be
+evaluated.</p><p>To build workflows, use the <a href="EDSL/index.html">EDSL</a> module, that provide a set of
 combinators to write shell scripts easily. For instance, the
 following function shows how to create a gzipped file using the
 output of another workflow:
