@@ -50,7 +50,7 @@ let sort ?on:order bam =
     samtools "sort" [
       option (fun o -> flag string "-n" (o = `name)) order ;
       dep bam ;
-      dest ;
+      opt "-o" Fn.id dest ;
     ] ;
     mv (seq [dest ; string ".bam"]) dest ;
   ]
