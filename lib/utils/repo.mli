@@ -7,7 +7,11 @@ type t = item list
 
 val ( %> ) : string list -> _ workflow -> item
 
+val singleton : string -> _ workflow -> t
+
 val add_prefix : string list -> t -> t
+
+val shift : string -> t -> t
 
 val to_term :
   ?precious:Bistro.any_workflow list ->

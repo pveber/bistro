@@ -97,3 +97,7 @@ let add_prefix prefix items =
   List.map items ~f:(function
       | Repo_item (p, w) -> Repo_item (prefix @ p, w)
     )
+
+let shift dir items = add_prefix [ dir ] items
+
+let singleton dir w = [ [ dir ] %> w ]
