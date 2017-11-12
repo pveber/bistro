@@ -52,7 +52,6 @@ let sort ?on:order bam =
       dep bam ;
       opt "-o" Fn.id dest ;
     ] ;
-    mv (seq [dest ; string ".bam"]) dest ;
   ]
 
 let indexed_bam_of_bam bam =
