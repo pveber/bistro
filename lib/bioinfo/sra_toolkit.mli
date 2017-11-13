@@ -1,6 +1,8 @@
 open Bistro.Std
 open Defs
 
+val env : docker_image
+
 val fastq_dump : sra workflow -> [`sanger] fastq workflow
 
 val fastq_dump_gz :
