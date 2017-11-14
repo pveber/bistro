@@ -81,12 +81,12 @@ paste the following program:
    let sample_peaks =                               (* Call peaks on mapped reads *)
      Macs2.(callpeak sam [ sample_sam ])
 
-   let repo = Bistro_repo.[
+   let repo = Repo.[
      [ "peaks" ] %> sample_peaks
    ]
 
    (** Actually run the pipeline *)
-   let () = Bistro_repo.build ~outdir:"res" ~np:2 ~mem:(`GB 4) repo
+   let () = Repo.build ~outdir:"res" ~np:2 ~mem:(`GB 4) repo
 
 Running a pipeline
 ==================
