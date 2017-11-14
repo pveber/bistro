@@ -9,7 +9,7 @@ cd bistro
 git checkout gh-pages
 rsync -avz ../_build/default/_doc/ ./
 git add *
-git commit -m $(cd .. && git log -1 --pretty="%h %s")
+git commit -m "$(cd .. && git log -1 --pretty="%h %s")"
 git push origin gh-pages
 cd ..
 rm -rf bistro
