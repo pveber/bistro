@@ -130,6 +130,50 @@ output of workflow ``text_file`` in the command invocating
 entire collections of interdependent scripts without ever caring about
 where the generated files are stored.
 
+Utility functions to describe a command's arguments
+===================================================
+
+The functions ``string`` and ``dep`` are enough to describe virtually
+any command-line argument to a program. In addition, module
+``Bistro.EDSL`` provides a few more utility functions that help
+writing concise and readable wrappers. The following code illustrates
+the use of a few of them on a simplified wrapper for the ``bowtie``
+command:
+
+.. code-block:: ocaml
+
+   let bowtie ?v index fq1 fq2 =
+     workflow ~descr:"bowtie" [
+       cmd "bowtie" [
+         string "-S" ;
+         opt "-1" dep fq1 ;
+         opt "-2" dep fq2 ;
+         option (opt "-v" int) v ;
+         seq ~sep:"" [ dep index ; string "/index" ] ;
+         dest ;
+       ]
+     ]
+
+Let us examine each parameter to this command from top to bottom:
+  - the first argument is a simple ``-S`` switch, we encode it
+    directly with the ``string`` function
+  - the second and third arguments are paths to input files introduces
+    with a switch; here writing ``[ ... ; opt "-1" dep fq1 ; ... ]``
+    is equivalent to writing ``[ ... ; string "-1" ; dep fq1 ;
+    ... ]`` but is shorter and more readable
+  - the fourth argument is optional; notice that the variable ``v`` is
+    an optional argument to the ``bowtie`` function, so it is of type
+    ``'a option``; the ``option`` function from ``Bistro.EDSL`` will
+    add nothing to the command line if ``v`` is ``None`` or else apply
+    its first argument to the value if holds. In that case, the
+    applied function adds an integer argument introduced by a ``-v``
+    switch
+  - the fifth argument features a constructor called ``seq`` that can
+    be used to concatenate a list of other chunks interspersed with a
+    string (here the empty string); here we use it to describe a
+    subdirectory of a workflow result
+  - the last argument is simply the destination where to build the
+    result.
 
 Typing workflows
 ================
