@@ -48,5 +48,77 @@ Let's describe what we wrote:
 
 Basically defining a workflow amounts to providing a list of commands
 that are expected to produce a result at the location represented by
-the token ``dest``.
+the token ``dest``. The value ``touch`` we have defined has type ``'a
+workflow``, and represents a recipe (right, a very simple one) to
+produce a result file. This type is too general and we'd have to
+restrict it to prevent run-time error, but we'll see that later. Let's
+now see how we make make a pipeline on some parameter.
 
+Parameterizing workflows
+========================
+
+Our ``touch`` workflow is a very normal OCaml value. It's a
+datastructure that describes a recipe to produce a file. Let's write
+another one which is very similar:
+
+.. code-block:: ocaml
+
+   let echo_hello =
+     workflow ~descr:"echo_hello" [
+       cmd "echo" ~stdout:dest [ string "hello" ] ;
+     ]
+
+There are a few newcomers here:
+  - there is an argument ``stdout`` to the ``cmd`` function, which
+    adds to the command what's necessary to redirect its standard
+    output to a file. Here we redirect to ``dest``
+  - we see that we can form arguments from simple strings with the
+    ``string`` function. There are other such argument constructors,
+    like ``int``, ``float`` and other more sophisticated ones
+
+With this wrapper, we've encoded the following command line:
+
+.. code-block:: bash
+
+   $ echo "hello" > $DEST
+
+So far so good. But do we really have to write a new wrapper each time
+we want to change a small detail in the workflow? Of course not,
+instead we can simply write our a function that produces our workflow:
+
+.. code-block:: ocaml
+
+   let echo msg =
+     workflow ~descr:"echo" [
+       cmd "echo" ~stdout:dest [ string msg ] ;
+     ]
+
+Our workflow is now a lot more generic, since it can be used to
+produce files with any content. Well saying workflow here is slightly
+incorrect, because the value ``echo`` has type ``string -> 'a
+workflow``. It's a function that produces workflows, but since it will
+be so common, I'll just call them workflows. To put it another way,
+instead of writing a single script, we now have a function that can
+produce a particular kind of script given a string.
+
+Depending on others
+===================
+
+Most of the time, a computational step in a workflow will take as an
+input the results obtained from some other. This can be expressed
+thanks to the function ``dep``. Let's see right away how it can be
+used to wrap the program ``sort``:
+
+.. code-block:: ocaml
+
+   let sort text_file =
+     workflow ~descr:"sort" [
+       cmd "sort" ~stdout:dest [ dep text_file ] ;
+     ]
+
+The value ``sort`` thus defined is again a function, but this time its
+argument is a workflow. If you ask OCaml, it will say that ``sort``
+has type ``'a workflow -> 'b workflow``. That is, given a first
+workflow, this function is able to build a new one. This new workflow
+will call ``sort`` redirecting the standard output to the expected
+destination and giving it ``text_file`` as an argument.
