@@ -24,9 +24,21 @@ mostly related to computational biology and unix for now).
 Questions, suggestions or contributions are welcome, please file an
 [issue](https://github.com/pveber/bistro/issues) as needed.
 
+## Documentation
+
+A
+[manual](http://bistro.readthedocs.io/en/latest/getting-started.html)
+is available, but feel free to file issues if something is unclear or
+missing. There is also a
+[generated API documentation](http://pveber.github.io/bistro/).
+
 ## Installation
 
-Detailed instructions are available in the [manual](http://bistro.readthedocs.io/en/latest/getting-started.html). In a nutshell, `bistro` can be installed using [opam](http://opam.ocaml.org/). You need a recent (at least 4.03.0) installation of OCaml. Once this is done, simply type
+Detailed instructions are available in the
+[manual](http://bistro.readthedocs.io/en/latest/getting-started.html). In
+a nutshell, `bistro` can be installed using
+[opam](http://opam.ocaml.org/). You need a recent (at least 4.03.0)
+installation of OCaml. Once this is done, simply type
 
 ```
 opam install bistro
@@ -39,29 +51,3 @@ opam pin add -y bistro --dev-repo
 ```
 to get the current development version.
 
-## Usage
-
-Here is an example of how we could write a typical workflow for
-ChIP-seq data:
-
-```ocaml
-open Bistro.Std;;
-open Bistro_bioinfo.Std;;
-
-let sample = Sra.fetch_srr "SRR217304"                         (* Fetch a sample from the SRA database *)
-let sample_fq = Sra_toolkit.fastq_dump sample                  (* Convert it to FASTQ format *)
-let genome = Ucsc_gb.genome_sequence `sacCer2                  (* Fetch a reference genome *)
-let bowtie2_index = Bowtie2.bowtie2_build genome               (* Build a Bowtie2 index from it *)
-let sample_sam =                                               (* Map the reads on the reference genome *)
-  Bowtie2.bowtie2 bowtie2_index (`single_end [ sample_fq ])
-let sample_bam =                                               (* Convert SAM file to BAM format *)
-  Samtools.(indexed_bam_of_sam sample_sam / indexed_bam_to_bam)
-let sample_peaks = Macs2.callpeak sample_bam                   (* Call peaks on mapped reads *)
-
-let repo = Bistro_repo.[
-  [ "peaks" ] %> sample_peaks 
-]
-
-(** Actually run the pipeline *)
-let () = Bistro_repo.build ~outdir:"res" repo
-```
