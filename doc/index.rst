@@ -10,6 +10,7 @@ Welcome to bistro's documentation!
    :maxdepth: 3
 
    getting-started
+   ocaml-primer
    basics
    wrapping
 
