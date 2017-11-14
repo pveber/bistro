@@ -11,4 +11,5 @@ Welcome to bistro's documentation!
 
    getting-started
    installing-docker
- 
+   basics
+   wrapping
