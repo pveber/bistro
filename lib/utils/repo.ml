@@ -93,6 +93,9 @@ let to_term ?(precious = []) ~outdir items =
 let build ?np ?mem ?logger ?keep_all ?precious ?bistro_dir ~outdir repo =
   Term.run ?np ?mem ?logger ?keep_all ?bistro_dir (to_term ~outdir ?precious repo)
 
+let dry_run ?precious repo =
+  Term.dry_run (to_term ~outdir:"res" ?precious repo)
+
 let add_prefix prefix items =
   List.map items ~f:(function
       | Repo_item (p, w) -> Repo_item (prefix @ p, w)

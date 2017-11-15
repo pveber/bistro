@@ -35,6 +35,9 @@ val run :
   ?bistro_dir:string ->
   'a t -> 'a
 
+val dry_run :
+  'a t -> Scheduler.dry_run
+
 module Syntax : sig
   module Let_syntax : sig
     type nonrec 'a t = 'a t

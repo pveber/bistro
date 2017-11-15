@@ -27,3 +27,7 @@ val build  :
   ?precious:Bistro.any_workflow list ->
   ?bistro_dir:string ->
   outdir:string -> t -> unit
+
+val dry_run :
+  ?precious:Bistro.any_workflow list ->
+  t -> Scheduler.dry_run

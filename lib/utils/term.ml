@@ -188,3 +188,9 @@ let run ?np ?mem ?logger ?keep_all ?bistro_dir app =
     prerr_endline msg ;
     failwith "Some workflow failed!"
 
+let dry_run term =
+  let workflows = to_workflow_list term in
+  let dag, goals, precious = Scheduler.compile workflows in
+  let config = Task.config ~db_path:"_bistro" ~use_docker:true ~keep_all:true ~precious in
+  Scheduler.dry_run ~goals config dag
+  |> Lwt_main.run
