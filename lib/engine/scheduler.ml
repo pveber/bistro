@@ -81,3 +81,6 @@ let compile workflows =
 
 let run ?logger ?goals alloc config dag =
   DAG.run ?logger ?goals alloc config dag
+
+let dry_run ?goals config dag =
+  DAG.dry_run ?goals config dag

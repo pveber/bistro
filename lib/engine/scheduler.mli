@@ -32,6 +32,13 @@ type trace =
                | `Missing_dep
                | `Allocation_error of string ]
 
+type dry_run = Dry_run of {
+    nb_tasks : int ;
+    nb_goals : int ;
+    status : (Task.t * [ `TODO | `DONE ]) list ;
+    simulation : Task.t list ;
+  }
+
 val compile :
   Bistro.any_workflow list ->
   DAG.t * Task.t list * String.Set.t
@@ -43,3 +50,9 @@ val run :
   Allocator.t ->
   DAG.t ->
   trace String.Map.t Lwt.t
+
+val dry_run :
+  ?goals:Task.t list ->
+  Task.config ->
+  DAG.t ->
+  dry_run Lwt.t
