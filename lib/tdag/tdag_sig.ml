@@ -72,6 +72,13 @@ module type S = sig
                              | `Missing_dep
                              | `Allocation_error of string ]
 
+  type dry_run = Dry_run of {
+      nb_tasks : int ;
+      nb_goals : int ;
+      status : (task * [ `TODO | `DONE ]) list ;
+      simulation : task list ;
+    }
+
   class type logger = object
     method event : config -> time -> event -> unit
     method stop : unit
@@ -98,4 +105,10 @@ module type S = sig
     allocator ->
     t ->
     trace String.Map.t thread
+
+  val dry_run :
+    ?goals:task list ->
+    config ->
+    t ->
+    dry_run thread
 end

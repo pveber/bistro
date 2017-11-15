@@ -83,6 +83,13 @@ module Make(D : Domain) = struct
                              | `Missing_dep
                              | `Allocation_error of string ]
 
+  type dry_run = Dry_run of {
+      nb_tasks : int ;
+      nb_goals : int ;
+      status : (task * [ `TODO | `DONE ]) list ;
+      simulation : task list ;
+    }
+
   class type logger = object
     method event : config -> time -> event -> unit
     method stop : unit
@@ -252,4 +259,40 @@ module Make(D : Domain) = struct
     map_p threads ~f:ident >>| fun traces ->
     List.zip_exn ids traces
     |> String.Map.of_alist_exn
+
+  let rec simulation_aux config g ((seen, call_stack, status_map) as acc) t =
+      let tid = Task.id t in
+    if String.Set.mem seen tid then
+      Thread.return acc
+    else
+      Task.is_done t config >>= fun is_done ->
+      let status = if is_done then `DONE else `TODO in
+      let seen = String.Set.add seen tid in
+      let call_stack = if status = `TODO then t :: call_stack else call_stack in
+      let status_map = String.Map.add status_map ~key:tid ~data:(t, status) in
+      fold_s
+        (G.successors g t)
+        ~init:(seen, call_stack, status_map)
+        ~f:(simulation_aux config g)
+
+  let simulation config g goals =
+    fold_s goals
+      ~init:(String.Set.empty, [], String.Map.empty)
+      ~f:(simulation_aux config g)
+    >>| fun (_, call_stack, status_map) ->
+    List.rev call_stack, status_map
+
+  let dry_run ?goals config g =
+    if Dfs.has_cycle g then failwith "Cycle in dependency graph" ;
+    let goals = match goals with
+      | None -> sources g
+      | Some tasks -> tasks
+    in
+    simulation config g goals >>| fun (call_stack, status_map) ->
+    Dry_run {
+      nb_goals = List.length goals ;
+      nb_tasks = nb_tasks g ;
+      simulation = call_stack ;
+      status = String.Map.data status_map ;
+    }
 end
