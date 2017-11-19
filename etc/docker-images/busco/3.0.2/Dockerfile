@@ -23,5 +23,5 @@ RUN ln -fs /usr/bin/python3 /usr/bin/python
 
 RUN cd /root && git clone http://gitlab.com/ezlab/busco && cd busco && python setup.py install && cp scripts/*.py /usr/bin/ && cp config/config.ini.default config.ini
 
-ENV BUSCO_CONFIG_FILE "/root/config/config.ini"
+ENV BUSCO_CONFIG_FILE "/root/busco/config.ini"
 
