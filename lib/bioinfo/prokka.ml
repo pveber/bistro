@@ -2,7 +2,7 @@ open Core_kernel.Std
 open Bistro.EDSL
 
 
-let env = docker_image ~account:"pveber" ~name:"srst2" ~tag:"1.12" ()
+let env = docker_image ~account:"pveber" ~name:"prokka" ~tag:"1.12" ()
 
 let gram_expr = function
   | `Plus -> string "+"
