@@ -8,15 +8,14 @@ let gram_expr = function
   | `Plus -> string "+"
   | `Minus -> string "-"
 
-let run ?prefix ?addgenes ?locustag ?increment ?gffver ?compliant
+let run ?addgenes ?locustag ?increment ?gffver ?compliant
     ?centre ?genus ?species ?strain ?plasmid ?kingdom ?gcode ?gram
     ?usegenus ?proteins ?hmms ?metagenome ?rawproduct ?fast ?(threads = 1)
     ?mincontiglen ?evalue ?rfam ?norrna ?notrna ?rnammer fa =
   workflow ~descr:"prokka" ~np:threads ~mem:(3 * 1024) [
     mkdir_p dest ;
     cmd "prokka" ~env [
-      string "--force" ;
-      option (opt "--prefix" string) prefix ;
+      string "--force --prefix prokka_res" ;
       option (flag string "--addgenes") addgenes ;
       option (opt "--locustag" string) locustag ;
       option (opt "--increment" int) increment ;
@@ -47,3 +46,9 @@ let run ?prefix ?addgenes ?locustag ?increment ?gffver ?compliant
       dep fa ;
     ] ;
   ]
+
+
+let transcripts = selector ["prokka_res.ffn"] 
+let proteins = selector ["prokka_res.faa"]
+let gff_annotation = selector [ "prokka_res.gff" ]
+let gbk_annotation = selector [ "prokka_res.gbk" ]  
