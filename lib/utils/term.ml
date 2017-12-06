@@ -159,14 +159,14 @@ let has_error traces =
 
 let create
     ?(np = 1) ?mem:(`GB mem = `GB 1) ?logger ?(keep_all = true)
-    ?(bistro_dir = "_bistro")
+    ?(use_docker = true) ?(bistro_dir = "_bistro")
     app
   =
   let open Lwt in
   let allocator = Allocator.create ~np ~mem:(mem * 1024) in
   let workflows = to_workflow_list app in
   let dag, goals, precious = Scheduler.compile workflows in
-  let config = Task.config ~db_path:bistro_dir ~use_docker:true ~keep_all ~precious in
+  let config = Task.config ~db_path:bistro_dir ~use_docker ~keep_all ~precious in
   Scheduler.(run ?logger ~goals config allocator dag) >>= fun traces ->
   (
     match logger with
@@ -180,8 +180,8 @@ let create
   )
   else Ok (eval config.Task.db app)
 
-let run ?np ?mem ?logger ?keep_all ?bistro_dir app =
-  let thread = create ?np ?mem ?logger ?keep_all ?bistro_dir app in
+let run ?np ?mem ?logger ?keep_all ?use_docker ?bistro_dir app =
+  let thread = create ?np ?mem ?logger ?keep_all ?use_docker ?bistro_dir app in
   match Lwt_main.run thread with
   | Ok x -> x
   | Error msg ->

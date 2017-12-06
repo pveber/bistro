@@ -24,6 +24,7 @@ val create :
   ?mem:[`GB of int] ->
   ?logger:Scheduler.logger ->
   ?keep_all:bool ->
+  ?use_docker:bool ->
   ?bistro_dir:string ->
   'a t -> ('a, string) result Lwt.t
 
@@ -32,6 +33,7 @@ val run :
   ?mem:[`GB of int] ->
   ?logger:Scheduler.logger ->
   ?keep_all:bool ->
+  ?use_docker:bool ->
   ?bistro_dir:string ->
   'a t -> 'a
 

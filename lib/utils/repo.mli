@@ -24,6 +24,7 @@ val build  :
   ?mem:[`GB of int] ->
   ?logger:Scheduler.logger ->
   ?keep_all:bool ->
+  ?use_docker:bool ->
   ?precious:Bistro.any_workflow list ->
   ?bistro_dir:string ->
   outdir:string -> t -> unit
