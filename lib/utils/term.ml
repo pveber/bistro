@@ -126,22 +126,36 @@ let error_long_descr db buf tid =
     bprintf buf "%s\n" (In_channel.read_all (Db.stderr db tid))
 
 let error_report_aux db buf = function
-  | tid, Scheduler.Run { outcome ; _ } when Task.failure outcome ->
-    let short_descr = error_short_descr outcome in
+  | tid, Scheduler.Run { outcome ; _ } ->
+    if Task.failure outcome then
+      let short_descr = error_short_descr outcome in
+      bprintf buf "################################################################################\n" ;
+      bprintf buf "#                                                                              #\n" ;
+      bprintf buf "#  Task %s failed\n" tid ;
+      bprintf buf "#                                                                               \n" ;
+      bprintf buf "#------------------------------------------------------------------------------#\n" ;
+      bprintf buf "#                                                                               \n" ;
+      bprintf buf "# %s\n" short_descr ;
+      bprintf buf "#                                                                              #\n" ;
+      bprintf buf "################################################################################\n" ;
+      bprintf buf "###\n" ;
+      bprintf buf "##\n" ;
+      bprintf buf "#\n" ;
+      error_long_descr db buf tid outcome
+  | tid, Scheduler.Skipped (`Allocation_error err)->
     bprintf buf "################################################################################\n" ;
     bprintf buf "#                                                                              #\n" ;
     bprintf buf "#  Task %s failed\n" tid ;
     bprintf buf "#                                                                               \n" ;
     bprintf buf "#------------------------------------------------------------------------------#\n" ;
     bprintf buf "#                                                                               \n" ;
-    bprintf buf "# %s\n" short_descr ;
+    bprintf buf "# Allocation error: %s\n" err ;
     bprintf buf "#                                                                              #\n" ;
     bprintf buf "################################################################################\n" ;
     bprintf buf "###\n" ;
     bprintf buf "##\n" ;
-    bprintf buf "#\n" ;
-    error_long_descr db buf tid outcome
-  | _ -> ()
+    bprintf buf "#\n"
+  | _, Scheduler.Skipped (`Done_already | `Missing_dep) -> ()
 
 let error_report db traces =
   let buf = Buffer.create 1024 in
@@ -153,8 +167,8 @@ let error_report db traces =
 let has_error traces =
   String.Map.exists traces ~f:Scheduler.(function
       | Run { outcome ; _ } -> Task.failure outcome
-      | Skipped (`Missing_dep | `Allocation_error _) -> true
-      | Skipped `Done_already -> false
+      | Skipped (`Allocation_error _) -> true
+      | Skipped (`Missing_dep | `Done_already) -> false
     )
 
 let create
@@ -176,7 +190,7 @@ let create
     | None -> Lwt.return ()
   ) >|= fun () ->
   if has_error traces then (
-    Pervasives.Error (error_report config.Task.db traces)
+    Error (error_report config.Task.db traces)
   )
   else Ok (eval config.Task.db app)
 
