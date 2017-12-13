@@ -458,8 +458,8 @@ let post_revdeps_hook t config ~all_revdeps_succeeded =
 let failure = function
   | Input_check { pass ; _ }
   | Select_check { pass ; _ } -> not pass
-  | Step_result { outcome = `Succeeded ; _ } -> true
-  | Step_result { outcome = (`Failed | `Missing_output) ; _ } -> false
+  | Step_result { outcome = `Succeeded ; _ } -> false
+  | Step_result { outcome = (`Failed | `Missing_output) ; _ } -> true
 
 let render_step_command ~np ~mem config task cmd =
   let open Concrete_task in
