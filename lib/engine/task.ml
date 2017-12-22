@@ -253,7 +253,7 @@ module Concrete_task = struct
   let extract_file_dumps env action =
     let file_dumps = file_dumps_of_action action in
     let f (`File_dump (toks, in_docker)) =
-      let exec_env = if in_docker then make_docker_execution_env env else env in
+      let exec_env = if in_docker && env.use_docker then make_docker_execution_env env else env in
       let path = env.file_dump toks in
       let text = string_of_tokens exec_env toks in
       path, text
