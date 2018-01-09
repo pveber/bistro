@@ -490,10 +490,15 @@ module Std = struct
         cmd "bunzip2" [ opt "-c" dep bz2 ] ~stdout:dest
       ]
 
-    let tar_xfz tgz =
+    let tar_xfz ?strip_components tgz =
       workflow ~descr:"utils.tar_xfz" [
         mkdir_p dest ;
-        cmd "tar" [ string "xfz" ; dep tgz ; opt "-C" ident dest ] ;
+        cmd "tar" [
+          string "xfz" ;
+          dep tgz ;
+          opt "-C" ident dest ;
+          option (opt "--strip-components" int) strip_components ;
+        ] ;
       ]
 
     let crlf2lf f =

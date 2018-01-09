@@ -457,7 +457,10 @@ module Std : sig
     val gunzip : 'a gz workflow -> 'a workflow
     val bunzip2 : 'a bz2 workflow -> 'a workflow
     val unzip : 'a zip workflow -> 'a workflow
-    val tar_xfz : 'a tar gz workflow -> 'a workflow
+    val tar_xfz :
+      ?strip_components:int ->
+      'a tar gz workflow ->
+      'a workflow
     val crlf2lf : (#text_file as 'a) workflow -> 'a workflow
   end
 end
