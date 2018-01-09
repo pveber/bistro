@@ -19,7 +19,9 @@ let normalized_repo_item (Repo_item (repo_path, w)) (Term.Path cache_path) =
     cache_path ;
   }
 
-let ( %> ) path w = Repo_item (path, w)
+let item path w = Repo_item (path, w)
+
+let ( %> ) path w = item path w
 
 let is_strict_prefix ~prefix u =
   String.length prefix < String.length u

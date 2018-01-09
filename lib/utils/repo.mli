@@ -7,6 +7,8 @@ type t = item list
 
 val ( %> ) : string list -> _ workflow -> item
 
+val item : string list -> _ workflow -> item
+
 val singleton : string -> _ workflow -> t
 
 val add_prefix : string list -> t -> t
