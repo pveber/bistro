@@ -15,6 +15,9 @@ type result =
       stdout : string ;
       stderr : string ;
     }
+  | Map_command_result of {
+      pass : bool ;
+    }
 
 type config = private {
   db : Db.t ;
@@ -58,4 +61,20 @@ val render_step_dumps :
   mem:int ->
   config ->
   Bistro.step ->
+  (string * string) list
+
+val render_map_command_command :
+  np:int ->
+  mem:int ->
+  config ->
+  id:string ->
+  cmd:('a Bistro.workflow -> 'b Bistro.workflow Bistro.Command.t) ->
+  string
+
+val render_map_command_dumps :
+  np:int ->
+  mem:int ->
+  config ->
+  id:string ->
+  cmd:('a Bistro.workflow -> 'b Bistro.workflow Bistro.Command.t) ->
   (string * string) list

@@ -16,6 +16,8 @@ let workflow_deps =
   | Input _ -> []
   | Select (_, dir, _) -> [ dir ]
   | Step s -> s.deps
+  | Map_command m ->
+    Bistro.Command.deps (m.cmd m.dir)
 
 
 (* If [w] is a select, we need to ensure its parent dir is
@@ -27,8 +29,10 @@ let precious_expand =
   | (Input _ as w) -> [ w ]
   | Select (_, (Step _ as s), _) as w ->
     [ w ; s ]
+  | Select (_, (Map_command _ as s), _) as w ->
+    [ w ; s ]
   | Select (_, (Input _ | Select _), _) as w -> [ w ]
-  | Step _ as w -> [ w ]
+  | (Step _ | Map_command _) as w -> [ w ]
 
 let precious_expansion = List.concat_map ~f:precious_expand
 
@@ -48,11 +52,11 @@ let rec add_workflow (seen, dag) u =
               | Select (_, dep_dir, _) ->
                 let seen, dag = add_workflow accu dep_dir in
                 seen, DAG.add_dep dag u ~on:dep_dir
-              | Input _ | Step _ -> accu
+              | Input _ | Step _ | Map_command _ -> accu
             )
           in
           let seen, dag = add_workflow accu dep in
-          String.Map.add seen ~key:id ~data:u,
+          String.Map.set seen ~key:id ~data:u,
           DAG.add_dep dag u ~on:dep
         )
     in

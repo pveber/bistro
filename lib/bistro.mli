@@ -45,7 +45,6 @@ type id = string
 
 type dep = [
     `Task of id
-  | `Map of id
   | `Select of id * Path.t
   | `Input of Path.t
 ]
@@ -85,6 +84,11 @@ module Command : sig
     | MEM
     | EXE
 
+  val map :
+    f:('a -> 'b) ->
+    'a t ->
+    'b t
+
   val deps : 'a t -> 'a list
 end
 
@@ -93,10 +97,12 @@ type u = private
   | Input of string * Path.t
   | Select of string * u * Path.t (** invariant: [u] cannot be a [Select] *)
   | Step of step
-  | Map of {
+  | Map_command of {
       id : string ;
+      descr : string ;
+      np : int ;
       dir : u ;
-      f : u -> u ;
+      cmd : u -> u Command.t ;
     }
 
 and step = private {
@@ -118,6 +124,8 @@ and action =
 
 module U : sig
   type t = u
+  val to_dep : t -> dep
+  val select : t -> Path.t -> t
   val id : t -> string
   val compare : t -> t -> int
   val equal : t -> t -> bool
@@ -278,7 +286,12 @@ module EDSL : sig
   (** Constructs a workflow by selecting a dir or file from a
       directory workflow *)
 
-  val map : _ #directory workflow -> (_ workflow -> _ workflow) -> _ #directory workflow
+  val map_command :
+    ?descr:string ->
+    ?np:int ->
+    _ #directory workflow ->
+    (_ workflow -> command) ->
+    _ #directory workflow
 
   val cmd :
     string ->

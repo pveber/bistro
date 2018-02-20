@@ -63,7 +63,6 @@ type id = string
 
 type dep = [
     `Task of id
-  | `Map of id
   | `Select of id * Path.t
   | `Input of Path.t
 ]
@@ -86,7 +85,7 @@ end
 module Command = struct
   type 'a t =
     | Docker of docker_image * 'a t
-    | Simple_command of 'a token list
+    | Simple_command of 'a fragment
     | And_list of 'a t list
     | Or_list of 'a t list
     | Pipe_list of 'a t list
@@ -94,12 +93,14 @@ module Command = struct
   and 'a token =
     | S of string
     | D of 'a
-    | F of 'a token list
+    | F of 'a fragment
     | DEST
     | TMP
     | NP
     | MEM
     | EXE
+
+  and 'a fragment = 'a token list
 
   let rec deps_of_template tmpl =
     List.map tmpl ~f:(function
@@ -145,10 +146,12 @@ type u =
   | Input of string * Path.t
   | Select of string * u * Path.t (* invariant: [u] is not a select *)
   | Step of step
-  | Map of {
+  | Map_command of {
       id : string ;
+      descr : string ;
+      np : int ;
       dir : u ;
-      f : u -> u ;
+      cmd : u -> u Command.t ;
     }
 
 and step = {
@@ -168,13 +171,16 @@ and action =
       f : env -> unit ;
     }
 
+type ('a, 'b) selector = Selector of Path.t
+
+
 module U_impl = struct
 
   let id = function
     | Input (id, _)
     | Select (id, _, _)
     | Step { id ; _ }
-    | Map { id ; _ } -> id
+    | Map_command { id ; _ } -> id
 
   let compare u v =
     String.compare (id u) (id v)
@@ -182,16 +188,33 @@ module U_impl = struct
   let equal x y =
     compare x y = 0
 
+  let select u path =
+    let u, path =
+      match u with
+      | Select (_, v, p) -> v, p @ path
+      | Input _ | Step _ | Map_command _ -> u, path
+    in
+    let id = digest ("select", id u, path) in
+    Select (id, u, path)
+
+  let to_dep = function
+    | Step s -> `Task s.id
+    | Map_command m -> `Task m.id
+    | Input (_, p) -> `Input p
+    | Select (_, Input (_, p), q) ->
+      `Input (p @ q)
+    | Select (_, Step s, p) ->
+      `Select (s.id, p)
+    | Select (_, Map_command m, p) ->
+      `Select (m.id, p)
+    | Select (_, Select _, _) -> assert false
+
 end
 
 module U = struct
   type t = u
   include U_impl
 end
-
-type ('a, 'b) selector = Selector of Path.t
-
-
 
 module Workflow = struct
   type 'a t = U.t
@@ -202,19 +225,6 @@ module Workflow = struct
     let hash = if may_change then Some (Md5.digest_file_blocking_without_releasing_runtime_lock target) else None in
     let id = digest ("input", target, hash) in
     Input (id, Path.make_relative target)
-
-  let to_dep = function
-    | Step s -> `Task s.id
-    | Map m -> `Map m.id
-    | Input (_, p) -> `Input p
-    | Select (_, Input (_, p), q) ->
-      `Input (p @ q)
-    | Select (_, Step s, p) ->
-      `Select (s.id, p)
-    | Select (_, Map m, p) ->
-      `Select (m.id, p)
-    | Select (_, Select _, _) -> assert false
-
 
   let digestible_action = function
     | Exec cmd -> `Exec cmd
@@ -236,14 +246,22 @@ module Workflow = struct
   let of_fun ?descr ?mem ?np ?version ~id ~deps f =
     make ?descr ?mem ?np ?version (Eval { id ; f }) deps
 
-  let select u (Selector path) =
-    let u, path =
-      match u with
-      | Select (_, v, p) -> v, p @ path
-      | Input _ | Step _ | Map _ -> u, path
+  let select u (Selector p) = select u p
+
+  let map_command ?(descr = "") ?(np = 1) dir cmd =
+    let digestible_action =
+      input "input"
+      |> cmd
+      |> Command.map ~f:to_dep
     in
-    let id = digest ("select", id u, path) in
-    Select (id, u, path)
+    let id = digest ("map", U.id dir, digestible_action) in
+    Map_command {
+      id ;
+      descr ;
+      np ;
+      dir ;
+      cmd ;
+    }
 
   let u x = x
 end
@@ -373,13 +391,7 @@ module EDSL = struct
   let selector x = Selector x
   let ( / ) = Workflow.select
 
-  let map dir f =
-    let id = digest ("map", U.id dir, U.id (f (input "i"))) in
-    Map {
-      id ;
-      dir ;
-      f ;
-    }
+  let map_command = Workflow.map_command
 
   let docker_image ?tag ?registry ~account ~name () = {
     dck_account = account ;

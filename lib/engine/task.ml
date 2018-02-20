@@ -1,7 +1,7 @@
 open Core
 
 let digest x =
-  Digest.to_hex (Digest.string (Marshal.to_string x []))
+  Md5.to_hex (Md5.digest_string (Marshal.to_string x []))
 
 let ( >>= ) = Lwt.( >>= )
 let ( >>| ) = Lwt.( >|= )
@@ -37,6 +37,9 @@ type result =
       stdout : string ;
       stderr : string ;
     }
+  | Map_command_result of {
+      pass : bool ;
+    }
 
 type config = {
   db : Db.t ;
@@ -59,6 +62,8 @@ let requirement =
   | Select _ -> Allocator.Request { np = 0 ; mem = 0 }
   | Step { np ; mem ; _ } ->
     Allocator.Request { np ; mem }
+  | Map_command { np ; _ } ->
+    Allocator.Request { np ; mem = 100 (* FIXME *) }
 
 let rec command_uses_docker =
   let open Bistro.Command in
@@ -77,17 +82,17 @@ let action_uses_docker =
 
 type execution_env = {
   use_docker : bool ;
-  tmp_dir : string ;
-  dest : string ;
-  tmp : string ;
+  tmp_dir : string ; (* host all execution *)
+  dest : string ;    (* expected path for the target *)
+  tmp : string ;     (* temp dir for the process *)
   dep : Bistro.dep -> string ;
   file_dump : Bistro.dep Bistro.Command.token list -> string ;
   np : int ;
   mem : int ;
 }
 
-let make_execution_env { db ; use_docker ; _ } ~np ~mem step =
-  let tmp_dir = Db.tmp db step.Bistro.id in
+let make_execution_env { db ; use_docker ; _ } ~np ~mem id =
+  let tmp_dir = Db.tmp db id in
   let path_of_task_id tid = Db.cache db tid in
   let dep = function
     | `Input p ->
@@ -99,6 +104,7 @@ let make_execution_env { db ; use_docker ; _ } ~np ~mem step =
     | `Task tid -> path_of_task_id tid
     | `Select (tid, p) ->
       Filename.concat (path_of_task_id tid) (Bistro.Path.to_string p)
+    | `Map _ -> assert false
   in
   let file_dump toks =
     Filename.concat tmp_dir (digest toks)
@@ -140,7 +146,7 @@ module Concrete_task = struct
   let rec file_dumps_of_tokens in_docker toks =
     List.map toks ~f:(file_dumps_of_token in_docker)
     |> List.concat
-    |> List.dedup
+    |> List.dedup_and_sort
 
   and file_dumps_of_token in_docker =
     let open Bistro.Command in
@@ -154,7 +160,7 @@ module Concrete_task = struct
     | EXE -> []
     | F f ->
       (`File_dump (f, in_docker)) :: file_dumps_of_tokens in_docker f
-      |> List.dedup
+      |> List.dedup_and_sort
 
   let rec file_dumps_of_command in_docker =
     let open Bistro.Command in
@@ -165,7 +171,7 @@ module Concrete_task = struct
     | Pipe_list xs ->
       List.map xs ~f:(file_dumps_of_command in_docker)
       |> List.concat
-      |> List.dedup
+      |> List.dedup_and_sort
     | Docker (_, cmd) -> file_dumps_of_command true cmd
 
   let file_dumps_of_action =
@@ -336,7 +342,7 @@ let perform_step
     ({ db ; _ } as config)
     ({ Bistro.action ; _ } as step) =
   let uid = Unix.getuid () in
-  let env = make_execution_env config ~np ~mem step in
+  let env = make_execution_env config ~np ~mem step.id in
   let stdout = Db.stdout db step.id in
   let stderr = Db.stderr db step.id in
   remove_if_exists env.tmp_dir >>= fun () ->
@@ -409,11 +415,83 @@ let perform_select db dir sel =
       }
     )
 
+let perform_map_command
+    (Allocator.Resource { np ; mem })
+    config
+    ~id ~dir ~cmd =
+  let uid = Unix.getuid () in
+  let env = make_execution_env config ~np ~mem id in
+
+
+  let f fn =
+    let chunk_finaldest = Filename.concat env.dest fn in
+    if Sys.file_exists chunk_finaldest = `Yes then Lwt.return `Succeeded
+    else
+      let chunk_dir = sprintf "%s/%s/%s" env.tmp_dir "chunks" fn in
+      let chunk_stdout = Filename.concat chunk_dir "stdout" in
+      let chunk_stderr = Filename.concat chunk_dir "stderr" in
+      let chunk_tmp = Filename.concat chunk_dir "tmp" in
+      let chunk_dest = Filename.concat chunk_dir "dest" in
+      remove_if_exists chunk_dir >>= fun () ->
+      Unix.mkdir_p chunk_tmp ;
+
+      let input = Bistro.U.select dir [fn] in
+      let action =
+        Bistro.Exec (
+          cmd input
+          |> Bistro.(Command.map ~f:U.to_dep)
+        )
+      in
+      let chunk_env = { env with tmp_dir = chunk_dir ;
+                                 dest = chunk_dest ;
+                                 tmp = chunk_tmp ;
+                                 np = 1 ;
+                                 mem ; } in
+      let ct = Concrete_task.of_action chunk_env action in
+      let file_dumps = Concrete_task.extract_file_dumps env action in
+      Concrete_task.write_file_dumps file_dumps >>= fun () ->
+      Concrete_task.(perform ~stdout:chunk_stdout ~stderr:chunk_stderr ct) >>= fun exit_code ->
+      let dest_exists = Sys.file_exists chunk_dest = `Yes in
+      let success = exit_code = 0 && dest_exists in
+      if config.use_docker && action_uses_docker action then (
+        docker_chown env.tmp_dir uid ;
+        if dest_exists then docker_chown env.dest uid
+      ) ;
+      (
+        if success then
+          mv chunk_dest chunk_finaldest >>= fun () ->
+          remove_if_exists chunk_dir
+        else
+          Lwt.return ()
+      ) >>= fun () ->
+      let outcome = match exit_code = 0, dest_exists with
+          true, true -> `Succeeded
+        | false, _ -> `Failed
+        | true, false -> `Missing_output
+      in
+      Lwt.return outcome
+  in
+  let dir_contents =
+    env.dep (Bistro.U.to_dep dir)
+    |> Sys.readdir
+    |> Array.to_list
+  in
+  Unix.mkdir_p env.dest ;
+  Lwt_list.map_s f dir_contents >>= fun results ->
+  let success = List.for_all results ~f:(( = ) `Succeeded) in
+  (* FIXME copy stdout/stderr *)
+  Lwt.return (
+    Map_command_result {
+      pass = success ;
+    }
+  )
+
 let dep_of_select_child =
   let open Bistro in
   function
   | Input (_, p) -> `Input p
-  | Step { id ; _ } -> `Step id
+  | Step { id ; _ }
+  | Map_command { id ; _ } -> `Step id
   | Select _ -> assert false
 
 let perform alloc config =
@@ -422,15 +500,16 @@ let perform alloc config =
   | Input (_, p) -> perform_input (Bistro.Path.to_string p)
   | Select (_, dir, q) -> perform_select config.db (dep_of_select_child dir) q
   | Step s -> perform_step alloc config s
+  | Map_command { id ; dir ; cmd ; _ } ->
+    perform_map_command alloc config ~id ~dir ~cmd
 
 let is_done t { db ; _ } =
   let open Bistro in
   let path = match t with
     | Input (_, p) -> Bistro.Path.to_string p
     | Select (_, dir, q) -> select_path db (dep_of_select_child dir) q
-    | Step { id ; _ } ->
-      let b = Db.cache db id in
-      (*      printf "%s %s\n" descr b ; *) b
+    | Step { id ; _ }
+    | Map_command { id ; _ } -> Db.cache db id
   in
   Lwt.return (Sys.file_exists path = `Yes)
 
@@ -438,37 +517,63 @@ let clean t { db ; _ } =
   let open Bistro in
   match t with
   | Input _ | Select _ -> Lwt.return ()
-  | Step s ->
-    remove_if_exists (Db.cache db s.id) >>= fun () ->
-    remove_if_exists (Db.stdout db s.id) >>= fun () ->
-    remove_if_exists (Db.stderr db s.id)
+  | Map_command { id ; _ }
+  | Step { id ; _ } ->
+    remove_if_exists (Db.cache db id) >>= fun () ->
+    remove_if_exists (Db.stdout db id) >>= fun () ->
+    remove_if_exists (Db.stderr db id)
 
 let post_revdeps_hook t config ~all_revdeps_succeeded =
   let open Bistro in
   match t with
   | Input _ | Select _ -> Lwt.return ()
-  | Step s ->
+  | Map_command { id ; _ }
+  | Step { id ; _ } ->
     if
       not config.keep_all
-      && not (String.Set.mem config.precious s.id)
+      && not (String.Set.mem config.precious id)
       && all_revdeps_succeeded
     then clean t config
     else Lwt.return ()
 
 let failure = function
+  | Map_command_result { pass ; _ }
   | Input_check { pass ; _ }
   | Select_check { pass ; _ } -> not pass
   | Step_result { outcome = `Succeeded ; _ } -> false
   | Step_result { outcome = (`Failed | `Missing_output) ; _ } -> true
 
+
 let render_step_command ~np ~mem config task cmd =
   let open Concrete_task in
-  let env = make_execution_env ~np ~mem config task in
+  let env = make_execution_env ~np ~mem config task.Bistro.id in
   match of_cmd env cmd with
   | Sh cmd -> cmd
   | Eval _ -> ""
 
-let render_step_dumps ~np ~mem config s =
-  let env = make_execution_env ~np ~mem config s in
-  let `File_dumps res = Concrete_task.extract_file_dumps env s.action in
+let render_step_dumps ~np ~mem config { Bistro.id ; action ; _ } =
+  let env = make_execution_env ~np ~mem config id in
+  let `File_dumps res = Concrete_task.extract_file_dumps env action in
+  res
+
+let render_map_command_command ~np ~mem config ~id ~cmd =
+  let open Bistro in
+  let open Concrete_task in
+  let env = make_execution_env ~np ~mem config id in
+  let cmd =
+    cmd (EDSL.input "<input>")
+    |> Command.map ~f:Workflow.to_dep
+  in
+  match of_cmd env cmd with
+  | Sh cmd -> cmd
+  | Eval _ -> ""
+
+let render_map_command_dumps ~np ~mem config ~id ~cmd =
+  let open Bistro in
+  let env = make_execution_env ~np ~mem config id in
+  let cmd =
+    cmd (EDSL.input "<input>")
+    |> Command.map ~f:Workflow.to_dep
+  in
+  let `File_dumps res = Concrete_task.extract_file_dumps env (Exec cmd) in
   res

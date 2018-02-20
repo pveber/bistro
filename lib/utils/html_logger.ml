@@ -51,6 +51,15 @@ let translate_event config _ = function
         Some (Step_task_started { step ; action = `Eval ; file_dumps = [] })
     )
 
+  | Scheduler.Task_started (Bistro.Map_command _,
+                            Allocator.Resource _) ->
+    (
+      assert false (* FIXME *)
+      (* let cmd = Task.render_map_command_command ~np ~mem config ~id ~cmd in
+       * let file_dumps = Task.render_map_command_dumps ~np ~mem config ~id ~cmd in
+       * Some (Step_task_started { step ; action = `Sh cmd ; file_dumps }) *)
+    )
+
   | Scheduler.Task_ended outcome ->
     Some (Task_ended outcome)
 
@@ -216,6 +225,7 @@ module Render = struct
             p [ k "missing_output" ]
         ]
         ~body:(step_result_details ~id:step.id ~action ~cache ~stderr ~stdout ~dumps)
+    | Map_command_result _ -> assert false (* FIXME *)
 
   let task =
     let open Bistro in
@@ -243,6 +253,9 @@ module Render = struct
         ~header:[]
         ~body:[ item "id" [ k id ] ]
 
+    | Map_command _ -> assert false (* FIXME *)
+    | Select (_, Map_command _, _) -> assert false (* FIXME *)
+
   let task_start ~step:{ Bistro.descr ; id ; _ } ~action ~file_dumps:_ =
     collapsible_panel
       ~title:[ k descr ]
@@ -262,6 +275,7 @@ module Render = struct
         ~title:[ k descr ]
         ~header:[]
         ~body:[ item "id" [ a ~a:[a_href path] [ k id ] ] ]
+    | Map_command _ -> assert false (* FIXME *)
 
   let event_label_text col text =
     let col = match col with
@@ -289,6 +303,7 @@ module Render = struct
 
     | Step_result { outcome = `Succeeded ; _ } ->
       event_label_text `GREEN "DONE"
+    | Map_command_result _ -> assert false (* FIXME *)
 
   let event time evt =
     let table_line label details =
