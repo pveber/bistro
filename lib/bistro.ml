@@ -1,7 +1,7 @@
 open Core_kernel.Std
 
 let digest x =
-  Digest.to_hex (Digest.string (Marshal.to_string x []))
+  Md5.to_hex (Md5.digest_string (Marshal.to_string x []))
 
 module Path = struct
   type t = string list
@@ -63,6 +63,7 @@ type id = string
 
 type dep = [
     `Task of id
+  | `Map of id
   | `Select of id * Path.t
   | `Input of Path.t
 ]
@@ -107,7 +108,7 @@ module Command = struct
         | S _ | DEST | TMP | NP | MEM | EXE -> []
       )
     |> List.concat
-    |> List.dedup
+    |> List.dedup_and_sort
 
   let rec deps = function
     | And_list xs
@@ -115,7 +116,7 @@ module Command = struct
     | Pipe_list xs ->
       List.map xs ~f:deps
       |> List.concat
-      |> List.dedup
+      |> List.dedup_and_sort
     | Simple_command tokens -> deps_of_template tokens
     | Docker (_, c) -> deps c
 
@@ -144,6 +145,11 @@ type u =
   | Input of string * Path.t
   | Select of string * u * Path.t (* invariant: [u] is not a select *)
   | Step of step
+  | Map of {
+      id : string ;
+      dir : u ;
+      f : u -> u ;
+    }
 
 and step = {
   id : string ;
@@ -167,7 +173,8 @@ module U_impl = struct
   let id = function
     | Input (id, _)
     | Select (id, _, _)
-    | Step { id ; _ } -> id
+    | Step { id ; _ }
+    | Map { id ; _ } -> id
 
   let compare u v =
     String.compare (id u) (id v)
@@ -192,17 +199,20 @@ module Workflow = struct
   include U_impl
 
   let input ?(may_change = false) target =
-    let hash = if may_change then Some (Digest.file target) else None in
+    let hash = if may_change then Some (Md5.digest_file_blocking_without_releasing_runtime_lock target) else None in
     let id = digest ("input", target, hash) in
     Input (id, Path.make_relative target)
 
   let to_dep = function
     | Step s -> `Task s.id
+    | Map m -> `Map m.id
     | Input (_, p) -> `Input p
     | Select (_, Input (_, p), q) ->
       `Input (p @ q)
     | Select (_, Step s, p) ->
       `Select (s.id, p)
+    | Select (_, Map m, p) ->
+      `Select (m.id, p)
     | Select (_, Select _, _) -> assert false
 
 
@@ -230,7 +240,7 @@ module Workflow = struct
     let u, path =
       match u with
       | Select (_, v, p) -> v, p @ path
-      | Input _ | Step _ -> u, path
+      | Input _ | Step _ | Map _ -> u, path
     in
     let id = digest ("select", id u, path) in
     Select (id, u, path)
@@ -362,6 +372,14 @@ module EDSL = struct
 
   let selector x = Selector x
   let ( / ) = Workflow.select
+
+  let map dir f =
+    let id = digest ("map", U.id dir, U.id (f (input "i"))) in
+    Map {
+      id ;
+      dir ;
+      f ;
+    }
 
   let docker_image ?tag ?registry ~account ~name () = {
     dck_account = account ;

@@ -122,6 +122,7 @@ let rec workflow_path' db =
   | Select (_, dir, p) ->
     Filename.concat (workflow_path' db dir) (Path.to_string p)
   | Step s -> cache db s.id
+  | Map s -> cache db s.id
 
 let workflow_path db w =
   workflow_path' db (Bistro.Workflow.u w)

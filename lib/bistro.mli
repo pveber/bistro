@@ -45,6 +45,7 @@ type id = string
 
 type dep = [
     `Task of id
+  | `Map of id
   | `Select of id * Path.t
   | `Input of Path.t
 ]
@@ -92,6 +93,11 @@ type u = private
   | Input of string * Path.t
   | Select of string * u * Path.t (** invariant: [u] cannot be a [Select] *)
   | Step of step
+  | Map of {
+      id : string ;
+      dir : u ;
+      f : u -> u ;
+    }
 
 and step = private {
   id : string ;
@@ -271,6 +277,8 @@ module EDSL : sig
   val ( / ) : _ #directory workflow -> ('a, 'b) selector -> 'b workflow
   (** Constructs a workflow by selecting a dir or file from a
       directory workflow *)
+
+  val map : _ #directory workflow -> (_ workflow -> _ workflow) -> _ #directory workflow
 
   val cmd :
     string ->

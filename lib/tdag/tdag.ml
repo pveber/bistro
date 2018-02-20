@@ -207,7 +207,7 @@ module Make(D : Domain) = struct
             performance_thread config logger alloc dep_traces u
         in
         S.add u seen,
-        M.add table ~key:(Task.id u) ~data:thread
+        M.set table ~key:(Task.id u) ~data:thread
     in
     List.fold sources ~init:(S.empty, M.empty) ~f:(Fn.flip aux)
     |> snd
@@ -269,7 +269,7 @@ module Make(D : Domain) = struct
       let status = if is_done then `DONE else `TODO in
       let seen = String.Set.add seen tid in
       let call_stack = if status = `TODO then t :: call_stack else call_stack in
-      let status_map = String.Map.add status_map ~key:tid ~data:(t, status) in
+      let status_map = String.Map.set status_map ~key:tid ~data:(t, status) in
       fold_s
         (G.successors g t)
         ~init:(seen, call_stack, status_map)
