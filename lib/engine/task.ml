@@ -479,7 +479,14 @@ let perform_map_command
   Unix.mkdir_p env.dest ;
   Lwt_list.map_s f dir_contents >>= fun results ->
   let success = List.for_all results ~f:(( = ) `Succeeded) in
-  (* FIXME copy stdout/stderr *)
+  ((* FIXME copy stdout/stderr *)
+    if success then (
+      let cache_dest = Db.cache config.db id in
+      mv env.dest cache_dest >>= fun () ->
+      remove_if_exists env.tmp_dir
+    )
+    else Lwt.return ()
+  ) >>= fun () ->
   Lwt.return (
     Map_command_result {
       pass = success ;
