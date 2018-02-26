@@ -17,7 +17,6 @@ let shape = function
   | Bistro.Input _
   | Select _
   | Step _ -> `Box
-  | Map_command _ -> `Box3d
 
 let dot_output dag ~needed ~already_done ~precious fn =
   let vertex_attribute u =
@@ -32,8 +31,7 @@ let dot_output dag ~needed ~already_done ~precious fn =
     | Select (_, _, p) ->
       let label = Bistro.Path.to_string p in
       [ `Label label ; `Fontcolor color ; `Color color ; shape ]
-    | Step { descr ; id ; _ }
-    | Map_command { descr ; id ; _ } as u ->
+    | Step { descr ; id ; _ } as u ->
       let already_done  = Hash_set.mem already_done u in
       let precious = String.Set.mem precious id in
       let label_suffix = if precious then "*" else "" in

@@ -103,7 +103,7 @@ let error_long_descr db buf tid =
   | Select_check _ -> ()
   | Map_command_result _ ->
     bprintf buf "some command failed"
-  | Step_result { action ; dumps ; _ } ->
+  | Step_result { action ; file_dumps ; _ } ->
     (
       match action with
       | `Sh cmd ->
@@ -113,7 +113,7 @@ let error_long_descr db buf tid =
         bprintf buf "%s\n" cmd
       | `Eval -> ()
     ) ;
-    List.iter dumps ~f:(fun (path, text) ->
+    List.iter file_dumps ~f:(fun (Task.File_dump { path ; text }) ->
         bprintf buf "+------------------------------------------------------------------------------+\n" ;
         bprintf buf "|> Dumped file: %s\n" path ;
         bprintf buf "+------------------------------------------------------------------------------+\n" ;

@@ -146,13 +146,6 @@ type u =
   | Input of string * Path.t
   | Select of string * u * Path.t (* invariant: [u] is not a select *)
   | Step of step
-  | Map_command of {
-      id : string ;
-      descr : string ;
-      np : int ;
-      dir : u ;
-      cmd : u -> u Command.t ;
-    }
 
 and step = {
   id : string ;
@@ -166,6 +159,10 @@ and step = {
 
 and action =
   | Exec of dep Command.t
+  | Par_exec of {
+      dir : u ;
+      cmd : u -> u Command.t ;
+    }
   | Eval of {
       id : string ;
       f : env -> unit ;
@@ -179,8 +176,7 @@ module U_impl = struct
   let id = function
     | Input (id, _)
     | Select (id, _, _)
-    | Step { id ; _ }
-    | Map_command { id ; _ } -> id
+    | Step { id ; _ } -> id
 
   let compare u v =
     String.compare (id u) (id v)
@@ -192,21 +188,18 @@ module U_impl = struct
     let u, path =
       match u with
       | Select (_, v, p) -> v, p @ path
-      | Input _ | Step _ | Map_command _ -> u, path
+      | Input _ | Step _ -> u, path
     in
     let id = digest ("select", id u, path) in
     Select (id, u, path)
 
   let to_dep = function
     | Step s -> `Task s.id
-    | Map_command m -> `Task m.id
     | Input (_, p) -> `Input p
     | Select (_, Input (_, p), q) ->
       `Input (p @ q)
     | Select (_, Step s, p) ->
       `Select (s.id, p)
-    | Select (_, Map_command m, p) ->
-      `Select (m.id, p)
     | Select (_, Select _, _) -> assert false
 
 end
@@ -228,6 +221,11 @@ module Workflow = struct
 
   let digestible_action = function
     | Exec cmd -> `Exec cmd
+    | Par_exec { dir ; cmd } ->
+      `Par_exec (
+        cmd dir
+        |> Command.map ~f:to_dep
+      )
     | Eval { id ; _ } -> `Eval id
 
   let digestible_deps xs =
@@ -247,21 +245,6 @@ module Workflow = struct
     make ?descr ?mem ?np ?version (Eval { id ; f }) deps
 
   let select u (Selector p) = select u p
-
-  let map_command ?(descr = "") ?(np = 1) dir cmd =
-    let digestible_action =
-      input "input"
-      |> cmd
-      |> Command.map ~f:to_dep
-    in
-    let id = digest ("map", U.id dir, digestible_action) in
-    Map_command {
-      id ;
-      descr ;
-      np ;
-      dir ;
-      cmd ;
-    }
 
   let u x = x
 end
@@ -391,7 +374,10 @@ module EDSL = struct
   let selector x = Selector x
   let ( / ) = Workflow.select
 
-  let map_command = Workflow.map_command
+  let map_command ?descr ?mem ?np dir cmd =
+    let deps = Command.deps (cmd dir) in
+    let action = Par_exec { dir ; cmd } in
+    Workflow.make ?descr ?mem ?np action deps
 
   let docker_image ?tag ?registry ~account ~name () = {
     dck_account = account ;

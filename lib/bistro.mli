@@ -97,13 +97,6 @@ type u = private
   | Input of string * Path.t
   | Select of string * u * Path.t (** invariant: [u] cannot be a [Select] *)
   | Step of step
-  | Map_command of {
-      id : string ;
-      descr : string ;
-      np : int ;
-      dir : u ;
-      cmd : u -> u Command.t ;
-    }
 
 and step = private {
   id : string ;
@@ -117,6 +110,10 @@ and step = private {
 
 and action =
   | Exec of dep Command.t
+  | Par_exec of {
+      dir : u ;
+      cmd : u -> u Command.t ;
+    }
   | Eval of {
       id : string ;
       f : env -> unit ;
@@ -288,6 +285,7 @@ module EDSL : sig
 
   val map_command :
     ?descr:string ->
+    ?mem:int ->
     ?np:int ->
     _ #directory workflow ->
     (_ workflow -> command) ->

@@ -6,8 +6,6 @@ type time = float
 type event =
   | Step_task_started of {
       step : Bistro.step ;
-      action : [`Sh of string | `Eval ] ;
-      file_dumps : (string * string) list ;
     }
   | Task_ended of Task.result
   | Task_done_already of {
@@ -39,26 +37,8 @@ let create path = {
 }
 
 let translate_event config _ = function
-  | Scheduler.Task_started (Bistro.Step step,
-                            Allocator.Resource { np ; mem }) ->
-    (
-      match step.Bistro.action with
-      | Bistro.Exec cmd ->
-        let cmd = Task.render_step_command ~np ~mem config step cmd in
-        let file_dumps = Task.render_step_dumps ~np ~mem config step in
-        Some (Step_task_started { step ; action = `Sh cmd ; file_dumps })
-      | Bistro.Eval _ ->
-        Some (Step_task_started { step ; action = `Eval ; file_dumps = [] })
-    )
-
-  | Scheduler.Task_started (Bistro.Map_command _,
-                            Allocator.Resource _) ->
-    (
-      assert false (* FIXME *)
-      (* let cmd = Task.render_map_command_command ~np ~mem config ~id ~cmd in
-       * let file_dumps = Task.render_map_command_dumps ~np ~mem config ~id ~cmd in
-       * Some (Step_task_started { step ; action = `Sh cmd ; file_dumps }) *)
-    )
+  | Scheduler.Task_started (Bistro.Step step, _) ->
+    Some (Step_task_started { step })
 
   | Scheduler.Task_ended outcome ->
     Some (Task_ended outcome)
@@ -140,11 +120,11 @@ module Render = struct
   let step_file_dumps = function
     | [] -> k"" ;
     | _ :: _ as dumps ->
-      let modals = List.map dumps ~f:(fun (fn, contents) ->
+      let modals = List.map dumps ~f:(fun (Task.File_dump { text ; path }) ->
           let id, modal =
-            modal ~header:[ k fn ] ~body:[ pre [ k contents ] ]
+            modal ~header:[ k path ] ~body:[ pre [ k text ] ]
           in
-          id, fn, modal
+          id, path, modal
         )
       in
       let links =
@@ -171,7 +151,7 @@ module Render = struct
       ]
     | `Eval -> div []
 
-  let step_result_details ~id ~action ~cache ~stdout ~stderr ~dumps =
+  let step_result_details ~id ~action ~cache ~stdout ~stderr ~file_dumps =
     let outputs = div [
         item "outcome" [
           a ~a:[a_href stdout ] [ k "stdout" ] ;
@@ -190,7 +170,7 @@ module Render = struct
 
       outputs ;
       step_action action ;
-      step_file_dumps dumps ;
+      step_file_dumps file_dumps ;
     ]
 
   let task_result =
@@ -213,7 +193,7 @@ module Render = struct
               a ~a:[a_href dir_path] [k dir_path ] ]
         ) ]
 
-    | Step_result { exit_code ; outcome ; step ; stdout ; stderr ; cache ; dumps ; action } ->
+    | Step_result { exit_code ; outcome ; step ; stdout ; stderr ; cache ; file_dumps ; action } ->
       collapsible_panel
         ~title:[ k step.descr ]
         ~header:[
@@ -224,7 +204,7 @@ module Render = struct
           | `Missing_output ->
             p [ k "missing_output" ]
         ]
-        ~body:(step_result_details ~id:step.id ~action ~cache ~stderr ~stdout ~dumps)
+        ~body:(step_result_details ~id:step.id ~action ~cache ~stderr ~stdout ~file_dumps)
     | Map_command_result _ -> assert false (* FIXME *)
 
   let task =
@@ -253,16 +233,12 @@ module Render = struct
         ~header:[]
         ~body:[ item "id" [ k id ] ]
 
-    | Map_command _ -> assert false (* FIXME *)
-    | Select (_, Map_command _, _) -> assert false (* FIXME *)
-
-  let task_start ~step:{ Bistro.descr ; id ; _ } ~action ~file_dumps:_ =
+  let task_start ~step:{ Bistro.descr ; id ; _ } =
     collapsible_panel
       ~title:[ k descr ]
       ~header:[]
       ~body:[
         item "id" [ k id ] ;
-        step_action action ;
       ]
 
   let cached_task t path =
@@ -275,7 +251,6 @@ module Render = struct
         ~title:[ k descr ]
         ~header:[]
         ~body:[ item "id" [ a ~a:[a_href path] [ k id ] ] ]
-    | Map_command _ -> assert false (* FIXME *)
 
   let event_label_text col text =
     let col = match col with
@@ -314,10 +289,10 @@ module Render = struct
       ]
     in
     match evt with
-    | Step_task_started { step ; action ; file_dumps } ->
+    | Step_task_started { step } ->
       table_line
         (event_label_text `BLACK "STARTED")
-        (task_start ~step ~action ~file_dumps)
+        (task_start ~step)
 
     | Task_ended result ->
       table_line (result_label result) (task_result result)
