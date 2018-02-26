@@ -399,6 +399,19 @@ struct
     Lwt.return (exit_code, outcome ~dest_exists ~exit_code)
 
 
+  let parmap jobs ~k ~f =
+    let alloc = Allocator.create ~np:k ~mem:0 in
+    let f x =
+      Allocator.(request alloc (Request { np = 1 ; mem = 0 })) >>=
+      function
+      | Ok token ->
+        f x >>= fun y ->
+        Allocator.release alloc token ;
+        Lwt.return y
+      | Error _ -> assert false
+    in
+    Lwt_list.map_p f jobs
+
   let perform_par_command ~env ~cmds ~dir_contents =
     let f (dest, (Command cmd as command)) =
       if Sys.file_exists dest = `Yes then Lwt.return `Succeeded
@@ -415,7 +428,7 @@ struct
   in
   Unix.mkdir_p env.dest ;
   List.map2_exn dir_contents cmds ~f:(fun dst cmd -> dst, cmd)
-  |> Lwt_list.map_s f >>= fun results ->
+  |> parmap ~k:env.np ~f >>= fun results ->
   let success = List.for_all results ~f:(( = ) `Succeeded) in
   (* FIXME copy stdout/stderr *)
   Lwt.return (
