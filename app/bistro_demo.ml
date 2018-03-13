@@ -4,33 +4,40 @@ open Core
 open Bistro.Std
 open Bistro.EDSL
 open Bistro_bioinfo.Std
-open Bistro_engine
 open Bistro_utils
 
-let common_spec =
-  let open Command.Spec in
-  empty
-  +> flag "--outdir"  (required string) ~doc:"DIR Directory where to link exported targets"
-  +> flag "--np"      (optional_with_default 4 int) ~doc:"INT Number of processors"
-  +> flag "--mem"     (optional_with_default 4 int) ~doc:"INT Available memory (in GB)"
-  +> flag "--verbose" no_arg ~doc:" Logs build events on the console"
-  +> flag "--html-report" (optional string) ~doc:"PATH Logs build events in an HTML report"
+let common_spec f =
+  let open Command.Let_syntax in
+  [%map_open
+    let outdir =
+      flag "--outdir" (required string) ~doc:"DIR Directory where to link exported targets"
+    and np =
+      flag "--np" (optional_with_default 4 int) ~doc:"INT Number of processors"
+    and mem =
+      flag "--mem" (optional_with_default 4 int) ~doc:"INT Available memory (in GB)"
+    and verbose =
+      flag "--verbose" no_arg ~doc:" Logs build events on the console"
+    and html_report =
+      flag "--html-report" (optional string) ~doc:"PATH Logs build events in an HTML report"
+    in
+    f ~outdir ~np ~mem ~verbose ~html_report
+  ]
 
 let logger verbose html_report =
-  Bistro_logger.tee
-    (if verbose then Bistro_console_logger.create () else Bistro_logger.null)
-    (Bistro_logger.tee
-       (Bistro_dot_output.create "dag.dot")
-       (match html_report with
-        | Some path -> Bistro_html_logger.create path
-        | None -> Bistro_logger.null))
+  Logger.tee [
+    (if verbose then Console_logger.create () else Logger.null) ;
+    (Dot_output.create "dag.dot") ;
+    (match html_report with
+     | Some path -> Html_logger.create path
+     | None -> Logger.null)
+  ]
 
 
-let main repo outdir np mem verbose html_report () =
-  let open Bistro_repo in
+let main repo ~outdir ~np ~mem ~verbose ~html_report () =
+  let open Repo in
   build
     ~keep_all:false
-    ~np ~mem:(mem * 1024)
+    ~np ~mem:(`GB mem)
     ~logger:(logger verbose html_report)
     ~outdir repo
 
@@ -49,17 +56,15 @@ module ChIP_seq = struct
 
   let chIP_pho4_noPi_macs2 = Macs2.callpeak ~mfold:(1,100) Macs2.bam [ chIP_pho4_noPi_bam ]
 
-  let repo = Bistro_repo.[
+  let repo = Repo.[
     [ "chIP_pho4_noPi_macs2.peaks" ] %> chIP_pho4_noPi_macs2
   ]
 
-  let spec = common_spec
-
   let command =
+    let open Command.Let_syntax in
     Command.basic
       ~summary:"Analysis of a ChIP-seq dataset"
-      spec
-      (main repo)
+      (common_spec (main repo))
 end
 
 module RNA_seq = struct
@@ -119,18 +124,14 @@ module RNA_seq = struct
       [ [   "0" ], counts (`WT, `High_Pi) ;
         [ "360" ], counts (`WT, `No_Pi 360) ; ]
 
-  let repo = Bistro_repo.[
+  let repo = Repo.[
     [ "deseq2" ; "0_vs_360" ] %> deseq2#effect_table ;
   ]
-
-  let spec = common_spec
 
   let command =
     Command.basic
       ~summary:"Analysis of a RNA-seq dataset"
-      spec
-      (main repo)
-
+      (common_spec (main repo))
 end
 
 let command =
