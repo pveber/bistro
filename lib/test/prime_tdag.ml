@@ -201,12 +201,14 @@ let check_performed xs =
 let command =
   Command.basic
     ~summary:"Tests job scheduling on an integer divisor DAG"
-    Command.Spec.empty
-    (fun () ->
-       let n = 100 in
-       let g = TG.make n in
-       Lwt_main.run (
-         TG.run ~logger:TG.logger () (Allocator.create ()) g >>| fun _ ->
-         check_performed (List.rev !performed) ;
-         check_events n (List.rev !events)
-       ))
+    (
+      Command.Param.return (fun () ->
+          let n = 100 in
+          let g = TG.make n in
+          Lwt_main.run (
+            TG.run ~logger:TG.logger () (Allocator.create ()) g >>| fun _ ->
+            check_performed (List.rev !performed) ;
+            check_events n (List.rev !events)
+          )
+        )
+    )

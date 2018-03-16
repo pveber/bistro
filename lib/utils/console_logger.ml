@@ -16,6 +16,7 @@ let error_short_descr =
   function
   | Input_check _ -> "input doesn't exist"
   | Select_check _ -> "invalid select"
+  | Map_command_result _ -> "some command failed"
   | Step_result { exit_code ; outcome ; _ } ->
     match outcome with
     | `Succeeded -> assert false

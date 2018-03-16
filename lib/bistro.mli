@@ -84,6 +84,11 @@ module Command : sig
     | MEM
     | EXE
 
+  val map :
+    f:('a -> 'b) ->
+    'a t ->
+    'b t
+
   val deps : 'a t -> 'a list
 end
 
@@ -105,6 +110,10 @@ and step = private {
 
 and action =
   | Exec of dep Command.t
+  | Par_exec of {
+      dir : u ;
+      cmd : u -> u Command.t ;
+    }
   | Eval of {
       id : string ;
       f : env -> unit ;
@@ -112,6 +121,8 @@ and action =
 
 module U : sig
   type t = u
+  val to_dep : t -> dep
+  val select : t -> Path.t -> t
   val id : t -> string
   val compare : t -> t -> int
   val equal : t -> t -> bool
@@ -271,6 +282,14 @@ module EDSL : sig
   val ( / ) : _ #directory workflow -> ('a, 'b) selector -> 'b workflow
   (** Constructs a workflow by selecting a dir or file from a
       directory workflow *)
+
+  val map_command :
+    ?descr:string ->
+    ?mem:int ->
+    ?np:int ->
+    _ #directory workflow ->
+    (_ workflow -> command) ->
+    _ #directory workflow
 
   val cmd :
     string ->

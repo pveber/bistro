@@ -42,7 +42,7 @@ let main () =
       assert (mem = 1)
     | _ -> assert false
   ) ;
-  Bistro_app.(
+  Term.(
     run (
       pure (fun xs ->
           List.iter xs ~f:(fun (Path p) ->
@@ -56,5 +56,4 @@ let main () =
 let command =
   Command.basic
     ~summary:"Basic test of PPX extension"
-    Command.Spec.(empty)
-    main
+    (Command.Param.return main)

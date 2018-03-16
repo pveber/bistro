@@ -2,6 +2,11 @@ open Core
 
 type t = Bistro.u
 
+type file_dump = File_dump of {
+    text : string ;
+    path : string ;
+  }
+
 type result =
   | Input_check of { path : string ; pass : bool }
   | Select_check of { dir_path : string ; sel : string list ; pass : bool }
@@ -10,10 +15,13 @@ type result =
       step : Bistro.step ;
       exit_code : int ;
       action : [`Sh of string | `Eval] ;
-      dumps : (string * string) list ;
+      file_dumps : file_dump list ;
       cache : string option ;
       stdout : string ;
       stderr : string ;
+    }
+  | Map_command_result of {
+      pass : bool ;
     }
 
 type config = private {
@@ -43,19 +51,3 @@ val post_revdeps_hook :
   all_revdeps_succeeded:bool ->
   unit Lwt.t
 val clean : t -> config -> unit Lwt.t
-
-(* LOW-LEVEL API *)
-val render_step_command :
-  np:int ->
-  mem:int ->
-  config ->
-  Bistro.step ->
-  Bistro.dep Bistro.Command.t ->
-  string
-
-val render_step_dumps :
-  np:int ->
-  mem:int ->
-  config ->
-  Bistro.step ->
-  (string * string) list

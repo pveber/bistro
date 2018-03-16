@@ -24,27 +24,28 @@ let pipeline n debug =
   let middle = append l1 "middle" in
   let l2 = List.init n ~f:(fun i -> append [ middle ] (sprintf "l2_%d" i)) in
   let final = append l2 "final" in
-  let open Bistro_app in
+  let open Term in
   List.map (final :: if debug then l2 else []) ~f:(fun x -> pureW x)
   |> list
 
 let main n debug dot_output () =
-  let open Bistro_app in
+  let open Term in
   let logger =
-    Bistro_logger.tee
-      (if dot_output then Bistro_dot_output.create "accordion.dot" else Bistro_logger.null)
-      (Bistro_console_logger.create ())
+    Logger.tee [
+      if dot_output then Dot_output.create "accordion.dot" else Logger.null ;
+      Console_logger.create () ;
+    ]
   in
   run ~logger (pipeline n debug)
   |> ignore
 
 let command =
+  let open Command.Let_syntax in
   Command.basic
     ~summary:"Performance test on large pipelines"
-    Command.Spec.(
-      empty
-      +> flag "-n" (required int) ~doc:"INT size of the pipeline"
-      +> flag "--debug" no_arg ~doc:" sets many targets in the final repo"
-      +> flag "--dot-output" no_arg ~doc:" produces a dot file"
-    )
-    main
+    [%map_open
+      let n = flag "-n" (required int) ~doc:"INT size of the pipeline"
+      and debug = flag "--debug" no_arg ~doc:" sets many targets in the final repo"
+      and dot_output = flag "--dot-output" no_arg ~doc:" produces a dot file" in
+      main n debug dot_output
+    ]

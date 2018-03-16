@@ -17,7 +17,6 @@ let workflow_deps =
   | Select (_, dir, _) -> [ dir ]
   | Step s -> s.deps
 
-
 (* If [w] is a select, we need to ensure its parent dir is
    marked as precious. [w] only performs a side effect, the
    real contents is in the result of selected workflow. *)
@@ -52,7 +51,7 @@ let rec add_workflow (seen, dag) u =
             )
           in
           let seen, dag = add_workflow accu dep in
-          String.Map.add seen ~key:id ~data:u,
+          String.Map.set seen ~key:id ~data:u,
           DAG.add_dep dag u ~on:dep
         )
     in

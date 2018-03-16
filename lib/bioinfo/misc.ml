@@ -9,9 +9,6 @@ let string_of_path = function
 
 let path_of_string s = String.split ~on:'/' s
 
-let digest x =
-  Digest.to_hex (Digest.string (Marshal.to_string x []))
-
 let python_version fmt =
   let regexp = match fmt with
     | `M_m -> "[0-9]\\.[0-9]"

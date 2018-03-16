@@ -87,6 +87,8 @@ let error_short_descr =
     sprintf "Input %s doesn't exist" path
   | Select_check { dir_path ; sel ; _ } ->
     sprintf "Path %s doesn't exist in %s" (Bistro.Path.to_string sel) dir_path
+  | Map_command_result _ ->
+    "Some command failed"
   | Step_result { exit_code ; outcome ; _ } ->
     match outcome with
     | `Missing_output -> "Missing output"
@@ -99,7 +101,9 @@ let error_long_descr db buf tid =
   function
   | Input_check _
   | Select_check _ -> ()
-  | Step_result { action ; dumps ; _ } ->
+  | Map_command_result _ ->
+    bprintf buf "some command failed"
+  | Step_result { action ; file_dumps ; _ } ->
     (
       match action with
       | `Sh cmd ->
@@ -109,7 +113,7 @@ let error_long_descr db buf tid =
         bprintf buf "%s\n" cmd
       | `Eval -> ()
     ) ;
-    List.iter dumps ~f:(fun (path, text) ->
+    List.iter file_dumps ~f:(fun (Task.File_dump { path ; text }) ->
         bprintf buf "+------------------------------------------------------------------------------+\n" ;
         bprintf buf "|> Dumped file: %s\n" path ;
         bprintf buf "+------------------------------------------------------------------------------+\n" ;

@@ -13,24 +13,30 @@ module S = Hash_set.Make(T)
 let light_gray = 0xC0C0C0
 let black = 0
 
+let shape = function
+  | Bistro.Input _
+  | Select _
+  | Step _ -> `Box
+
 let dot_output dag ~needed ~already_done ~precious fn =
   let vertex_attribute u =
     let open Bistro in
     let needed = Hash_set.mem needed u in
     let color = if needed then black else light_gray in
+    let shape = `Shape (shape u) in
     match u with
     | Input (_, p) ->
       let label = Bistro.Path.to_string p in
-      [ `Label label ; `Color color ; `Fontcolor color ; `Shape `Box ]
+      [ `Label label ; `Color color ; `Fontcolor color ; shape ]
     | Select (_, _, p) ->
       let label = Bistro.Path.to_string p in
-      [ `Label label ; `Fontcolor color ; `Color color ; `Shape `Box ]
+      [ `Label label ; `Fontcolor color ; `Color color ; shape ]
     | Step { descr ; id ; _ } as u ->
       let already_done  = Hash_set.mem already_done u in
       let precious = String.Set.mem precious id in
       let label_suffix = if precious then "*" else "" in
       [ `Label (descr ^ label_suffix) ;
-        `Shape `Box ;
+        shape ;
         `Peripheries (if already_done then 2 else 1) ;
         `Color color ;
         `Fontcolor color ;
