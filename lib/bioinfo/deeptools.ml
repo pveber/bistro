@@ -359,7 +359,7 @@ let plotHeatmap
       option (opt "--refPointLabel" string) refPointLabel  ;
       option (opt "--regionsLabel" (slist string)) regionsLabel ;
       option (opt "--samplesLabel" (slist string)) samplesLabel ;
-      option (opt "--plotTitle" string) plotTitle ;
+      option (opt "--plotTitle" (string % quote ~using:'\'')) plotTitle ;
       option (opt "--yAxisLabel" string) yAxisLabel ;
       option (opt "--yMin" (slist float)) yMin ;
       option (opt "--yMax" (slist float)) yMax ;
