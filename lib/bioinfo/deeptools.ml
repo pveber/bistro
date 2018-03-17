@@ -15,7 +15,7 @@ end
 let bigwig = `bigWig
 let bedgraph = `bedGraph
 let png = `png
-let pdf = `png
+let pdf = `pdf
 let svg = `svg
 
 let ext_of_format = function
