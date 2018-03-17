@@ -447,6 +447,8 @@ struct
     touch env.stderr >>= fun () ->
     let (read_from_child, write_to_parent) = Unix.pipe () in
     let (read_from_parent, write_to_child) = Unix.pipe () in
+    remove_if_exists env.tmp_dir >>= fun () ->
+    Unix.mkdir_p env.tmp ;
     match Unix.fork () with
     | `In_the_child ->
       Unix.close read_from_child ;
