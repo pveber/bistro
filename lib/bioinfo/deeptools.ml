@@ -371,37 +371,36 @@ let plotHeatmap
     mv tmp_file dest ;
   ]
 
-let plotHeatmap = (plotHeatmap :   ?dpi:int ->
-  ?kmeans:int ->
-  ?hclust:int ->
-  ?sortRegions:[`descend | `ascend | `no] ->
-  ?sortUsing:[`mean | `median | `max | `min | `sum | `region_length] ->
-  ?sortUsingSamples:int list ->
-  ?averageTypeSummaryPlot:[`mean | `median | `min | `max | `std | `sum] ->
-  ?missingDataColor:string ->
-  ?colorMap:string ->
-  ?alpha:float ->
-  ?colorList:string list ->
-  ?colorNumber:int ->
-  ?zMin:float list ->
-  ?zMax:float list ->
-  ?heatmapHeight:float ->
-  ?heatmapWidth:float ->
-  ?whatToShow:[`plot_heatmap_and_colorbar | `plot_and_heatmap | `heatmap_only | `heatmap_and_colorbar] ->
-  ?boxAroundHeatmaps:bool ->
-  ?xAxisLabel:string ->
-  ?startLabel:string ->
-  ?endLabel:string ->
-  ?refPointLabel:string ->
-  ?regionsLabel:string list ->
-  ?samplesLabel:string list ->
-  ?plotTitle:string ->
-  ?yAxisLabel:string ->
-  ?yMin:float list ->
-  ?yMax:float list ->
-  ?legendLocation:[`best | `upper_right | `upper_left | `upper_center | `lower_left | `lower_right | `lower_center | `center | `center_left | `center_right | `none] ->
-  ?perGroup:bool ->
-  'a img_format ->
-  deeptools_matrix gz workflow ->
-  'a workflow
-                  )
+let corMethod_enum =
+  Fn.compose string (function
+      | `spearman -> "spearman"
+      | `pearson -> "pearson"
+    )
+
+let whatToPlot_enum =
+  Fn.compose string (function
+      | `heatmap -> "heatmap"
+      | `scatterplot -> "scatterplot"
+    )
+
+let plotCorrelation
+    ?skipZeros ?labels ?plotTitle ?removeOutliers
+    ?colorMap ?plotNumbers ?log1p
+    ~corMethod ~whatToPlot output_format corData
+  =
+  workflow  ~descr:"deeptools.plotCorrelation" [
+    cmd "plotCorrelation" ~env [
+      opt "--corData" dep corData ;
+      opt "--corMethod" corMethod_enum corMethod ;
+      opt "--whatToPlot" whatToPlot_enum whatToPlot ;
+      opt "--plotFile" Fn.id dest ;
+      opt "--plotFileFormat" string (ext_of_format output_format) ;
+      option (flag string "--skipZeros") skipZeros ;
+      option (opt "--labels" (list ~sep:" " string)) labels ;
+      option (opt "--plotTitle" (string % quote ~using:'\'')) plotTitle ;
+      option (flag string "--removeOutliers") removeOutliers ;
+      option (opt "--colorMap" string) colorMap ;
+      option (flag string "--plotNumbers") plotNumbers ;
+      option (flag string "--log1p") log1p ;
+    ] ;
+  ]

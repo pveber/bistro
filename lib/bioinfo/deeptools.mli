@@ -184,6 +184,19 @@ val plotHeatmap :
   deeptools_matrix gz workflow ->
   'a workflow
 
+val plotCorrelation :
+  ?skipZeros:bool ->
+  ?labels:string list ->
+  ?plotTitle:string ->
+  ?removeOutliers:bool ->
+  ?colorMap:string ->
+  ?plotNumbers:bool ->
+  ?log1p:bool ->
+  corMethod:[`spearman | `pearson] ->
+  whatToPlot:[`heatmap | `scatterplot] ->
+  'a img_format ->
+  compressed_numpy_array workflow ->
+  _ directory workflow
 
 (* val plotProfile : *)
 (*   ?dpi:int -> *)
