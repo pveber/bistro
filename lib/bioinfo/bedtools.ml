@@ -40,8 +40,8 @@ let slop ?strand ?header ~mode _ input chrom_size =
   ]
 
 let intersect ?ubam ?wa ?wb ?loj ?wo ?wao ?u ?c ?v ?f ?_F ?r ?e ?s ?_S
-    ?split ?sorted ?g ?header ?filenames ?sortout file files =
-    workflow ~descr:"bedtools.intersect" ~mem:(3 * 1024) ~np:8 [
+    ?split ?sorted ?g ?header ?filenames ?sortout _ file files =
+    workflow ~descr:"bedtools.intersect" [
       cmd "bedtools intersect" ~env ~stdout:dest [
         option (flag string "-ubam") ubam ;
         option (flag string "-wa") wa ;

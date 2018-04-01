@@ -66,9 +66,10 @@ val intersect :
   ?header:bool ->
   ?filenames:bool ->
   ?sortout:bool ->
-  #bed3 workflow ->
+  'a input ->
+  'a workflow ->
   #bed3 workflow list ->
-  #bed3 workflow
+  'a workflow
 
 val bamtobed :
   ?bed12:bool ->
