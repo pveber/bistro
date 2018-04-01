@@ -67,29 +67,28 @@ let indexed_bam_of_bam bam =
 let indexed_bam_to_bam =
   selector ["reads.bam"]
 
-(* let output_format_expr = function *)
-(*   | Bam -> string "-b" *)
-(*   | Sam -> string "" *)
+let output_format_expr = function
+  | Bam -> string "-b"
+  | Sam -> string ""
 
-(*
-let view ?input_format ?output_format ?_1 ?u ?h ?_H ?c ?_L ?q ?m ?f ?_F ?_B ?s file =
-  workflow ~descr:"samtools.view" ~mem:(3 * 1024) ~np:8 [
+
+let view ~output (* ?_1 ?u *) ?h ?_H (* ?c ?_L *) ?q (* ?m ?f ?_F ?_B ?s *) file =
+  workflow ~descr:"samtools.view" [
     cmd "samtools view" ~env [
-      option output_format_expr output_format ;
-      option (flag string "-1") _1 ;
-      option (flag string "-u") u ;
+      output_format_expr output ;
+      (* option (flag string "-1") _1 ; *)
+      (* option (flag string "-u") u ; *)
       option (flag string "-h") h ;
       option (flag string "-H") _H ;
-      option (flag string "-c") c ;
-      option (opt "-L" dep) _L ;
+      (* option (flag string "-c") c ; *)
+      (* option (opt "-L" dep) _L ; *)
       option (opt "-q" int) q ;
-      option (opt "-m" int) m ;
-      option (opt "-f" int) f ;
-      option (opt "-F" int) _F ;
-      option (flag string "-B") _B ;
-      option (opt "-s" float) s ;
+      (* option (opt "-m" int) m ; *)
+      (* option (opt "-f" int) f ; *)
+      (* option (opt "-F" int) _F ; *)
+      (* option (flag string "-B") _B ; *)
+      (* option (opt "-s" float) s ; *)
       dep file ;
       opt "-o" ident dest ;
     ]
   ]
-*)
