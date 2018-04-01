@@ -1,5 +1,7 @@
 open Bistro.Std
 
+val env : docker_image
+
 class type table = object
   inherit tsv
   method header : [`yes]
