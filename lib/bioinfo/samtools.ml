@@ -59,7 +59,7 @@ let indexed_bam_of_bam bam =
     mkdir_p dest ;
     samtools "sort" [
       dep bam ;
-      dest // "reads" ;
+      opt "-o" Fn.id (dest // "reads") ;
     ] ;
     samtools "index" [ dest // "reads.bam" ] ;
   ]
