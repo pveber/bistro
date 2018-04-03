@@ -15,7 +15,7 @@ let sra_of_input = function
 let fastq_dump_gz input =
   let sra = sra_of_input input in
   workflow ~descr:"sratoolkit.fastq_dump" [
-    cmd ~env "fastq-dump" [ string "-Z" ; sra ] ~stdout:dest
+    cmd ~env "fastq-dump" [ string "--gzip" ; string "-Z" ; sra ] ~stdout:dest
   ]
 
 let fastq_dump_pe sra =
