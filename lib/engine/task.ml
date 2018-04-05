@@ -49,6 +49,7 @@ type result =
     }
   | Map_command_result of {
       pass : bool ;
+      step : Bistro.step ;
     }
 
 type config = {
