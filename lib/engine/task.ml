@@ -443,7 +443,7 @@ struct
     try Unix.waitpid pid
     with Unix.Unix_error (Unix.EINTR, _, _) -> waitpid pid
 
-  let perform_eval step cache_dest env f =
+  let perform_eval env f =
     touch env.stdout >>= fun () ->
     touch env.stderr >>= fun () ->
     let (read_from_child, write_to_parent) = Unix.pipe () in
@@ -499,7 +499,7 @@ struct
       | Par_sh { cmds ; dir_contents ; env } ->
         perform_par_command ~env ~cmds ~dir_contents
       | Eval { f ; env } ->
-        perform_eval step cache_dest env f
+        perform_eval env f
     ) >>= fun (outcome, exit_code, action, file_dumps) ->
     (
       if outcome = `Succeeded then
