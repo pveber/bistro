@@ -5,6 +5,7 @@ RUN echo 'source("https://bioconductor.org/biocLite.R") ; biocLite()' | R --vani
 RUN echo 'source("https://bioconductor.org/biocLite.R") ; biocLite("DESeq2")' | R --vanilla
 RUN echo 'source("https://bioconductor.org/biocLite.R") ; biocLite("GenoGAM")' | R --vanilla
 RUN echo 'source("https://bioconductor.org/biocLite.R") ; biocLite("chipseq")' | R --vanilla
+RUN echo 'source("https://bioconductor.org/biocLite.R") ; biocLite("ChIPQC")' | R --vanilla
 RUN echo 'install.packages("gplots", repos="https://pbil.univ-lyon1.fr/CRAN/")' | R --vanilla
 RUN echo 'install.packages("pvclust", repos="https://pbil.univ-lyon1.fr/CRAN/")' | R --vanilla
 RUN echo 'install.packages("pheatmap", repos="https://pbil.univ-lyon1.fr/CRAN/")' | R --vanilla
