@@ -1,4 +1,4 @@
-open Core_kernel.Std
+open Core_kernel
 
 let digest x =
   Md5.to_hex (Md5.digest_string (Marshal.to_string x []))
@@ -109,7 +109,7 @@ module Command = struct
         | S _ | DEST | TMP | NP | MEM | EXE -> []
       )
     |> List.concat
-    |> List.dedup_and_sort
+    |> List.dedup_and_sort ~compare:Caml.compare
 
   let rec deps = function
     | And_list xs
@@ -117,7 +117,7 @@ module Command = struct
     | Pipe_list xs ->
       List.map xs ~f:deps
       |> List.concat
-      |> List.dedup_and_sort
+      |> List.dedup_and_sort ~compare:Caml.compare
     | Simple_command tokens -> deps_of_template tokens
     | Docker (_, c) -> deps c
 

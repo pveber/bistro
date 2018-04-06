@@ -197,7 +197,7 @@ struct
   let rec file_dumps_of_tokens in_docker toks =
     List.map toks ~f:(file_dumps_of_token in_docker)
     |> List.concat
-    |> List.dedup_and_sort
+    |> List.dedup_and_sort ~compare:Caml.compare
 
   and file_dumps_of_token in_docker =
     let open Bistro.Command in
@@ -214,7 +214,7 @@ struct
         contents = contents ;
         in_docker = in_docker
       } :: file_dumps_of_tokens in_docker contents
-      |> List.dedup_and_sort
+      |> List.dedup_and_sort ~compare:Caml.compare
 
   let rec file_dumps_of_command in_docker =
     let open Bistro.Command in
@@ -225,7 +225,7 @@ struct
     | Pipe_list xs ->
       List.map xs ~f:(file_dumps_of_command in_docker)
       |> List.concat
-      |> List.dedup_and_sort
+      |> List.dedup_and_sort ~compare:Caml.compare
     | Docker (_, cmd) -> file_dumps_of_command true cmd
 
   let token env =

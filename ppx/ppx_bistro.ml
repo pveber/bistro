@@ -1,4 +1,5 @@
-open! Ppx_core
+open Base
+open Ppxlib
 
 let rec extract_body = function
   | { pexp_desc = Pexp_fun (_,_,_,body) ; _ } -> extract_body body
@@ -153,7 +154,6 @@ let version_attr =
     (fun x -> x)
 
 let ext =
-  let open Ppx_core in
   let open Extension in
   let pattern =
     let open Ast_pattern in

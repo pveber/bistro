@@ -1,4 +1,4 @@
-open Core_kernel.Std
+open Core_kernel
 open Bistro.EDSL
 
 let env = docker_image ~account:"pveber" ~name:"tophat" ~tag:"2.1.1" ()

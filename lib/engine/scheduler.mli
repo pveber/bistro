@@ -1,4 +1,4 @@
-open Core_kernel.Std
+open Core_kernel
 open Bistro_tdag
 
 module DAG : Tdag_sig.S

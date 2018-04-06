@@ -1,4 +1,4 @@
-open Core_kernel.Std
+open Core_kernel
 open Bistro.EDSL
 
 let env = docker_image ~account:"pveber" ~name:"bedtools" ~tag:"2.21.0" ()

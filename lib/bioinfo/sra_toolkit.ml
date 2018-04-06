@@ -1,4 +1,4 @@
-open Core_kernel.Std
+open Core_kernel
 open Bistro.EDSL
 
 let env = docker_image ~account:"pveber" ~name:"sra-toolkit" ~tag:"2.8.0" ()

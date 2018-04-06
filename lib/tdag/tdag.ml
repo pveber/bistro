@@ -1,4 +1,4 @@
-open Core_kernel.Std
+open Core_kernel
 open Tdag_sig
 
 module Make(D : Domain) = struct

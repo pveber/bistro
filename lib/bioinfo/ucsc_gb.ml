@@ -1,4 +1,4 @@
-open Core_kernel.Std
+open Core_kernel
 open Bistro.Std
 open Bistro.EDSL
 open Defs
@@ -141,7 +141,7 @@ let twoBitToFa bed twobits =
 (* (\*       twoBitToFa ~positions:(`bed bed) ~seq2b ~fa:path) *\) *)
 
 (* (\* let fetch_sequences (File seq2b) locations = *\) *)
-(* (\*   let open Core_kernel.Std in *\) *)
+(* (\*   let open Core_kernel in *\) *)
 (* (\*   Core_extended.Sys_utils.with_tmp ~pre:"gzm" ~suf:".seqList" (fun seqList -> *\) *)
 (* (\*     Core_extended.Sys_utils.with_tmp ~pre:"gzm" ~suf:".fa" (fun fa -> *\) *)
 (* (\*       (\\* Write locations to a file *\\) *\) *)
