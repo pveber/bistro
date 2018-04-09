@@ -2,8 +2,8 @@
  ((name ppx_bistro)
   (public_name bistro.ppx)
   (kind ppx_rewriter)
-  (libraries (ppx_driver))
-  (preprocess (pps (ppx_metaquot ppx_driver.runner)))
+  (libraries (ppxlib))
+  (preprocess (pps (ppxlib.metaquot ppxlib.runner)))
   ))
 
 (jbuild_version 1)

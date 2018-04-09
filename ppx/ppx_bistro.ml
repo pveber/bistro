@@ -169,4 +169,4 @@ let ext =
   declare "bistro" Context.structure_item pattern rewriter
 
 let () =
-  Ppx_driver.register_transformation "bistro" ~extensions:[ ext ]
+  Driver.register_transformation "bistro" ~extensions:[ ext ]
