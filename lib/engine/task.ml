@@ -1,19 +1,8 @@
 open Core
+open Lwt_utils
 
 let digest x =
   Md5.to_hex (Md5.digest_string (Marshal.to_string x []))
-
-let ( >>= ) = Lwt.( >>= )
-let ( >>| ) = Lwt.( >|= )
-
-let mv src dst =
-  Lwt_process.exec ("", [| "mv" ; src ; dst |]) >>| ignore
-
-let remove_if_exists fn =
-  if Sys.file_exists fn = `Yes then
-    Lwt_process.exec ("", [| "rm" ; "-rf" ; fn |]) >>| ignore
-  else
-    Lwt.return ()
 
 let docker_chown dir uid =
   sprintf "docker run --log-driver=none --rm -v %s:/bistro -i busybox chown -R %d /bistro" dir uid

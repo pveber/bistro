@@ -40,6 +40,9 @@ val run :
 val dry_run :
   'a t -> Scheduler.dry_run
 
+val clean_run :
+  'a t -> unit
+
 module Syntax : sig
   module Let_syntax : sig
     type nonrec 'a t = 'a t

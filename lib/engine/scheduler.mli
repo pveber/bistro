@@ -56,3 +56,8 @@ val dry_run :
   Task.config ->
   DAG.t ->
   dry_run Lwt.t
+
+val clean_run :
+  Task.config ->
+  DAG.t ->
+  unit Lwt.t

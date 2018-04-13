@@ -83,3 +83,19 @@ let run ?logger ?goals alloc config dag =
 
 let dry_run ?goals config dag =
   DAG.dry_run ?goals config dag
+
+let clean_run config dag =
+  let all_tasks =
+    DAG.fold_tasks dag ~init:String.Set.empty ~f:(fun acc t ->
+        String.Set.add acc (Task.id t)
+      )
+  in
+  let to_be_deleted =
+    Db.fold_cache config.Task.db ~init:String.Set.empty ~f:(fun acc id ->
+        if not (String.Set.mem all_tasks id)
+        then String.Set.add acc id
+        else acc
+      )
+  in
+  String.Set.elements to_be_deleted
+  |> Lwt_list.iter_p (fun id -> Lwt_utils.remove_if_exists (Db.cache config.db id))

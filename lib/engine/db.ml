@@ -125,3 +125,8 @@ let rec workflow_path' db =
 
 let workflow_path db w =
   workflow_path' db (Bistro.Workflow.u w)
+
+let fold_cache db ~init ~f =
+  Array.fold
+    (Sys.readdir (cache_dir db))
+    ~init ~f
