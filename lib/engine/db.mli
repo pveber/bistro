@@ -34,3 +34,9 @@ val stderr : t -> string -> string
 val build : t -> string -> string
 
 val workflow_path : t -> _ Bistro.Workflow.t -> string
+
+val fold_cache :
+  t ->
+  init:'a ->
+  f:('a -> string -> 'a) ->
+  'a
