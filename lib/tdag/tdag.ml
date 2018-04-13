@@ -106,6 +106,9 @@ module Make(D : Domain) = struct
   let add_dep g u ~on:v =
     G.add_edge g u v
 
+  let fold_tasks g ~init ~f =
+    G.fold_vertex (Fn.flip f) g init
+
   let dot_output g vertex_attributes edge_attributes fn =
     let module G = struct
       include G

@@ -91,6 +91,13 @@ module type S = sig
   val empty : t
   val add_task : t -> task -> t
   val add_dep : t -> task -> on:task -> t
+
+  val fold_tasks :
+    t ->
+    init:'a ->
+    f:('a -> task -> 'a) ->
+    'a
+
   val dot_output :
     t ->
     (task -> Graph.Graphviz.DotAttributes.vertex list) ->
