@@ -212,3 +212,12 @@ let dry_run term =
   let config = Task.config ~db_path:"_bistro" ~use_docker:true ~keep_all:true ~precious in
   Scheduler.dry_run ~goals config dag
   |> Lwt_main.run
+
+
+let clean_run term =
+  let workflows = to_workflow_list term in
+  let dag, _, precious = Scheduler.compile workflows in
+  let config =
+    Task.config ~db_path:"_bistro" ~use_docker:true ~keep_all:true ~precious in
+  Scheduler.clean_run config dag
+  |> Lwt_main.run
