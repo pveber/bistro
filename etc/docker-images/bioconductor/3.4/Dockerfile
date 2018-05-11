@@ -10,3 +10,5 @@ RUN echo 'install.packages("gplots", repos="https://pbil.univ-lyon1.fr/CRAN/")' 
 RUN echo 'install.packages("pvclust", repos="https://pbil.univ-lyon1.fr/CRAN/")' | R --vanilla
 RUN echo 'install.packages("pheatmap", repos="https://pbil.univ-lyon1.fr/CRAN/")' | R --vanilla
 RUN echo 'install.packages("cluster", repos="https://pbil.univ-lyon1.fr/CRAN/")' | R --vanilla
+RUN echo 'source("https://bioconductor.org/biocLite.R") ; biocLite("limma")' | R --vanilla
+RUN echo 'install.packages("ggfortify", repos="https://pbil.univ-lyon1.fr/CRAN/")' | R --vanilla
