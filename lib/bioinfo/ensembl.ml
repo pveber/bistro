@@ -63,3 +63,11 @@ let gtf ?(chr_name = `ensembl) ~release ~species =
     | `ucsc -> ucsc_chr_names_gtf
   in
   f @@ Unix_tools.(gunzip (wget url))
+
+let cdna ~release ~species =
+  let url = sprintf "ftp://ftp.ensembl.org/pub/release-%d/fasta/%s/cdna/%s.%s.cdna.all.fa.gz"
+      release (string_of_species species)
+      (String.capitalize (string_of_species species))
+      (lab_label_of_genome (ucsc_reference_genome ~release ~species))
+  in
+  Unix_tools.wget url
