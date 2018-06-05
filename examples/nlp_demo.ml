@@ -1,4 +1,4 @@
-open Bistro_pack
+open Bistro
 
 let wikipedia_query q : text_file workflow =
   let url = "https://en.wikipedia.org/api/rest_v1/page/summary/" ^ q in

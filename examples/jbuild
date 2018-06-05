@@ -1,9 +1,6 @@
 (jbuild_version 1)
 
-
-(executable
- ((name nlp_demo)
-  (modules (nlp_demo))
-  (libraries (bistro.pack))
-  (preprocess (pps (ppx_jane)))
-))
+(executables
+ ((names (ngs_qc nlp_demo))
+  (libraries (bistro bistro.unix bistro.bioinfo))
+  (preprocess (pps (ppx_bistro)))))
