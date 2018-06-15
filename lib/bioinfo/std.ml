@@ -3,11 +3,11 @@ class type bed3 = Defs.bed3
 class type bed4 = Defs.bed4
 class type bed5 = Defs.bed5
 class type bed6 = Defs.bed6
-type fasta = Defs.fasta
+class type fasta = Defs.fasta
 class type gff = Defs.gff
-type 'a fastq = 'a Defs.fastq
-type sam = Defs.sam
-type sra = Defs.sra
+class type ['a] fastq = ['a] Defs.fastq
+class type sam = Defs.sam
+class type sra = Defs.sra
 
 module Bed = Bed
 module Bedtools = Bedtools
