@@ -1,3 +1,13 @@
+v0.4.0 2018-06-16 Lyon
+----------------------
+
+- ppx syntax extension to write workflow steps as regular OCaml functions
+- new workflow type, that maps a command on all files of a directory in //
+- use class types for phantom typing
+- started a documentation!
+- dry-run execution mode
+- new docker files
+
 v0.3.0 2017-06-21 Lyon
 ----------------------
 
