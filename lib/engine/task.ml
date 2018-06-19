@@ -196,6 +196,7 @@ struct
     | TMP
     | S _
     | D _
+    | I _
     | MEM
     | EXE -> []
     | F contents ->
@@ -217,11 +218,12 @@ struct
       |> List.dedup_and_sort ~compare:Caml.compare
     | Docker (_, cmd) -> file_dumps_of_command true cmd
 
-  let token env =
+  let token host_env env =
     let open Bistro.Command in
     function
     | S s -> s
     | D d -> env.dep d
+    | I d -> In_channel.read_all (host_env.dep d)
     | F toks -> env.file_dump toks
     | DEST -> env.dest
     | TMP -> env.tmp
@@ -229,8 +231,8 @@ struct
     | MEM -> string_of_int env.mem
     | EXE -> Sys.argv.(0)
 
-  let string_of_tokens env xs =
-    List.map ~f:(token env) xs
+  let string_of_tokens host_env env xs =
+    List.map ~f:(token host_env env) xs
     |> String.concat
 
   let deps_mount env dck_env deps =
@@ -253,13 +255,13 @@ struct
 
   let par x = "(" ^ x ^ ")"
 
-  let rec string_of_command env =
+  let rec string_of_command host_env env =
     let open Bistro.Command in
     function
-    | Simple_command tokens -> string_of_tokens env tokens
-    | And_list xs -> par (string_of_command_aux env " && " xs)
-    | Or_list xs -> par (string_of_command_aux env " || " xs)
-    | Pipe_list xs -> par (string_of_command_aux env " | " xs)
+    | Simple_command tokens -> string_of_tokens host_env env tokens
+    | And_list xs -> par (string_of_command_aux host_env env " && " xs)
+    | Or_list xs -> par (string_of_command_aux host_env env " || " xs)
+    | Pipe_list xs -> par (string_of_command_aux host_env env " | " xs)
     | Docker (image, cmd) ->
       if env.using_docker then
         let dck_env = make_docker_execution_env env in
@@ -270,30 +272,30 @@ struct
           (tmp_mount env dck_env)
           (dest_mount env dck_env)
           (docker_image_url image)
-          (string_of_command (make_docker_execution_env env) cmd)
+          (string_of_command host_env (make_docker_execution_env env) cmd)
       else
-        string_of_command env cmd
+        string_of_command host_env env cmd
 
-  and string_of_command_aux env sep xs =
-    List.map xs ~f:(string_of_command env)
+  and string_of_command_aux host_env env sep xs =
+    List.map xs ~f:(string_of_command host_env env)
     |> String.concat ~sep
 
-  let compile_file_dump env (Symbolic_file_dump { contents ; in_docker }) =
+  let compile_file_dump host_env env (Symbolic_file_dump { contents ; in_docker }) =
     let exec_env =
       if in_docker && env.using_docker
       then make_docker_execution_env env
       else env
     in
     let path = env.file_dump contents in
-    let text = string_of_tokens exec_env contents in
+    let text = string_of_tokens host_env exec_env contents in
     File_dump { path ; text }
 
   let make_cmd env cmd =
     Command {
-      text = string_of_command env cmd ;
+      text = string_of_command env env cmd ;
       file_dumps =
         file_dumps_of_command false cmd
-        |> List.map ~f:(compile_file_dump env) ;
+        |> List.map ~f:(compile_file_dump env env) ;
       env ;
       uses_docker = command_uses_docker cmd ;
     }

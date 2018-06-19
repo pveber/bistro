@@ -77,6 +77,7 @@ module Command : sig
   and 'a token =
     | S of string
     | D of 'a
+    | I of 'a
     | F of 'a token list
     | DEST
     | TMP
@@ -216,6 +217,8 @@ module Template : sig
   val dep : _ Workflow.t -> t
   (** [dep w] is interpreted as the path where to find the result of
       workflow [w] *)
+
+  val insert : _ Workflow.t -> t
 
   val quote : ?using:char -> t -> t
   (** [quote ~using:c t] surrounds template [t] with character [c] *)

@@ -93,6 +93,7 @@ module Command = struct
   and 'a token =
     | S of string
     | D of 'a
+    | I of 'a
     | F of 'a fragment
     | DEST
     | TMP
@@ -104,7 +105,8 @@ module Command = struct
 
   let rec deps_of_template tmpl =
     List.map tmpl ~f:(function
-        | D r -> [ r ]
+        | D r
+        | I r -> [ r ]
         | F toks -> deps_of_template toks
         | S _ | DEST | TMP | NP | MEM | EXE -> []
       )
@@ -132,6 +134,7 @@ module Command = struct
   and map_token ~f x = match x with
     | S s -> S s
     | D dep -> D (f dep)
+    | I dep -> I (f dep)
     | F toks -> F (List.map toks ~f:(map_token ~f))
     | DEST -> DEST
     | TMP -> TMP
@@ -266,6 +269,7 @@ module Template = struct
   let float f = string (Float.to_string f)
   let path p = string (Path.to_string p)
   let dep w = [ Command.D w ]
+  let insert w = [ Command.I w ]
 
   let quote ?using:(c = '"') e =
     let quote_symbol = Command.S (Char.to_string c) in
