@@ -55,12 +55,23 @@ let rec file_dumps_of_command in_docker =
     |> List.dedup_and_sort ~compare:Caml.compare
   | Docker (_, cmd) -> file_dumps_of_command true cmd
 
+let rec eval_expr : type s. Execution_env.t -> s Workflow.expr -> s = fun env e ->
+  let open Workflow in
+  match e with
+  | Pure { value } -> value
+  | App (f, x) -> (eval_expr env f) (eval_expr env x)
+  | List xs -> List.map xs ~f:(eval_expr env)
+  | Glob { dir ; pattern } -> assert false
+  | Map_workflows { xs ; f } ->
+    List.map (eval_expr env xs) ~f
+  | Dep w -> env.dep (eval_expr env w)
+  | Deps ws -> List.map (eval_expr env ws) ~f:env.dep
 
 let string_of_token (env : Execution_env.t) =
   let open Template in
   function
   | S s -> s
-  | D d -> env.dep d
+  | D d -> eval_expr env d
   | F toks -> env.file_dump toks
   | DEST -> env.dest
   | TMP -> env.tmp
@@ -79,6 +90,11 @@ let deps_mount ~env ~dck_env deps =
   Docker.mount_options
     ~host_paths:(List.map deps env.dep)
     ~container_paths:(List.map deps dck_env.dep)
+
+let cache_mount env =
+  Docker.mount_options
+    ~host_paths:[Db.cache_dir env.Execution_env.db]
+    ~container_paths:[Execution_env.docker_cache_dir]
 
 let file_dumps_mount env dck_env file_dumps =
   let open Execution_env in
@@ -114,7 +130,7 @@ let rec string_of_command env =
       let dck_env = Execution_env.dockerize env in
       sprintf
         "docker run --log-driver=none --rm %s %s %s %s -i %s bash -c '%s'"
-        (deps_mount ~env ~dck_env (deps cmd))
+        (cache_mount env)
         (file_dumps_mount env dck_env (file_dumps_of_command true cmd))
         (tmp_mount env dck_env)
         (dest_mount env dck_env)

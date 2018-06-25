@@ -5,7 +5,24 @@ type config = {
   use_docker : bool ;
 }
 
-val requirement : _ Workflow.t -> Allocator.request
+type t
+
+val input :
+  id:string ->
+  path:string ->
+  t
+
+val select :
+  dir:_ Workflow.t ->
+  path:string list ->
+  t
+
+val shell :
+  string Command.t -> t
+
+val requirement : t -> Allocator.request
+
+val perform : t -> Task_result.t Lwt.t
 
 val is_done : _ Workflow.t -> Db.t -> bool Lwt.t
 

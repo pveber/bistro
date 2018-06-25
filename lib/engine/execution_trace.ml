@@ -54,3 +54,5 @@ let error_report trace db buf tid =
     bprintf buf "##\n" ;
     bprintf buf "#\n"
   | Skipped (`Done_already | `Missing_dep) -> ()
+
+let all_ok xs = not (List.exists ~f:is_errored xs)

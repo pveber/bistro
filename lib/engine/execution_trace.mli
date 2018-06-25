@@ -31,3 +31,4 @@ val error_report :
   string ->
   unit
 
+val all_ok : t list -> bool

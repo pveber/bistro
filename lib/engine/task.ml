@@ -7,6 +7,12 @@ type config = {
   use_docker : bool ;
 }
 
+type t = unit
+
+let input = assert false
+let select = assert false
+let shell = assert false
+
 let step_outcome ~exit_code ~dest_exists=
   match exit_code, dest_exists with
     0, true -> `Succeeded
@@ -23,6 +29,10 @@ let requirement : type s. s Workflow.t -> _ =
     Allocator.Request { np ; mem }
   | Closure { np ; mem ; _ } ->
     Allocator.Request { np ; mem }
+
+let requirement = assert false
+
+let perform = assert false
 
 let perform_input path =
   Lwt.wrap (fun () ->

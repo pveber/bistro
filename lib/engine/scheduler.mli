@@ -20,10 +20,8 @@ val create :
   unit -> t
 
 val submit :
-  t -> _ Workflow.t -> unit
+  t -> _ Workflow.t -> Execution_trace.t Lwt.t
 
-val start : t -> unit Lwt.t
+val start : t -> unit
 
-val join :
-  t ->
-  (string * Execution_trace.t) list Lwt.t
+val join : t -> unit Lwt.t

@@ -1,13 +1,14 @@
 open Bistro_base
 
 type t = {
+  db : Db.t ;
   using_docker : bool ;
   tmp_dir : string ; (* host all execution *)
   dest : string ;    (* expected path for the target *)
   tmp : string ;     (* temp dir for the process *)
   stdout : string ;
   stderr : string ;
-  dep : Workflow.any -> string ;
+  dep : Workflow.u -> string ;
   file_dump : Workflow.template -> string ;
   np : int ;
   mem : int ;
@@ -23,3 +24,4 @@ val make :
   t
 
 val dockerize : t -> t
+val docker_cache_dir : string

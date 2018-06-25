@@ -33,7 +33,7 @@ module Template_dsl = struct
   let string s = [ Template.S s ]
   let int i = string (string_of_int i)
   let float f = string (Float.to_string f)
-  let dep w = [ Template.D (Workflow.Any w) ]
+  let dep w = [ Template.D Workflow.(dep (pureW w)) ]
 
   let quote ?using:(c = '"') e =
     let quote_symbol = Template.S (Char.to_string c) in
