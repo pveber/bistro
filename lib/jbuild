@@ -1,0 +1,8 @@
+(jbuild_version 1)
+
+(library
+ ((name bistro)
+  (public_name bistro)
+  (libraries (bistro.base core_kernel))
+  (preprocess (pps (ppx_sexp_conv)))
+))
