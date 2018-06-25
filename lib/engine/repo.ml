@@ -13,11 +13,11 @@ type normalized_repo_item = {
   cache_path : string ;
 }
 
-let normalized_repo_item repo_path w cache_path =
+let normalized_repo_item db repo_path w dep =
   {
     repo_path = Path.to_string repo_path ;
     file_path = Filename.concat "_files" (Workflow.id w) ;
-    cache_path ;
+    cache_path = Db.dep_path db dep ;
   }
 
 let item path w = Repo_item (path, Private.reveal w)
@@ -83,10 +83,10 @@ let generate outdir items =
 let use t (Bistro.Any_workflow w) =
   Workflow.(pure ~id:"fst" (fun x _ -> x) $ t $ pureW (Private.reveal w))
 
-let to_expr ?(precious = []) ~outdir items =
+let to_expr ?(precious = []) db ~outdir items =
   let open Workflow in
   List.map items ~f:(function (Repo_item (path, w)) ->
-      pure ~id:"normalized_repo_item" normalized_repo_item
+      pure ~id:"normalized_repo_item" (normalized_repo_item db)
       $ list string path
       $ pureW w
       $ dep (pureW w)
@@ -99,7 +99,7 @@ let to_expr ?(precious = []) ~outdir items =
 let build ?np ?mem ?logger ?keep_all ?use_docker ?precious ?(bistro_dir = "_bistro") ~outdir repo =
   let db = Db.init_exn bistro_dir in
   let sched = Scheduler.create ?np ?mem ?use_docker db in
-  let expr = to_expr ~outdir ?precious repo in
+  let expr = to_expr ~outdir ?precious db repo in
   let t = Scheduler.eval_expr sched expr in
   match Lwt_main.run t with
   | Ok () -> ()

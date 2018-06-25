@@ -1,5 +1,6 @@
 open Bistro_base
 
+
 type t = {
   db : Db.t ;
   using_docker : bool ;
@@ -8,8 +9,8 @@ type t = {
   tmp : string ;     (* temp dir for the process *)
   stdout : string ;
   stderr : string ;
-  dep : Workflow.u -> string ;
-  file_dump : Workflow.template -> string ;
+  dep : Workflow.dep -> string ;
+  file_dump : Workflow.dep Template.t -> string ;
   np : int ;
   mem : int ;
   uid : int ;

@@ -101,12 +101,12 @@ let rec submit sched w =
 and compute_task sched =
   let open Lwt_eval in function
   | Input { path ; id } -> Lwt_result.return @@ Task.input ~path ~id
-  | Select { dir ; path } ->
+  | Select { dir ; sel } ->
     on_dep_outcome sched [ submit sched dir ] @@ fun () ->
-    Task.select ~dir ~path
-  | Shell { task = cmd ; } ->
+    Task.select ~dir ~sel
+  | Shell { task = cmd ; id ; descr ; np ; mem } ->
     eval_command sched cmd >>=? fun cmd ->
-    Lwt_result.return @@ Task.shell cmd
+    Lwt_result.return @@ Task.shell ~id ~descr ~np ~mem cmd
   | Closure _ -> assert false
 
 and on_dep_outcome sched deps f = (* FIXME: pas vraiment nécessaire *)
@@ -147,7 +147,7 @@ and eval_token sched =
   let open Template in
   let open Lwt_eval in
   function
-  | D expr -> eval_expr sched expr >|=? fun id -> D id
+  | D expr -> eval_expr sched expr >|=? fun path -> D path
   | F tmpl -> eval_template sched tmpl >|=? fun tmpl -> F tmpl
   | (S _ | DEST | TMP | NP | MEM as x) -> return_ok x
 
@@ -182,12 +182,12 @@ and eval_expr : type s. t -> s Workflow.expr -> (s, unit) Lwt_result.t = fun sch
     if Execution_trace.is_errored trace then
       return_failure ()
     else
-      return_ok (Db.path sched.config.db w)
+      return_ok (Workflow.to_dep w)
   | Deps ws ->
     eval_expr sched ws >>=? fun ws ->
     Lwt_list.map_p (submit sched) ws >>= fun traces ->
     if Execution_trace.all_ok traces then
-      return_ok (List.map ws ~f:(Db.path sched.config.db))
+      return_ok (List.map ws ~f:Workflow.to_dep)
     else
       return_failure ()
 
@@ -197,7 +197,7 @@ and task_trace sched t =
   Allocator.request sched.allocator (Task.requirement t) >>= function
   | Ok resource ->
     let start = Unix.gettimeofday () in
-    Task.perform t >>= fun outcome ->
+    Task.perform t sched.config resource >>= fun outcome ->
     let _end_ = Unix.gettimeofday () in
     Allocator.release sched.allocator resource ;
     Lwt.return (

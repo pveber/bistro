@@ -8,7 +8,7 @@ type file_dump = File_dump of {
 
 
 type symbolic_file_dump = Symbolic_file_dump of {
-    contents : Workflow.template ;
+    contents : Workflow.dep Template.t ;
     in_docker : bool ;
   }
 
@@ -55,23 +55,11 @@ let rec file_dumps_of_command in_docker =
     |> List.dedup_and_sort ~compare:Caml.compare
   | Docker (_, cmd) -> file_dumps_of_command true cmd
 
-let rec eval_expr : type s. Execution_env.t -> s Workflow.expr -> s = fun env e ->
-  let open Workflow in
-  match e with
-  | Pure { value } -> value
-  | App (f, x) -> (eval_expr env f) (eval_expr env x)
-  | List xs -> List.map xs ~f:(eval_expr env)
-  | Glob { dir ; pattern } -> assert false
-  | Map_workflows { xs ; f } ->
-    List.map (eval_expr env xs) ~f
-  | Dep w -> env.dep (eval_expr env w)
-  | Deps ws -> List.map (eval_expr env ws) ~f:env.dep
-
 let string_of_token (env : Execution_env.t) =
   let open Template in
   function
   | S s -> s
-  | D d -> eval_expr env d
+  | D dep -> Db.dep_path env.db dep
   | F toks -> env.file_dump toks
   | DEST -> env.dest
   | TMP -> env.tmp

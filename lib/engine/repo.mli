@@ -16,6 +16,7 @@ val shift : string -> t -> t
 
 val to_expr :
   ?precious:Bistro.any_workflow list ->
+  Db.t ->
   outdir:string ->
   t ->
   unit Bistro_base.Workflow.expr

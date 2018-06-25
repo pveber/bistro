@@ -9,8 +9,8 @@ type t = {
   tmp : string ;     (* temp dir for the process *)
   stdout : string ;
   stderr : string ;
-  dep : Workflow.u -> string ;
-  file_dump : Workflow.template -> string ;
+  dep : Workflow.dep -> string ;
+  file_dump : Workflow.dep Template.t -> string ;
   np : int ;
   mem : int ;
   uid : int ;
@@ -30,7 +30,7 @@ let make ~db  ~use_docker ~np ~mem ~id =
     stdout = Db.stdout db id ;
     stderr = Db.stderr db id ;
     file_dump ;
-    dep = (Db.path db) ;
+    dep = (Db.dep_path db) ;
     np ;
     mem ;
     uid = Unix.getuid () ;
@@ -38,13 +38,22 @@ let make ~db  ~use_docker ~np ~mem ~id =
 
 let docker_cache_dir = "/bistro/data"
 
+let dep_path_in_docker = function
+  | `Cached id -> Filename.concat docker_cache_dir id
+  | `Select (`Cached id, sel) ->
+    List.reduce_exn ~f:Filename.concat [
+      docker_cache_dir ;
+      id ;
+      Path.to_string sel
+    ]
+
 let dockerize env = {
   db = env.db ;
   tmp_dir = "/bistro" ;
   using_docker = false ;
   dest = "/bistro/dest" ;
   tmp = "/bistro/tmp" ;
-  dep = (fun w -> Filename.concat docker_cache_dir (Workflow.id w)) ;
+  dep = dep_path_in_docker ;
   file_dump = (fun toks -> Filename.concat docker_cache_dir (Misc.digest toks)) ;
   np = env.np ;
   mem = env.mem ;
@@ -52,4 +61,3 @@ let dockerize env = {
   stderr = env.stderr ;
   uid = env.uid ;
 }
-

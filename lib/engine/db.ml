@@ -125,6 +125,11 @@ let rec path : type s. t -> s Bistro_base.Workflow.t -> string = fun db ->
   function
   | Bistro_base.Workflow.Input i -> i.path
   | Select s ->
-    Filename.concat (path db s.dir) (Path.to_string s.path)
+    Filename.concat (path db s.dir) (Path.to_string s.sel)
   | Shell s -> cache db s.id
   | Closure s -> cache db s.id
+
+let dep_path db = function
+  | `Cached id -> cache db id
+  | `Select (`Cached id, sel) ->
+    Filename.concat (cache db id) (Path.to_string sel)

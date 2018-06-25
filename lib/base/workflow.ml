@@ -4,12 +4,17 @@ open File_formats
 let digest x =
   Md5.to_hex (Md5.digest_string (Marshal.to_string x []))
 
+type dep = [
+  | `Cached of string
+  | `Select of [`Cached of string] * string list
+]
+
 type u =
   | Input of { id : string ; path : string }
   | Select of {
       id : string ;
       dir : u ; (* invariant: [dir] is not a select *)
-      path : string list
+      sel : string list
     }
   | Shell of shell
   | Closure of (env -> unit) expr step
@@ -31,8 +36,8 @@ and 'a expr =
       xs : 'a t list expr ;
       f : ('a t -> 'b t) ;
     } -> 'b t list expr
-  | Dep   : _ t expr -> string expr
-  | Deps : _ t list expr -> string list expr
+  | Dep   : _ t expr -> dep expr
+  | Deps : _ t list expr -> dep list expr
 
 and 'a step = {
   id : string ;
@@ -43,8 +48,8 @@ and 'a step = {
   version : int option ; (** Version number of the wrapper *)
 }
 and shell = shell_command step
-and shell_command = string expr Command.t
-and template = string expr Template.t
+and shell_command = dep expr Command.t
+and template = dep expr Template.t
 and env = < tmp : string ; dest : string  ; np : int ; mem : int >
 
 let id = function
@@ -60,12 +65,12 @@ let equal x y =
   compare x y = 0
 
 let select u q =
-  let k dir path =
-    let id = digest ("select", id u, path) in
-    Select { id ; dir ; path }
+  let k dir sel =
+    let id = digest ("select", id u, sel) in
+    Select { id ; dir ; sel }
   in
   match u with
-  | Select { dir ; path = p ; _ } -> k dir (p @ q)
+  | Select { dir ; sel = p ; _ } -> k dir (p @ q)
   | Input _
   | Closure _
   | Shell _ -> k u q
@@ -79,9 +84,9 @@ let input ?(may_change = false) path =
 let rec digestible_dep = function
   | Shell s -> `Shell s.id
   | Input { path ; _ } -> `Input path
-  | Select { dir = Input { path = p ; _ } ; path = q } ->
+  | Select { dir = Input { path = p ; _ } ; sel = q } ->
     `Select ((`Input p), q)
-  | Select { dir ; path = p ; _ } ->
+  | Select { dir ; sel = p ; _ } ->
     `Select (digestible_dep dir, p)
   | Closure c -> `Closure c.id
 
@@ -115,3 +120,11 @@ let app f x = App (f, x)
 let ( $ ) f x = app f x
 let list f xs = List (List.map xs ~f)
 let string s = pure ~id:(digest s) s
+
+let to_dep = function
+  | Input { id }
+  | Closure { id }
+  | Shell { id } -> `Cached id
+  | Select { dir = (Input { id } | Closure { id } | Shell { id }) ; sel ; _ } ->
+    `Select (`Cached id, sel)
+  | Select { dir = Select _ ; _ } -> assert false
