@@ -108,6 +108,10 @@ let shell
   let id = digest ("shell", version, digestible_cmd cmd) in
   Shell { descr ; task = cmd ; np ; mem ; version ; id }
 
+let pure ~id value = Pure { id ; value }
 let pureW w = Pure { id = id w ; value = w }
 let dep e = Dep e
-
+let app f x = App (f, x)
+let ( $ ) f x = app f x
+let list f xs = List (List.map xs ~f)
+let string s = pure ~id:(digest s) s

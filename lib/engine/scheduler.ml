@@ -210,7 +210,7 @@ and task_trace sched t =
 let create
     ?(loggers = [])
     ?(np = 1) ?mem:(`GB mem = `GB 1)
-    ~db ~use_docker () =
+    ?(use_docker = true) db =
   {
     allocator = Allocator.create ~np ~mem:(mem * 1024) ;
     config = { Task.db ; use_docker } ;

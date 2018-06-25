@@ -15,12 +15,14 @@ val create :
   ?loggers:logger list ->
   ?np:int ->
   ?mem:[`GB of int] ->
-  db:Db.t ->
-  use_docker:bool ->
-  unit -> t
+  ?use_docker:bool ->
+  Db.t -> t
 
 val submit :
   t -> _ Workflow.t -> Execution_trace.t Lwt.t
+
+val eval_expr :
+  t -> 'a Workflow.expr -> ('a, unit) result Lwt.t
 
 val start : t -> unit
 
