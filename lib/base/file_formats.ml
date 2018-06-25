@@ -8,7 +8,7 @@ end
 
 (** Conventional type to represent directory targets *)
 class type ['a] directory = object
-  method file_type : [`Directory]
+  method file_type : [`directory]
   method contents : 'a
 end
 
@@ -24,7 +24,7 @@ end
 
 (** Conventional type to represent OCaml values saved with the
     {!module:Marshal} module. *)
-class type ['a] marshalled_value = object
+class type ['a] value = object
   inherit binary_file
   method format : [`marshalled_value]
   method content_type : 'a
