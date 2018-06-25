@@ -101,6 +101,7 @@ let build ?np ?mem ?logger ?keep_all ?use_docker ?precious ?(bistro_dir = "_bist
   let sched = Scheduler.create ?np ?mem ?use_docker db in
   let expr = to_expr ~outdir ?precious db repo in
   let t = Scheduler.eval_expr sched expr in
+  Scheduler.start sched ;
   match Lwt_main.run t with
   | Ok () -> ()
   | Error () -> failwith "repo build failed"
