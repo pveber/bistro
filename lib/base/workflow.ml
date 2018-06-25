@@ -26,17 +26,12 @@ and 'a _list_ =
       f : ('a t -> 'b t) ;
     } -> 'b _list_
 
-and dep =
-  | Dep : _ t -> dep
-  | Deps : {
-      xs : _ _list_ ;
-      f : string -> template ;
-    } -> dep
+and any = Any : _ t -> any
 
 and 'a step = {
   id : string ;
   descr : string ;
-  deps : dep list ;
+  deps : any list ;
   task : 'a ;
   np : int ; (** Required number of processors *)
   mem : int ; (** Required memory in MB *)
@@ -45,8 +40,8 @@ and 'a step = {
 
 and shell = shell_command step
 
-and shell_command = dep Command.t
-and template = dep Template.t
+and shell_command = any Command.t
+and template = any Template.t
 
 and 'a closure = (env -> 'a) step
 
@@ -57,7 +52,6 @@ and env = <
   tmp : string ;
   dest : string
 >
-
 
 let id : type s. s t -> string = function
   | Input { id ;  _ }
@@ -81,10 +75,10 @@ let select u q =
   | Input _  -> k u q
   | Shell _ -> k u q
 
-let deps = function
+let deps : type s. s t -> any list = function
   | Input _ -> []
-  | Select { dir ; _ } -> [ Dep dir ]
-  | Closure { deps ; _ }
+  | Select { dir ; _ } -> [ Any dir ]
+  | Closure { deps ; _ } -> deps
   | Shell { deps ; _ } -> deps
   (* | Map_list { xs ; _ } -> (
    *     match xs with
@@ -117,14 +111,14 @@ let rec digestible_dep_list : type s. s _list_ -> _ = function
   | Glob { dir ; pattern } -> `Glob (digestible_dep dir, pattern)
 
 let digestible_cmd = Command.map ~f:(function
-    | Dep u -> `Dep (id u)
-    | Deps { xs ; _ } -> digestible_dep_list xs
+    | Any u -> `Dep (id u)
+    (* | Deps { xs ; _ } -> digestible_dep_list xs *)
   )
 
 let digestible_deps xs =
   List.map xs ~f:(function
-      | Dep d -> digestible_dep d
-      | Deps { xs } -> digestible_dep_list xs
+      | Any d -> digestible_dep d
+      (* | Deps { xs } -> digestible_dep_list xs *)
     )
 
 let shell
@@ -133,7 +127,7 @@ let shell
     ?(np = 1)
     ?version
     cmds =
-  let cmd : dep Command.t = Command.And_list cmds in
+  let cmd : any Command.t = Command.And_list cmds in
   let deps = Command.deps cmd in
   let id = digest ("shell", version, digestible_cmd cmd, digestible_deps deps) in
   Shell { descr ; deps ; task = cmd ; np ; mem ; version ; id }
