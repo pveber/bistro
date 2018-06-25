@@ -31,8 +31,8 @@ let succeeded = function
     )
 
 let error_short_descr = function
-  | Input { path } -> sprintf "Input %s doesn't exist" path
-  | Select { dir_path ; sel } ->
+  | Input { path ; _ } -> sprintf "Input %s doesn't exist" path
+  | Select { dir_path ; sel ; _ } ->
     sprintf "Path %s doesn't exist in %s" (Path.to_string sel) dir_path
   | Shell x -> (
       match x.outcome with
@@ -43,7 +43,7 @@ let error_short_descr = function
         let msg = "Task_outcome.error_short_descr: not an error result" in
         raise (Invalid_argument msg)
     )
-  | Closure { descr } -> sprintf "Closure %s failed" descr
+  | Closure { descr ; _ } -> sprintf "Closure %s failed" descr
 
 let error_long_descr x db buf id = match x with
   | Input _ | Select _ | Closure _ -> ()

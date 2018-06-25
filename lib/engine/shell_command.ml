@@ -73,11 +73,11 @@ let string_of_tokens env xs =
 let par x = "(" ^ x ^ ")"
 
 
-let deps_mount ~env ~dck_env deps =
-  let open Execution_env in
-  Docker.mount_options
-    ~host_paths:(List.map deps env.dep)
-    ~container_paths:(List.map deps dck_env.dep)
+(* let deps_mount ~env ~dck_env deps =
+ *   let open Execution_env in
+ *   Docker.mount_options
+ *     ~host_paths:(List.map deps ~f:env.dep)
+ *     ~container_paths:(List.map deps ~f:dck_env.dep) *)
 
 let cache_mount env =
   Docker.mount_options
@@ -90,8 +90,8 @@ let file_dumps_mount env dck_env file_dumps =
     env.file_dump fd
   in
   Docker.mount_options
-    ~host_paths:(List.map file_dumps (f env))
-    ~container_paths:(List.map file_dumps (f dck_env))
+    ~host_paths:(List.map file_dumps ~f:(f env))
+    ~container_paths:(List.map file_dumps ~f:(f dck_env))
 
 let tmp_mount env dck_env =
   let open Execution_env in
@@ -181,8 +181,8 @@ let run (Command cmd) =
   let dest_exists = Sys.file_exists cmd.env.dest = `Yes in
   (
     if cmd.env.using_docker && cmd.uses_docker then (
-      Misc.docker_chown cmd.env.tmp_dir cmd.env.uid >>= fun () ->
-      if dest_exists then Misc.docker_chown cmd.env.dest cmd.env.uid
+      Misc.docker_chown ~path:cmd.env.tmp_dir ~uid:cmd.env.uid >>= fun () ->
+      if dest_exists then Misc.docker_chown ~path:cmd.env.dest ~uid:cmd.env.uid
       else Lwt.return ()
     )
     else Lwt.return ()

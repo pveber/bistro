@@ -84,7 +84,7 @@ let input ?(may_change = false) path =
 let rec digestible_dep = function
   | Shell s -> `Shell s.id
   | Input { path ; _ } -> `Input path
-  | Select { dir = Input { path = p ; _ } ; sel = q } ->
+  | Select { dir = Input { path = p ; _ } ; sel = q ; _ } ->
     `Select ((`Input p), q)
   | Select { dir ; sel = p ; _ } ->
     `Select (digestible_dep dir, p)
@@ -92,7 +92,7 @@ let rec digestible_dep = function
 
 
 let rec digestible_expr : type s. s expr -> _ = function
-  | Pure { id } -> `Pure id
+  | Pure { id ; _ } -> `Pure id
   | App (f, x) -> `App (digestible_expr f, digestible_expr x)
   | List xs -> `List (List.map xs ~f:digestible_expr)
   | Glob { dir ; pattern } -> `Glob (digestible_dep dir, pattern)
@@ -122,9 +122,11 @@ let list f xs = List (List.map xs ~f)
 let string s = pure ~id:(digest s) s
 
 let to_dep = function
-  | Input { id }
-  | Closure { id }
-  | Shell { id } -> `Cached id
-  | Select { dir = (Input { id } | Closure { id } | Shell { id }) ; sel ; _ } ->
+  | Input { id ; _ }
+  | Closure { id ; _ }
+  | Shell { id ; _ } -> `Cached id
+  | Select { dir = (Input { id ; _ }
+                   | Closure { id ; _ }
+                   | Shell { id ; _ }) ; sel ; _ } ->
     `Select (`Cached id, sel)
   | Select { dir = Select _ ; _ } -> assert false

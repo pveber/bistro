@@ -96,7 +96,7 @@ let to_expr ?(precious = []) db ~outdir items =
   |> app (pure ~id:"generate" generate $ string outdir)
   |> fun init -> List.fold precious ~init ~f:use
 
-let build ?np ?mem ?logger ?keep_all ?use_docker ?precious ?(bistro_dir = "_bistro") ~outdir repo =
+let build ?np ?mem ?logger:_ ?keep_all:_ ?use_docker ?precious ?(bistro_dir = "_bistro") ~outdir repo =
   let db = Db.init_exn bistro_dir in
   let sched = Scheduler.create ?np ?mem ?use_docker db in
   let expr = to_expr ~outdir ?precious db repo in

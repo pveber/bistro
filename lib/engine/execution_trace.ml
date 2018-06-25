@@ -13,7 +13,7 @@ type t =
                | `Allocation_error of string ]
 
 let is_errored = function
-  | Run { outcome } -> not (Task_result.succeeded outcome)
+  | Run { outcome ; _ } -> not (Task_result.succeeded outcome)
   | Skipped (`Allocation_error _ | `Missing_dep) -> true
   | Skipped `Done_already -> false
 

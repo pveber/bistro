@@ -10,18 +10,6 @@ type event =
 
 type logger = time -> event -> unit
 
-module Event = struct
-  type 'a t = {
-    value : 'a Lwt.t ;
-    send : 'a Lwt.u ;
-  }
-
-  let create () =
-    let value, send = Lwt.wait () in
-    { value ; send }
-
-end
-
 module Semaphore = struct
   type t = {
     mutable state : bool ;
@@ -37,8 +25,8 @@ module Semaphore = struct
     s.state <- true ;
     Lwt_condition.broadcast s.cond ()
 
-  let stop s =
-    s.state <- false
+  (* let stop s =
+   *   s.state <- false *)
 
   let wait s =
     if s.state then Lwt.return ()
@@ -54,12 +42,7 @@ type t = {
   start_signal : Semaphore.t ;
 }
 
-let null_logger _ _ = ()
-
-
 module Lwt_eval = struct
-  type 'a t = ('a, unit) Pervasives.result Lwt.t
-
   let ( >>= ) = Lwt.( >>= )
   let ( >>=? ) = Lwt_result.( >>= )
   let ( >|=? ) = Lwt_result.( >|= )
@@ -85,7 +68,6 @@ let rec submit sched w =
       if is_done then
         Lwt.return (Execution_trace.Skipped `Done_already)
       else (
-        let open Execution_trace in
         compute_task sched w >>= function
         | Ok t ->
           task_trace sched t
@@ -93,7 +75,7 @@ let rec submit sched w =
           Lwt.return (Execution_trace.Skipped `Missing_dep)
       )
     in
-    Table.set sched.traces (Workflow.id w) trace ;
+    Table.set sched.traces ~key:(Workflow.id w) ~data:trace ;
     trace
   | Some trace -> trace
 
@@ -101,20 +83,20 @@ let rec submit sched w =
 and compute_task sched =
   let open Lwt_eval in function
   | Input { path ; id } -> Lwt_result.return @@ Task.input ~path ~id
-  | Select { dir ; sel } ->
-    on_dep_outcome sched [ submit sched dir ] @@ fun () ->
+  | Select { dir ; sel ; _ } ->
+    on_dep_outcome [ submit sched dir ] @@ fun () ->
     Task.select ~dir ~sel
-  | Shell { task = cmd ; id ; descr ; np ; mem } ->
+  | Shell { task = cmd ; id ; descr ; np ; mem ; _ } ->
     eval_command sched cmd >>=? fun cmd ->
     Lwt_result.return @@ Task.shell ~id ~descr ~np ~mem cmd
   | Closure _ -> assert false
 
-and on_dep_outcome sched deps f = (* FIXME: pas vraiment nécessaire *)
+and on_dep_outcome deps f = (* FIXME: pas vraiment nécessaire *)
   let check_outcome trace =
     trace >|= function
     | Execution_trace.Skipped `Done_already -> true
     | Skipped (`Missing_dep | `Allocation_error _) -> false
-    | Run { outcome } -> Task_result.succeeded outcome
+    | Run { outcome ; _ } -> Task_result.succeeded outcome
   in
   Lwt_list.map_p check_outcome deps >>= fun xs ->
   if List.for_all xs ~f:ident then (Lwt_result.return (f()))
@@ -155,7 +137,7 @@ and eval_expr : type s. t -> s Workflow.expr -> (s, unit) Lwt_result.t = fun sch
   let open Workflow in
   let open Lwt_eval in
   match expr with
-  | Pure { value } -> Lwt_result.return value
+  | Pure { value ; _ } -> Lwt_result.return value
   | App (f, x) ->
     eval_expr sched f >>=? fun f ->
     eval_expr sched x >>=? fun x ->
@@ -163,7 +145,7 @@ and eval_expr : type s. t -> s Workflow.expr -> (s, unit) Lwt_result.t = fun sch
   | List xs ->
     map_p ~f:(eval_expr sched) xs
 
-  | Glob { dir ; pattern } ->
+  | Glob { dir ; _ } ->
     let open Lwt in
     submit sched dir >>= fun _ ->
     assert false
@@ -192,7 +174,6 @@ and eval_expr : type s. t -> s Workflow.expr -> (s, unit) Lwt_result.t = fun sch
       return_failure ()
 
 and task_trace sched t =
-  let open Execution_trace in
   let ready = Unix.gettimeofday () in
   Allocator.request sched.allocator (Task.requirement t) >>= function
   | Ok resource ->
@@ -208,7 +189,7 @@ and task_trace sched t =
     Lwt.return (Execution_trace.Skipped err)
 
 let create
-    ?(loggers = [])
+    ?loggers:(_ = [])
     ?(np = 1) ?mem:(`GB mem = `GB 1)
     ?(use_docker = true) db =
   {
@@ -220,7 +201,7 @@ let create
 
 let join sched =
   Table.to_alist sched.traces
-  |> List.map ~f:(fun (wid, trace) -> trace >|= ignore)
+  |> List.map ~f:(fun (_, trace) -> trace >|= ignore)
   |> Lwt.join
 
 let start sched =
