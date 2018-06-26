@@ -1,7 +1,4 @@
 open Core_kernel
-
-include File_formats
-
 open Bistro
 open Shell_dsl
 

@@ -122,7 +122,7 @@ module type Shell_dsl = sig
 end
 
 module type DSL = sig
-  type 'a workflow
+  type +'a workflow
 
   include module type of File_formats
 

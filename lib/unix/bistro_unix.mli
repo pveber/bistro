@@ -1,5 +1,3 @@
-include module type of File_formats
-
 open Bistro
 
 module Cmd : sig
