@@ -26,6 +26,10 @@
 
 include Bistro_base.Sigs.DSL
 
+type logger
+module Repo : Bistro_base.Sigs.Repo with type 'a workflow := 'a workflow
+                                     and type logger := logger
+
 module Private : sig
   val reveal : 'a workflow -> 'a Bistro_base.Workflow.t
 end

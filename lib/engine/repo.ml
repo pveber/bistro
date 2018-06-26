@@ -1,5 +1,4 @@
 open Core
-open Bistro
 open Bistro_base
 
 type item =
@@ -20,7 +19,7 @@ let normalized_repo_item db repo_path w dep =
     cache_path = Db.dep_path db dep ;
   }
 
-let item path w = Repo_item (path, Private.reveal w)
+let item path w = Repo_item (path, w)
 
 let ( %> ) path w = item path w
 

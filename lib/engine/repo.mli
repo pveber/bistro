@@ -1,30 +1,10 @@
-open Bistro
+open Bistro_base
 
-type item
-
-type t = item list
-
-val ( %> ) : string list -> _ workflow -> item
-
-val item : string list -> _ workflow -> item
-
-val singleton : string -> _ workflow -> t
-
-val add_prefix : string list -> t -> t
-
-val shift : string -> t -> t
+include Sigs.Repo with type 'a workflow := 'a Workflow.t
+                   and type logger := Scheduler.logger
 
 val to_expr :
   Db.t ->
   outdir:string ->
   t ->
-  unit Bistro_base.Workflow.expr
-
-val build  :
-  ?np:int ->
-  ?mem:[`GB of int] ->
-  ?loggers:Scheduler.logger list ->
-  ?keep_all:bool ->
-  ?use_docker:bool ->
-  ?bistro_dir:string ->
-  outdir:string -> t -> unit
+  unit Workflow.expr
