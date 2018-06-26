@@ -1,3 +1,27 @@
-include Sigs.S with type 'a workflow := 'a Bistro.workflow
-                and type template := Bistro.Shell_dsl.template
-                and type shell_command := Bistro.shell_command
+include module type of File_formats
+
+open Bistro
+
+module Cmd : sig
+  val wget :
+    ?no_check_certificate:bool ->
+    ?user:string ->
+    ?password:string ->
+    ?dest:Shell_dsl.template ->
+    string -> shell_command
+end
+
+val wget :
+  ?descr_url:string ->
+  ?no_check_certificate:bool ->
+  ?user:string ->
+  ?password:string ->
+  string -> #file workflow
+val gunzip : 'a gz workflow -> 'a workflow
+val bunzip2 : 'a bz2 workflow -> 'a workflow
+val unzip : 'a zip workflow -> 'a workflow
+val tar_xfz :
+  ?strip_components:int ->
+  'a tar gz workflow ->
+  'a workflow
+val crlf2lf : (#text_file as 'a) workflow -> 'a workflow

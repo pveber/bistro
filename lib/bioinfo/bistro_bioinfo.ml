@@ -1,7 +1,6 @@
 open Core_kernel
 include File_formats
 open Bistro
-open Bistro_unix
 open Shell_dsl
 
 
@@ -1009,7 +1008,7 @@ module Ensembl = struct
         (String.capitalize (string_of_species species))
         (lab_label_of_genome (ucsc_reference_genome ~release ~species)) release
     in
-    let gff = Unix_tools.(gunzip (wget url)) in
+    let gff = Bistro_unix.(gunzip (wget url)) in
     match chr_name with
     | `ensembl -> gff
     | `ucsc -> ucsc_chr_names_gtf gff
@@ -1025,7 +1024,7 @@ module Ensembl = struct
       | `ensembl -> ident
       | `ucsc -> ucsc_chr_names_gtf
     in
-    f @@ Unix_tools.(gunzip (wget url))
+    f @@ Bistro_unix.(gunzip (wget url))
 end
 
 module FastQC = struct
@@ -1627,7 +1626,7 @@ module Sra = struct
           "ftp://ftp-trace.ncbi.nlm.nih.gov/sra/sra-instant/reads/ByRun/sra/SRR/%s/%s/%s.sra"
           prefix id id
       in
-      shell ~descr:(sprintf "sra.fetch_srr(%s)" id) [ Unix_tools.Cmd.wget ~dest url ]
+      shell ~descr:(sprintf "sra.fetch_srr(%s)" id) [ Bistro_unix.Cmd.wget ~dest url ]
     )
     else failwithf "Bistro_bioinfo.Sra.fetch_srr: id %s is invalid (should be longer than 6 characters long)" id ()
 
@@ -1865,7 +1864,7 @@ module Ucsc_gb = struct
     in
     let descr = sprintf "ucsc_gb.chromosome_sequence(%s,%s)" org chr in
     shell ~descr [
-      Unix_tools.Cmd.wget ~dest:(tmp // "seq.fa.gz") url ;
+      Bistro_unix.Cmd.wget ~dest:(tmp // "seq.fa.gz") url ;
       cmd "gunzip" [ tmp // "seq.fa.gz" ] ;
       cmd "mv" [ tmp // "seq.fa.gz" ; dest ] ;
     ]
@@ -1875,7 +1874,7 @@ module Ucsc_gb = struct
     shell ~descr:(sprintf "ucsc_gb.chromosome_sequences(%s)" org) [
       mkdir_p dest ;
       cd dest ;
-      Unix_tools.Cmd.wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/chromosomes/*" org) ;
+      Bistro_unix.Cmd.wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/chromosomes/*" org) ;
       cmd "gunzip" [ string "*.gz" ]
     ]
 
@@ -1897,7 +1896,7 @@ module Ucsc_gb = struct
     shell ~descr:(sprintf "ucsc_gb.2bit_sequence(%s)" org) [
       mkdir dest ;
       cd dest ;
-      Unix_tools.Cmd.wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/bigZips/%s.2bit" org org) ;
+      Bistro_unix.Cmd.wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/bigZips/%s.2bit" org org) ;
     ]
 
   let genome_2bit_sequence org =
@@ -2070,7 +2069,7 @@ module Ucsc_gb = struct
           "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/liftOver/%sTo%s.over.chain.gz"
           org_from org_from (String.capitalize org_to)
       in
-      Unix_tools.(gunzip (wget url))
+      Bistro_unix.(gunzip (wget url))
 
     let bed ~org_from ~org_to bed =
       let chain_file = chain_file ~org_from ~org_to in

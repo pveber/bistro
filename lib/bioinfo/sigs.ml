@@ -1,11 +1,3 @@
-module type DSL = sig
-  include Bistro_base.Sigs.DSL
-  include Bistro_unix__Sigs.S
-    with type template := Shell_dsl.template
-     and type shell_command := Shell_dsl.command
-     and type 'a workflow := 'a workflow
-end
-
 module type S = sig
   include module type of File_formats
   open Bistro
