@@ -1,4 +1,4 @@
-include Bistro_base.Sigs.S
+include Bistro_base.Sigs.DSL
 include Bistro_unix__Sigs.S
   with type 'a workflow := 'a workflow
    and type template := Shell_dsl.template

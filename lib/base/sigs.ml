@@ -121,7 +121,7 @@ module type Shell_dsl = sig
   val ( % ) : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c
 end
 
-module type S = sig
+module type DSL = sig
   type 'a workflow
 
   include module type of File_formats

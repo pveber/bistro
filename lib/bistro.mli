@@ -24,7 +24,7 @@
     engine like the one provided by [bistro.engine].
 *)
 
-include Bistro_base.Sigs.S
+include Bistro_base.Sigs.DSL
 
 module Private : sig
   val reveal : 'a workflow -> 'a Bistro_base.Workflow.t

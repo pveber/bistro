@@ -1,5 +1,5 @@
 module type DSL = sig
-  include Bistro_base.Sigs.S
+  include Bistro_base.Sigs.DSL
   include Bistro_unix__Sigs.S
     with type template := Shell_dsl.template
      and type shell_command := Shell_dsl.command
