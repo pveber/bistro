@@ -165,9 +165,10 @@ module type S = sig
 
   type any_workflow = Any_workflow : _ workflow -> any_workflow
 
+  type docker_image
   module Shell_dsl : Shell_dsl with type 'a dep := 'a workflow
                                 and type command = shell_command
-                                and type docker_image := Command.docker_image
+                                and type docker_image := docker_image
 end
 
 module type Term = sig
