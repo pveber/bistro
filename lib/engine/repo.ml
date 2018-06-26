@@ -80,10 +80,7 @@ let generate outdir items =
       link file_path cache_path
     )
 
-let use t (Bistro.Any_workflow w) =
-  Workflow.(pure ~id:"fst" (fun x _ -> x) $ t $ pureW (Private.reveal w))
-
-let to_expr ?(precious = []) db ~outdir items =
+let to_expr db ~outdir items =
   let open Workflow in
   List.map items ~f:(function (Repo_item (path, w)) ->
       pure ~id:"normalized_repo_item" (normalized_repo_item db)
@@ -94,12 +91,11 @@ let to_expr ?(precious = []) db ~outdir items =
   |> list ident
   |> app (pure ~id:"remove_redundancies" remove_redundancies)
   |> app (pure ~id:"generate" generate $ string outdir)
-  |> fun init -> List.fold precious ~init ~f:use
 
-let build ?np ?mem ?logger:_ ?keep_all:_ ?use_docker ?precious ?(bistro_dir = "_bistro") ~outdir repo =
+let build ?np ?mem ?loggers:_ ?keep_all:_ ?use_docker ?(bistro_dir = "_bistro") ~outdir repo =
   let db = Db.init_exn bistro_dir in
   let sched = Scheduler.create ?np ?mem ?use_docker db in
-  let expr = to_expr ~outdir ?precious db repo in
+  let expr = to_expr ~outdir db repo in
   let t = Scheduler.eval_expr sched expr in
   Scheduler.start sched ;
   match Lwt_main.run t with

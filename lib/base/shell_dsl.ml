@@ -12,7 +12,6 @@ module Make(Dep : Dep) = struct
 
   type 'a dep = 'a Dep.t
 
-  type fragment = Dep.any Template.t
   type command = Dep.any Command.t
   type docker_image = Command.docker_image
 

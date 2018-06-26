@@ -211,7 +211,6 @@ end
 
 module type Repo = sig
   type 'a workflow
-  type 'a term
   type logger
 
   type item
@@ -228,19 +227,12 @@ module type Repo = sig
 
   val shift : string -> t -> t
 
-  val to_term :
-    ?precious:'a workflow list ->
-    outdir:string ->
-    t ->
-    unit term
-
   val build  :
     ?np:int ->
     ?mem:[`GB of int] ->
     ?loggers:logger list ->
     ?keep_all:bool ->
     ?use_docker:bool ->
-    ?precious:'a workflow list ->
     ?bistro_dir:string ->
     outdir:string -> t -> unit
 end
