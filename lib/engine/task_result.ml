@@ -17,15 +17,15 @@ type t =
   | Closure of {
       id : string ;
       descr : string ;
-      pass : bool
+      outcome : [`Succeeded | `Missing_output | `Failed] ;
     }
 
 let succeeded = function
   | Input { pass ; _ }
-  | Select { pass ; _ }
-  | Closure { pass ; _ } -> pass
-  | Shell x -> (
-      match x.outcome with
+  | Select { pass ; _ } -> pass
+  | Closure { outcome ; _ }
+  | Shell { outcome ; _ } -> (
+      match outcome with
       | `Succeeded -> true
       | `Failed | `Missing_output -> false
     )

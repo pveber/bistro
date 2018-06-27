@@ -1,7 +1,7 @@
 open Bistro_base
 
 include Sigs.Repo with type 'a workflow := 'a Workflow.t
-                   and type logger := Scheduler.logger
+                   and type logger := Logger.t
 
 val to_expr :
   Db.t ->

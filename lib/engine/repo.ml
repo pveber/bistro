@@ -91,9 +91,9 @@ let to_expr db ~outdir items =
   |> app (pure ~id:"remove_redundancies" remove_redundancies)
   |> app (pure ~id:"generate" generate $ string outdir)
 
-let build ?np ?mem ?loggers:_ ?keep_all:_ ?use_docker ?(bistro_dir = "_bistro") ~outdir repo =
+let build ?np ?mem ?loggers ?keep_all:_ ?use_docker ?(bistro_dir = "_bistro") ~outdir repo =
   let db = Db.init_exn bistro_dir in
-  let sched = Scheduler.create ?np ?mem ?use_docker db in
+  let sched = Scheduler.create ?loggers ?np ?mem ?use_docker db in
   let expr = to_expr ~outdir db repo in
   let t = Scheduler.eval_expr sched expr in
   Scheduler.start sched ;

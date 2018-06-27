@@ -2,17 +2,8 @@ open Bistro_base
 
 type t
 
-type time = float
-
-type event =
-  | Start
-  | End
-
-
-type logger = time -> event -> unit
-
 val create :
-  ?loggers:logger list ->
+  ?loggers:Logger.t list ->
   ?np:int ->
   ?mem:[`GB of int] ->
   ?use_docker:bool ->

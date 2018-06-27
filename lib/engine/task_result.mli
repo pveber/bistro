@@ -15,7 +15,7 @@ type t =
   | Closure of {
       id : string ;
       descr : string ;
-      pass : bool
+      outcome : [`Succeeded | `Missing_output | `Failed] ;
     }
 
 val succeeded : t -> bool

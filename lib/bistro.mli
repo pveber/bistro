@@ -26,7 +26,10 @@
 
 include Bistro_base.Sigs.DSL
 
-type logger
+type logger = Bistro_engine.Logger.t
+val null_logger : unit -> logger
+val console_logger : unit -> logger
+
 module Repo : Bistro_base.Sigs.Repo with type 'a workflow := 'a workflow
                                      and type logger := logger
 

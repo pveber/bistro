@@ -26,7 +26,9 @@ include File_formats
 module Template_dsl = Template_dsl
 module Shell_dsl = Shell_dsl
 
-type logger = Bistro_engine.Scheduler.logger
+type logger = Bistro_engine.Logger.t
+let null_logger () = Bistro_engine.Logger.null
+let console_logger () = Bistro_engine.Console_logger.create ()
 
 module Repo = Bistro_engine.Repo
 

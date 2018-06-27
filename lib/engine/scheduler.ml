@@ -2,14 +2,6 @@ open Core_kernel
 open Lwt
 open Bistro_base
 
-type time = float
-
-type event =
-  | Start
-  | End
-
-type logger = time -> event -> unit
-
 module Semaphore = struct
   type t = {
     mutable state : bool ;
@@ -40,6 +32,7 @@ type t = {
   config : Task.config ;
   traces : Execution_trace.t Lwt.t Table.t ;
   start_signal : Semaphore.t ;
+  logger : Logger.t ;
 }
 
 module Lwt_eval = struct
@@ -59,19 +52,25 @@ module Lwt_eval = struct
     Lwt.return res
 end
 
+let log ?(time = Unix.gettimeofday ()) sched event =
+  sched.logger#event sched.config.db time event
+
 let rec submit sched w =
   match Table.find sched.traces (Workflow.id w) with
   | None ->
     let trace =
       Semaphore.wait sched.start_signal >>= fun () ->
       Task.is_done w sched.config.db >>= fun is_done ->
-      if is_done then
+      if is_done then (
+        log sched (Logger.Workflow_skipped (w, `Done_already)) ;
         Lwt.return (Execution_trace.Skipped `Done_already)
+      )
       else (
         compute_task sched w >>= function
         | Ok t ->
           task_trace sched t
         | Error () ->
+          log sched Logger.(Workflow_skipped (w, `Missing_dep)) ;
           Lwt.return (Execution_trace.Skipped `Missing_dep)
       )
     in
@@ -175,21 +174,25 @@ and eval_expr : type s. t -> s Workflow.expr -> (s, unit) Lwt_result.t = fun sch
 
 and task_trace sched t =
   let ready = Unix.gettimeofday () in
+  log ~time:ready sched (Logger.Task_ready t) ;
   Allocator.request sched.allocator (Task.requirement t) >>= function
   | Ok resource ->
     let start = Unix.gettimeofday () in
+    log ~time:start sched (Logger.Task_started (t, resource)) ;
     Task.perform t sched.config resource >>= fun outcome ->
     let _end_ = Unix.gettimeofday () in
+    log ~time:_end_ sched (Logger.Task_ended { outcome ; start ; _end_ }) ;
     Allocator.release sched.allocator resource ;
     Lwt.return (
-      Execution_trace.Run { ready ; start  ; _end_ = 0. ; outcome }
+      Execution_trace.Run { ready ; start  ; _end_ ; outcome }
     )
   | Error (`Msg msg) ->
     let err = `Allocation_error msg in
+    log sched (Logger.Task_allocation_error (t, msg)) ;
     Lwt.return (Execution_trace.Skipped err)
 
 let create
-    ?loggers:(_ = [])
+    ?(loggers = [])
     ?(np = 1) ?mem:(`GB mem = `GB 1)
     ?(use_docker = true) db =
   {
@@ -197,6 +200,7 @@ let create
     config = { Task.db ; use_docker } ;
     start_signal = Semaphore.create false ;
     traces = String.Table.create () ;
+    logger = Logger.tee loggers ;
   }
 
 let join sched =

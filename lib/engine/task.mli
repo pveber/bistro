@@ -5,7 +5,19 @@ type config = {
   use_docker : bool ;
 }
 
-type t
+type t = private
+  | Input of { id : string ; path : string }
+  | Select of {
+      dir : Workflow.u ;
+      sel : string list
+    }
+  | Shell of {
+      id : string ;
+      descr : string ;
+      np : int ;
+      mem : int ;
+      cmd : Workflow.dep Command.t ;
+    }
 
 val input :
   id:string ->
