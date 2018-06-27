@@ -1,7 +1,6 @@
 module type S = sig
   include module type of File_formats
   open Bistro
-  open Bistro_unix
 
   type 'a workflow
   type shell_command

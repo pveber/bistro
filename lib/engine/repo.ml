@@ -91,6 +91,13 @@ let to_expr db ~outdir items =
   |> app (pure ~id:"remove_redundancies" remove_redundancies)
   |> app (pure ~id:"generate" generate $ string outdir)
 
+let error_report db traces =
+  let buf = Buffer.create 1024 in
+  List.iter traces ~f:(fun (id, trace) ->
+      Execution_trace.error_report trace db buf id
+    ) ;
+  Buffer.contents buf
+
 let build ?np ?mem ?loggers ?keep_all:_ ?use_docker ?(bistro_dir = "_bistro") ~outdir repo =
   let db = Db.init_exn bistro_dir in
   let sched = Scheduler.create ?loggers ?np ?mem ?use_docker db in
@@ -99,7 +106,11 @@ let build ?np ?mem ?loggers ?keep_all:_ ?use_docker ?(bistro_dir = "_bistro") ~o
   Scheduler.start sched ;
   match Lwt_main.run t with
   | Ok () -> ()
-  | Error () -> failwith "repo build failed"
+  | Error traces ->
+    let msg = error_report db traces in
+    prerr_endline msg ;
+    failwith "Some workflow failed!"
+
 
 let add_prefix prefix items =
   List.map items ~f:(function

@@ -13,7 +13,7 @@ val submit :
   t -> _ Workflow.t -> Execution_trace.t Lwt.t
 
 val eval_expr :
-  t -> 'a Workflow.expr -> ('a, unit) result Lwt.t
+  t -> 'a Workflow.expr -> ('a, (string * Execution_trace.t) list) result Lwt.t
 
 val start : t -> unit
 

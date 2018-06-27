@@ -1,4 +1,7 @@
 open Core_kernel
+open Bistro_base
+
+module S = String.Set
 
 type time = float
 
@@ -8,19 +11,30 @@ type t =
              _end_ : time ;
              outcome : Task_result.t }
 
-  | Skipped of [ `Done_already
-               | `Missing_dep
-               | `Allocation_error of string ]
+  | Done_already
+  | Canceled of { missing_deps : String.Set.t }
+  | Allocation_error of string
 
 let is_errored = function
   | Run { outcome ; _ } -> not (Task_result.succeeded outcome)
-  | Skipped (`Allocation_error _ | `Missing_dep) -> true
-  | Skipped `Done_already -> false
+  | Allocation_error _
+  | Canceled _ -> true
+  | Done_already -> false
 
-let run ~ready ~start ~_end_ ~outcome = Run { ready ; start ; _end_ ; outcome }
+let all_ok xs = not (List.exists ~f:is_errored xs)
 
-let skipped x = Skipped x
-
+  let gather_failures workflows traces =
+    List.fold2_exn workflows traces ~init:S.empty ~f:(fun acc w t ->
+        match t with
+        | Done_already -> acc
+        | Run { outcome ; _ } ->
+          if Task_result.succeeded outcome then
+            acc
+          else
+            S.add acc (Workflow.id w)
+        | Canceled { missing_deps } -> S.union acc missing_deps
+        | Allocation_error _ -> S.add acc (Workflow.id w)
+      )
 
 let error_report trace db buf tid =
   match trace with
@@ -40,7 +54,7 @@ let error_report trace db buf tid =
       bprintf buf "##\n" ;
       bprintf buf "#\n" ;
       Task_result.error_long_descr outcome db buf tid
-  | Skipped (`Allocation_error err)->
+  | Allocation_error err ->
     bprintf buf "################################################################################\n" ;
     bprintf buf "#                                                                              #\n" ;
     bprintf buf "#  Task %s failed\n" tid ;
@@ -53,6 +67,6 @@ let error_report trace db buf tid =
     bprintf buf "###\n" ;
     bprintf buf "##\n" ;
     bprintf buf "#\n"
-  | Skipped (`Done_already | `Missing_dep) -> ()
+  | (Done_already | Canceled _) -> ()
 
 let all_ok xs = not (List.exists ~f:is_errored xs)

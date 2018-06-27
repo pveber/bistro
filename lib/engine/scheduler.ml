@@ -2,6 +2,8 @@ open Core_kernel
 open Lwt
 open Bistro_base
 
+module S = String.Set
+
 module Semaphore = struct
   type t = {
     mutable state : bool ;
@@ -36,18 +38,30 @@ type t = {
 }
 
 module Lwt_eval = struct
-  let ( >>= ) = Lwt.( >>= )
-  let ( >>=? ) = Lwt_result.( >>= )
-  let ( >|=? ) = Lwt_result.( >|= )
+  type 'a t = ('a, S.t) Lwt_result.t (* missing deps *)
+  let ( >> ) = Lwt.( >>= )
+  let ( >>= ) = Lwt_result.( >>= )
+  let ( >|= ) = Lwt_result.( >|= )
 
-  let return_ok = Lwt_result.return
-  let return_failure = Lwt_result.fail
+  let return = Lwt_result.return
+  let fail = Lwt_result.fail
+  let fail1 e = Lwt_result.fail (S.singleton e)
 
   let map_p xs ~f =
     Lwt.bind (Lwt_list.map_p f xs) @@ fun results ->
     let res =
-      try Ok (List.map results ~f:(function Ok x -> x | Error _ -> failwith ""))
-      with Failure _ -> Error ()
+      List.fold results ~init:(Ok []) ~f:(fun acc res ->
+          match acc, res with
+          | Ok xs, Ok x -> Ok (x :: xs)
+          | Ok _, Error e -> Error e
+          | Error e, Ok _ -> Error e
+          | Error e, Error e' -> Error (S.union e e')
+        )
+      |> (
+        function
+        | Ok xs -> Ok (List.rev xs)
+        | Error _ as e -> e
+      )
     in
     Lwt.return res
 end
@@ -55,7 +69,7 @@ end
 let log ?(time = Unix.gettimeofday ()) sched event =
   sched.logger#event sched.config.db time event
 
-let rec submit sched w =
+let rec submit sched w : Execution_trace.t Lwt.t =
   match Table.find sched.traces (Workflow.id w) with
   | None ->
     let trace =
@@ -63,15 +77,15 @@ let rec submit sched w =
       Task.is_done w sched.config.db >>= fun is_done ->
       if is_done then (
         log sched (Logger.Workflow_skipped (w, `Done_already)) ;
-        Lwt.return (Execution_trace.Skipped `Done_already)
+        Lwt.return Execution_trace.Done_already
       )
       else (
         compute_task sched w >>= function
         | Ok t ->
           task_trace sched t
-        | Error () ->
+        | Error missing_deps ->
           log sched Logger.(Workflow_skipped (w, `Missing_dep)) ;
-          Lwt.return (Execution_trace.Skipped `Missing_dep)
+          Lwt.return (Execution_trace.Canceled { missing_deps })
       )
     in
     Table.set sched.traces ~key:(Workflow.id w) ~data:trace ;
@@ -81,44 +95,41 @@ let rec submit sched w =
 
 and compute_task sched =
   let open Lwt_eval in function
-  | Input { path ; id } -> Lwt_result.return @@ Task.input ~path ~id
+  | Input { path ; id } -> return @@ Task.input ~path ~id
   | Select { dir ; sel ; _ } ->
-    on_dep_outcome [ submit sched dir ] @@ fun () ->
-    Task.select ~dir ~sel
+    submit_for_eval sched dir >>= fun _ ->
+    return @@ Task.select ~dir ~sel
   | Shell { task = cmd ; id ; descr ; np ; mem ; _ } ->
-    eval_command sched cmd >>=? fun cmd ->
-    Lwt_result.return @@ Task.shell ~id ~descr ~np ~mem cmd
+    eval_command sched cmd >>= fun cmd ->
+    return @@ Task.shell ~id ~descr ~np ~mem cmd
   | Closure _ -> assert false
 
-and on_dep_outcome deps f = (* FIXME: pas vraiment nécessaire *)
-  let check_outcome trace =
-    trace >|= function
-    | Execution_trace.Skipped `Done_already -> true
-    | Skipped (`Missing_dep | `Allocation_error _) -> false
-    | Run { outcome ; _ } -> Task_result.succeeded outcome
-  in
-  Lwt_list.map_p check_outcome deps >>= fun xs ->
-  if List.for_all xs ~f:ident then (Lwt_result.return (f()))
-  else Lwt_result.fail ()
+and submit_for_eval sched w =
+  let open Lwt_eval in
+  submit sched w >> fun trace ->
+  if Execution_trace.is_errored trace then
+    fail (Execution_trace.gather_failures [w] [trace])
+  else
+    return trace
 
-and eval_command sched =
+and eval_command sched : _ Command.t -> _ Lwt_eval.t =
   let open Command in
   let open Lwt_eval in
   function
   | Simple_command tmpl ->
-    eval_template sched tmpl >|=? fun tmpl ->
+    eval_template sched tmpl >|= fun tmpl ->
     Simple_command tmpl
   | Docker (img, c) ->
-    eval_command sched c >|=? fun c ->
+    eval_command sched c >|= fun c ->
     Docker (img, c)
   | And_list cs ->
-    map_p cs ~f:(eval_command sched) >|=? fun cs ->
+    map_p cs ~f:(eval_command sched) >|= fun cs ->
     And_list cs
   | Pipe_list cs ->
-    map_p cs ~f:(eval_command sched) >|=? fun cs ->
+    map_p cs ~f:(eval_command sched) >|= fun cs ->
     Pipe_list cs
   | Or_list cs ->
-    map_p cs ~f:(eval_command sched) >|=? fun cs ->
+    map_p cs ~f:(eval_command sched) >|= fun cs ->
     Or_list cs
 
 and eval_template sched xs =
@@ -128,18 +139,18 @@ and eval_token sched =
   let open Template in
   let open Lwt_eval in
   function
-  | D expr -> eval_expr sched expr >|=? fun path -> D path
-  | F tmpl -> eval_template sched tmpl >|=? fun tmpl -> F tmpl
-  | (S _ | DEST | TMP | NP | MEM as x) -> return_ok x
+  | D expr -> eval_expr sched expr >|= fun path -> D path
+  | F tmpl -> eval_template sched tmpl >|= fun tmpl -> F tmpl
+  | (S _ | DEST | TMP | NP | MEM as x) -> return x
 
-and eval_expr : type s. t -> s Workflow.expr -> (s, unit) Lwt_result.t = fun sched expr ->
+and eval_expr : type s. t -> s Workflow.expr -> s Lwt_eval.t = fun sched expr ->
   let open Workflow in
   let open Lwt_eval in
   match expr with
   | Pure { value ; _ } -> Lwt_result.return value
   | App (f, x) ->
-    eval_expr sched f >>=? fun f ->
-    eval_expr sched x >>=? fun x ->
+    eval_expr sched f >>= fun f ->
+    eval_expr sched x >>= fun x ->
     return_ok (f x)
   | List xs ->
     map_p ~f:(eval_expr sched) xs
@@ -150,27 +161,27 @@ and eval_expr : type s. t -> s Workflow.expr -> (s, unit) Lwt_result.t = fun sch
     assert false
 
   | Map_workflows { xs ; f } ->
-    eval_expr sched xs >>=? fun sources ->
+    eval_expr sched xs >>= fun sources ->
     let targets = List.map ~f sources in
-    Lwt_list.map_p (submit sched) targets >>= fun traces ->
+    map_p ~f:(submit_for_eval sched) targets >>= fun traces ->
     if Execution_trace.all_ok traces then
-      return_ok targets
+      return targets
     else
-      return_failure ()
+      Lwt_eval.fail (Execution_trace.gather_failures targets traces)
   | Dep w ->
-    eval_expr sched w >>=? fun w ->
-    submit sched w >>= fun trace ->
+    eval_expr sched w >>= fun w ->
+    submit_for_eval sched w >>= fun trace ->
     if Execution_trace.is_errored trace then
-      return_failure ()
+      fail (Execution_trace.gather_failures [w] [trace])
     else
-      return_ok (Workflow.to_dep w)
+      return (Workflow.to_dep w)
   | Deps ws ->
-    eval_expr sched ws >>=? fun ws ->
-    Lwt_list.map_p (submit sched) ws >>= fun traces ->
+    eval_expr sched ws >>= fun ws ->
+    map_p ~f:(submit_for_eval sched) ws >>= fun traces ->
     if Execution_trace.all_ok traces then
-      return_ok (List.map ws ~f:Workflow.to_dep)
+      return (List.map ws ~f:Workflow.to_dep)
     else
-      return_failure ()
+      fail (Execution_trace.gather_failures ws traces)
 
 and task_trace sched t =
   let ready = Unix.gettimeofday () in
@@ -187,9 +198,16 @@ and task_trace sched t =
       Execution_trace.Run { ready ; start  ; _end_ ; outcome }
     )
   | Error (`Msg msg) ->
-    let err = `Allocation_error msg in
     log sched (Logger.Task_allocation_error (t, msg)) ;
-    Lwt.return (Execution_trace.Skipped err)
+    Lwt.return (Execution_trace.Allocation_error msg)
+
+let eval_expr sched e =
+  let f ids =
+    let ids = S.to_list ids in
+    Lwt_list.map_p (fun id -> Table.find_exn sched.traces id) ids >|= fun traces ->
+    List.zip_exn ids traces
+  in
+  Lwt_result.bind_lwt_err (eval_expr sched e) f
 
 let create
     ?(loggers = [])
