@@ -1,0 +1,7 @@
+(jbuild_version 1)
+
+(library
+ ((name bistro_test)
+  (libraries (bistro))
+  (preprocess (pps (ppx_let ppx_bistro)))
+))
