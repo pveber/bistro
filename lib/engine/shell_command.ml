@@ -59,7 +59,7 @@ let string_of_token (env : Execution_env.t) =
   let open Template in
   function
   | S s -> s
-  | D dep -> Db.dep_path env.db dep
+  | D dep -> env.dep dep
   | F toks -> env.file_dump toks
   | DEST -> env.dest
   | TMP -> env.tmp
@@ -123,7 +123,7 @@ let rec string_of_command env =
         (tmp_mount env dck_env)
         (dest_mount env dck_env)
         (Docker.image_url image)
-        (string_of_command (Execution_env.dockerize env) cmd)
+        (string_of_command dck_env cmd)
     else
       string_of_command env cmd
 
