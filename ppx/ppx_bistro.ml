@@ -51,7 +51,7 @@ class payload_rewriter = object
         | PStr [ { pstr_desc = Pstr_eval (e, _) ; pstr_loc = loc } ] ->
           let id = new_id () in
           let acc' = (id, Dep e) :: acc in
-          let expr' = [%expr env#dep [%e B.elident id]] in
+          let expr' = B.elident id in
           expr', acc'
         | _ -> failwith "expected a workflow expression"
       )
@@ -60,7 +60,7 @@ class payload_rewriter = object
         | PStr [ { pstr_desc = Pstr_eval (e, _) ; pstr_loc = loc } ] ->
           let id = new_id () in
           let acc' = (id, Deps e) :: acc in
-          let expr' = [%expr List.map ~f:env#dep [%e B.elident id]] in
+          let expr' = B.elident id in
           expr', acc'
         | _ -> failwith "expected a workflow list expression"
       )
