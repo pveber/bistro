@@ -22,20 +22,19 @@ let pipeline n debug =
   let middle = append l1 "middle" in
   let l2 = List.init n ~f:(fun i -> append [ middle ] (sprintf "l2_%d" i)) in
   let final = append l2 "final" in
-  let open Repo in
-  [ item ["final"] final ]
-(* FIXME: build a term !
-  List.map (final :: if debug then l2 else []) ~f:(fun x -> pureW x)
-  |> list
-*)
-  
+  Expr.(list pureW) (final :: if debug then l2 else [])
+
 let main n debug dot_output () =
   let loggers = [
       (* FIXME if dot_output then Dot_output.create "accordion.dot" else Logger.null ; *)
       console_logger () ;
     ]
   in
-  Repo.build ~outdir:"res" ~loggers (pipeline n debug)
+  match eval_expr ~loggers (pipeline n debug) with
+  | Ok _ -> ()
+  | Error report ->
+    prerr_endline report ;
+    failwith "Some workflow failed!"
 
 let command =
   let open Command.Let_syntax in

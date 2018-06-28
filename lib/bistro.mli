@@ -33,6 +33,14 @@ val console_logger : unit -> logger
 module Repo : Bistro_base.Sigs.Repo with type 'a workflow := 'a workflow
                                      and type logger := logger
 
+val eval_expr :
+  ?np:int ->
+  ?mem:[`GB of int] ->
+  ?loggers:logger list ->
+  ?use_docker:bool ->
+  ?bistro_dir:string ->
+  'a Expr.t -> ('a, string) result
+
 module Private : sig
   val reveal : 'a workflow -> 'a Bistro_base.Workflow.t
 end

@@ -18,3 +18,12 @@ val eval_expr :
 val start : t -> unit
 
 val join : t -> unit Lwt.t
+
+val eval_expr_main :
+  ?np:int ->
+  ?mem:[`GB of int] ->
+  ?loggers:Logger.t list ->
+  ?use_docker:bool ->
+  Db.t ->
+  'a Workflow.expr ->
+  ('a, string) result

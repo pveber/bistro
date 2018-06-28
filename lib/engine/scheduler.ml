@@ -229,15 +229,20 @@ let join sched =
 let start sched =
   Semaphore.go sched.start_signal
 
+let error_report db traces =
+  let buf = Buffer.create 1024 in
+  List.iter traces ~f:(fun (id, trace) ->
+      Execution_trace.error_report trace db buf id
+    ) ;
+  Buffer.contents buf
 
-
-
-
-
-
-
-
-
+let eval_expr_main ?np ?mem ?loggers ?use_docker db expr =
+  let sched = create ?loggers ?np ?mem ?use_docker db in
+  let t = eval_expr sched expr in
+  start sched ;
+  match Lwt_main.run t with
+  | Ok _ as x -> x
+  | Error traces -> Error (error_report db traces)
 
 
 
