@@ -51,7 +51,7 @@ class payload_rewriter = object
         | PStr [ { pstr_desc = Pstr_eval (e, _) ; pstr_loc = loc } ] ->
           let id = new_id () in
           let acc' = (id, Dep e) :: acc in
-          let expr' = [%expr env#dep [%e B.elident (id ^ "_id")]] in
+          let expr' = [%expr env#dep [%e B.elident id]] in
           expr', acc'
         | _ -> failwith "expected a workflow expression"
       )
@@ -60,7 +60,7 @@ class payload_rewriter = object
         | PStr [ { pstr_desc = Pstr_eval (e, _) ; pstr_loc = loc } ] ->
           let id = new_id () in
           let acc' = (id, Deps e) :: acc in
-          let expr' = [%expr List.map ~f:env#dep [%e B.elident (id ^ "_id")]] in
+          let expr' = [%expr List.map ~f:env#dep [%e B.elident id]] in
           expr', acc'
         | _ -> failwith "expected a workflow list expression"
       )
@@ -91,40 +91,51 @@ let rewriter ~loc ~path:_ descr version mem np var expr =
   let body = extract_body expr in
   let rewriter = new payload_rewriter in
   let code, deps = rewriter#expression body [] in
+  let code_with_arguments =
+    List.fold_right
+      deps
+      ~init:[%expr fun env -> [%e code]]
+      ~f:(fun (tmpvar, _) acc ->
+          [%expr fun [%p B.pvar tmpvar] -> [%e acc]]
+        )
+  in
   let id = digest (string_of_expression code) in
+  let workflow_expr =
+    List.fold_right
+      deps
+      ~init:[%expr Bistro.Private.Expr.pure ~id f]
+      ~f:(fun (tmpvar, payload) acc ->
+          let arg = match payload with
+            | Dep _  ->
+              [%expr Bistro.Private.Expr.(dep (pureW [%e B.elident tmpvar]))]
+            | Deps _ ->
+              [%expr Bistro.Private.Expr.(deps (list pureW [%e B.elident tmpvar]))]
+          in
+          [%expr Bistro.Private.Expr.app [%e acc] [%e arg]]
+        )
+  in
   let add_bindings body = List.fold deps ~init:body ~f:(fun acc (tmpvar, payload) ->
       match payload with
       | Dep expr ->
         [%expr
           let [%p B.pvar tmpvar] = [%e expr] in
-          let [%p B.pvar (tmpvar ^ "_id")] =
-            Bistro.Workflow.to_dep [%e B.elident tmpvar] in
           [%e acc]]
       | Deps expr ->
         [%expr
           let [%p B.pvar tmpvar] = [%e expr] in
-          let [%p B.pvar (tmpvar ^ "_id")] =
-            List.map ~f:Bistro.Workflow.to_dep [%e B.elident tmpvar] in
           [%e acc]]
     )
   in
-  let dep_list =
-    List.map deps ~f:(fun (v, payload) ->
-        match payload with
-        | Dep _ -> [%expr [ Bistro.Workflow.u [%e B.elident v] ]]
-        | Deps _ -> [%expr List.map ~f:Bistro.Workflow.u [%e B.elident v]]
-      )
-    |> B.elist
-  in
   let new_body = [%expr
     let id = [%e B.estring id] in
-    let f env : unit = [%e code] in
-    Bistro.Workflow.of_fun
+    let f = [%e code_with_arguments] in
+    let expr = [%e workflow_expr] in
+    Bistro.Private.closure
       ~descr:[%e descr]
       ~np:[%e np]
       ~mem:[%e mem]
       ~version:[%e version]
-      ~id ~deps:(List.concat [%e dep_list]) f
+      expr
   ] |> add_bindings
   in
   [%stri let [%p B.pvar var] = [%e replace_body new_body expr]]

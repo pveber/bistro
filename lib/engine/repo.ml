@@ -80,7 +80,7 @@ let generate outdir items =
     )
 
 let to_expr db ~outdir items =
-  let open Workflow in
+  let open Workflow.Expr in
   List.map items ~f:(function (Repo_item (path, w)) ->
       pure ~id:"normalized_repo_item" (normalized_repo_item db)
       $ list string path

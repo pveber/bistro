@@ -33,6 +33,20 @@ val console_logger : unit -> logger
 module Repo : Bistro_base.Sigs.Repo with type 'a workflow := 'a workflow
                                      and type logger := logger
 
+
+module Expr : sig
+  type 'a t
+  val pure : id:string -> 'a -> 'a t
+
+  val pureW : 'a workflow -> 'a workflow t
+
+  val app : ('a -> 'b) t -> 'a t -> 'b t
+
+  val ( $ ) : ('a -> 'b) t -> 'a t -> 'b t
+
+  val list : ('a -> 'b t) -> 'a list -> 'b list t
+end
+
 val eval_expr :
   ?np:int ->
   ?mem:[`GB of int] ->
@@ -42,5 +56,30 @@ val eval_expr :
   'a Expr.t -> ('a, string) result
 
 module Private : sig
+  open Bistro_base
   val reveal : 'a workflow -> 'a Bistro_base.Workflow.t
+
+  module Expr : sig
+    type 'a t
+    val pure : id:string -> 'a -> 'a t
+
+    val pureW : 'a workflow -> 'a workflow t
+
+    val app : ('a -> 'b) t -> 'a t -> 'b t
+
+    val ( $ ) : ('a -> 'b) t -> 'a t -> 'b t
+
+    val list : ('a -> 'b t) -> 'a list -> 'b list t
+
+    val dep : 'a workflow t -> Workflow.dep t
+    val deps : 'a workflow list t -> Workflow.dep list t
+  end
+
+  val closure :
+    ?descr:string ->
+    ?mem:int ->
+    ?np:int ->
+    ?version:int ->
+    (Workflow.env -> unit) Expr.t ->
+    'a workflow
 end

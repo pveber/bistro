@@ -1,5 +1,6 @@
 open Core
 open Bistro
+open Shell_dsl
 
 let%bistro [@np 2] [@mem 1] [@descr "foobar"] [@version 42]
     comment_filter bed =
@@ -16,7 +17,7 @@ let%bistro cat files =
 
 let create_file contents =
   let file = string contents in
-  workflow ~descr:"create_file" [
+  shell ~descr:"create_file" [
     cmd "cp" [ file_dump file ; dest ]
   ]
 
@@ -30,27 +31,28 @@ let%bistro test_id' =
 
 
 let main () =
-  assert Bistro.Workflow.(id test_id = id test_id') ;
+  let open Bistro_base in
+  let open Bistro.Private in
+  assert Workflow.(id (reveal test_id) = id (reveal test_id')) ;
   let bed = comment_filter (create_file "# comment\nchr1\t42\t100\n") in
-  let bed2 = comment_filter (create_file "# comment\n# comment\nchr10\t42\t100\n") in
+  (* let bed2 = comment_filter (create_file "# comment\n# comment\nchr10\t42\t100\n") in *)
   Bistro.(
-    match Workflow.u bed with
-    | Step { descr ; version ; mem } ->
+    match Private.reveal bed with
+    | Closure { descr ; version ; mem } ->
       assert (descr = "foobar") ;
       assert (version = Some 42) ;
       assert (mem = 1)
     | _ -> assert false
-  ) ;
-  Term.(
-    run (
-      pure (fun xs ->
-          List.iter xs ~f:(fun (Path p) ->
-              print_endline (In_channel.read_all p)
-            )
-        )
-      $ list [ pureW bed ; pureW bed2 ]
-    )
-  )
+  ) (* ;
+   * eval_expr Expr.(
+   *     pure ~id:"foobar" (fun xs ->
+   *         List.iter xs ~f:(fun (Path p) ->
+   *             print_endline (In_channel.read_all p)
+   *           )
+   *       )
+   *     $ list [ pureW bed ; pureW bed2 ]
+   *   )
+   * ) *)                       (* FIXME *)
 
 let command =
   Command.basic

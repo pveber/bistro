@@ -170,18 +170,6 @@ module type DSL = sig
                                 and type command = shell_command
                                 and type docker_image := docker_image
 
-  module Expr : sig
-    type 'a t
-    val pure : id:string -> 'a -> 'a t
-
-    val pureW : 'a workflow -> 'a workflow t
-
-    val app : ('a -> 'b) t -> 'a t -> 'b t
-
-    val ( $ ) : ('a -> 'b) t -> 'a t -> 'b t
-
-    val list : ('a -> 'b t) -> 'a list -> 'b list t
-  end
 end
 
 module type Term = sig

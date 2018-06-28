@@ -50,7 +50,13 @@ and 'a step = {
 and shell = shell_command step
 and shell_command = dep expr Command.t
 and template = dep expr Template.t
-and env = < tmp : string ; dest : string  ; np : int ; mem : int >
+and env = <
+  dep : dep -> string ;
+  tmp : string ;
+  dest : string ;
+  np : int ;
+  mem : int
+>
 
 let id = function
   | Input { id ;  _ }
@@ -113,13 +119,25 @@ let shell
   let id = digest ("shell", version, digestible_cmd cmd) in
   Shell { descr ; task = cmd ; np ; mem ; version ; id }
 
-let pure ~id value = Pure { id ; value }
-let pureW w = Pure { id = id w ; value = w }
-let dep e = Dep e
-let app f x = App (f, x)
-let ( $ ) f x = app f x
-let list f xs = List (List.map xs ~f)
-let string s = pure ~id:(digest s) s
+let closure
+    ?(descr = "")
+    ?(mem = 100)
+    ?(np = 1)
+    ?version
+    f =
+  let id = digest ("closure", version, digestible_expr f) in
+  Closure { descr ; task = f ; np ; mem ; version ; id }
+
+module Expr = struct
+  let pure ~id value = Pure { id ; value }
+  let pureW w = Pure { id = id w ; value = w }
+  let dep e = Dep e
+  let deps e = Deps e
+  let app f x = App (f, x)
+  let ( $ ) f x = app f x
+  let list f xs = List (List.map xs ~f)
+  let string s = pure ~id:(digest s) s
+end
 
 let to_dep = function
   | Input { id ; _ }

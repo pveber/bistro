@@ -32,11 +32,7 @@ let console_logger () = Bistro_engine.Console_logger.create ()
 
 module Expr = struct
   type 'a t = 'a Workflow.expr
-  let pure = Workflow.pure
-  let pureW = Workflow.pureW
-  let app = Workflow.app
-  let ( $ ) = app
-  let list = Workflow.list
+  include Workflow.Expr
 end
 
 let eval_expr ?np ?mem ?loggers ?use_docker ?(bistro_dir = "_bistro") expr =
@@ -48,4 +44,7 @@ module Repo = Bistro_engine.Repo
 
 module Private = struct
   let reveal (x : 'a workflow) = (x : 'a Workflow.t)
+
+  module Expr = Expr
+  let closure = Workflow.closure
 end
