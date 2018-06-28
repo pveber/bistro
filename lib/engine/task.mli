@@ -16,7 +16,7 @@ type t = private
       descr : string ;
       np : int ;
       mem : int ;
-      cmd : Workflow.dep Command.t ;
+      cmd : string Command.t ;
     }
 
 val input :
@@ -34,7 +34,7 @@ val shell :
   descr:string ->
   np:int ->
   mem:int ->
-  Workflow.dep Command.t -> t
+  string Command.t -> t
 
 val requirement : t -> Allocator.request
 

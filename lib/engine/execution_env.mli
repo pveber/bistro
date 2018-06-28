@@ -9,8 +9,7 @@ type t = {
   tmp : string ;     (* temp dir for the process *)
   stdout : string ;
   stderr : string ;
-  dep : Workflow.dep -> string ;
-  file_dump : Workflow.dep Template.t -> string ;
+  file_dump : string Template.t -> string ;
   np : int ;
   mem : int ;
   uid : int ;
@@ -24,5 +23,6 @@ val make :
   id:string ->
   t
 
+val container_path : Workflow.dep -> string
 val dockerize : t -> t
 val docker_cache_dir : string

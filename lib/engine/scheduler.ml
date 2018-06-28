@@ -100,7 +100,7 @@ and compute_task sched =
     submit_for_eval sched dir >>= fun _ ->
     return @@ Task.select ~dir ~sel
   | Shell { task = cmd ; id ; descr ; np ; mem ; _ } ->
-    eval_command sched cmd >>= fun cmd ->
+    eval_command sched ~in_container:false cmd >>= fun cmd ->
     return @@ Task.shell ~id ~descr ~np ~mem cmd
   | Closure _ -> assert false
 
@@ -112,48 +112,48 @@ and submit_for_eval sched w =
   else
     return trace
 
-and eval_command sched : _ Command.t -> _ Lwt_eval.t =
+and eval_command : type s. t -> in_container:bool -> s Workflow.expr Command.t -> s Command.t Lwt_eval.t = fun sched ~in_container ->
   let open Command in
   let open Lwt_eval in
   function
   | Simple_command tmpl ->
-    eval_template sched tmpl >|= fun tmpl ->
+    eval_template sched ~in_container tmpl >|= fun tmpl ->
     Simple_command tmpl
   | Docker (img, c) ->
-    eval_command sched c >|= fun c ->
+    eval_command ~in_container:sched.config.use_docker sched c >|= fun c ->
     Docker (img, c)
   | And_list cs ->
-    map_p cs ~f:(eval_command sched) >|= fun cs ->
+    map_p cs ~f:(eval_command ~in_container sched) >|= fun cs ->
     And_list cs
   | Pipe_list cs ->
-    map_p cs ~f:(eval_command sched) >|= fun cs ->
+    map_p cs ~f:(eval_command ~in_container sched) >|= fun cs ->
     Pipe_list cs
   | Or_list cs ->
-    map_p cs ~f:(eval_command sched) >|= fun cs ->
+    map_p cs ~f:(eval_command ~in_container sched) >|= fun cs ->
     Or_list cs
 
-and eval_template sched xs =
-  Lwt_eval.map_p xs ~f:(eval_token sched)
+and eval_template : type s. t -> in_container:bool -> s Workflow.expr Template.t -> s Template.t Lwt_eval.t = fun sched ~in_container xs ->
+  Lwt_eval.map_p xs ~f:(eval_token sched ~in_container)
 
-and eval_token sched =
+and eval_token : type s. t -> in_container:bool -> s Workflow.expr Template.token -> s Template.token Lwt_eval.t = fun sched ~in_container ->
   let open Template in
   let open Lwt_eval in
   function
-  | D expr -> eval_expr sched expr >|= fun path -> D path
-  | F tmpl -> eval_template sched tmpl >|= fun tmpl -> F tmpl
+  | D expr -> eval_expr sched ~in_container expr >|= fun path -> D path
+  | F tmpl -> eval_template sched ~in_container tmpl >|= fun tmpl -> F tmpl
   | (S _ | DEST | TMP | NP | MEM as x) -> return x
 
-and eval_expr : type s. t -> s Workflow.expr -> s Lwt_eval.t = fun sched expr ->
+and eval_expr : type s. t -> in_container:bool -> s Workflow.expr -> s Lwt_eval.t = fun sched ~in_container expr ->
   let open Workflow in
   let open Lwt_eval in
   match expr with
   | Pure { value ; _ } -> Lwt_result.return value
   | App (f, x) ->
-    eval_expr sched f >>= fun f ->
-    eval_expr sched x >>= fun x ->
+    eval_expr sched ~in_container f >>= fun f ->
+    eval_expr sched ~in_container x >>= fun x ->
     return_ok (f x)
   | List xs ->
-    map_p ~f:(eval_expr sched) xs
+    map_p ~f:(eval_expr ~in_container sched) xs
 
   | Glob { dir ; _ } ->
     let open Lwt in
@@ -161,7 +161,7 @@ and eval_expr : type s. t -> s Workflow.expr -> s Lwt_eval.t = fun sched expr ->
     assert false
 
   | Map_workflows { xs ; f } ->
-    eval_expr sched xs >>= fun sources ->
+    eval_expr sched ~in_container xs >>= fun sources ->
     let targets = List.map ~f sources in
     map_p ~f:(submit_for_eval sched) targets >>= fun traces ->
     if Execution_trace.all_ok traces then
@@ -169,19 +169,30 @@ and eval_expr : type s. t -> s Workflow.expr -> s Lwt_eval.t = fun sched expr ->
     else
       Lwt_eval.fail (Execution_trace.gather_failures targets traces)
   | Dep w ->
-    eval_expr sched w >>= fun w ->
+    eval_expr sched ~in_container:false w >>= fun w ->
     submit_for_eval sched w >>= fun trace ->
     if Execution_trace.is_errored trace then
       fail (Execution_trace.gather_failures [w] [trace])
     else
-      return (Workflow.to_dep w)
+      return (dep_path sched ~in_container w)
   | Deps ws ->
-    eval_expr sched ws >>= fun ws ->
+    eval_expr sched ~in_container:false ws >>= fun ws ->
     map_p ~f:(submit_for_eval sched) ws >>= fun traces ->
     if Execution_trace.all_ok traces then
-      return (List.map ws ~f:Workflow.to_dep)
+      return (List.map ws ~f:(dep_path sched ~in_container))
     else
       fail (Execution_trace.gather_failures ws traces)
+
+and dep_path
+  : type s. t -> in_container:bool -> s Workflow.t -> string
+  = fun sched ~in_container w ->
+  let path =
+    if in_container then
+      Execution_env.container_path
+    else
+      Db.dep_path sched.config.db
+  in
+  path (Workflow.to_dep w)
 
 and task_trace sched t =
   let ready = Unix.gettimeofday () in
@@ -207,7 +218,7 @@ let eval_expr sched e =
     Lwt_list.map_p (fun id -> Table.find_exn sched.traces id) ids >|= fun traces ->
     List.zip_exn ids traces
   in
-  Lwt_result.bind_lwt_err (eval_expr sched e) f
+  Lwt_result.bind_lwt_err (eval_expr sched ~in_container:false e) f
 
 let create
     ?(loggers = [])
@@ -263,7 +274,7 @@ let eval_expr_main ?np ?mem ?loggers ?use_docker db expr =
  *   Lwt_list.map_p check_outcome deps >|= fun xs ->
  *   if List.for_all xs ~f:ident then `All_deps_cleared
  *   else `Some_dep_failed
- * 
+ *
  * let rec register sched (Workflow.Any w) =
  *   let is_registered = Table.mem sched.traces (Workflow.id w) in
  *   if not is_registered then (
@@ -287,7 +298,7 @@ let eval_expr_main ?np ?mem ?loggers ?use_docker db expr =
  *     in
  *     Table.set sched.traces (Workflow.id w) trace
  *   )
- * 
+ *
  * and regular_trace sched (Workflow.Any w) =
  *   let open Execution_trace in
  *   let ready = Unix.gettimeofday () in

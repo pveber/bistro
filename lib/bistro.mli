@@ -71,8 +71,8 @@ module Private : sig
 
     val list : ('a -> 'b t) -> 'a list -> 'b list t
 
-    val dep : 'a workflow t -> Workflow.dep t
-    val deps : 'a workflow list t -> Workflow.dep list t
+    val dep : 'a workflow t -> string t
+    val deps : 'a workflow list t -> string list t
   end
 
   val closure :

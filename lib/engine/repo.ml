@@ -12,11 +12,11 @@ type normalized_repo_item = {
   cache_path : string ;
 }
 
-let normalized_repo_item db repo_path w dep =
+let normalized_repo_item db repo_path w cache_path =
   {
     repo_path = Path.to_string repo_path ;
     file_path = Filename.concat "_files" (Workflow.id w) ;
-    cache_path = Db.dep_path db dep ;
+    cache_path ;
   }
 
 let item path w = Repo_item (path, w)
@@ -94,7 +94,7 @@ let to_expr db ~outdir items =
 let build ?np ?mem ?loggers ?keep_all:_ ?use_docker ?(bistro_dir = "_bistro") ~outdir repo =
   let db = Db.init_exn bistro_dir in
   let expr = to_expr ~outdir db repo in
-  match Scheduler.eval_expr_main db expr with
+  match Scheduler.eval_expr_main ?np ?mem ?loggers ?use_docker db expr with
   | Ok () -> ()
   | Error report ->
     prerr_endline report ;

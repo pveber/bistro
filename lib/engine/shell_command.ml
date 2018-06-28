@@ -8,7 +8,7 @@ type file_dump = File_dump of {
 
 
 type symbolic_file_dump = Symbolic_file_dump of {
-    contents : Workflow.dep Template.t ;
+    contents : string Template.t ;
     in_docker : bool ;
   }
 
@@ -59,8 +59,8 @@ let string_of_token (env : Execution_env.t) =
   let open Template in
   function
   | S s -> s
-  | D dep -> env.dep dep
-  | F toks -> env.file_dump toks
+  | D dep -> (* env.dep *) dep
+  | F toks -> Workflow.digest toks
   | DEST -> env.dest
   | TMP -> env.tmp
   | NP -> string_of_int env.np

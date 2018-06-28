@@ -18,7 +18,7 @@ type t =
       descr : string ;
       np : int ;
       mem : int ;
-      cmd : Workflow.dep Command.t ;
+      cmd : string Command.t ;
     }
 
 let input ~id ~path = Input { id ; path }

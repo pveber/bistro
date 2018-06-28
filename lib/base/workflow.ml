@@ -36,8 +36,8 @@ and 'a expr =
       xs : 'a t list expr ;
       f : ('a t -> 'b t) ;
     } -> 'b t list expr
-  | Dep   : _ t expr -> dep expr
-  | Deps : _ t list expr -> dep list expr
+  | Dep   : _ t expr -> string expr
+  | Deps : _ t list expr -> string list expr
 
 and 'a step = {
   id : string ;
@@ -48,8 +48,8 @@ and 'a step = {
   version : int option ; (** Version number of the wrapper *)
 }
 and shell = shell_command step
-and shell_command = dep expr Command.t
-and template = dep expr Template.t
+and shell_command = string expr Command.t
+and template = string expr Template.t
 and env = <
   dep : dep -> string ;
   tmp : string ;

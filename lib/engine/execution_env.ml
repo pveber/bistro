@@ -9,8 +9,7 @@ type t = {
   tmp : string ;     (* temp dir for the process *)
   stdout : string ;
   stderr : string ;
-  dep : Workflow.dep -> string ;
-  file_dump : Workflow.dep Template.t -> string ;
+  file_dump : string Template.t -> string ;
   np : int ;
   mem : int ;
   uid : int ;
@@ -30,7 +29,6 @@ let make ~db  ~use_docker ~np ~mem ~id =
     stdout = Db.stdout db id ;
     stderr = Db.stderr db id ;
     file_dump ;
-    dep = (Db.dep_path db) ;
     np ;
     mem ;
     uid = Unix.getuid () ;
@@ -38,7 +36,7 @@ let make ~db  ~use_docker ~np ~mem ~id =
 
 let docker_cache_dir = "/bistro/data"
 
-let dep_path_in_docker = function
+let container_path = function
   | `Cached id -> Filename.concat docker_cache_dir id
   | `Select (`Cached id, sel) ->
     List.reduce_exn ~f:Filename.concat [
@@ -53,7 +51,6 @@ let dockerize env = {
   using_docker = false ;
   dest = "/bistro/dest" ;
   tmp = "/bistro/tmp" ;
-  dep = dep_path_in_docker ;
   file_dump = (fun toks -> Filename.concat docker_cache_dir (Misc.digest toks)) ;
   np = env.np ;
   mem = env.mem ;
