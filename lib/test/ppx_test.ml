@@ -29,11 +29,19 @@ let%bistro test_id' =
   let a = 1 in
   ignore a
 
+let%bistro test_param =
+  let a = [%param 2] in
+  ignore a
+
+let%bistro test_param' =
+  let a = [%param "foo"] in
+  ignore a
 
 let main () =
   let open Bistro_base in
   let open Bistro.Private in
   assert Workflow.(id (reveal test_id) = id (reveal test_id')) ;
+  assert Workflow.(id (reveal test_param) <> id (reveal test_param')) ;
   let bed = comment_filter (create_file "# comment\nchr1\t42\t100\n") in
   let bed2 = comment_filter (create_file "# comment\n# comment\nchr10\t42\t100\n") in
   Bistro.(

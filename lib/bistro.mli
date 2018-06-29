@@ -38,6 +38,8 @@ module Expr : sig
   type 'a t
   val pure : id:string -> 'a -> 'a t
 
+  val pure_data : 'a -> 'a t
+
   val pureW : 'a workflow -> 'a workflow t
 
   val app : ('a -> 'b) t -> 'a t -> 'b t

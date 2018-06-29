@@ -39,6 +39,7 @@ module B = struct
 end
 
 type payload =
+  | Param of expression
   | Dep of expression
   | Deps of expression
 
@@ -61,6 +62,15 @@ class payload_rewriter = object
           let id = new_id () in
           let acc' = (id, Deps e) :: acc in
           let expr' = B.elident id in
+          expr', acc'
+        | _ -> failwith "expected a workflow list expression"
+      )
+    | { pexp_desc = Pexp_extension ({ txt = "param" ; _ }, payload) ;  _ } -> (
+        match payload with
+        | PStr [ { pstr_desc = Pstr_eval (e, _) ; pstr_loc = loc } ] ->
+          let id = new_id () in
+          let acc' = (id, Param e) :: acc in
+          let expr' = [%expr [%e B.elident id]] in
           expr', acc'
         | _ -> failwith "expected a workflow list expression"
       )
@@ -106,6 +116,8 @@ let rewriter ~loc ~path:_ descr version mem np var expr =
       ~init:[%expr Bistro.Expr.pure ~id f]
       ~f:(fun (tmpvar, payload) acc ->
           let arg = match payload with
+            | Param _ ->
+              [%expr Bistro.Expr.(pure_data [%e B.elident tmpvar])]
             | Dep _  ->
               [%expr Bistro.Expr.(dep (pureW [%e B.elident tmpvar]))]
             | Deps _ ->
@@ -116,10 +128,8 @@ let rewriter ~loc ~path:_ descr version mem np var expr =
   in
   let add_bindings body = List.fold deps ~init:body ~f:(fun acc (tmpvar, payload) ->
       match payload with
-      | Dep expr ->
-        [%expr
-          let [%p B.pvar tmpvar] = [%e expr] in
-          [%e acc]]
+      | Param expr
+      | Dep expr
       | Deps expr ->
         [%expr
           let [%p B.pvar tmpvar] = [%e expr] in

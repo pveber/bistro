@@ -129,6 +129,7 @@ let closure
 
 module Expr = struct
   let pure ~id value = Pure { id ; value }
+  let pure_data value = Pure { id = digest value ; value }
   let pureW w = Pure { id = id w ; value = w }
   let dep e = Dep e
   let deps e = Deps e
