@@ -102,7 +102,9 @@ and compute_task sched =
   | Shell { task = cmd ; id ; descr ; np ; mem ; _ } ->
     eval_command sched ~in_container:false cmd >>= fun cmd ->
     return @@ Task.shell ~id ~descr ~np ~mem cmd
-  | Closure _ -> assert false
+  | Closure { task = f ; id ; descr ; np ; mem; _} -> 
+    eval_expr sched ~in_container:false f >>= fun f ->
+    return @@ Task.closure ~id ~descr ~np ~mem f
 
 and submit_for_eval sched w =
   let open Lwt_eval in
@@ -149,8 +151,10 @@ and eval_expr : type s. t -> in_container:bool -> s Workflow.expr -> s Lwt_eval.
   match expr with
   | Pure { value ; _ } -> Lwt_result.return value
   | App (f, x) ->
-    eval_expr sched ~in_container f >>= fun f ->
-    eval_expr sched ~in_container x >>= fun x ->
+    let f = eval_expr sched ~in_container f
+    and x = eval_expr sched ~in_container x in
+    f >>= fun f ->
+    x >>= fun x ->
     return_ok (f x)
   | List xs ->
     map_p ~f:(eval_expr ~in_container sched) xs

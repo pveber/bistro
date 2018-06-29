@@ -51,7 +51,6 @@ and shell = shell_command step
 and shell_command = string expr Command.t
 and template = string expr Template.t
 and env = <
-  dep : dep -> string ;
   tmp : string ;
   dest : string ;
   np : int ;

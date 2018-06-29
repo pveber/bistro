@@ -60,7 +60,7 @@ let string_of_token (env : Execution_env.t) =
   function
   | S s -> s
   | D dep -> (* env.dep *) dep
-  | F toks -> Workflow.digest toks
+  | F toks -> env.file_dump toks
   | DEST -> env.dest
   | TMP -> env.tmp
   | NP -> string_of_int env.np

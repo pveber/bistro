@@ -44,7 +44,7 @@ let main () =
       assert (mem = 1)
     | _ -> assert false
   ) ;
-  eval_expr_exn Expr.(
+  eval_expr Expr.(
       pure ~id:"foobar" (fun xs ->
           List.iter xs ~f:(fun p ->
               print_endline (In_channel.read_all p)
@@ -52,6 +52,11 @@ let main () =
         )
       $ deps (list pureW [ bed ; bed2 ])
     )
+  |> (
+    function
+      Ok () -> ()
+    | Error msg -> prerr_endline msg
+  )
 
 let command =
   Command.basic

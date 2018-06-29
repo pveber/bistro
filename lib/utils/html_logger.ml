@@ -38,7 +38,9 @@ let create path = {
 }
 
 let translate_event db _ = function
-  | Logger.Task_started (Task.Shell {id ; descr ; _}, _) ->
+  | Logger.Task_started (
+      (Task.Shell {id ; descr ; _}
+      | Closure { id ; descr ; _ }), _) ->
     Some (Step_task_started { id ; descr })
 
   | Task_ended { outcome ; _ } ->

@@ -18,6 +18,13 @@ type t = private
       mem : int ;
       cmd : string Command.t ;
     }
+  | Closure of {
+      id : string ;
+      descr : string ;
+      np : int ;
+      mem : int ;
+      f : Workflow.env -> unit ;
+    }
 
 val input :
   id:string ->
@@ -35,6 +42,13 @@ val shell :
   np:int ->
   mem:int ->
   string Command.t -> t
+
+val closure :
+  id:string ->
+  descr:string ->
+  np:int ->
+  mem:int ->
+  (Workflow.env -> unit) -> t
 
 val requirement : t -> Allocator.request
 
