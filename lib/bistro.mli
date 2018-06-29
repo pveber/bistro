@@ -45,6 +45,9 @@ module Expr : sig
   val ( $ ) : ('a -> 'b) t -> 'a t -> 'b t
 
   val list : ('a -> 'b t) -> 'a list -> 'b list t
+
+  val dep : 'a workflow t -> string t
+  val deps : 'a workflow list t -> string list t
 end
 
 val eval_expr :
@@ -55,25 +58,17 @@ val eval_expr :
   ?bistro_dir:string ->
   'a Expr.t -> ('a, string) result
 
+val eval_expr_exn :
+  ?np:int ->
+  ?mem:[`GB of int] ->
+  ?loggers:logger list ->
+  ?use_docker:bool ->
+  ?bistro_dir:string ->
+  'a Expr.t -> 'a
+
 module Private : sig
   open Bistro_base
   val reveal : 'a workflow -> 'a Bistro_base.Workflow.t
-
-  module Expr : sig
-    type 'a t
-    val pure : id:string -> 'a -> 'a t
-
-    val pureW : 'a workflow -> 'a workflow t
-
-    val app : ('a -> 'b) t -> 'a t -> 'b t
-
-    val ( $ ) : ('a -> 'b) t -> 'a t -> 'b t
-
-    val list : ('a -> 'b t) -> 'a list -> 'b list t
-
-    val dep : 'a workflow t -> string t
-    val deps : 'a workflow list t -> string list t
-  end
 
   val closure :
     ?descr:string ->

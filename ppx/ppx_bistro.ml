@@ -103,15 +103,15 @@ let rewriter ~loc ~path:_ descr version mem np var expr =
   let workflow_expr =
     List.fold_right
       deps
-      ~init:[%expr Bistro.Private.Expr.pure ~id f]
+      ~init:[%expr Bistro.Expr.pure ~id f]
       ~f:(fun (tmpvar, payload) acc ->
           let arg = match payload with
             | Dep _  ->
-              [%expr Bistro.Private.Expr.(dep (pureW [%e B.elident tmpvar]))]
+              [%expr Bistro.Expr.(dep (pureW [%e B.elident tmpvar]))]
             | Deps _ ->
-              [%expr Bistro.Private.Expr.(deps (list pureW [%e B.elident tmpvar]))]
+              [%expr Bistro.Expr.(deps (list pureW [%e B.elident tmpvar]))]
           in
-          [%expr Bistro.Private.Expr.app [%e acc] [%e arg]]
+          [%expr Bistro.Expr.app [%e acc] [%e arg]]
         )
   in
   let add_bindings body = List.fold deps ~init:body ~f:(fun acc (tmpvar, payload) ->

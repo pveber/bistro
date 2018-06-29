@@ -40,6 +40,11 @@ let eval_expr ?np ?mem ?loggers ?use_docker ?(bistro_dir = "_bistro") expr =
   let db = Db.init_exn bistro_dir in
   Scheduler.eval_expr_main ?np ?mem ?loggers db expr
 
+let eval_expr_exn ?np ?mem ?loggers ?use_docker ?bistro_dir expr =
+  match eval_expr ?np ?mem ?loggers ?use_docker ?bistro_dir expr with
+  | Ok x -> x
+  | Error msg -> failwith msg
+
 module Repo = Bistro_engine.Repo
 
 module Private = struct

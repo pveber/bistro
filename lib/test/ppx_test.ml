@@ -35,7 +35,7 @@ let main () =
   let open Bistro.Private in
   assert Workflow.(id (reveal test_id) = id (reveal test_id')) ;
   let bed = comment_filter (create_file "# comment\nchr1\t42\t100\n") in
-  (* let bed2 = comment_filter (create_file "# comment\n# comment\nchr10\t42\t100\n") in *)
+  let bed2 = comment_filter (create_file "# comment\n# comment\nchr10\t42\t100\n") in
   Bistro.(
     match Private.reveal bed with
     | Closure { descr ; version ; mem } ->
@@ -43,16 +43,15 @@ let main () =
       assert (version = Some 42) ;
       assert (mem = 1)
     | _ -> assert false
-  ) (* ;
-   * eval_expr Expr.(
-   *     pure ~id:"foobar" (fun xs ->
-   *         List.iter xs ~f:(fun (Path p) ->
-   *             print_endline (In_channel.read_all p)
-   *           )
-   *       )
-   *     $ list [ pureW bed ; pureW bed2 ]
-   *   )
-   * ) *)                       (* FIXME *)
+  ) ;
+  eval_expr_exn Expr.(
+      pure ~id:"foobar" (fun xs ->
+          List.iter xs ~f:(fun p ->
+              print_endline (In_channel.read_all p)
+            )
+        )
+      $ deps (list pureW [ bed ; bed2 ])
+    )
 
 let command =
   Command.basic
