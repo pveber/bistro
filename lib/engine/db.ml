@@ -115,18 +115,21 @@ let init path =
 
 let init_exn path = ok_exn (init path)
 
-let rec workflow_path' db =
-  let open Bistro in
-  function
-  | Input (_, p) -> Path.to_string p
-  | Select (_, dir, p) ->
-    Filename.concat (workflow_path' db dir) (Path.to_string p)
-  | Step s -> cache db s.id
-
-let workflow_path db w =
-  workflow_path' db (Bistro.Workflow.u w)
-
 let fold_cache db ~init ~f =
   Array.fold
     (Sys.readdir (cache_dir db))
     ~init ~f
+
+let rec path : type s. t -> s Bistro_base.Workflow.t -> string = fun db ->
+  let open Bistro_base.Workflow in
+  function
+  | Bistro_base.Workflow.Input i -> i.path
+  | Select s ->
+    Filename.concat (path db s.dir) (Path.to_string s.sel)
+  | Shell s -> cache db s.id
+  | Closure s -> cache db s.id
+
+let dep_path db = function
+  | `Cached id -> cache db id
+  | `Select (`Cached id, sel) ->
+    Filename.concat (cache db id) (Path.to_string sel)

@@ -33,10 +33,13 @@ val stdout : t -> string -> string
 val stderr : t -> string -> string
 val build : t -> string -> string
 
-val workflow_path : t -> _ Bistro.Workflow.t -> string
+(* val workflow_path : t -> Bistro.Private.Workflow.t -> string *)
 
 val fold_cache :
   t ->
   init:'a ->
   f:('a -> string -> 'a) ->
   'a
+
+val path : t -> _ Bistro_base.Workflow.t -> string
+val dep_path : t -> Bistro_base.Workflow.dep -> string

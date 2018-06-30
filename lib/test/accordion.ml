@@ -1,17 +1,11 @@
 open Core
 open Lwt
-open Bistro.Std
-open Bistro.EDSL
-open Bistro_engine
-open Bistro_utils
+open Bistro
+open Shell_dsl
 
-module Workflow = Bistro.Workflow
-
-type txt
-
-let append (xs : txt workflow list) id =
+let append (xs : text_file workflow list) id =
   let echo_cmd = cmd "echo" [ string id ; string ">>" ; dest ] in
-  workflow (match xs with
+  shell (match xs with
       | [] -> [ echo_cmd ]
       | _ :: _ -> [
           cmd "wc" ~stdout:dest [ string "-l" ; list ~sep:" " dep xs ] ;
@@ -24,20 +18,19 @@ let pipeline n debug =
   let middle = append l1 "middle" in
   let l2 = List.init n ~f:(fun i -> append [ middle ] (sprintf "l2_%d" i)) in
   let final = append l2 "final" in
-  let open Term in
-  List.map (final :: if debug then l2 else []) ~f:(fun x -> pureW x)
-  |> list
+  Expr.(deps @@ list pureW (final :: if debug then l2 else []))
 
 let main n debug dot_output () =
-  let open Term in
-  let logger =
-    Logger.tee [
-      if dot_output then Dot_output.create "accordion.dot" else Logger.null ;
-      Console_logger.create () ;
+  let loggers = [
+      (* FIXME if dot_output then Dot_output.create "accordion.dot" else Logger.null ; *)
+      console_logger () ;
     ]
   in
-  run ~logger (pipeline n debug)
-  |> ignore
+  match eval_expr ~loggers (pipeline n debug) with
+  | Ok _ -> ()
+  | Error report ->
+    prerr_endline report ;
+    failwith "Some workflow failed!"
 
 let command =
   let open Command.Let_syntax in

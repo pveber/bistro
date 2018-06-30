@@ -1,0 +1,2093 @@
+open Core_kernel
+include File_formats
+open Bistro
+open Shell_dsl
+
+
+let bam_select_in_indexed_bam = "reads.bam"
+
+module Bed = struct
+  let keep ~n bed =
+    if n < 1 then raise (Invalid_argument "Bed.keep") ;
+    shell ~descr:"bed.keep" [
+      cmd "cut" ~stdout:dest [
+        string (sprintf "-f 1-%d" n) ;
+        dep bed ;
+      ]
+    ]
+
+  let keep3 x = keep ~n:3 x
+
+  let keep4 x = keep ~n:4 x
+
+  let keep5 x = keep ~n:5 x
+
+  let keep6 x = keep ~n:6 x
+end
+
+module Fastq = struct
+
+  type _ format =
+    | Sanger  : [`sanger] format
+    | Solexa  : [`solexa] format
+    | Phred64 : [`phred64] format
+
+  let to_sanger :
+    type s. s format -> s fastq workflow -> [`sanger] fastq workflow
+    = fun format fq ->
+      match format with
+      | Sanger -> fq
+      | Solexa -> failwith "not implemented"
+      | Phred64 -> failwith "not implemented"
+
+  let concat = function
+    | [] -> raise (Invalid_argument "fastq concat: empty list")
+    | x :: [] -> x
+    | fqs ->
+      shell ~descr:"fastq.concat" [
+        cmd "cat" ~stdout:dest [ list dep ~sep:" " fqs ]
+      ]
+
+  let head n fq =
+    shell ~descr:"fastq.head" [
+      cmd "head" ~stdout:dest [
+        opt "-n" int (n * 4) ;
+        dep fq ;
+      ]
+    ]
+end
+
+module Bedtools = struct
+  let env = docker_image ~account:"pveber" ~name:"bedtools" ~tag:"2.21.0" ()
+
+  let bedtools ?stdout subcmd args =
+    cmd "bedtools" ?stdout ~env (string subcmd :: args)
+
+  type 'a input = Bed | Gff
+
+  let bed = Bed
+  let gff = Gff
+
+  module Cmd = struct
+    let slop_args ?strand ?header ~mode = [
+      option (flag string "-s") strand ;
+      option (flag string "-header") header ;
+      seq (
+        match mode with
+        | `both n      -> [ opt "-b" int n ]
+        | `left n      -> [ opt "-l" int n ]
+        | `right n     -> [ opt "-r" int n ]
+        | `left_pct p  -> [ opt "-l" float p ; string "-pct" ]
+        | `right_pct p -> [ opt "-l" float p ; string "-pct" ]
+        | `both_pct p  -> [ opt "-b" float p ; string "-pct" ]
+      )
+    ]
+
+    let slop ?strand ?header ~mode input chrom_size =
+      bedtools "slop" ~stdout:dest [
+        seq (slop_args ?strand ?header ~mode) ;
+        opt "-i" dep input ;
+        opt "-g" dep chrom_size ;
+      ]
+  end
+
+  let slop ?strand ?header ~mode _ input chrom_size =
+    shell ~descr:"bedtools.slop" [
+      Cmd.slop ?strand ?header ~mode input chrom_size
+    ]
+
+  let intersect ?ubam ?wa ?wb ?loj ?wo ?wao ?u ?c ?v ?f ?_F ?r ?e ?s ?_S
+      ?split ?sorted ?g ?header ?filenames ?sortout _ file files =
+    shell ~descr:"bedtools.intersect" [
+      cmd "bedtools intersect" ~env ~stdout:dest [
+        option (flag string "-ubam") ubam ;
+        option (flag string "-wa") wa ;
+        option (flag string "-wb") wb ;
+        option (flag string "-loj") loj ;
+        option (flag string "-wo") wo ;
+        option (flag string "-wao") wao ;
+        option (flag string "-u") u ;
+        option (flag string "-c") c ;
+        option (flag string "-v") v ;
+        option (opt "-f" float) f ;
+        option (opt "-F" float) _F ;
+        option (flag string "-r") r ;
+        option (flag string "-e") e ;
+        option (flag string "-s") s ;
+        option (flag string "-S") _S ;
+        option (flag string "-split") split ;
+        option (flag string "-sorted") sorted ;
+        option (opt "-g" dep) g ;
+        option (flag string "-header") header ;
+        option (flag string "-filenames") filenames ;
+        option (flag string "-sortout") sortout ;
+        opt "-a" dep file ;
+        opt "-b" (list dep ~sep:" ") files ;
+      ]
+    ]
+
+  let bamtobed ?bed12 ?split ?splitD ?ed ?tag ?cigar bam =
+    shell ~descr:"bedtools.bamtobed" ~mem:(3 * 1024) ~np:8 [
+      cmd "bedtools bamtobed" ~stdout:dest ~env [
+        option (flag string "-bed12") bed12 ;
+        option (flag string "-split") split ;
+        option (flag string "-splitD") splitD ;
+        option (flag string "-ed") ed ;
+        option (flag string "-tag") tag ;
+        option (flag string "-cigar") cigar ;
+        opt "-i" dep bam ;
+      ]
+    ]
+end
+
+module Bowtie2 = struct
+  type index = [`bowtie2_index] directory
+
+  let env = docker_image ~account:"pveber" ~name:"bowtie2" ~tag:"2.3.3" ()
+
+  (* memory bound correspond to storing a human index in memory, following bowtie manual *)
+  let bowtie2_build ?large_index ?noauto ?packed ?bmax ?bmaxdivn ?dcv ?nodc ?noref ?justref ?offrate ?ftabchars ?seed ?cutoff fa =
+    shell ~descr:"bowtie2_build" ~np:8 ~mem:(3 * 1024) [
+      mkdir_p dest ;
+      cmd "bowtie2-build" ~env [
+        option (flag string "--large-index") large_index ;
+        option (flag string "--no-auto") noauto ;
+        option (flag string "--packed") packed ;
+        option (flag string "--nodc") nodc ;
+        option (flag string "--noref") noref ;
+        option (flag string "--justref") justref ;
+        option (opt "--bmax" int) bmax ;
+        option (opt "--bmaxdivn" int) bmaxdivn ;
+        option (opt "--dcv" int) dcv ;
+        option (opt "--offrate" int) offrate ;
+        option (opt "--ftabchars" int) ftabchars ;
+        opt "--threads" ident np ;
+        option (opt "--seed" int) seed ;
+        option (opt "--cutoff" int) cutoff ;
+        opt "-f" dep fa ;
+        seq [ dest ; string "/index" ]
+      ]
+    ]
+
+  let qual_option (type s) x = match (x : s Fastq.format) with
+    | Fastq.Solexa  -> "--solexa-quals"
+    | Fastq.Sanger -> "--phred33-quals"
+    | Fastq. Phred64 -> "--phred64-quals"
+
+  let flag_of_preset mode preset =
+    let flag = match preset with
+      | `very_fast -> "--very-fast"
+      | `fast -> "--fast"
+      | `sensitive -> "--sensitive"
+      | `very_sensitive -> "--very-sensitive"
+    in
+    if mode = `local then flag ^ "-local" else flag
+
+  let flag_of_mode = function
+    | `end_to_end -> "--end-to-end"
+    | `local -> "--local"
+
+  let flag_of_orientation = function
+    | `fr -> "--fr"
+    | `rf -> "--rf"
+    | `ff -> "--ff"
+
+  (* memory bound correspond to storing a human index in memory, following bowtie manual *)
+  let bowtie2
+      ?skip ?qupto ?trim5 ?trim3 ?preset
+      ?_N ?_L ?ignore_quals ?(mode = `end_to_end)
+      ?a ?k ?_D ?_R ?minins ?maxins ?orientation
+      ?no_mixed ?no_discordant ?dovetail ?no_contain ?no_overlap
+      ?no_unal ?seed
+      ?fastq_format index fqs =
+
+    let args = match fqs with
+      | `single_end fqs ->
+        opt "-U" (list dep ~sep:",") fqs
+      | `paired_end (fqs1, fqs2) ->
+        seq [
+          opt "-1" (list dep ~sep:",") fqs1 ;
+          string " " ;
+          opt "-2" (list dep ~sep:",") fqs2
+        ]
+    in
+    shell ~descr:"bowtie2" ~mem:(3 * 1024) ~np:8 [
+      cmd "bowtie2" ~env [
+        option (opt "--skip" int) skip ;
+        option (opt "--qupto" int) qupto ;
+        option (opt "--trim5" int) trim5 ;
+        option (opt "--trim3" int) trim3 ;
+        option ((flag_of_preset mode) % string) preset ;
+        option (opt "-N" int) _N ;
+        option (opt "-L" int) _L ;
+        option (flag string "--ignore-quals") ignore_quals ;
+        (flag_of_mode % string) mode ;
+        option (flag string "-a") a ;
+        option (opt "-k" int) k ;
+        option (opt "-D" int) _D ;
+        option (opt "-R" int) _R ;
+        option (opt "--minins" int) minins ;
+        option (opt "--maxins" int) maxins ;
+        option (flag_of_orientation % string) orientation ;
+        option (flag string "--no-mixed") no_mixed  ;
+        option (flag string "--no-discordant") no_discordant  ;
+        option (flag string "--dovetail") dovetail ;
+        option (flag string "--no-contain") no_contain ;
+        option (flag string "--no-overlap") no_overlap ;
+        option (flag string "--no-unal") no_unal ;
+        opt "--threads" ident np ;
+        option (opt "--seed" int) seed ;
+        option (opt "-q" (qual_option % string)) fastq_format ;
+        opt "-x" (fun index -> seq [dep index ; string "/index"]) index ;
+        args ;
+        opt "-S" ident dest ;
+      ]
+    ]
+end
+
+module Bowtie = struct
+  type index = [`bowtie_index] directory
+
+  let env = docker_image ~account:"pveber" ~name:"bowtie" ~tag:"1.1.2" ()
+
+  (* memory bound correspond to storing a human index in memory, following bowtie manual *)
+  let bowtie_build ?packed ?color fa =
+    shell ~descr:"bowtie_build" ~mem:(3 * 1024) [
+      mkdir_p dest ;
+      cmd "bowtie-build" ~env [
+        option (flag string "-a -p") packed ;
+        option (flag string "--color") color ;
+        opt "-f" dep fa ;
+        seq [ dest ; string "/index" ]
+      ]
+    ]
+
+  let qual_option (type s) x = match (x : s Fastq.format) with
+    | Fastq.Solexa  -> "--solexa-quals"
+    | Fastq.Sanger -> "--phred33-quals"
+    | Fastq.Phred64 -> "--phred64-quals"
+
+  let bowtie ?l ?e ?m ?fastq_format ?n ?v ?maxins index fastq_files =
+    let args = match fastq_files with
+      | `single_end fqs -> list dep ~sep:"," fqs
+      | `paired_end (fqs1, fqs2) ->
+        seq [
+          opt "-1" (list dep ~sep:",") fqs1 ;
+          string " " ;
+          opt "-2" (list dep ~sep:",") fqs2
+        ]
+    in
+    shell ~descr:"bowtie" ~mem:(3 * 1024) ~np:8 [
+      cmd "bowtie" ~env [
+        string "-S" ;
+        option (opt "-n" int) n ;
+        option (opt "-l" int) l ;
+        option (opt "-e" int) e ;
+        option (opt "-m" int) m ;
+        option (opt "-v" int) v ;
+        option (opt "-q" (qual_option % string)) fastq_format ;
+        opt "-p" ident np ;
+        option (opt "--maxins" int) maxins ;
+        seq [dep index ; string "/index"] ;
+        args ;
+        dest ;
+      ]
+    ]
+end
+
+module ChIPQC = struct
+  type 'a sample = {
+    id : string ;
+    tissue : string ;
+    factor : string ;
+    replicate : string ;
+    bam : bam workflow ;
+    peaks : (#bed3 as 'a) workflow ;
+  }
+
+  type output = [`ChIPQC] directory
+
+  let env = docker_image ~account:"pveber" ~name:"bioconductor" ~tag:"3.3" ()
+
+  let sample_sheet samples =
+    let header = string "SampleID,Tissue,Factor,Replicate,bamReads,Peaks" in
+    let line { id ; tissue ; factor ; replicate ; bam ; peaks } =
+      seq ~sep:"," [ string id ; string tissue ; string factor ; string replicate ; dep bam ; dep peaks ]
+    in
+    seq ~sep:"\n" (header :: List.map samples ~f:line)
+
+  let rscript sample_sheet =
+    seq ~sep:"\n" [
+      string "library(ChIPQC)" ;
+      seq ~sep:"" [
+        string {|samples = read.csv("|} ;
+        file_dump sample_sheet ;
+        string {|")|} ;
+      ] ;
+      string "experiment = ChIPQC(samples)" ;
+      seq ~sep:"" [
+        string {|ChIPQCreport(experiment,reportFolder="|} ;
+        dest ;
+        string {|")|} ;
+      ]
+    ]
+
+  let run samples =
+    shell ~descr:"ChIPQC" [
+      cmd "Rscript" ~env [ file_dump (rscript (sample_sheet samples)) ] ;
+    ]
+end
+
+module Deeptools = struct
+  let env = docker_image ~account:"pveber" ~name:"deeptools" ~tag:"2.4.1" ()
+
+  type 'a signal_format = [ `bigWig | `bedGraph ]
+  type 'a img_format = [ `png | `pdf | ` svg ]
+
+  class type compressed_numpy_array = object
+    inherit binary_file
+    method format : [`compressed_numpy_array]
+  end
+
+  let bigwig = `bigWig
+  let bedgraph = `bedGraph
+  let png = `png
+  let pdf = `pdf
+  let svg = `svg
+
+  let ext_of_format = function
+    | `png -> "png"
+    | `pdf -> "pdf"
+    | `svg -> "svg"
+
+  let file_format_expr = function
+    | `bigWig -> string "bigwig"
+    | `bedGraph -> string "bedgraph"
+
+  let filterRNAstrand_expr = function
+    | `forward -> string "forward"
+    | `reverse -> string "reverse"
+
+  let scalefactormethod_expr = function
+    | `readcount -> string "readCount"
+    | `ses -> string "SES"
+
+  let ratio_expr = function
+    | `log2 -> string "log2"
+    | `ratio -> string "ratio"
+    | `subtract -> string "subtract"
+    | `add -> string "add"
+    | `mean -> string "mean"
+    | `reciprocal_ratio -> string "reciprocal_ratio"
+    | `first -> string "first"
+    | `second -> string "second"
+
+  let slist f x = list ~sep:" " f x
+
+  let dep_list xs = slist dep xs
+
+  (*Transform a number from French format into an US format.*)
+  let normalizeto1x_expr nbr =
+    let nbr_s = string_of_int nbr in
+    let lgth = String.length nbr_s in
+    let rec compute acc idx nbr_s = match idx with
+      | 0 -> string acc
+      | l ->
+        if l <= 3 then
+          string (String.sub nbr_s ~pos:0 ~len:l ^ acc)
+        else
+          let acc = "," ^ String.sub nbr_s ~pos:(l - 3) ~len:3 ^ acc in
+          compute acc (l-3) nbr_s
+    in
+    compute "" lgth nbr_s
+
+
+  let bam_gen_cmd ?outfileformat ?scalefactor ?blacklist ?normalizeto1x
+      ?centerreads ?normalizeusingrpkm ?ignorefornormalization ?skipnoncoveredregions
+      ?smoothlength ?extendreads ?ignoreduplicates ?minmappingquality
+      ?samflaginclude ?samflagexclude ?minfragmentlength ?maxfragmentlength
+      cmd_name other_args =
+    cmd cmd_name ~env (
+      List.append [
+        option (opt "--outFileFormat" file_format_expr) outfileformat ;
+        option (opt "--scaleFactor" float) scalefactor ;
+        option (opt "--blackListFileName" dep) blacklist ;
+        option (opt "--normalizeTo1x" normalizeto1x_expr) normalizeto1x ;
+        option (flag string "--normalizeUsingRPKM") normalizeusingrpkm ;
+        option (opt "--ignoreForNormalization" (list string ~sep:" ")) ignorefornormalization ;
+        option (flag string "--skipNonCoveredRegions") skipnoncoveredregions ;
+        option (opt "--smoothLength" int) smoothlength ;
+        option (opt "--extendReads" int) extendreads ;
+        option (flag string "--ignoreDuplicates") ignoreduplicates ;
+        option (opt "--minMappingQuality" int) minmappingquality ;
+        option (flag string "--centerReads") centerreads ;
+        option (opt "--samFlagInclude" int) samflaginclude ;
+        option (opt "--samFlagExclude" int) samflagexclude ;
+        option (opt "--minFragmentLength" int) minfragmentlength ;
+        option (opt "--maxfragmentLength" int) maxfragmentlength ;
+      ]
+        other_args
+    )
+
+  let bamcoverage ?scalefactor ?filterrnastrand ?binsize ?blacklist
+      ?(threads = 1) ?normalizeto1x ?normalizeusingrpkm ?ignorefornormalization
+      ?skipnoncoveredregions ?smoothlength ?extendreads ?ignoreduplicates
+      ?minmappingquality ?centerreads ?samflaginclude ?samflagexclude
+      ?minfragmentlength ?maxfragmentlength outfileformat indexed_bam =
+    shell ~descr:"bamcoverage" ~np:threads [
+      bam_gen_cmd "bamCoverage" ?scalefactor ?blacklist
+        ?normalizeto1x ?normalizeusingrpkm ?ignorefornormalization
+        ?skipnoncoveredregions ?smoothlength ?extendreads ?ignoreduplicates
+        ?minmappingquality ?centerreads ?samflaginclude ?samflagexclude
+        ?minfragmentlength ?maxfragmentlength [
+        option (opt "--filterRNAstrand" filterRNAstrand_expr) filterrnastrand ;
+        option (opt "--binSize" int) binsize ;
+        opt "--numberOfProcessors" ident np ;
+        opt "--bam" ident (dep indexed_bam // bam_select_in_indexed_bam) ;
+        opt "--outFileName" ident dest ;
+        opt "--outFileFormat" file_format_expr outfileformat ;
+      ]
+    ]
+
+  let bamcompare ?scalefactormethod ?samplelength ?numberofsamples
+      ?scalefactor ?ratio ?pseudocount ?binsize ?region ?blacklist ?(threads = 1)
+      ?normalizeto1x ?normalizeusingrpkm ?ignorefornormalization ?skipnoncoveredregions
+      ?smoothlength ?extendreads ?ignoreduplicates ?minmappingquality
+      ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
+      ?maxfragmentlength outfileformat indexed_bam1 indexed_bam2 =
+    shell ~descr:"bamcompare" ~np:threads [
+      bam_gen_cmd "bamCompare"
+        ?scalefactor ?blacklist
+        ?normalizeto1x ?normalizeusingrpkm ?ignorefornormalization ?skipnoncoveredregions
+        ?smoothlength ?extendreads ?ignoreduplicates ?minmappingquality
+        ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
+        ?maxfragmentlength [
+        option (opt "--scaleFactorMethod" scalefactormethod_expr) scalefactormethod ;
+        option (opt "--sampleLength" int) samplelength ;
+        option (opt "--numberOfSamples" int) numberofsamples ;
+        option (opt "--ratio" ratio_expr) ratio ;
+        option (opt "--pseudocount" int) pseudocount ;
+        option (opt "--binSize" int) binsize ;
+        option (opt "--region" string) region ;
+        opt "--numberOfProcessors" ident np ;
+        opt "--bamfile1" ident (dep indexed_bam1 // bam_select_in_indexed_bam) ;
+        opt "--bamfile2" ident (dep indexed_bam2 // bam_select_in_indexed_bam) ;
+        opt "--outFileName" ident dest ;
+        opt "--outFileFormat" file_format_expr outfileformat ;
+      ]
+    ]
+
+
+  let bigwigcompare ?scalefactor ?ratio ?pseudocount ?binsize
+      ?region ?blacklist ?(threads = 1)
+      outfileformat bigwig1 bigwig2 =
+    shell ~descr:"bigwigcompare" ~np:threads [
+      cmd "bigwigCompare" ~env [
+        option (opt "--scaleFactor" float) scalefactor ;
+        option (opt "--ratio" ratio_expr) ratio ;
+        option (opt "--pseudocount" int) pseudocount ;
+        option (opt "--binSize" int) binsize ;
+        option (opt "--region" string) region ;
+        option (opt "--blackListFileName" dep) blacklist ;
+        opt "--numberOfProcessors" ident np ;
+        opt "--bigwig1" dep bigwig1 ;
+        opt "--bigwig2" dep bigwig2 ;
+        opt "--outFileName" ident dest ;
+        opt "--outFileFormat" file_format_expr outfileformat ;
+      ]
+    ]
+
+
+  let multibamsum_gen_cmd ?outrawcounts ?extendreads ?ignoreduplicates
+      ?minmappingquality ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
+      ?maxfragmentlength ?blacklist ?region cmd_name other_args =
+    cmd cmd_name ~env (
+      List.append [
+        option (opt "--region" string) region ;
+        option (flag string "--outRawCounts") outrawcounts ;
+        option (opt "--extendReads" int) extendreads ;
+        option (flag string "--ignoreDuplicates") ignoreduplicates ;
+        option (opt "--minMappingQuality" int) minmappingquality ;
+        option (flag string "--centerReads") centerreads ;
+        option (opt "--samFlagInclude" int) samflaginclude ;
+        option (opt "--samFlagExclude" int) samflagexclude ;
+        option (opt "--minFragmentLength" int) minfragmentlength ;
+        option (opt "--maxfragmentLength" int) maxfragmentlength ;
+        option (opt "--blackListFileName" dep) blacklist ;
+      ]
+        other_args
+    )
+
+
+  let multibamsummary_bins ?binsize ?distancebetweenbins ?region ?blacklist
+      ?(threads = 1) ?outrawcounts ?extendreads ?ignoreduplicates ?minmappingquality
+      ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
+      ?maxfragmentlength indexed_bams =
+    shell ~descr:"multibamsummary_bins" ~np:threads [
+      multibamsum_gen_cmd "multiBamSummary bins"
+        ?region ?blacklist
+        ?outrawcounts ?extendreads ?ignoreduplicates ?minmappingquality
+        ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
+        ?maxfragmentlength [
+        option (opt "--binSize" int) binsize ;
+        option (opt "--distanceBetweenBins" int) distancebetweenbins ;
+        opt "--numberOfProcessors" ident np ;
+        opt "--bamfiles" (list (fun bam -> dep bam // bam_select_in_indexed_bam) ~sep:" ") indexed_bams ;
+        opt "--outFileName" ident dest ;
+      ]
+    ]
+
+
+  let multibamsummary_bed ?region ?blacklist ?(threads = 1)
+      ?outrawcounts ?extendreads ?ignoreduplicates ?minmappingquality
+      ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
+      ?maxfragmentlength ?metagene ?transcriptid ?exonid ?transcriptiddesignator bed
+      indexed_bams =
+    shell ~descr:"multibamsummary_bed" ~np:threads [
+      multibamsum_gen_cmd "multiBamSummary BED-file"
+        ?region ?blacklist
+        ?outrawcounts ?extendreads ?ignoreduplicates ?minmappingquality
+        ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
+        ?maxfragmentlength [
+        option (flag string "--metagene") metagene ;
+        option (flag string "--transcriptID") transcriptid ;
+        option (flag string "--exonID") exonid ;
+        option (flag string "--transcript_id_designator") transcriptiddesignator ;
+        opt "--numberOfProcessors" ident np ;
+        string "--BED" ;
+        (dep bed) ;
+        opt "--bamfiles"
+          (list (fun bam -> dep bam // bam_select_in_indexed_bam) ~sep:" ")
+          indexed_bams ;
+        opt "--outFileName" ident dest ;
+      ]
+    ]
+
+  let reference_point_enum =
+    Fn.compose string (function
+        | `TES -> "TES"
+        | `TSS -> "TSS"
+        | `center -> "center"
+      )
+
+  let sort_regions_enum x =
+    Fn.compose string (function
+        | `no -> "no"
+        | `ascend -> "ascend"
+        | `descend -> "descend"
+        | `keep -> "keep"
+      ) x
+
+  let sort_using_enum =
+    Fn.compose string (function
+        | `max -> "max"
+        | `min -> "min"
+        | `mean -> "mean"
+        | `median -> "median"
+        | `region_length -> "region_length"
+        | `sum -> "sum"
+      )
+
+  let average_type_bins_enum =
+    Fn.compose string (function
+        | `max -> "max"
+        | `min -> "min"
+        | `mean -> "mean"
+        | `median -> "median"
+        | `std -> "std"
+        | `sum -> "sum"
+      )
+
+  let what_to_show_enum =
+    Fn.compose string (function
+        | `plot_heatmap_and_colorbar -> "plot, heatmap and colorbar"
+        | `plot_and_heatmap -> "plot and heatmap"
+        | `heatmap_only -> "heatmap only"
+        | `heatmap_and_colorbar -> "heatmap and colorbar"
+      )
+
+
+  let legend_location_enum =
+    Fn.compose string (function
+        | `best-> "best"
+        | `upper_right-> "upper_right"
+        | `upper_left-> "upper_left"
+        | `upper_center-> "upper_center"
+        | `lower_left-> "lower_left"
+        | `lower_right-> "lower_right"
+        | `lower_center-> "lower_center"
+        | `center-> "center"
+        | `center_left-> "center_left"
+        | `center_right-> "center_right"
+        | `none -> "none"
+      )
+
+
+
+  class type deeptools_matrix = object
+    inherit binary_file
+    method format : [`deeptools_matrix]
+  end
+
+  let computeMatrix_reference_point
+      ?referencePoint ?upstream ?downstream ?nanAfterEnd
+      ?binSize ?sortRegions ?sortUsing ?sortUsingSamples
+      ?averageTypeBins ?missingDataAsZero ?skipZeros
+      ?minThreshold ?maxThreshold ?blackList ?scale
+      ?(numberOfProcessors = 1) ~regions ~scores () =
+    shell ~descr:"deeptools.computeMatrix_reference_point" ~np:numberOfProcessors [
+      cmd "computeMatrix" ~env [
+        string "reference-point" ;
+        option (opt "--referencePoint" reference_point_enum) referencePoint ;
+        option (opt "--upstream" int) upstream ;
+        option (opt "--downstream" int) downstream ;
+        option (flag string "--nanAfterEnd") nanAfterEnd ;
+        option (opt "--binSize" int) binSize ;
+        option (opt "--sortRegions" sort_regions_enum) sortRegions ;
+        option (opt "--sortUsing" sort_using_enum) sortUsing ;
+        option (opt "--sortUsingSamples" (slist int) ) sortUsingSamples ;
+        option (opt "--averageTypeBins" average_type_bins_enum) averageTypeBins ;
+        option (flag string "--missingDataAsZero") missingDataAsZero ;
+        option (flag string "--skipZeros") skipZeros ;
+        option (opt "--minThreshold" float) minThreshold ;
+        option (opt "--maxThreshold" float) maxThreshold ;
+        option (opt "--blackListFileName" dep) blackList ;
+        option (opt "--sc" float) scale ;
+        opt "--outFileName" Fn.id dest ;
+        opt "--regionsFileName" dep_list regions ;
+        opt "--scoreFileName" dep_list scores ;
+      ]
+    ]
+
+  let plotHeatmap
+      ?dpi ?kmeans ?hclust ?sortRegions ?sortUsing ?sortUsingSamples
+      ?averageTypeSummaryPlot ?missingDataColor ?colorMap ?alpha
+      ?colorList ?colorNumber ?zMin ?zMax ?heatmapHeight ?heatmapWidth
+      ?whatToShow ?boxAroundHeatmaps ?xAxisLabel ?startLabel
+      ?endLabel ?refPointLabel ?regionsLabel ?samplesLabel ?plotTitle
+      ?yAxisLabel ?yMin ?yMax ?legendLocation ?perGroup
+      output_format matrix =
+    let tmp_file = tmp // ("file." ^ ext_of_format output_format) in
+    shell ~descr:"deeptools.plotHeatmap" [
+      cmd "plotHeatmap" ~env [
+        option (opt "--dpi" int) dpi ;
+        option (opt "--kmeans" int) kmeans ;
+        option (opt "--hclust" int) hclust ;
+        option (opt "--sortRegions" sort_regions_enum) sortRegions ;
+        option (opt "--sortUsing" sort_using_enum) sortUsing ;
+        option (opt "--sortUsingSamples" (slist int)) sortUsingSamples ;
+        option (opt "--averageTypeSummaryPlot" average_type_bins_enum) averageTypeSummaryPlot ;
+        option (opt "--missingDataColor" string) missingDataColor ;
+        option (opt "--colorMap" string) colorMap ;
+        option (opt "--alpha" float) alpha ;
+        option (opt "--colorList" (slist string)) colorList ;
+        option (opt "--colorNumber" int) colorNumber ;
+        option (opt "--zMin" (slist float)) zMin ;
+        option (opt "--zMax" (slist float)) zMax ;
+        option (opt "--heatmapHeight" float) heatmapHeight ;
+        option (opt "--heatmapWidth" float) heatmapWidth ;
+        option (opt "--whatToShow" what_to_show_enum) whatToShow ;
+        option (opt "--boxAroundHeatmaps" (fun b -> string (if b then "yes" else "no"))) boxAroundHeatmaps ;
+        option (opt "--xAxisLabel" string) xAxisLabel ;
+        option (opt "--startLabel" string) startLabel  ;
+        option (opt "--endLabel" string) endLabel  ;
+        option (opt "--refPointLabel" string) refPointLabel  ;
+        option (opt "--regionsLabel" (slist string)) regionsLabel ;
+        option (opt "--samplesLabel" (slist string)) samplesLabel ;
+        option (opt "--plotTitle" (string % quote ~using:'\'')) plotTitle ;
+        option (opt "--yAxisLabel" string) yAxisLabel ;
+        option (opt "--yMin" (slist float)) yMin ;
+        option (opt "--yMax" (slist float)) yMax ;
+        option (opt "--legendLocation" legend_location_enum) legendLocation ;
+        option (flag string "--perGroup") perGroup ;
+        opt "--matrixFile" dep matrix ;
+        opt "--outFileName" Fn.id tmp_file ;
+      ] ;
+      mv tmp_file dest ;
+    ]
+
+  let corMethod_enum =
+    Fn.compose string (function
+        | `spearman -> "spearman"
+        | `pearson -> "pearson"
+      )
+
+  let whatToPlot_enum =
+    Fn.compose string (function
+        | `heatmap -> "heatmap"
+        | `scatterplot -> "scatterplot"
+      )
+
+  let plotCorrelation
+      ?skipZeros ?labels ?plotTitle ?removeOutliers
+      ?colorMap ?plotNumbers ?log1p
+      ~corMethod ~whatToPlot output_format corData
+    =
+    shell  ~descr:"deeptools.plotCorrelation" [
+      cmd "plotCorrelation" ~env [
+        opt "--corData" dep corData ;
+        opt "--corMethod" corMethod_enum corMethod ;
+        opt "--whatToPlot" whatToPlot_enum whatToPlot ;
+        opt "--plotFile" Fn.id dest ;
+        opt "--plotFileFormat" string (ext_of_format output_format) ;
+        option (flag string "--skipZeros") skipZeros ;
+        option (opt "--labels" (list ~sep:" " string)) labels ;
+        option (opt "--plotTitle" (string % quote ~using:'\'')) plotTitle ;
+        option (flag string "--removeOutliers") removeOutliers ;
+        option (opt "--colorMap" string) colorMap ;
+        option (flag string "--plotNumbers") plotNumbers ;
+        option (flag string "--log1p") log1p ;
+      ] ;
+    ]
+end
+
+module DESeq2 = struct
+  class type table = object
+    inherit tsv
+    method header : [`yes]
+  end
+
+  type output =
+    <
+      comparison_summary : table workflow ;
+      comparisons : ((string * string * string) * table workflow) list ;
+      effect_table : table workflow ;
+      normalized_counts : table workflow ;
+      sample_clustering : svg workflow ;
+      sample_pca : svg workflow ;
+      directory : [ `deseq2_output ] directory workflow ;
+    >
+
+  let env = docker_image ~account:"pveber" ~name:"bioconductor" ~tag:"3.3" ()
+
+  let wrapper_script = {|
+library(DESeq2)
+library(gplots)
+library(RColorBrewer)
+
+### DATA PROCESSING
+loadCounts <- function(sample_files) {
+    loadFile <- function(fn) {
+        d <- read.table(fn,header=F,sep='\t')
+        d[1:(dim(d)[1] - 5),2]
+    }
+    sapply(sample_files,loadFile)
+}
+
+loadIds <- function(sample_files) {
+    d <- read.table(sample_files[1],header=F,sep='\t')
+    d[1:(dim(d)[1] - 5),1]
+}
+
+differentialAnalysis <- function(counts, description) {
+    DESeq(DESeqDataSetFromMatrix(countData=counts,
+                                 colData=description,
+                                 design=as.formula(paste("~", paste(colnames(description),collapse=" + ")))),
+          fitType='local')
+}
+
+my.summary.results <- function(object) {
+    alpha <- 0.1
+    notallzero <- sum(object$baseMean > 0)
+    up <- sum(object$padj < alpha & object$log2FoldChange > 0,
+              na.rm = TRUE)
+    down <- sum(object$padj < alpha & object$log2FoldChange <
+                    0, na.rm = TRUE)
+    filt <- sum(!is.na(object$pvalue) & is.na(object$padj))
+    outlier <- sum(object$baseMean > 0 & is.na(object$pvalue))
+    c(notallzero, up, down, filt, outlier)
+}
+
+### OUTPUT
+outputForAllComparisons <- function(description, outdir, factor_names, ids, dds) {
+    recap <- data.frame(gene = ids)
+    stats <- data.frame(comparison = character(0),
+                        expressed = integer(0),
+                        up = integer(0),
+                        down = integer(0),
+                        filt = integer(0),
+                        outlier = integer(0), stringsAsFactors=F)
+    for(f in factor_names) {
+        l <- unique(description[,f])
+        for(i in 1:length(l))
+            for(j in if(i+1 > length(l)) c() else (i + 1):length(l)) {
+                label <- paste0(f,"_",l[i],"_",l[j])
+
+                res <- results(dds,contrast=c(f,as.character(l[i]),as.character(l[j])))
+
+                fn <- paste0(outdir,"/results_",label,".tsv")
+                write.table(cbind(data.frame(id = ids), res),file=fn,row.names=F,sep='\t',quote=F)
+
+                recap[,paste0(label,"_l2fc")] <- res[,"log2FoldChange"]
+                recap[,paste0(label,"_padj")] <- res[,"padj"]
+
+                stats[dim(stats)[1]+1,] <- c(label,my.summary.results(res))
+
+                svg(paste0(outdir,"/MA_plot_",label,".svg"), width=7, height=3.5)
+                plotMA(res,main=label)
+                dev.off()
+            }
+    }
+
+    write.table(recap, file = paste0(outdir,"/recap.tsv"),row.names=F,sep='\t',quote=F)
+    write.table(stats, file = paste0(outdir,"/summary.tsv"),row.names=F,sep='\t',quote=F)
+}
+
+
+generalPlots <- function(description, outdir, factor_names, ids, dds) {
+    rld <- rlog(dds)
+    rldMat <- assay(rld)
+    rldDist <- dist(t(rldMat))
+    mat <- as.matrix(rldDist)
+    rownames(mat) <- colnames(mat) <- apply(description, 1, paste, collapse = ":")
+    hc <- hclust(rldDist)
+    hmcol <- colorRampPalette(brewer.pal(9,"GnBu"))(100)
+
+    svg(paste0(outdir,"/sample_clustering.svg"))
+    heatmap.2(mat, Rowv = as.dendrogram(hc), symm = TRUE, trace = "none", col = rev(hmcol), margin = c(13,13))
+    dev.off()
+
+    svg(paste0(outdir,"/sample_pca.svg"))
+    print(plotPCA(rld, intgroup = factor_names))
+    dev.off()
+
+    counts <- cbind(ids,as.data.frame(counts(dds,normalized=T)))
+    write.table(counts, file = paste0(outdir,"/normalized_counts.tsv"),row.names=F,sep='\t',quote=F,col.names=F)
+}
+
+main <- function(outdir, factor_names, sample_files, conditions) {
+    description <- as.data.frame(conditions)
+    colnames(description) <- factor_names
+    rownames(description) <- NULL
+    ids <- loadIds(sample_files)
+    counts <- loadCounts(sample_files)
+    dds <- differentialAnalysis(counts, description)
+    system(paste("mkdir -p", outdir))
+    outputForAllComparisons(description, outdir, factor_names, ids, dds)
+    generalPlots(description, outdir, factor_names, ids, dds)
+}
+|}
+
+  let app fn args =
+    seq ~sep:"" [
+      string fn ; string "(" ;
+      seq ~sep:"," args ;
+      string ")" ;
+    ]
+
+  let app' fn args =
+    let arg (k, v) = seq ~sep:"=" [ string k ; v ] in
+    seq ~sep:"" [
+      string fn ; string "(" ;
+      list arg ~sep:"," args ;
+      string ")" ;
+    ]
+
+  let script factors samples =
+    seq ~sep:"\n" [
+      string wrapper_script ;
+      app "main" [
+        quote dest ~using:'"' ;
+        app "c" (List.map factors ~f:(string % quote ~using:'"')) ;
+        app "c" (List.map samples ~f:(snd % dep % quote ~using:'"')) ;
+        app' "matrix" [
+          "data", app "c" (List.map samples ~f:fst
+                           |> List.concat
+                           |> List.map ~f:(string % quote ~using:'"')) ;
+          "ncol", int (List.length factors) ;
+          "byrow", string "T" ;
+        ]
+      ]
+    ]
+
+
+  let wrapper factors samples =
+    shell ~descr:"deseq2.wrapper" [
+      cmd "Rscript" ~env [ file_dump (script factors samples) ] ;
+    ]
+
+(*
+   remove duplicates *and* keep original order
+   not tail-recursive and quadratic complexity
+*)
+  let unique xs =
+    let rec aux seen = function
+      | [] -> []
+      | h :: t ->
+        if List.mem ~equal:( = ) seen h then
+          aux seen t
+        else
+          h :: aux (h :: seen) t
+    in
+    aux [] xs
+
+  let rec fold_2sets xs ~init ~f =
+    match xs with
+    | [] -> init
+    | h :: t ->
+      let next = List.fold t ~init ~f:(fun accu g -> f accu h g) in
+      fold_2sets t ~init:next ~f
+
+  let factor_levels factor_names conditions =
+    List.fold_right
+      conditions
+      ~init:(List.map factor_names ~f:(const []))
+      ~f:(fun cond accu -> List.map2_exn cond accu ~f:(fun c cs -> c :: cs))
+    |> List.map ~f:unique
+
+  let comparisons factor_names conditions =
+    let factor_levels = factor_levels factor_names conditions in
+    List.map2_exn factor_names factor_levels ~f:(fun name levels ->
+        fold_2sets levels ~init:[] ~f:(fun accu l1 l2 ->
+            (name, l1, l2) :: accu
+          )
+        |> List.rev
+      )
+    |> List.concat
+
+
+  let main_effects factors samples =
+    let o = wrapper factors samples in
+    let sel p = select o (selector p) in
+    object
+      method sample_clustering = sel [ "sample_clustering.svg" ]
+      method sample_pca = sel [ "sample_pca.svg" ]
+      method normalized_counts = sel [ "normalized_counts.tsv" ]
+      method comparison_summary = sel [ "summary.tsv" ]
+      method effect_table = sel [ "recap.tsv" ]
+      method comparisons =
+        let conditions = List.map samples ~f:fst in
+        List.map (comparisons factors conditions) ~f:(fun ((name, l1, l2) as comp) ->
+            comp, sel [ sprintf "results_%s_%s_%s.tsv" name l1 l2 ]
+          )
+      method directory = o
+    end
+end
+
+module Ensembl = struct
+  type species = [
+    | `homo_sapiens
+    | `mus_musculus
+  ]
+
+  let ucsc_reference_genome ~release ~species =
+    match species with
+    | `mus_musculus when 63 <= release && release <= 65 -> `mm9
+    | `mus_musculus when 81 <= release -> `mm10
+    | `homo_sapiens when release = 71 -> `hg19
+    | `homo_sapiens when 84 <= release && release <= 87 -> `hg38
+    | _ -> failwith "Ensembl.ucsc_reference_genome: unknown release for this species"
+
+  (* acronym of the lab where the species was sequenced *)
+  let lab_label_of_genome = function
+    | `hg19 -> "GRCh37"
+    | `hg38 -> "GRCh38"
+    | `mm9 -> "NCBIM37"
+    | `mm10 -> "GRCm38"
+
+  let string_of_species = function
+    | `homo_sapiens -> "homo_sapiens"
+    | `mus_musculus -> "mus_musculus"
+
+  let ucsc_chr_names_gtf gff =
+    shell ~descr:"ensembl.ucsc_chr_names_gtf" [
+      pipe [
+        cmd "awk" [
+          string "'{print \"chr\" $0}'" ;
+          dep gff
+        ] ;
+        cmd "sed" [ string "'s/chrMT/chrM/g'" ] ;
+        cmd "sed" [ string "'s/chr#/#/g'" ] ~stdout:dest
+      ]
+    ]
+
+  let gff ?(chr_name = `ensembl) ~release ~species =
+    let url =
+      sprintf "ftp://ftp.ensembl.org/pub/release-%d/gff3/%s/%s.%s.%d.gff3.gz"
+        release (string_of_species species)
+        (String.capitalize (string_of_species species))
+        (lab_label_of_genome (ucsc_reference_genome ~release ~species)) release
+    in
+    let gff = Bistro_unix.(gunzip (wget url)) in
+    match chr_name with
+    | `ensembl -> gff
+    | `ucsc -> ucsc_chr_names_gtf gff
+
+  let gtf ?(chr_name = `ensembl) ~release ~species =
+    let url =
+      sprintf "ftp://ftp.ensembl.org/pub/release-%d/gtf/%s/%s.%s.%d.gtf.gz"
+        release (string_of_species species)
+        (String.capitalize (string_of_species species))
+        (lab_label_of_genome (ucsc_reference_genome ~release ~species)) release
+    in
+    let f = match chr_name with
+      | `ensembl -> ident
+      | `ucsc -> ucsc_chr_names_gtf
+    in
+    f @@ Bistro_unix.(gunzip (wget url))
+end
+
+module FastQC = struct
+  let env = docker_image ~account:"pveber" ~name:"fastqc" ~tag:"0.11.5" ()
+
+  type report = [`fastQC_report] directory
+
+  let run fq = shell ~descr:"fastQC" [
+      mkdir_p dest ;
+      cmd "fastqc" ~env [
+        seq ~sep:"" [ string "--outdir=" ; dest ] ;
+        dep fq ;
+      ] ;
+      and_list [
+        cd dest ;
+        cmd "unzip" [ string "*_fastqc.zip" ] ;
+        cmd "mv" [ string "*_fastqc/*" ; string "." ]
+      ] ;
+    ]
+
+  let html_report dir =
+    select dir (selector ["fastqc_report.html"])
+
+  let per_base_quality dir =
+    select dir (selector ["Images" ; "per_base_quality.png"])
+
+  let per_base_sequence_content dir =
+    select dir (selector ["Images" ; "per_base_sequence_content.png"])
+
+end
+
+module Fastq_screen = struct
+  let env = docker_image ~account:"pveber" ~name:"fastq-screen" ~tag:"0.11.1" ()
+
+  let rec filter_expr res = function
+      [] -> string res
+    | h :: t ->
+      let res = match h with
+        | `Not_map -> res ^ "0"
+        | `Uniquely -> res ^ "1"
+        | `Multi_maps -> res ^ "2"
+        | `Maps -> res ^ "3"
+        | `Not_map_or_Uniquely -> res ^ "4"
+        | `Not_map_or_Multi_maps -> res ^ "5"
+        | `Ignore -> res ^ "-"
+      in
+      filter_expr res t
+
+  let top_expr = function
+    | `top1 x -> string (string_of_int x)
+    | `top2 (x, y) -> string (string_of_int x ^ "," ^ string_of_int y)
+
+  let configuration genomes =
+    let database_lines = List.map genomes ~f:(fun (name, fa) ->
+        let index = Bowtie2.bowtie2_build fa in
+        seq ~sep:"\t" [
+          string "DATABASE" ;
+          string name ;
+          dep index // "index"
+        ]
+      )
+    in
+    seq ~sep:"\n" database_lines
+
+  let fastq_screen ?bowtie2_opts ?filter ?illumina ?nohits ?pass ?subset
+      ?tag ?(threads = 1) ?top ?(lightweight = true) fq genomes =
+    shell ~descr:"fastq_screen" ~np:threads ~mem:(3 * 1024) [
+      mkdir_p dest ;
+      cmd "fastq_screen" ~env [
+        string "--aligner bowtie2" ;
+        option (opt "--bowtie2" string) bowtie2_opts ;
+        option (opt "--filter" (filter_expr "")) filter ;
+        option (flag string "--illumina1_3") illumina ;
+        option (flag string "--nohits") nohits ;
+        option (opt "--pass" int) pass ;
+        option (opt "--subset" int) subset ;
+        option (flag string "--tag") tag ;
+        opt "--threads" ident np ;
+        option (opt "--top" top_expr) top ;
+        dep fq ;
+        string "--conf" ; file_dump (configuration genomes) ;
+        opt "--outdir" ident dest ;
+      ] ;
+      if lightweight then rm_rf ( dest // "*.fastq" )
+      else cmd "" [] ;
+      mv ( dest // "*_screen.html"  ) ( dest // "report_screen.html") ;
+    ]
+
+  let html_report dir = select dir (selector [ "report_screen.html" ])
+end
+
+module Htseq = struct
+  let env = docker_image ~account:"pveber" ~name:"htseq" ~tag:"0.6.1" ()
+
+  class type count_tsv = object
+    inherit tsv
+    method header : [`none]
+    method f1 : string
+    method f2 : int
+  end
+
+  let string_of_mode = function
+    | `union -> "union"
+    | `intersection_strict -> "intersection-strict"
+    | `intersection_nonempty -> "intersection-nonempty"
+
+  let string_of_strandedness = function
+    | `yes -> "yes"
+    | `no -> "no"
+    | `reverse -> "reverse"
+
+  let string_of_order = function
+    | `name -> "name"
+    | `position -> "pos"
+
+  let count ?order ?mode ?stranded ?feature_type ?minaqual ?idattribute alns gff =
+    let format, input = match alns with
+      | `sam sam -> "sam", dep sam
+      | `bam bam -> "bam", dep bam
+    in
+    shell ~descr:"htseq-count" [
+      cmd "htseq-count" ~env ~stdout:dest [
+        opt "-f" string format ;
+        option (opt "-m" (string_of_mode % string)) mode ;
+        option (opt "-r" (string_of_order % string)) order ;
+        option (opt "-s" (string_of_strandedness % string)) stranded ;
+        option (opt "-t" string) feature_type ;
+        option (opt "-a" int) minaqual ;
+        option (opt "-i" string) idattribute ;
+        input ;
+        dep gff ;
+      ]
+    ]
+end
+
+module Macs = struct
+  let env = docker_image ~account:"pveber" ~name:"macs" ~tag:"1.4.2" ()
+
+
+  type _ format =
+    | Sam
+    | Bam
+
+  let sam = Sam
+  let bam = Bam
+
+  let opt_of_format = function
+    | Sam -> "SAM"
+    | Bam -> "BAM"
+
+  type gsize = [ `hs | `mm | `ce | `dm | `gsize of int ]
+
+  let gsize_expr = function
+    | `hs -> string "hs"
+    | `mm -> string "mm"
+    | `dm -> string "dm"
+    | `ce -> string "ce"
+    | `gsize n -> int n
+
+  type keep_dup = [ `all | `auto | `int of int ]
+
+  let keep_dup_expr = function
+    | `all -> string "all"
+    | `auto -> string "auto"
+    | `int n -> int n
+
+  let name = "macs"
+
+  let run ?control ?petdist ?gsize ?tsize ?bw ?pvalue ?mfold ?nolambda
+      ?slocal ?llocal ?on_auto ?nomodel ?shiftsize ?keep_dup
+      ?to_large ?wig ?bdg ?single_profile ?space ?call_subpeaks
+      ?diag ?fe_min ?fe_max ?fe_step format treatment =
+    shell ~descr:"macs" ~mem:(3 * 1024) ~np:8  [
+      mkdir_p dest ;
+      cmd "macs14" ~env [
+        option (opt "--control" (list ~sep:"," dep)) control ;
+        opt "--name" seq [ dest ; string "/" ; string name ] ;
+        opt "--format" (fun x -> x |> opt_of_format |> string) format ;
+        option (opt "--petdist" int) petdist ;
+        option (opt "--gsize" gsize_expr) gsize ;
+        option (opt "--tsize" int) tsize ;
+        option (opt "--bw" int) bw ;
+        option (opt "--pvalue" float) pvalue ;
+        option (opt "--mfold" (fun (i, j) -> seq ~sep:"," [int i ; int j])) mfold ;
+        option (flag string "--nolambda") nolambda ;
+        option (opt "--slocal" int) slocal ;
+        option (opt "--llocal" int) llocal ;
+        option (flag string "--on-auto") on_auto ;
+        option (flag string "--nomodel") nomodel ;
+        option (opt "--shiftsize" int) shiftsize ;
+        option (opt "--keep-dup" keep_dup_expr) keep_dup ;
+        option (flag string "--to-large") to_large ;
+        option (flag string "--wig") wig ;
+        option (flag string "--bdg") bdg ;
+        option (flag string "--single-profile") single_profile ;
+        option (opt "--space" int) space ;
+        option (flag string "--call-subpeaks") call_subpeaks ;
+        option (flag string "--diag") diag ;
+        option (opt "--fe-min" int) fe_min ;
+        option (opt "--fe-max" int) fe_max ;
+        option (opt "--fe-step" int) fe_step ;
+        opt "--treatment" (list ~sep:"," dep) treatment ;
+        ident dest ;
+      ]
+    ]
+
+  class type peaks_xls = object
+    inherit bed3
+    method f4 : int
+    method f5 : int
+    method f6 : int
+    method f7 : float
+    method f8 : float
+    method f9 : float
+  end
+
+  let peaks_xls dir = select dir (selector [ name ^ "_peaks.xls" ])
+
+  class type narrow_peaks = object
+    inherit bed5
+    method f6 : string
+    method f7 : float
+    method f8 : float
+    method f9 : float
+    method f10 : int
+  end
+
+  let narrow_peaks dir =
+    select dir (selector [ name ^ "_peaks.narrowPeak" ])
+
+  class type peak_summits = object
+    inherit bed4
+    method f5 : float
+  end
+
+  let peak_summits dir = select dir (selector [ name ^ "_summits.bed" ])
+end
+
+module Macs2 = struct
+  let env = docker_image ~account:"pveber" ~name:"macs2" ~tag:"2.1.1" ()
+
+  let macs2 subcmd opts =
+    cmd "macs2" ~env (string subcmd :: opts)
+
+  let pileup ?extsize ?both_direction bam =
+    shell ~descr:"macs2.pileup" [
+      macs2 "pileup" [
+        opt "-i" dep bam ;
+        opt "-o" ident dest ;
+        option (flag string "-B") both_direction ;
+        option (opt "--extsize" int) extsize ;
+      ]
+    ]
+
+  type _ format =
+    | Sam
+    | Bam
+
+  let sam = Sam
+  let bam = Bam
+
+  let opt_of_format = function
+    | Sam -> "SAM"
+    | Bam -> "BAM"
+
+  type gsize = [`hs | `mm | `ce | `dm | `gsize of int]
+
+  let gsize_expr = function
+    | `hs -> string "hs"
+    | `mm -> string "mm"
+    | `dm -> string "dm"
+    | `ce -> string "ce"
+    | `gsize n -> int n
+
+  let name = "macs2"
+
+  type keep_dup = [ `all | `auto | `int of int ]
+
+  let keep_dup_expr = function
+    | `all -> string "all"
+    | `auto -> string "auto"
+    | `int n -> int n
+
+  let callpeak_gen
+      ?broad ?pvalue ?qvalue ?gsize ?call_summits
+      ?fix_bimodal ?mfold ?extsize ?nomodel ?bdg ?control ?keep_dup format treatment =
+    shell ~descr:"macs2.callpeak" [
+      macs2 "callpeak" [
+        option (flag string "--broad") broad ;
+        opt "--outdir" ident dest ;
+        opt "--name" string name ;
+        opt "--format" (fun x -> x |> opt_of_format |> string) format ;
+        option (opt "--pvalue" float) pvalue ;
+        option (opt "--qvalue" float) qvalue ;
+        option (opt "--gsize" gsize_expr) gsize ;
+        option (flag string "--bdg") bdg ;
+        option (flag string "--call-summits") call_summits ;
+        option (opt "--mfold" (fun (i, j) -> seq ~sep:" " [int i ; int j])) mfold ;
+        option (opt "--extsize" int) extsize ;
+        option (flag string "--nomodel") nomodel ;
+        option (flag string "--fix-bimodal") fix_bimodal ;
+        option (opt "--keep-dup" keep_dup_expr) keep_dup ;
+        option (opt "--control" (list ~sep:" " dep)) control ;
+        opt "--treatment" (list ~sep:" " dep) treatment ;
+      ]
+    ]
+
+  let callpeak
+      ?pvalue ?qvalue ?gsize ?call_summits
+      ?fix_bimodal ?mfold ?extsize ?nomodel ?bdg ?control ?keep_dup format treatment
+    =
+    callpeak_gen ~broad:false ?pvalue ?qvalue ?gsize ?call_summits
+      ?fix_bimodal ?mfold ?extsize ?nomodel ?bdg ?control ?keep_dup format treatment
+
+
+  class type peaks_xls = object
+    inherit bed3
+    method f4 : int
+    method f5 : int
+    method f6 : int
+    method f7 : float
+    method f8 : float
+    method f9 : float
+  end
+
+  let peaks_xls dir = select dir (selector [ name ^ "_peaks.xls" ])
+
+  class type narrow_peaks = object
+    inherit bed5
+    method f6 : string
+    method f7 : float
+    method f8 : float
+    method f9 : float
+    method f10 : int
+  end
+
+  let narrow_peaks dir =
+    select dir (selector [ name ^ "_peaks.narrowPeak" ])
+
+  class type peak_summits = object
+    inherit bed4
+    method f5 : float
+  end
+
+  let peak_summits dir = select dir (selector [ name ^ "_summits.bed" ])
+
+  let callpeak_broad
+      ?pvalue ?qvalue ?gsize ?call_summits
+      ?fix_bimodal ?mfold ?extsize ?nomodel ?bdg ?control ?keep_dup format treatment
+    =
+    callpeak_gen ~broad:true ?pvalue ?qvalue ?gsize ?call_summits
+      ?fix_bimodal ?mfold ?extsize ?nomodel ?bdg ?control ?keep_dup format treatment
+
+  class type broad_peaks = object
+    inherit bed5
+    method f6 : string
+    method f7 : float
+    method f8 : float
+    method f9 : float
+  end
+
+  let broad_peaks dir =
+    select dir (selector [ name ^ "_peaks.broadPeak" ])
+end
+
+module Meme_suite = struct
+  let env = docker_image ~account:"pveber" ~name:"meme" ~tag:"4.11.2" ()
+
+  let meme_chip ?meme_nmotifs ?meme_minw ?meme_maxw ?np fa =
+    shell ~descr:"meme-chip" ?np [
+      cmd "meme-chip" ~env [
+        option (opt "-meme-nmotifs" int) meme_nmotifs ;
+        option (opt "-meme-minw" int) meme_minw ;
+        option (opt "-meme-maxw" int) meme_maxw ;
+        (*opt "-meme-p" ident Bistro.EDSL.np ;*)
+        opt "--oc" ident dest ;
+        dep fa ;
+      ]
+    ]
+
+  let fimo ?alpha ?bgfile ?max_stored_scores ?motif ?motif_pseudo ?qv_thresh ?thresh meme_motifs fa =
+    shell ~descr:"fimo" [
+      cmd "fimo" ~env [
+        option (opt "--aplha" float) alpha;
+        option (opt "--bgfile" string) bgfile ;
+        option (opt "--max-stored-scores" int) max_stored_scores ;
+        option (opt "--motif" string) motif ;
+        option (opt "--motif-pseudo" float) motif_pseudo ;
+        option (flag string "--qv-thresh") qv_thresh ;
+        option (opt "--thresh" float) thresh ;
+        opt "--oc" ident dest ;
+        dep meme_motifs ;
+        dep fa;
+      ]
+    ]
+end
+
+module Prokka = struct
+  let env = docker_image ~account:"pveber" ~name:"prokka" ~tag:"1.12" ()
+
+  let gram_expr = function
+    | `Plus -> string "+"
+    | `Minus -> string "-"
+
+  let run ?prefix ?addgenes ?locustag ?increment ?gffver ?compliant
+      ?centre ?genus ?species ?strain ?plasmid ?kingdom ?gcode ?gram
+      ?usegenus ?proteins ?hmms ?metagenome ?rawproduct ?fast ?(threads = 1)
+      ?mincontiglen ?evalue ?rfam ?norrna ?notrna ?rnammer fa =
+    shell ~descr:"prokka" ~np:threads ~mem:(3 * 1024) [
+      mkdir_p dest ;
+      cmd "prokka" ~env [
+        string "--force" ;
+        option (opt "--prefix" string) prefix ;
+        option (flag string "--addgenes") addgenes ;
+        option (opt "--locustag" string) locustag ;
+        option (opt "--increment" int) increment ;
+        option (opt "--gffver" string) gffver ;
+        option (flag string "--compliant") compliant ;
+        option (opt "--centre" string) centre ;
+        option (opt "--genus" string) genus ;
+        option (opt "--species" string) species ;
+        option (opt "--strain" string) strain ;
+        option (opt "--plasmid" string) plasmid ;
+        option (opt "--kingdom" string) kingdom ;
+        option (opt "--gcode" int) gcode ;
+        option (opt "--gram" gram_expr) gram ;
+        option (flag string "--usegenus") usegenus ;
+        option (opt "--proteins" string) proteins ;
+        option (opt "--hmms" string) hmms ;
+        option (flag string "--metagenome") metagenome ;
+        option (flag string "--rawproduct") rawproduct ;
+        option (flag string "--fast") fast ;
+        opt "--cpus" ident np ;
+        option (opt "--mincontiglen" int) mincontiglen ;
+        option (opt "--evalue" float) evalue ;
+        option (flag string "--rfam") rfam ;
+        option (flag string "--norrna") norrna ;
+        option (flag string "--notrna") notrna ;
+        option (flag string "--rnammer") rnammer ;
+        opt "--outdir" ident dest ;
+        dep fa ;
+      ] ;
+    ]
+end
+
+module Samtools = struct
+  type 'a format = Bam | Sam
+
+  let bam = Bam
+  let sam = Sam
+
+
+  let env = docker_image ~account:"pveber" ~name:"samtools" ~tag:"1.3.1" ()
+
+  let samtools subcmd args =
+    cmd "samtools" ~env (string subcmd :: args)
+
+  let sam_of_bam bam =
+    shell ~descr:"samtools.sam_of_bam" [
+      samtools "view" [
+        opt "-o" ident dest ;
+        dep bam ;
+      ]
+    ]
+
+  let bam_of_sam sam =
+    shell ~descr:"samtools.bam_of_sam" [
+      samtools "view" [
+        string "-S -b" ;
+        opt "-o" ident dest ;
+        dep sam ;
+      ]
+    ]
+
+  let indexed_bam_of_sam sam =
+    shell ~descr:"samtools.indexed_bam_of_sam" [
+      mkdir_p dest ;
+      samtools "view" [
+        string "-S -b" ;
+        opt "-o" (fun () -> dest // "temp.bam") () ;
+        dep sam ;
+      ] ;
+      samtools "sort" [
+        dest // "temp.bam" ;
+        opt "-o" ident (dest // "reads.bam") ;
+      ] ;
+      samtools "index" [ dest // "reads.bam" ] ;
+      rm_rf (dest // "temp.bam") ;
+    ]
+
+  let sort ?on:order bam =
+    shell ~descr:"samtools.sort" [
+      samtools "sort" [
+        option (fun o -> flag string "-n" (o = `name)) order ;
+        dep bam ;
+        opt "-o" Fn.id dest ;
+      ] ;
+    ]
+
+  let indexed_bam_of_bam bam =
+    shell ~descr:"samtools.indexed_bam_of_bam" [
+      mkdir_p dest ;
+      samtools "sort" [
+        dep bam ;
+        opt "-o" Fn.id (dest // bam_select_in_indexed_bam) ;
+      ] ;
+      samtools "index" [ dest // bam_select_in_indexed_bam ] ;
+    ]
+
+  let indexed_bam_to_bam dir =
+    select dir (selector [bam_select_in_indexed_bam])
+
+  let output_format_expr = function
+    | Bam -> string "-b"
+    | Sam -> string ""
+
+
+  let view ~output (* ?_1 ?u *) ?h ?_H (* ?c ?_L *) ?q (* ?m ?f ?_F ?_B ?s *) file =
+    shell ~descr:"samtools.view" [
+      cmd "samtools view" ~env [
+        output_format_expr output ;
+        (* option (flag string "-1") _1 ; *)
+        (* option (flag string "-u") u ; *)
+        option (flag string "-h") h ;
+        option (flag string "-H") _H ;
+        (* option (flag string "-c") c ; *)
+        (* option (opt "-L" dep) _L ; *)
+        option (opt "-q" int) q ;
+        (* option (opt "-m" int) m ; *)
+        (* option (opt "-f" int) f ; *)
+        (* option (opt "-F" int) _F ; *)
+        (* option (flag string "-B") _B ; *)
+        (* option (opt "-s" float) s ; *)
+        dep file ;
+        opt "-o" ident dest ;
+      ]
+    ]
+end
+
+module Spades = struct
+  let env = docker_image ~account:"pveber" ~name:"spades" ~tag:"3.9.1" ()
+
+  let renamings (ones, twos) =
+    let f side i x =
+      let id = sprintf "pe%d-%d" (i + 1) side in
+      let new_name = seq ~sep:"/" [ tmp ; string (id ^ ".fq") ] in
+      let opt = opt (sprintf "--pe%d-%d" (i + 1) side) ident new_name in
+      let cmd = cmd "ln" [ string "-s" ; dep x ; new_name ] in
+      opt, cmd
+    in
+    let r = List.mapi ones ~f:(f 1) @ List.mapi twos ~f:(f 2) in
+    let args = seq ~sep:" " (List.map r ~f:fst) in
+    let cmds = List.map r ~f:snd in
+    Some args, cmds
+
+  let spades
+      ?single_cell ?iontorrent
+      ?pe
+      ?(threads = 4)
+      ?(memory = 10)
+      ()
+    : [`spades] directory workflow
+    =
+    let pe_args, ln_commands = match pe with
+      | None -> None, []
+      | Some files -> renamings files
+    in
+    shell ~np:threads ~mem:(memory * 1024) ~descr:"spades" [
+      mkdir_p tmp ;
+      mkdir_p dest ;
+      docker env (
+        and_list (
+          ln_commands @ [
+            cmd "spades.py" ~env [
+              option (flag string "--sc") single_cell ;
+              option (flag string "--iontorrent") iontorrent ;
+              opt "--threads" ident np ;
+              opt "--memory" ident (seq [ string "$((" ; mem ; string " / 1024))" ]) ;
+              option ident pe_args ;
+              opt "-o" ident dest ;
+            ]
+          ]
+        )
+      )
+    ]
+
+  let contigs dir = select dir (selector ["contigs.fasta"])
+  let scaffolds dir = select dir (selector ["scaffolds.fasta"])
+end
+
+module Sra = struct
+  let input x = input x
+
+  let fetch_srr id =
+    if (String.length id > 6) then (
+      let prefix = String.prefix id 6 in
+      let url =
+        sprintf
+          "ftp://ftp-trace.ncbi.nlm.nih.gov/sra/sra-instant/reads/ByRun/sra/SRR/%s/%s/%s.sra"
+          prefix id id
+      in
+      shell ~descr:(sprintf "sra.fetch_srr(%s)" id) [ Bistro_unix.Cmd.wget ~dest url ]
+    )
+    else failwithf "Bistro_bioinfo.Sra.fetch_srr: id %s is invalid (should be longer than 6 characters long)" id ()
+
+end
+
+module Sra_toolkit = struct
+
+  let env = docker_image ~account:"pveber" ~name:"sra-toolkit" ~tag:"2.8.0" ()
+
+  let fastq_dump sra =
+    shell ~descr:"sratoolkit.fastq_dump" [
+      cmd ~env "fastq-dump" [ string "-Z" ; dep sra ] ~stdout:dest
+    ]
+
+  let sra_of_input = function
+    | `id id -> string id
+    | `file w -> dep w
+
+  let fastq_dump_gz input =
+    let sra = sra_of_input input in
+    shell ~descr:"sratoolkit.fastq_dump" [
+      cmd ~env "fastq-dump" [ string "--gzip" ; string "-Z" ; sra ] ~stdout:dest
+    ]
+
+  let fastq_dump_pe sra =
+    let dir =
+      shell ~descr:"sratoolkit.fastq_dump" [
+        mkdir_p dest ;
+        cmd ~env "fastq-dump" [
+          opt "-O" ident dest ;
+          string "--split-files" ;
+          dep sra
+        ] ;
+        mv (dest // "*_1.fastq") (dest // "reads_1.fastq") ;
+        mv (dest // "*_2.fastq") (dest // "reads_2.fastq") ;
+      ]
+    in
+    select dir (selector ["reads_1.fastq"]),
+    select dir (selector ["reads_2.fastq"])
+
+
+  let fastq_dump_pe_gz input =
+    let sra = sra_of_input input in
+    let dir =
+      shell ~descr:"sratoolkit.fastq_dump" [
+        mkdir_p dest ;
+        cmd ~env "fastq-dump" [
+          opt "-O" ident dest ;
+          string "--split-files" ;
+          string "--gzip" ;
+          sra ;
+        ] ;
+        mv (dest // "*_1.fastq*") (dest // "reads_1.fq.gz") ;
+        mv (dest // "*_2.fastq*") (dest // "reads_2.fq.gz") ;
+      ]
+    in
+    select dir (selector ["reads_1.fq.gz"]),
+    select dir (selector ["reads_2.fq.gz"])
+
+  let fastq_dump_to_fasta sra =
+    shell ~descr:"sratoolkit.fastq_dump" [
+      cmd ~env "fastq-dump" [
+        string "-Z" ;
+        string "--fasta" ;
+        dep sra
+      ] ~stdout:dest
+    ]
+end
+
+module Srst2 = struct
+
+  let env = docker_image ~account:"pveber" ~name:"srst2" ~tag:"0.2.0" ()
+
+  module Cmd = struct
+    let run_gen ?mlst_db ?mlst_delimiter ?mlst_definitions
+        ?mlst_max_mismatch ?gene_db ?no_gene_details ?gene_max_mismatch
+        ?min_coverage ?max_divergence ?min_depth ?min_edge_depth ?prob_err
+        ?truncation_score_tolerance ?other ?max_unaligned_overlap ?mapq
+        ?baseq ?samtools_args ?report_new_consensus
+        ?report_all_consensus cmd_name other_args =
+      cmd cmd_name ~env (
+        List.append [
+          option (opt "--mlst_db" dep) mlst_db ;
+          option (opt "--mlst_delimiter" string) mlst_delimiter ;
+          option (opt "--mlst_definitions" dep) mlst_definitions ;
+          option (opt "--mlst_max_mismatch" int) mlst_max_mismatch ;
+          option (opt "--gene_db" (list ~sep:" " dep)) gene_db ;
+          option (flag string "--no_gene_details") no_gene_details ;
+          option (opt "--gene_max_mismatch" int) gene_max_mismatch ;
+          option (opt "--min_coverage" int) min_coverage ;
+          option (opt "--max_divergence" int) max_divergence ;
+          option (opt "--min_depth" int) min_depth ;
+          option (opt "--min_edge_depth" int) min_edge_depth ;
+          option (opt "--prob_err" float) prob_err ;
+          option (opt "--truncation_score_tolerance" int) truncation_score_tolerance ;
+          option (opt "--other" string) other ;
+          option (opt "--max_unaligned_overlap" int) max_unaligned_overlap ;
+          option (opt "--mapq" int) mapq ;
+          option (opt "--baseq" int) baseq ;
+          option (opt "--samtools_args" string) samtools_args ;
+          option (flag string "--report_new_consensus") report_new_consensus ;
+          option (flag string "--report_all_consensus") report_all_consensus ;
+        ]
+          other_args
+      )
+  end
+
+  let run_se ?mlst_db ?mlst_delimiter ?mlst_definitions
+      ?mlst_max_mismatch ?gene_db ?no_gene_details ?gene_max_mismatch
+      ?min_coverage ?max_divergence ?min_depth ?min_edge_depth ?prob_err
+      ?truncation_score_tolerance ?other ?max_unaligned_overlap ?mapq
+      ?baseq ?samtools_args ?report_new_consensus
+      ?report_all_consensus ?(threads = 1) fq =
+    shell ~descr:"srst2" ~np:threads ~mem:(3 * 1024) [
+      mkdir_p dest ;
+      Cmd.run_gen "srst2" ?mlst_db ?mlst_delimiter ?mlst_definitions
+        ?mlst_max_mismatch ?gene_db ?no_gene_details ?gene_max_mismatch
+        ?min_coverage ?max_divergence ?min_depth ?min_edge_depth ?prob_err
+        ?truncation_score_tolerance ?other ?max_unaligned_overlap ?mapq
+        ?baseq ?samtools_args ?report_new_consensus
+        ?report_all_consensus [
+        opt "--threads" ident np ;
+        opt "--input_se" (list ~sep:" " dep) fq ;
+        opt "--output" ident dest ;
+      ] ;
+    ]
+
+  let run_pe ?mlst_db ?mlst_delimiter ?mlst_definitions
+      ?mlst_max_mismatch ?gene_db ?no_gene_details ?gene_max_mismatch
+      ?min_coverage ?max_divergence ?min_depth ?min_edge_depth ?prob_err
+      ?truncation_score_tolerance ?other ?max_unaligned_overlap ?mapq
+      ?baseq ?samtools_args ?report_new_consensus
+      ?report_all_consensus ?(threads = 1) fq =
+    shell ~descr:"srst2" ~np:threads ~mem:(3 * 1024) [
+      mkdir_p dest ;
+      Cmd.run_gen "srst2" ?mlst_db ?mlst_delimiter ?mlst_definitions
+        ?mlst_max_mismatch ?gene_db ?no_gene_details ?gene_max_mismatch
+        ?min_coverage ?max_divergence ?min_depth ?min_edge_depth ?prob_err
+        ?truncation_score_tolerance ?other ?max_unaligned_overlap ?mapq
+        ?baseq ?samtools_args ?report_new_consensus
+        ?report_all_consensus [
+        opt "--threads" ident np ;
+        opt "--input_pe" (list ~sep:" " dep) fq ;
+        opt "--output" ident dest ;
+      ] ;
+    ]
+end
+
+module Tophat = struct
+  let env = docker_image ~account:"pveber" ~name:"tophat" ~tag:"2.1.1" ()
+
+  let tophat1 ?color index fqs =
+    let args = match fqs with
+      | `single_end fqs -> list dep ~sep:"," fqs
+      | `paired_end (fqs1, fqs2) ->
+        seq [
+          list dep ~sep:"," fqs1 ;
+          string " " ;
+          list dep ~sep:"," fqs2
+        ]
+    in
+    shell ~np:8 ~mem:(4 * 1024) ~descr:"tophat" [
+      cmd ~env "tophat" [
+        string "--bowtie1" ;
+        opt "--num-threads" ident np ;
+        option (flag string "--color") color ;
+        opt "--output-dir" ident dest ;
+        seq [ dep index ; string "/index" ] ;
+        args
+      ]
+    ]
+
+  let tophat2 index fqs =
+    let args = match fqs with
+      | `single_end fqs -> list dep ~sep:"," fqs
+      | `paired_end (fqs1, fqs2) ->
+        seq [
+          list dep ~sep:"," fqs1 ;
+          string " " ;
+          list dep ~sep:"," fqs2
+        ]
+    in
+    shell ~np:8 ~mem:(4 * 1024) ~descr:"tophat2" [
+      cmd ~env "tophat2" [
+        opt "--num-threads" ident np ;
+        opt "--output-dir" ident dest ;
+        seq [ dep index ; string "/index" ] ;
+        args
+      ]
+    ]
+
+  let accepted_hits dir = select dir (selector ["accepted_hits.bam"])
+
+  let junctions dir = select dir (selector ["junctions.bed"])
+
+end
+
+module Ucsc_gb = struct
+  type genome = [ `dm3 | `droSim1 | `hg18 | `hg19 | `hg38 | `mm8 | `mm9 | `mm10 | `sacCer2 ]
+
+  let string_of_genome = function
+    | `dm3 -> "dm3"
+    | `droSim1 -> "droSim1"
+    | `hg18 -> "hg18"
+    | `hg19 -> "hg19"
+    | `hg38 -> "hg38"
+    | `mm8 -> "mm8"
+    | `mm9 -> "mm9"
+    | `mm10 -> "mm10"
+    | `sacCer2 -> "sacCer2"
+
+  let genome_of_string = function
+    | "dm3" -> Some `dm3
+    | "droSim1" -> Some `droSim1
+    | "hg18" -> Some `hg18
+    | "hg19" -> Some `hg19
+    | "hg38" -> Some `hg38
+    | "mm8" -> Some `mm8
+    | "mm9" -> Some `mm9
+    | "mm10" -> Some `mm10
+    | "sacCer2" -> Some `sacCer2
+    | _ -> None
+
+  let env = docker_image ~account:"pveber" ~name:"ucsc-kent" ~tag:"330" ()
+
+
+  (** {5 Dealing with genome sequences} *)
+
+  let chromosome_sequence org chr =
+    let org = string_of_genome org in
+    let url =
+      sprintf
+        "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/chromosomes/%s.fa.gz"
+        org chr
+    in
+    let descr = sprintf "ucsc_gb.chromosome_sequence(%s,%s)" org chr in
+    shell ~descr [
+      Bistro_unix.Cmd.wget ~dest:(tmp // "seq.fa.gz") url ;
+      cmd "gunzip" [ tmp // "seq.fa.gz" ] ;
+      cmd "mv" [ tmp // "seq.fa.gz" ; dest ] ;
+    ]
+
+  let chromosome_sequences org =
+    let org = string_of_genome org in
+    shell ~descr:(sprintf "ucsc_gb.chromosome_sequences(%s)" org) [
+      mkdir_p dest ;
+      cd dest ;
+      Bistro_unix.Cmd.wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/chromosomes/*" org) ;
+      cmd "gunzip" [ string "*.gz" ]
+    ]
+
+  let genome_sequence org =
+    let chr_seqs = chromosome_sequences org in
+    shell ~descr:"ucsc_gb.genome_sequence" [
+      cmd "bash" [
+        opt "-c" string "'shopt -s nullglob ; cat $0/{chr?.fa,chr??.fa,chr???.fa,chr????.fa} > $1'" ;
+        dep chr_seqs ;
+        dest
+      ]
+    ]
+
+  (* UGLY hack due to twoBitToFa: this tool requires that the 2bit
+     sequence should be put in a file with extension 2bit. So I'm forced
+     to create first a directory and then to select the unique file in it...*)
+  let genome_2bit_sequence_dir org =
+    let org = string_of_genome org in
+    shell ~descr:(sprintf "ucsc_gb.2bit_sequence(%s)" org) [
+      mkdir dest ;
+      cd dest ;
+      Bistro_unix.Cmd.wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/bigZips/%s.2bit" org org) ;
+    ]
+
+  let genome_2bit_sequence org =
+    select (genome_2bit_sequence_dir org) (selector [ (string_of_genome org) ^ ".2bit" ])
+
+  (* (\* let wg_encode_crg_mappability n org = *\) *)
+  (* (\*   let url = sp "ftp://hgdownload.cse.ucsc.edu/gbdb/%s/bbi/wgEncodeCrgMapabilityAlign%dmer.bigWig" (string_of_genome org) n in *\) *)
+  (* (\*   Guizmin_unix.wget url *\) *)
+
+  (* (\* let wg_encode_crg_mappability_36 org = wg_encode_crg_mappability 36 org *\) *)
+  (* (\* let wg_encode_crg_mappability_40 org = wg_encode_crg_mappability 40 org *\) *)
+  (* (\* let wg_encode_crg_mappability_50 org = wg_encode_crg_mappability 50 org *\) *)
+  (* (\* let wg_encode_crg_mappability_75 org = wg_encode_crg_mappability 75 org *\) *)
+  (* (\* let wg_encode_crg_mappability_100 org = wg_encode_crg_mappability 100 org *\) *)
+
+  let twoBitToFa bed twobits =
+    shell ~descr:"ucsc_gb.twoBitToFa" [
+      cmd ~env "twoBitToFa" [
+        opt' "-bed" dep bed ;
+        dep twobits ;
+        dest
+      ]
+    ]
+
+  (* let fasta_of_bed org bed = *)
+  (*   twoBitToFa bed (genome_2bit_sequence org) *)
+
+  (* (\*   f2 *\) *)
+  (* (\*     "guizmin.bioinfo.ucsc.fasta_of_bed[1]" [] *\) *)
+  (* (\*     seq2b bed *\) *)
+  (* (\*     (fun env (File seq2b) (File bed) path -> *\) *)
+  (* (\*       twoBitToFa ~positions:(`bed bed) ~seq2b ~fa:path) *\) *)
+
+  (* (\* let fetch_sequences (File seq2b) locations = *\) *)
+  (* (\*   let open Core_kernel in *\) *)
+  (* (\*   Core_extended.Sys_utils.with_tmp ~pre:"gzm" ~suf:".seqList" (fun seqList -> *\) *)
+  (* (\*     Core_extended.Sys_utils.with_tmp ~pre:"gzm" ~suf:".fa" (fun fa -> *\) *)
+  (* (\*       (\\* Write locations to a file *\\) *\) *)
+  (* (\*       List.map locations Fungen.Location.to_string *\) *)
+  (* (\*       |> Out_channel.write_lines seqList ; *\) *)
+
+  (* (\*       (\\* run twoBitToFa *\\) *\) *)
+  (* (\*       twoBitToFa ~positions:(`seqList seqList) ~seq2b ~fa ; *\) *)
+
+  (* (\*       (\\* Parse the fasta file *\\) *\) *)
+  (* (\*       In_channel.with_file fa ~f:(fun ic -> *\) *)
+  (* (\*         Biocaml.fasta (in_channel_to_char_seq_item_stream_exn ic) *\) *)
+  (* (\*         /@ (fun x -> x.Biocaml.fasta sequence) *\) *)
+  (* (\*         |> Stream.to_list *\) *)
+  (* (\*       ) *\) *)
+  (* (\*     ) *\) *)
+  (* (\*   ) *\) *)
+
+  (** {5 Chromosome size and clipping} *)
+
+  let fetchChromSizes org =
+    shell ~descr:"ucsc_gb.fetchChromSizes" [
+      cmd "fetchChromSizes" ~env ~stdout:dest [
+        string (string_of_genome org) ;
+      ]
+    ]
+
+  let bedClip org bed =
+    shell ~descr:"ucsc_gb.bedClip" [
+      cmd "bedClip -verbose=2" ~env [
+        dep bed ;
+        dep org ;
+        dest ;
+      ]
+    ]
+
+
+
+
+  (** {5 Conversion between annotation file formats} *)
+
+  (* (\* let wig_of_bigWig bigWig = *\) *)
+  (* (\*   f1 *\) *)
+  (* (\*     "guizmin.bioinfo.ucsc.wig_of_bigWig[r1]" [] *\) *)
+  (* (\*     bigWig *\) *)
+  (* (\*     ( *\) *)
+  (* (\*       fun env (File bigWig) path -> *\) *)
+  (* (\* 	env.bash [ *\) *)
+  (* (\*           sp "bigWigToWig %s %s" bigWig path *\) *)
+  (* (\* 	] *\) *)
+  (* (\*     ) *\) *)
+
+  (* (\* let bigWig_of_wig ?(clip = false) org wig = *\) *)
+  (* (\*   let chrom_info = chrom_info org in *\) *)
+  (* (\*   f2 *\) *)
+  (* (\*     "guizmin.bioinfo.ucsc.bigWig_of_wig[r1]" [] *\) *)
+  (* (\*     chrom_info wig *\) *)
+  (* (\*     (fun env (File chrom_info) (File wig) path -> *\) *)
+  (* (\*       let clip = if clip then "-clip" else "" in *\) *)
+  (* (\*       env.sh "wigToBigWig %s %s %s %s" clip wig chrom_info path) *\) *)
+
+  let bedGraphToBigWig org bg =
+    let tmp = seq [ tmp ; string "/sorted.bedGraph" ] in
+    shell ~descr:"bedGraphToBigWig" [
+      cmd "sort" ~stdout:tmp [
+        string "-k1,1" ;
+        string "-k2,2n" ;
+        dep bg ;
+      ] ;
+      cmd "bedGraphToBigWig" ~env [
+        tmp ;
+        dep (fetchChromSizes org) ;
+        dest ;
+      ]
+    ]
+
+  let bedToBigBed_command org bed =
+    let tmp = seq [ tmp ; string "/sorted.bed" ] in
+    let sort =
+      cmd "sort" ~stdout:tmp [
+        string "-k1,1" ;
+        string "-k2,2n" ;
+        dep bed ;
+      ] in
+    let bedToBigBed =
+      cmd "bedToBigBed" ~env [
+        tmp ;
+        dep (fetchChromSizes org) ;
+        dest ;
+      ]
+    in
+    [ sort ; bedToBigBed ]
+
+  let bedToBigBed org =
+    let f bed =
+      shell
+        ~descr:"ucsc_gb.bedToBigBed"
+        (bedToBigBed_command org bed)
+    in
+    function
+    | `bed3 bed -> f bed
+    | `bed5 bed -> f bed
+
+  (* implements the following algorithm
+     if bed is empty
+     then touch target
+     else bedToBigBed (sort bed)
+  *)
+  let bedToBigBed_failsafe org =
+    let f bed =
+      let test = cmd "test" [ string "! -s" ; dep bed ] in
+      let touch = cmd "touch" [ dest ] in
+      let cmd = or_list [
+          and_list [ test ; touch ] ;
+          and_list (bedToBigBed_command org bed) ;
+        ] in
+      shell [ cmd ]
+    in
+    function
+    | `bed3 bed -> f bed
+    | `bed5 bed -> f bed
+
+
+  module Lift_over = struct
+    class type chain_file = object
+      inherit file
+      method format : [`lift_over_chain_file]
+    end
+
+    let chain_file ~org_from ~org_to =
+      let org_from = string_of_genome org_from
+      and org_to = string_of_genome org_to in
+      let url =
+        sprintf
+          "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/liftOver/%sTo%s.over.chain.gz"
+          org_from org_from (String.capitalize org_to)
+      in
+      Bistro_unix.(gunzip (wget url))
+
+    let bed ~org_from ~org_to bed =
+      let chain_file = chain_file ~org_from ~org_to in
+      shell ~descr:"ucsc.liftOver" [
+        mkdir_p dest ;
+        cmd "liftOver" ~env [
+          dep bed ;
+          dep chain_file ;
+          dest // "mapped.bed" ;
+          dest // "unmapped.bed" ;
+        ] ;
+      ]
+
+    let mapped dir = select dir (selector ["mapped.bed"])
+    let unmapped dir = select dir (selector ["unmapped.bed"])
+  end
+end
+
+module Sigs = Sigs
+
+module File_formats = File_formats

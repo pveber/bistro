@@ -1,0 +1,6 @@
+(jbuild_version 1)
+
+(executables
+ ((names (ngs_qc nlp_demo))
+  (libraries (bistro bistro.unix bistro.bioinfo))
+  (preprocess (pps (ppx_bistro)))))

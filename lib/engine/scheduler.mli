@@ -1,63 +1,29 @@
-open Core_kernel
-open Bistro_tdag
+open Bistro_base
 
-module DAG : Tdag_sig.S
-  with type task = Task.t
+type t
 
+val create :
+  ?loggers:Logger.t list ->
+  ?np:int ->
+  ?mem:[`GB of int] ->
+  ?use_docker:bool ->
+  Db.t -> t
 
-type time = float
+val submit :
+  t -> _ Workflow.t -> Execution_trace.t Lwt.t
 
-type event =
-  | Init of { dag : DAG.t ; needed : Task.t list ; already_done : Task.t list }
-  | Task_ready of Task.t
-  | Task_started of Task.t * Allocator.resource
-  | Task_ended of Task.result
-  | Task_skipped of Task.t * [ `Done_already
-                             | `Missing_dep
-                             | `Allocation_error of string]
+val eval_expr :
+  t -> 'a Workflow.expr -> ('a, (string * Execution_trace.t) list) result Lwt.t
 
-class type logger = object
-  method event : Task.config -> time -> event -> unit
-  method stop : unit
-  method wait4shutdown : unit Lwt.t
-end
+val start : t -> unit
 
-type trace =
-  | Run of { ready : time ;
-             start : time ;
-             end_ : time ;
-             outcome : Task.result }
+val join : t -> unit Lwt.t
 
-  | Skipped of [ `Done_already
-               | `Missing_dep
-               | `Allocation_error of string ]
-
-type dry_run = Dry_run of {
-    nb_tasks : int ;
-    nb_goals : int ;
-    status : (Task.t * [ `TODO | `DONE ]) list ;
-    simulation : Task.t list ;
-  }
-
-val compile :
-  Bistro.any_workflow list ->
-  DAG.t * Task.t list * String.Set.t
-
-val run :
-  ?logger:logger ->
-  ?goals:Task.t list ->
-  Task.config ->
-  Allocator.t ->
-  DAG.t ->
-  trace String.Map.t Lwt.t
-
-val dry_run :
-  ?goals:Task.t list ->
-  Task.config ->
-  DAG.t ->
-  dry_run Lwt.t
-
-val clean_run :
-  Task.config ->
-  DAG.t ->
-  unit Lwt.t
+val eval_expr_main :
+  ?np:int ->
+  ?mem:[`GB of int] ->
+  ?loggers:Logger.t list ->
+  ?use_docker:bool ->
+  Db.t ->
+  'a Workflow.expr ->
+  ('a, string) result

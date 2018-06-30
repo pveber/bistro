@@ -195,7 +195,7 @@ let check_events n xs =
   |> ignore
 
 let check_performed xs =
-  if List.contains_dup xs
+  if List.contains_dup ~compare:Int.compare xs
   then failwith "A task has been performed twice"
 
 let command =

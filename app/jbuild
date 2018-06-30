@@ -3,7 +3,7 @@
 (executable
  ((name bistro_demo)
   (modules (bistro_demo))
-  (libraries (bistro.bioinfo bistro.utils ppx_let))
+  (libraries (bistro bistro.bioinfo bistro.utils ppx_let))
   (preprocess (pps (ppx_jane)))
 ))
 

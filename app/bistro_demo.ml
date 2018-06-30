@@ -1,10 +1,8 @@
 (** {:{http://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE29506}GEO Series GSE29506} *)
 
 open Core
-open Bistro.Std
-open Bistro.EDSL
-open Bistro_bioinfo.Std
-open Bistro_utils
+open Bistro
+open Bistro_bioinfo
 
 let common_spec f =
   let open Command.Let_syntax in
@@ -23,13 +21,11 @@ let common_spec f =
     f ~outdir ~np ~mem ~verbose ~html_report
   ]
 
-let logger verbose html_report =
-  Logger.tee [
-    (if verbose then Console_logger.create () else Logger.null) ;
-    (Dot_output.create "dag.dot") ;
+let loggers verbose html_report = [
+    (if verbose then console_logger () else null_logger ()) ;
     (match html_report with
-     | Some path -> Html_logger.create path
-     | None -> Logger.null)
+     | Some path -> Bistro_utils.Html_logger.create path
+     | None -> null_logger ())
   ]
 
 
@@ -38,7 +34,7 @@ let main repo ~outdir ~np ~mem ~verbose ~html_report () =
   build
     ~keep_all:false
     ~np ~mem:(`GB mem)
-    ~logger:(logger verbose html_report)
+    ~loggers:(loggers verbose html_report)
     ~outdir repo
 
 module ChIP_seq = struct
@@ -52,7 +48,7 @@ module ChIP_seq = struct
   (* MAPPING *)
   let bowtie_index = Bowtie.bowtie_build genome
   let chIP_pho4_noPi_sam = Bowtie.bowtie ~v:2 bowtie_index (`single_end chIP_pho4_noPi_fq)
-  let chIP_pho4_noPi_bam = Samtools.(indexed_bam_of_sam chIP_pho4_noPi_sam / indexed_bam_to_bam)
+  let chIP_pho4_noPi_bam = Samtools.(indexed_bam_of_sam chIP_pho4_noPi_sam |> indexed_bam_to_bam)
 
   let chIP_pho4_noPi_macs2 = Macs2.callpeak ~mfold:(1,100) Macs2.bam [ chIP_pho4_noPi_bam ]
 
@@ -94,14 +90,13 @@ module RNA_seq = struct
       tophat1
         bowtie_index
         (`single_end [ fastq x ])
-      /
-      accepted_hits
+      |> accepted_hits
     )
 
   (* oddly the gff from sgd has a fasta file at the end, which htseq-count
      doesn't like. This is a step to remove it. *)
   let remove_fasta_from_gff gff =
-    workflow ~descr:"remove_fasta_from_gff" [
+    shell ~descr:"remove_fasta_from_gff" Shell_dsl.[
       cmd "sed" ~stdout:dest [
         string "'/###/q'" ;
         dep gff ;
@@ -109,7 +104,7 @@ module RNA_seq = struct
     ]
 
   let gene_annotation : gff workflow =
-    Unix_tools.wget
+    Bistro_unix.wget
       "http://downloads.yeastgenome.org/curation/chromosomal_feature/saccharomyces_cerevisiae.gff"
     |> remove_fasta_from_gff
 
@@ -119,7 +114,7 @@ module RNA_seq = struct
       (`bam (bam x)) gene_annotation
 
   let deseq2 =
-    Deseq2.main_effects
+    DESeq2.main_effects
       ["time"]
       [ [   "0" ], counts (`WT, `High_Pi) ;
         [ "360" ], counts (`WT, `No_Pi 360) ; ]

@@ -1,20 +1,21 @@
 open Core
+open Bistro_base
 open Bistro_engine
 
 type time = float
 
 type event =
   | Step_task_started of {
-      step : Bistro.step ;
+      id : string ;
+      descr : string ;
     }
-  | Task_ended of Task.result
-  | Task_done_already of {
-      task : Task.t ;
+  | Task_ended of Task_result.t
+  | Workflow_done_already of {
+      w : Workflow.u ;
       path : string ;
     }
 
 type model = {
-  dag : Scheduler.DAG.t option ;
   events : (time * event) list ;
 }
 
@@ -31,36 +32,33 @@ type t = {
 
 let create path = {
   path ;
-  model = { dag = None ; events = [] } ;
+  model = { events = [] } ;
   stop = false ;
   changed = true ;
 }
 
-let translate_event config _ = function
-  | Scheduler.Task_started (Bistro.Step step, _) ->
-    Some (Step_task_started { step })
+let translate_event db _ = function
+  | Logger.Task_started (
+      (Task.Shell {id ; descr ; _}
+      | Closure { id ; descr ; _ }), _) ->
+    Some (Step_task_started { id ; descr })
 
-  | Scheduler.Task_ended outcome ->
+  | Task_ended { outcome ; _ } ->
     Some (Task_ended outcome)
 
-  | Scheduler.Task_skipped (task, `Done_already) ->
-    let path = Db.cache config.Task.db (Task.id task) in
-    Some (Task_done_already { task ; path })
+  | Workflow_skipped (w, `Done_already) ->
+    let path = Db.cache db (Workflow.id w) in
+    Some (Workflow_done_already { w ; path })
 
-  | Scheduler.Init _
-  | Scheduler.Task_ready _
-  | Scheduler.Task_skipped (_, (`Allocation_error _ | `Missing_dep))
-  | Scheduler.Task_started ((Bistro.Input _ | Bistro.Select _), _) -> None
+  | Task_ready _
+  | Task_allocation_error _
+  | Workflow_skipped (_, `Missing_dep)
+  | Task_started ((Task.Input _ | Select _), _) -> None
 
-let update model config time evt =
+let update model db time evt =
   {
-    dag = (
-      match evt with
-      | Scheduler.Init { dag ; _ } -> Some dag
-      | _ -> model.dag
-    ) ;
     events = (
-      match translate_event config time evt with
+      match translate_event db time evt with
       | None -> model.events
       | Some evt -> (time, evt) :: model.events
     ) ;
@@ -120,7 +118,7 @@ module Render = struct
   let step_file_dumps = function
     | [] -> k"" ;
     | _ :: _ as dumps ->
-      let modals = List.map dumps ~f:(fun (Task.File_dump { text ; path }) ->
+      let modals = List.map dumps ~f:(fun (Shell_command.File_dump { text ; path }) ->
           let id, modal =
             modal ~header:[ k path ] ~body:[ pre [ k text ] ]
           in
@@ -144,14 +142,7 @@ module Render = struct
         :: List.map modals ~f:(fun (_,_,x) -> x)
       )
 
-  let step_action = function
-    | `Sh cmd -> div [
-        item "command" [] ;
-        pre [ k cmd ] ;
-      ]
-    | `Eval -> div []
-
-  let step_result_details ~id ~action ~cache ~stdout ~stderr ~file_dumps =
+  let shell_result_details ~id ~cmd ~cache ~stdout ~stderr ~file_dumps =
     let outputs = div [
         item "outcome" [
           a ~a:[a_href stdout ] [ k "stdout" ] ;
@@ -169,33 +160,34 @@ module Render = struct
       ] ;
 
       outputs ;
-      step_action action ;
+      div [
+        item "command" [] ;
+        pre [ k cmd ] ;
+      ] ;
       step_file_dumps file_dumps ;
     ]
 
-  let task_result =
-    let open Task in
-    function
-    | Input_check { path ; pass } ->
+  let task_result = function
+    | Task_result.Input { path ; pass } ->
       [ p [ k "input " ; k path ] ;
         if pass then k"" else (
           p [ k"Input doesn't exist" ]
         ) ]
 
-    | Select_check { dir_path ; sel ; pass } ->
+    | Select { dir_path ; sel ; pass } ->
       [ p [ k "select " ;
-            k (Bistro.Path.to_string sel) ;
+            k (Bistro_engine.Path.to_string sel) ;
             k " in " ;
             k dir_path ] ;
 
         if pass then k"" else (
-          p [ k"No path " ; k (Bistro.Path.to_string sel) ; k" in " ;
+          p [ k"No path " ; k (Bistro_engine.Path.to_string sel) ; k" in " ;
               a ~a:[a_href dir_path] [k dir_path ] ]
         ) ]
 
-    | Step_result { exit_code ; outcome ; step ; stdout ; stderr ; cache ; file_dumps ; action } ->
+    | Shell { exit_code ; outcome ; stdout ; stderr ; cache ; file_dumps ; cmd ; descr ; id } ->
       collapsible_panel
-        ~title:[ k step.descr ]
+        ~title:[ k descr ]
         ~header:[
           match outcome with
           | `Succeeded -> k""
@@ -204,36 +196,20 @@ module Render = struct
           | `Missing_output ->
             p [ k "missing_output" ]
         ]
-        ~body:(step_result_details ~id:step.id ~action ~cache ~stderr ~stdout ~file_dumps)
-    | Map_command_result _ -> assert false (* FIXME *)
-
-  let task =
-    let open Bistro in
-    function
-    | Input (_, path) ->
-      [ p [ k "input " ; k (Path.to_string path) ] ]
-
-    | Select (_, Input (_, input_path), path) ->
-      [ p [ k "select " ;
-            k (Path.to_string path) ;
-            k " in " ;
-            k (Path.to_string input_path) ] ]
-
-    | Select (_, Step { id ; _ }, path) ->
-      [ p [ k "select " ;
-            k (Path.to_string path) ;
-            k " in step " ;
-            k id ] ]
-
-    | Select (_, Select _, _) -> assert false
-
-    | Step { descr ; id ; _ } ->
+        ~body:(shell_result_details ~id:id ~cmd ~cache ~stderr ~stdout ~file_dumps)
+    | Closure { descr ; outcome } ->
       collapsible_panel
         ~title:[ k descr ]
-        ~header:[]
-        ~body:[ item "id" [ k id ] ]
+        ~header:[
+          match outcome with
+          | `Succeeded -> k""
+          | `Failed -> p [ k "failed" ]
+          | `Missing_output ->
+            p [ k "missing_output" ]
+        ]
+        ~body:[]
 
-  let task_start ~step:{ Bistro.descr ; id ; _ } =
+  let task_start ~descr ~id =
     collapsible_panel
       ~title:[ k descr ]
       ~header:[]
@@ -241,12 +217,25 @@ module Render = struct
         item "id" [ k id ] ;
       ]
 
-  let cached_task t path =
-    let open Bistro in
+  let cached_workflow t path =
     match t with
-    | Input _
-    | Select _ -> task t
-    | Step { descr ; id ; _ } ->
+    | Workflow.Input { path ; _ } ->
+      [ p [ k "input " ; k path ] ]
+    | Select { dir = Input { path = input_path } ; sel } ->
+      [ p [ k "select " ;
+            k (Path.to_string sel) ;
+            k " in " ;
+            k input_path ] ]
+
+    | Select { dir = (Shell { id ; _ } | Closure { id ; _ }) ; sel } ->
+      [ p [ k "select " ;
+            k (Path.to_string sel) ;
+            k " in step " ;
+            k id ] ]
+
+    | Select { dir = Select _ ; _} -> assert false
+    | Closure { descr ; id ; _ }
+    | Shell { descr ; id ; _ } ->
       collapsible_panel
         ~title:[ k descr ]
         ~header:[]
@@ -261,24 +250,25 @@ module Render = struct
     let style = sprintf "color:%s; font-weight:bold;" col in
     span ~a:[a_style style] [ k text ]
 
-  let result_label =
-    let open Task in
-    function
-    | Input_check { pass = true ; _ }
-    | Select_check { pass = true ; _ } ->
+  let result_label = function
+    | Task_result.Input { pass = true ; _ }
+    | Select { pass = true ; _ } ->
       event_label_text `BLACK "CHECKED"
 
-    | Input_check { pass = false ; _ }
-    | Select_check { pass = false ; _ }
-    | Step_result { outcome = `Failed ; _ } ->
+    | Input { pass = false ; _ }
+    | Select { pass = false ; _ }
+    | Closure { outcome = `Failed ; _ }
+    | Shell { outcome = `Failed ; _ } ->
       event_label_text `RED "FAILED"
 
-    | Step_result { outcome = `Missing_output ; _ } ->
-      event_label_text `GREEN "MISSING OUTPUT"
+    | Closure { outcome = `Missing_output ; _ }
+    | Shell { outcome = `Missing_output ; _ } ->
+      event_label_text `RED "MISSING OUTPUT"
 
-    | Step_result { outcome = `Succeeded ; _ } ->
+    | Shell { outcome = `Succeeded ; _ }
+    | Closure { outcome = `Succeeded ; _ } ->
       event_label_text `GREEN "DONE"
-    | Map_command_result _ -> assert false (* FIXME *)
+
 
   let event time evt =
     let table_line label details =
@@ -289,16 +279,16 @@ module Render = struct
       ]
     in
     match evt with
-    | Step_task_started { step } ->
+    | Step_task_started { id ; descr } ->
       table_line
         (event_label_text `BLACK "STARTED")
-        (task_start ~step)
+        (task_start ~id ~descr)
 
     | Task_ended result ->
       table_line (result_label result) (task_result result)
 
-    | Task_done_already { task = t ; path } ->
-      table_line (event_label_text `BLACK "CACHED") (cached_task t path)
+    | Workflow_done_already { w = t ; path } ->
+      table_line (event_label_text `BLACK "CACHED") (cached_workflow t path)
 
   let event_table m =
     let table =
@@ -353,14 +343,13 @@ class logger path =
   let logger = create path in
   let loop = loop logger in
   object
-    method event config time event =
-      logger.model <- update logger.model config time event ;
+    method event db time event =
+      logger.model <- update logger.model db time event ;
       logger.changed <- true
 
     method stop =
-      logger.stop <- true
-
-    method wait4shutdown = loop
+      logger.stop <- true ;
+      loop
   end
 
 let create path = new logger path

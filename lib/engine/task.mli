@@ -1,54 +1,57 @@
-open Core
+open Bistro_base
 
-type t = Bistro.u
-
-type file_dump = File_dump of {
-    text : string ;
-    path : string ;
-  }
-
-type result =
-  | Input_check of { path : string ; pass : bool }
-  | Select_check of { dir_path : string ; sel : string list ; pass : bool }
-  | Step_result of {
-      outcome : [`Succeeded | `Missing_output | `Failed] ;
-      step : Bistro.step ;
-      exit_code : int ;
-      action : [`Sh of string | `Eval] ;
-      file_dumps : file_dump list ;
-      cache : string option ;
-      stdout : string ;
-      stderr : string ;
-    }
-  | Map_command_result of {
-      pass : bool ;
-      step : Bistro.step ;
-    }
-
-type config = private {
+type config = {
   db : Db.t ;
   use_docker : bool ;
-  keep_all : bool ;
-  precious : String.Set.t ;
 }
 
-val config :
-  db_path:string ->
-  use_docker:bool ->
-  keep_all:bool ->
-  precious:String.Set.t ->
-  config
+type t = private
+  | Input of { id : string ; path : string }
+  | Select of {
+      dir : Workflow.u ;
+      sel : string list
+    }
+  | Shell of {
+      id : string ;
+      descr : string ;
+      np : int ;
+      mem : int ;
+      cmd : string Command.t ;
+    }
+  | Closure of {
+      id : string ;
+      descr : string ;
+      np : int ;
+      mem : int ;
+      f : Workflow.env -> unit ;
+    }
 
-val id : t -> string
-val equal : t -> t -> bool
-val compare : t -> t -> int
+val input :
+  id:string ->
+  path:string ->
+  t
+
+val select :
+  dir:_ Workflow.t ->
+  sel:string list ->
+  t
+
+val shell :
+  id:string ->
+  descr:string ->
+  np:int ->
+  mem:int ->
+  string Command.t -> t
+
+val closure :
+  id:string ->
+  descr:string ->
+  np:int ->
+  mem:int ->
+  (Workflow.env -> unit) -> t
+
 val requirement : t -> Allocator.request
-val perform : Allocator.resource -> config -> t -> result Lwt.t
-val failure : result -> bool
-val is_done : t -> config -> bool Lwt.t
-val post_revdeps_hook :
-  t ->
-  config ->
-  all_revdeps_succeeded:bool ->
-  unit Lwt.t
-val clean : t -> config -> unit Lwt.t
+
+val perform : t -> config -> Allocator.resource -> Task_result.t Lwt.t
+
+val is_done : _ Workflow.t -> Db.t -> bool Lwt.t

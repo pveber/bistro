@@ -1,0 +1,7 @@
+(jbuild_version 1)
+
+(library
+ ((name bistro_unix)
+  (public_name bistro.unix)
+  (libraries (bistro core_kernel))
+))

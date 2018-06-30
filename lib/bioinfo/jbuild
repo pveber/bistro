@@ -3,5 +3,5 @@
 (library
  ((name bistro_bioinfo)
   (public_name bistro.bioinfo)
-  (libraries (bistro core))
+  (libraries (bistro bistro.unix core_kernel))
 ))
