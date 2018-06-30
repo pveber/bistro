@@ -3,7 +3,7 @@ open Bistro
 open Shell_dsl
 
 let%bistro [@np 2] [@mem 1] [@descr "foobar"] [@version 42]
-    comment_filter bed =
+    comment_filter bed : text_file workflow  =
   In_channel.read_lines [%dep bed]
   |> List.filter ~f:(fun l -> not (String.is_prefix ~prefix:"#" l))
   |> Out_channel.write_lines [%dest]
@@ -29,19 +29,15 @@ let%bistro test_id' =
   let a = 1 in
   ignore a
 
-let%bistro test_param =
-  let a = [%param 2] in
-  ignore a
-
-let%bistro test_param' =
-  let a = [%param "foo"] in
+let%bistro test_param i =
+  let a = [%param i] in
   ignore a
 
 let main () =
   let open Bistro_base in
   let open Bistro.Private in
   assert Workflow.(id (reveal test_id) = id (reveal test_id')) ;
-  assert Workflow.(id (reveal test_param) <> id (reveal test_param')) ;
+  assert Workflow.(id (reveal @@ test_param 2) <> id (reveal @@ test_param "a")) ;
   let bed = comment_filter (create_file "# comment\nchr1\t42\t100\n") in
   let bed2 = comment_filter (create_file "# comment\n# comment\nchr10\t42\t100\n") in
   Bistro.(

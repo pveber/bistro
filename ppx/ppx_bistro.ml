@@ -3,7 +3,8 @@ open Ppxlib
 
 let rec extract_body = function
   | { pexp_desc = Pexp_fun (_,_,_,body) ; _ } -> extract_body body
-  | expr -> expr
+  | { pexp_desc = Pexp_constraint (expr, ty) ; _ } -> expr, Some ty
+  | expr -> expr, None
 
 let rec replace_body new_body = function
   | ({ pexp_desc = Pexp_fun (lab, e1, p, e2) ; _ } as expr) ->
@@ -98,7 +99,7 @@ let rewriter ~loc ~path:_ descr version mem np var expr =
   let mem = Option.value mem ~default:(B.eint 100) in
   let descr = Option.value descr ~default:(B.estring var) in
   let version = Option.value version ~default:(B.eint 0) in
-  let body = extract_body expr in
+  let body, body_type = extract_body expr in
   let rewriter = new payload_rewriter in
   let code, deps = rewriter#expression body [] in
   let code_with_arguments =
@@ -136,17 +137,24 @@ let rewriter ~loc ~path:_ descr version mem np var expr =
           [%e acc]]
     )
   in
-  let new_body = [%expr
-    let id = [%e B.estring id] in
-    let f = [%e code_with_arguments] in
-    let expr = [%e workflow_expr] in
-    Bistro.Private.closure
-      ~descr:[%e descr]
-      ~np:[%e np]
-      ~mem:[%e mem]
-      ~version:[%e version]
-      expr
-  ] |> add_bindings
+  let new_body =
+    [%expr
+      let id = [%e B.estring id] in
+      let f = [%e code_with_arguments] in
+      let expr = [%e workflow_expr] in
+      Bistro.Private.closure
+        ~descr:[%e descr]
+        ~np:[%e np]
+        ~mem:[%e mem]
+        ~version:[%e version]
+        expr
+    ]
+    |> add_bindings
+    |> (fun body ->
+        match body_type with
+        | None -> body
+        | Some ty -> [%expr ([%e body] : [%t ty])]
+      )
   in
   [%stri let [%p B.pvar var] = [%e replace_body new_body expr]]
 
