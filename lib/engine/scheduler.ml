@@ -102,7 +102,7 @@ and compute_task sched =
   | Shell { task = cmd ; id ; descr ; np ; mem ; _ } ->
     eval_command sched ~in_container:false cmd >>= fun cmd ->
     return @@ Task.shell ~id ~descr ~np ~mem cmd
-  | Closure { task = f ; id ; descr ; np ; mem; _} -> 
+  | Closure { task = f ; id ; descr ; np ; mem; _} ->
     eval_expr sched ~in_container:false f >>= fun f ->
     return @@ Task.closure ~id ~descr ~np ~mem f
 

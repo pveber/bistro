@@ -1,0 +1,121 @@
+open Core_kernel
+open Rresult
+
+module type Domain = sig
+
+  module Thread : sig
+    type 'a t
+    val return : 'a -> 'a t
+    val bind : 'a t -> ('a ->'b t) -> 'b t
+  end
+
+  module Allocator : sig
+    type t
+    type request
+    type resource
+
+    val request : t -> request -> (resource, R.msg) result Thread.t
+    val release : t -> resource -> unit
+  end
+
+  module Task : sig
+    type t
+    type config
+    type result
+
+    val id : t -> string
+    val requirement : t -> Allocator.request
+    val perform :
+      Allocator.resource ->
+      config ->
+      t ->
+      result Thread.t
+    val post_revdeps_hook :
+      t ->
+      config ->
+      all_revdeps_succeeded:bool ->
+      unit Thread.t
+
+    val failure : result -> bool
+    val is_done : t -> config -> bool Thread.t
+  end
+
+end
+
+module type S = sig
+  type t
+  type task
+  type task_result
+  type allocator
+  type resource
+  type config
+  type 'a thread
+
+  type trace =
+    | Run of { ready : time ;
+               start : time ;
+               end_ : time ;
+               outcome : task_result }
+
+    | Skipped of [ `Done_already
+                 | `Missing_dep
+                 | `Allocation_error of string ]
+
+  and time = float
+
+  type event =
+    | Init of { dag : t ; needed : task list ; already_done : task list }
+    | Task_ready of task
+    | Task_started of task * resource
+    | Task_ended of task_result
+    | Task_skipped of task * [ `Done_already
+                             | `Missing_dep
+                             | `Allocation_error of string ]
+
+  type dry_run = Dry_run of {
+      nb_tasks : int ;
+      nb_goals : int ;
+      status : (task * [ `TODO | `DONE ]) list ;
+      simulation : task list ;
+    }
+
+  class type logger = object
+    method event : config -> time -> event -> unit
+    method stop : unit
+    method wait4shutdown : unit thread
+  end
+
+  val nb_tasks : t -> int
+  val mem_task : t -> task -> bool
+
+  val empty : t
+  val add_task : t -> task -> t
+  val add_dep : t -> task -> on:task -> t
+
+  val fold_tasks :
+    t ->
+    init:'a ->
+    f:('a -> task -> 'a) ->
+    'a
+
+  val dot_output :
+    t ->
+    (task -> Graph.Graphviz.DotAttributes.vertex list) ->
+    (task * task -> Graph.Graphviz.DotAttributes.edge list) ->
+    string ->
+    unit
+
+  val run :
+    ?logger:logger ->
+    ?goals:task list ->
+    config ->
+    allocator ->
+    t ->
+    trace String.Map.t thread
+
+  val dry_run :
+    ?goals:task list ->
+    config ->
+    t ->
+    dry_run thread
+end

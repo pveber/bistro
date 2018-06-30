@@ -2,6 +2,6 @@
 
 (library
  ((name bistro_test)
-  (libraries (bistro))
+  (libraries (bistro bistro.tdag))
   (preprocess (pps (ppx_let ppx_bistro)))
 ))

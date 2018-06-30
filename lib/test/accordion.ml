@@ -3,11 +3,7 @@ open Lwt
 open Bistro
 open Shell_dsl
 
-(* module Workflow = Bistro.Workflow *)
-
-type txt
-
-let append (xs : txt workflow list) id =
+let append (xs : text_file workflow list) id =
   let echo_cmd = cmd "echo" [ string id ; string ">>" ; dest ] in
   shell (match xs with
       | [] -> [ echo_cmd ]
@@ -22,7 +18,7 @@ let pipeline n debug =
   let middle = append l1 "middle" in
   let l2 = List.init n ~f:(fun i -> append [ middle ] (sprintf "l2_%d" i)) in
   let final = append l2 "final" in
-  Expr.(list pureW) (final :: if debug then l2 else [])
+  Expr.(deps @@ list pureW (final :: if debug then l2 else []))
 
 let main n debug dot_output () =
   let loggers = [
