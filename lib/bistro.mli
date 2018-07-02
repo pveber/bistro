@@ -31,26 +31,18 @@ val null_logger : unit -> logger
 val console_logger : unit -> logger
 
 module Repo : Bistro_base.Sigs.Repo with type 'a workflow := 'a workflow
+                                     and type 'a expr := 'a expr
                                      and type logger := logger
 
+val glob :
+  ?pattern:string ->
+  _ #directory workflow ->
+  _ workflow list expr
 
-module Expr : sig
-  type 'a t
-  val pure : id:string -> 'a -> 'a t
-
-  val pure_data : 'a -> 'a t
-
-  val pureW : 'a workflow -> 'a workflow t
-
-  val app : ('a -> 'b) t -> 'a t -> 'b t
-
-  val ( $ ) : ('a -> 'b) t -> 'a t -> 'b t
-
-  val list : ('a -> 'b t) -> 'a list -> 'b list t
-
-  val dep : 'a workflow t -> string t
-  val deps : 'a workflow list t -> string list t
-end
+val map_workflows :
+  'a workflow list expr ->
+  f:('a workflow -> 'b workflow) ->
+  'b workflow list expr
 
 val eval_expr :
   ?np:int ->
@@ -58,7 +50,7 @@ val eval_expr :
   ?loggers:logger list ->
   ?use_docker:bool ->
   ?bistro_dir:string ->
-  'a Expr.t -> ('a, string) result
+  'a expr -> ('a, string) result
 
 val eval_expr_exn :
   ?np:int ->
@@ -66,7 +58,7 @@ val eval_expr_exn :
   ?loggers:logger list ->
   ?use_docker:bool ->
   ?bistro_dir:string ->
-  'a Expr.t -> 'a
+  'a expr -> 'a
 
 module Private : sig
   open Bistro_base
@@ -77,6 +69,6 @@ module Private : sig
     ?mem:int ->
     ?np:int ->
     ?version:int ->
-    (Workflow.env -> unit) Expr.t ->
+    (Workflow.env -> unit) expr ->
     'a workflow
 end

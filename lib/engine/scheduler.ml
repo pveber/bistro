@@ -160,9 +160,9 @@ and eval_expr : type s. t -> in_container:bool -> s Workflow.expr -> s Lwt_eval.
     map_p ~f:(eval_expr ~in_container sched) xs
 
   | Glob { dir ; _ } ->
-    let open Lwt in
-    submit sched dir >>= fun _ ->
-    assert false
+    submit_for_eval sched dir >>= fun _ ->
+    Misc.files_in_dir (dep_path sched ~in_container:false dir) >> fun files ->
+    return @@ List.map files ~f:(fun f -> Workflow.select dir [f])
 
   | Map_workflows { xs ; f } ->
     eval_expr sched ~in_container xs >>= fun sources ->

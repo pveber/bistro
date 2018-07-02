@@ -2,7 +2,13 @@ open Core
 open Bistro_base
 
 type item =
-  Repo_item : string list * _ Workflow.t -> item
+    Item  : string list * _ Workflow.t -> item
+  | Items : {
+      base : string option ;
+      ext : string option ;
+      path : string list ;
+      expr : _ Workflow.t list Workflow.expr
+    } -> item
 
 type t = item list
 
@@ -12,14 +18,24 @@ type normalized_repo_item = {
   cache_path : string ;
 }
 
-let normalized_repo_item db repo_path w cache_path =
+let normalized_repo_item db repo_path w cache_path = [
   {
     repo_path = Path.to_string repo_path ;
     file_path = Filename.concat "_files" (Workflow.id w) ;
     cache_path ;
   }
+]
 
-let item path w = Repo_item (path, w)
+let normalized_repo_items ?(base = "") ?ext db repo_path ws cache_paths =
+  List.mapi (List.zip_exn ws cache_paths) ~f:(fun i (w, cache_path) ->
+      let fn = sprintf "%s%06d%s" base i (match ext with None -> "" | Some e -> "." ^ e) in
+      let repo_path = repo_path @ [ fn ] in
+      normalized_repo_item db repo_path w cache_path
+    )
+  |> List.concat
+
+let item path w = Item (path, w)
+let items ?base ?ext path expr = Items { base ; ext ; path ; expr }
 
 let ( %> ) path w = item path w
 
@@ -65,7 +81,7 @@ let link dst p_u =
     make_relative ~from:(make_absolute dst_dir) (make_absolute target)
   in
   Unix.mkdir_p dst_dir ;
-  let cmd = sprintf "rm -rf %s && ln -s %s %s" dst target_from_dst_dir dst in
+  let cmd = sprintf "rm -rf '%s' && ln -s '%s' '%s'" dst target_from_dst_dir dst in
   ignore (Sys.command cmd)
 
 let generate outdir items =
@@ -81,13 +97,21 @@ let generate outdir items =
 
 let to_expr db ~outdir items =
   let open Workflow.Expr in
-  List.map items ~f:(function (Repo_item (path, w)) ->
+  List.map items ~f:(
+    function
+    | Item (path, w) ->
       pure ~id:"normalized_repo_item" (normalized_repo_item db)
       $ list string path
       $ pureW w
       $ dep (pureW w)
-    )
+    | Items { base ; ext ; path ; expr } ->
+      pure ~id:"normalized_repo_items" (normalized_repo_items ?base ?ext db)
+      $ list string path
+      $ expr
+      $ deps expr
+  )
   |> list ident
+  |> app (pure ~id:"List.concat" List.concat)
   |> app (pure ~id:"remove_redundancies" remove_redundancies)
   |> app (pure ~id:"generate" generate $ string outdir)
 
@@ -104,7 +128,8 @@ let build ?np ?mem ?loggers ?keep_all:_ ?use_docker ?(bistro_dir = "_bistro") ~o
 
 let add_prefix prefix items =
   List.map items ~f:(function
-      | Repo_item (p, w) -> Repo_item (prefix @ p, w)
+      | Item  (p, w) -> Item  (prefix @ p, w)
+      | Items i -> Items { i with path = prefix @ i.path }
     )
 
 let shift dir items = add_prefix [ dir ] items
