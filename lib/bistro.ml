@@ -26,6 +26,7 @@ type any_workflow = Any_workflow : _ workflow -> any_workflow
 
 include File_formats
 
+type template = Workflow.template
 module Template_dsl = Template_dsl
 module Shell_dsl = Shell_dsl
 

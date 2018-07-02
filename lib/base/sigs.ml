@@ -185,10 +185,15 @@ module type DSL = sig
     val deps : 'a workflow list t -> string list t
   end
 
+  type template
+  module Template_dsl : Template_dsl with type 'a dep := 'a workflow
+                                      and type template := template
+
   type docker_image
   module Shell_dsl : Shell_dsl with type 'a dep := 'a workflow
                                 and type command = shell_command
                                 and type docker_image := docker_image
+                                and type template := template
 
 end
 

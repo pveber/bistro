@@ -5,7 +5,7 @@ module Cmd : sig
     ?no_check_certificate:bool ->
     ?user:string ->
     ?password:string ->
-    ?dest:Shell_dsl.template ->
+    ?dest:template ->
     string -> shell_command
 end
 
