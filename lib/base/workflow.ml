@@ -127,6 +127,10 @@ let closure
   let id = digest ("closure", version, digestible_expr f) in
   Closure { descr ; task = f ; np ; mem ; version ; id }
 
+let glob ?(pattern = "") dir = Glob { pattern ; dir }
+
+let map_workflows xs ~f = Map_workflows { xs ; f }
+
 module Expr = struct
   let pure ~id value = Pure { id ; value }
   let pure_data value = Pure { id = digest value ; value }

@@ -12,12 +12,15 @@ type docker_image = Command.docker_image = {
 type ('a, 'b) selector = Selector of string list
 
 type 'a workflow = 'a Workflow.t
+type 'a expr = 'a Workflow.expr
 type shell_command = Workflow.shell_command
 let input = Workflow.input
 let shell = Workflow.shell
 let select dir (Selector path) = Workflow.select dir path
 let selector x = Selector x
 let ( /> ) = select
+let map_workflows = Workflow.map_workflows
+let glob = Workflow.glob
 
 type any_workflow = Any_workflow : _ workflow -> any_workflow
 
