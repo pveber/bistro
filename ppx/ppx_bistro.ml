@@ -103,10 +103,10 @@ let rewriter ~loc ~path:_ descr version mem np var expr =
   let rewriter = new payload_rewriter in
   let code, deps = rewriter#expression body [] in
   let code_with_arguments =
-    List.fold_right
+    List.fold
       deps
       ~init:[%expr fun env -> [%e code]]
-      ~f:(fun (tmpvar, _) acc ->
+      ~f:(fun acc (tmpvar, _) ->
           [%expr fun [%p B.pvar tmpvar] -> [%e acc]]
         )
   in
