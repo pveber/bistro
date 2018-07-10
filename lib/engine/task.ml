@@ -62,7 +62,7 @@ let perform t config (Allocator.Resource { np ; mem }) =
   | Input { path ; id } ->
     let pass = Sys.file_exists path = `Yes in
     (
-      if pass then Misc.ln path (Db.cache config.db id)
+      if pass then Misc.cp path (Db.cache config.db id)
       else Lwt.return ()
     ) >>= fun () ->
     Lwt.return (Task_result.Input { path ; pass })
@@ -193,7 +193,7 @@ let perform t config (Allocator.Resource { np ; mem }) =
 let is_done : type s. s Workflow.t -> Db.t -> bool Lwt.t = fun t db ->
   let open Workflow in
   let path = match t with
-    | Input { path ; _ } -> path
+    | Input { id ; _ } -> Db.cache db id
     | Select { dir ; sel ; _ } -> select_path db dir sel
     | Shell { id ; _ } -> Db.cache db id
     | Closure { id ; _ } -> Db.cache db id

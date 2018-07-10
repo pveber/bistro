@@ -44,7 +44,14 @@ let relativize ~from p =
 
 let ln from _to_ =
   let cmd = [|
-    "ln" ; "-s" ; quote (absolutize from) ; quote (absolutize _to_) ;
+    "ln" ; "-s" ; absolutize from ; absolutize _to_ ;
+  |]
+  in
+  exec_exn cmd
+
+let cp from _to_ =
+  let cmd = [|
+    "cp" ; "-r" ; absolutize from ; absolutize _to_ ;
   |]
   in
   exec_exn cmd
