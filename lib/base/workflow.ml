@@ -36,6 +36,11 @@ and 'a expr =
       xs : 'a t list expr ;
       f : ('a t -> 'b t) ;
     } -> 'b t list expr
+  | Map2_workflows : {
+      xs : 'a t list expr ;
+      ys : 'a t list expr ;
+      f : ('a t -> 'b t -> 'c t) ;
+    } -> 'b t list expr
   | Dep   : _ t expr -> string expr
   | Deps : _ t list expr -> string list expr
 
@@ -103,6 +108,8 @@ let rec digestible_expr : type s. s expr -> _ = function
   | Glob { dir ; pattern } -> `Glob (digestible_dep dir, pattern)
   | Map_workflows { xs ; f } ->
     `Map_workflows (digestible_expr xs, digestible_dep (f (input "foobar")))
+  | Map2_workflows { xs ; ys ; f } ->
+    `Map2_workflows (digestible_expr xs, digestible_expr xs, digestible_dep (f (input "foobar") (input "barbaz")))
   | Dep w -> `Dep (digestible_expr w)
   | Deps ws -> `Deps (digestible_expr ws)
 
@@ -130,6 +137,7 @@ let closure
 let glob ?(pattern = "") dir = Glob { pattern ; dir }
 
 let map_workflows xs ~f = Map_workflows { xs ; f }
+let map2_workflows xs ys ~f = Map2_workflows { xs ; ys ; f }
 
 module Expr = struct
   let pure ~id value = Pure { id ; value }

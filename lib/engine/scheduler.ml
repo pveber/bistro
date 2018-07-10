@@ -172,6 +172,19 @@ and eval_expr : type s. t -> in_container:bool -> s Workflow.expr -> s Lwt_eval.
       return targets
     else
       Lwt_eval.fail (Execution_trace.gather_failures targets traces)
+
+  | Map2_workflows { xs ; ys ; f } ->
+    let xs = eval_expr sched ~in_container xs in
+    let ys = eval_expr sched ~in_container ys in
+    xs >>= fun xs ->
+    ys >>= fun ys ->
+    let targets = List.map2_exn ~f xs ys in
+    map_p ~f:(submit_for_eval sched) targets >>= fun traces ->
+    if Execution_trace.all_ok traces then
+      return targets
+    else
+      Lwt_eval.fail (Execution_trace.gather_failures targets traces)
+
   | Dep w ->
     eval_expr sched ~in_container:false w >>= fun w ->
     submit_for_eval sched w >>= fun trace ->

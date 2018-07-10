@@ -20,6 +20,7 @@ let select dir (Selector path) = Workflow.select dir path
 let selector x = Selector x
 let ( /> ) = select
 let map_workflows = Workflow.map_workflows
+let map2_workflows = Workflow.map2_workflows
 let glob = Workflow.glob
 
 type any_workflow = Any_workflow : _ workflow -> any_workflow

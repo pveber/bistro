@@ -44,6 +44,12 @@ val map_workflows :
   f:('a workflow -> 'b workflow) ->
   'b workflow list expr
 
+val map2_workflows :
+  'a workflow list expr ->
+  'b workflow list expr ->
+  f:('a workflow -> 'b workflow -> 'c workflow) ->
+  'c workflow list expr
+
 val eval_expr :
   ?np:int ->
   ?mem:[`GB of int] ->
