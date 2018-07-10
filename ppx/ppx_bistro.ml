@@ -122,7 +122,7 @@ let rewriter ~loc ~path:_ descr version mem np var expr =
             | Dep _  ->
               [%expr Bistro.Expr.(dep (pureW [%e B.elident tmpvar]))]
             | Deps _ ->
-              [%expr Bistro.Expr.(deps (list pureW [%e B.elident tmpvar]))]
+              [%expr Bistro.Expr.(deps [%e B.elident tmpvar])]
           in
           [%expr Bistro.Expr.app [%e acc] [%e arg]]
         )
