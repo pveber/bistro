@@ -22,4 +22,8 @@ val tar_xfz :
   ?strip_components:int ->
   'a tar gz workflow ->
   'a workflow
+val tar_xfj :
+  ?strip_components:int ->
+  'a tar bz2 workflow ->
+  'a workflow
 val crlf2lf : (#text_file as 'a) workflow -> 'a workflow

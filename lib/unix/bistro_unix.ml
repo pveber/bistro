@@ -15,27 +15,27 @@ end
 
 let wget ?descr_url ?no_check_certificate ?user ?password url =
   let info = match descr_url with None -> "" | Some i -> sprintf "(%s)" i in
-  shell ~descr:("utils.wget" ^ info) [
+  shell ~descr:("unix.wget" ^ info) [
     Cmd.wget ?no_check_certificate ?user ?password ~dest url
   ]
 
 let unzip zip =
-  shell ~descr:"utils.unzip" [
+  shell ~descr:"unix.unzip" [
     cmd "unzip" [ opt "-d" ident dest ; dep zip ]
   ]
 
 let gunzip gz =
-  shell ~descr:"utils.gunzip" [
+  shell ~descr:"unix.gunzip" [
     cmd "gunzip" [ opt "-c" dep gz ] ~stdout:dest
   ]
 
 let bunzip2 bz2 =
-  shell ~descr:"utils.bunzip2" [
+  shell ~descr:"unix.bunzip2" [
     cmd "bunzip2" [ opt "-c" dep bz2 ] ~stdout:dest
   ]
 
 let tar_xfz ?strip_components tgz =
-  shell ~descr:"utils.tar_xfz" [
+  shell ~descr:"unix.tar_xfz" [
     mkdir_p dest ;
     cmd "tar" [
       string "xfz" ;
@@ -45,7 +45,18 @@ let tar_xfz ?strip_components tgz =
     ] ;
   ]
 
+let tar_xfj ?strip_components tgj =
+  shell ~descr:"unix.tar_xfj" [
+    mkdir_p dest ;
+    cmd "tar" [
+      string "xfj" ;
+      dep tgj ;
+      opt "-C" ident dest ;
+      option (opt "--strip-components" int) strip_components ;
+    ] ;
+  ]
+
 let crlf2lf f =
-  shell ~descr:"utils.crlf2lf" [
+  shell ~descr:"unix.crlf2lf" [
     cmd "tr" [ opt "-d" string "'\r'"] ~stdin:(dep f) ~stdout:dest
   ]
