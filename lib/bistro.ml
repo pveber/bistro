@@ -48,6 +48,15 @@ module Path = struct
     | "/" :: t -> "/" ^ (to_string t)
     | p -> List.reduce_exn p ~f:Filename.concat
 
+  let rec is_prefix ~prefix u =
+    match prefix, u with
+    | [], _ -> true
+    | _, [] -> false
+    | h_p :: t_p, h_u :: t_u ->
+      h_p = h_u && is_prefix ~prefix:t_p t_u
+
+  let is_strict_prefix ~prefix u =
+    prefix <> u && is_prefix ~prefix u
 end
 
 

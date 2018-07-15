@@ -25,13 +25,13 @@ let item path w = Repo_item (path, w)
 
 let ( %> ) path w = item path w
 
-let is_strict_prefix ~prefix u =
-  String.length prefix < String.length u
-  && String.is_prefix ~prefix u
-
 let find_bottom items item =
+  let module P = Bistro.Path in
   let f min_item candidate =
-    if is_strict_prefix ~prefix:candidate.target_path min_item.target_path
+    if
+      P.is_strict_prefix
+        ~prefix:(P.of_string candidate.target_path)
+        (P.of_string min_item.target_path)
     then candidate
     else min_item
   in

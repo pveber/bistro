@@ -39,6 +39,9 @@ module Path : sig
       can be used to go from [dirA] to [dirB]. @raise
       [Invalid_argument] if [dirA] is relative. *)
   val make_relative : ?from:string -> string -> t
+
+  val is_prefix : prefix:t -> t -> bool
+  val is_strict_prefix : prefix:t -> t -> bool
 end
 
 type id = string
