@@ -74,7 +74,7 @@ let generate outdir items =
       let file_path = Filename.concat outdir item.file_path in
       let cache_path =
         if Filename.is_absolute item.cache_path then item.cache_path
-        else Filename.concat outdir item.cache_path in
+        else make_absolute item.cache_path in
       link repo_path file_path ;
       link file_path cache_path
     )
