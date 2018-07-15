@@ -9,14 +9,16 @@ type t = item list
 type normalized_repo_item = {
   repo_path  : string ;
   file_path  : string ;
-  cache_path : string ;
+  target_path : string ;
+  target_in_cache : bool ;
 }
 
-let normalized_repo_item (Repo_item (repo_path, w)) (Term.Path cache_path) =
+let normalized_repo_item (Repo_item (repo_path, w)) (Term.Path target_path) =
   {
     repo_path = Bistro.Path.to_string repo_path ;
     file_path = Filename.concat "_files" (Bistro.Workflow.id w) ;
-    cache_path ;
+    target_path ;
+    target_in_cache = true ;
   }
 
 let item path w = Repo_item (path, w)
@@ -29,7 +31,7 @@ let is_strict_prefix ~prefix u =
 
 let find_bottom items item =
   let f min_item candidate =
-    if is_strict_prefix ~prefix:candidate.cache_path min_item.cache_path
+    if is_strict_prefix ~prefix:candidate.target_path min_item.target_path
     then candidate
     else min_item
   in
@@ -41,12 +43,12 @@ let remove_redundancies repo =
       let bottom = find_bottom repo item in
       if bottom = item then item
       else
-        let cache_path =
+        let target_path =
           Filename.concat
             bottom.file_path
-            (String.chop_prefix_exn ~prefix:bottom.cache_path item.cache_path)
+            (String.chop_prefix_exn ~prefix:bottom.target_path item.target_path)
         in
-        { item with cache_path }
+        { item with target_path ; target_in_cache = false }
     )
 
 let make_absolute p =
@@ -69,14 +71,15 @@ let link dst p_u =
   ignore (Sys.command cmd)
 
 let generate outdir items =
+  let outdir = if Filename.is_absolute outdir then outdir else make_absolute outdir in
   List.iter items ~f:(fun item ->
       let repo_path = Filename.concat outdir item.repo_path in
       let file_path = Filename.concat outdir item.file_path in
-      let cache_path =
-        if Filename.is_absolute item.cache_path then item.cache_path
-        else make_absolute item.cache_path in
+      let target_path =
+        if item.target_in_cache then item.target_path
+        else Filename.concat outdir item.target_path in
       link repo_path file_path ;
-      link file_path cache_path
+      link file_path target_path
     )
 
 let use t (Bistro.Any_workflow w) =
