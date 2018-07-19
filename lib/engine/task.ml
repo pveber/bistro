@@ -18,7 +18,7 @@ type t =
       descr : string ;
       np : int ;
       mem : int ;
-      cmd : string Command.t ;
+      cmd : Workflow.u Command.t ;
     }
   | Closure of {
       id : string ;

@@ -42,4 +42,3 @@ val fold_cache :
   'a
 
 val path : t -> _ Bistro_base.Workflow.t -> string
-val dep_path : t -> Bistro_base.Workflow.dep -> string

@@ -8,7 +8,7 @@ type file_dump = File_dump of {
 
 
 type symbolic_file_dump = Symbolic_file_dump of {
-    contents : string Template.t ;
+    contents : Workflow.u Template.t ;
     in_docker : bool ;
   }
 
@@ -59,7 +59,7 @@ let string_of_token (env : Execution_env.t) =
   let open Template in
   function
   | S s -> s
-  | D dep -> (* env.dep *) dep
+  | D dep -> Execution_env.((container_mount env.db dep).file_container_location)
   | F toks -> env.file_dump toks
   | DEST -> env.dest
   | TMP -> env.tmp
@@ -72,12 +72,15 @@ let string_of_tokens env xs =
 
 let par x = "(" ^ x ^ ")"
 
-
-(* let deps_mount ~env ~dck_env deps =
- *   let open Execution_env in
- *   Docker.mount_options
- *     ~host_paths:(List.map deps ~f:env.dep)
- *     ~container_paths:(List.map deps ~f:dck_env.dep) *)
+let deps_mount ~env ~dck_env deps =
+  let open Execution_env in
+  let mounts = List.map deps ~f:(Execution_env.container_mount env.db) in
+  let host_paths, container_paths =
+    List.map mounts ~f:Execution_env.(fun m -> m.mount_host_location, m.mount_container_location)
+    |> List.dedup_and_sort ~compare:Caml.compare
+    |> List.unzip
+  in
+  Docker.mount_options ~host_paths ~container_paths
 
 let cache_mount env =
   Docker.mount_options
@@ -118,7 +121,7 @@ let rec string_of_command env =
       let dck_env = Execution_env.dockerize env in
       sprintf
         "docker run --log-driver=none --rm %s %s %s %s -i %s bash -c '%s'"
-        (cache_mount env)
+        (deps_mount env dck_env (Command.deps cmd))
         (file_dumps_mount env dck_env (file_dumps_of_command true cmd))
         (tmp_mount env dck_env)
         (dest_mount env dck_env)

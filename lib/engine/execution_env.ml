@@ -9,7 +9,7 @@ type t = {
   tmp : string ;     (* temp dir for the process *)
   stdout : string ;
   stderr : string ;
-  file_dump : string Template.t -> string ;
+  file_dump : Workflow.u Template.t -> string ;
   np : int ;
   mem : int ;
   uid : int ;
@@ -36,14 +36,54 @@ let make ~db  ~use_docker ~np ~mem ~id =
 
 let docker_cache_dir = "/bistro/data"
 
-let container_path = function
-  | `Cached id -> Filename.concat docker_cache_dir id
-  | `Select (`Cached id, sel) ->
-    List.reduce_exn ~f:Filename.concat [
-      docker_cache_dir ;
-      id ;
-      Path.to_string sel
-    ]
+type container_mount = {
+  mount_host_location : string ;
+  mount_container_location : string ;
+  file_container_location : string ;
+}
+
+let container_mount db =
+  let open Workflow in
+  function
+  | Shell _ | Closure _ as u ->
+    {
+      mount_host_location = Db.cache_dir db ;
+      mount_container_location = docker_cache_dir ;
+      file_container_location = Filename.concat docker_cache_dir (Workflow.id u)
+    }
+
+  | Input { path ; id } ->
+    let container_path = Filename.concat docker_cache_dir id in
+    {
+      mount_host_location = path ;
+      mount_container_location = container_path ;
+      file_container_location = container_path ;
+    }
+
+  | Select { dir = (Shell _ | Closure _) as dir ; sel } ->
+    {
+      mount_host_location = Db.cache_dir db ;
+      mount_container_location = docker_cache_dir ;
+      file_container_location =
+        List.reduce_exn ~f:Filename.concat [
+          docker_cache_dir ;
+          Workflow.id dir ;
+          Path.to_string sel
+        ]
+    }
+  | Select { dir = Input { path ; id } ; sel } ->
+    {
+      mount_host_location = path ;
+      mount_container_location = Filename.concat docker_cache_dir id ;
+      file_container_location =
+        List.reduce_exn ~f:Filename.concat [
+          docker_cache_dir ;
+          id ;
+          Path.to_string sel
+        ]
+    }
+  | Select { dir = (Select _) ; sel } -> assert false
+
 
 let dockerize env = {
   db = env.db ;

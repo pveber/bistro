@@ -16,7 +16,7 @@ type t = private
       descr : string ;
       np : int ;
       mem : int ;
-      cmd : string Command.t ;
+      cmd : Workflow.u Command.t ;
     }
   | Closure of {
       id : string ;
@@ -41,7 +41,7 @@ val shell :
   descr:string ->
   np:int ->
   mem:int ->
-  string Command.t -> t
+  Workflow.u Command.t -> t
 
 val closure :
   id:string ->

@@ -103,7 +103,7 @@ let to_expr db ~outdir items =
       pure ~id:"normalized_repo_item" (normalized_repo_item db)
       $ list string path
       $ pureW w
-      $ dep (pureW w)
+      $ (path_of_dep $ (pureW w))
     | Items { base ; ext ; path ; expr } ->
       pure ~id:"normalized_repo_items" (normalized_repo_items ?base ?ext db)
       $ list string path

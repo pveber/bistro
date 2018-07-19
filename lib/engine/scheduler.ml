@@ -161,7 +161,7 @@ and eval_expr : type s. t -> in_container:bool -> s Workflow.expr -> s Lwt_eval.
 
   | Glob { dir ; _ } ->
     submit_for_eval sched dir >>= fun _ ->
-    Misc.files_in_dir (dep_path sched ~in_container:false dir) >> fun files ->
+    Misc.files_in_dir (workflow_path sched ~in_container:false dir) >> fun files ->
     return @@ List.map files ~f:(fun f -> Workflow.select dir [f])
 
   | Map_workflows { xs ; f } ->
@@ -184,32 +184,34 @@ and eval_expr : type s. t -> in_container:bool -> s Workflow.expr -> s Lwt_eval.
       return targets
     else
       Lwt_eval.fail (Execution_trace.gather_failures targets traces)
+  | Path_of_dep -> return (Db.path sched.config.db)
+  | Map_list { xs ; f } ->
+    let xs = eval_expr sched ~in_container xs in
+    let f  = eval_expr sched ~in_container f  in
+    xs >>= fun xs ->
+    f  >>= fun f  ->
+    return (List.map xs ~f)
+    
+  (* | Dep w -> *)
+  (*   eval_expr sched ~in_container:false w >>= fun w -> *)
+  (*   submit_for_eval sched w >>= fun trace -> *)
+  (*   if Execution_trace.is_errored trace then *)
+  (*     fail (Execution_trace.gather_failures [w] [trace]) *)
+  (*   else *)
+  (*     return (dep_path sched ~in_container w) *)
+  (* | Deps ws -> *)
+  (*   eval_expr sched ~in_container:false ws >>= fun ws -> *)
+  (*   map_p ~f:(submit_for_eval sched) ws >>= fun traces -> *)
+  (*   if Execution_trace.all_ok traces then *)
+  (*     return (List.map ws ~f:(dep_path sched ~in_container)) *)
+  (*   else *)
+  (*     fail (Execution_trace.gather_failures ws traces) *)
 
-  | Dep w ->
-    eval_expr sched ~in_container:false w >>= fun w ->
-    submit_for_eval sched w >>= fun trace ->
-    if Execution_trace.is_errored trace then
-      fail (Execution_trace.gather_failures [w] [trace])
-    else
-      return (dep_path sched ~in_container w)
-  | Deps ws ->
-    eval_expr sched ~in_container:false ws >>= fun ws ->
-    map_p ~f:(submit_for_eval sched) ws >>= fun traces ->
-    if Execution_trace.all_ok traces then
-      return (List.map ws ~f:(dep_path sched ~in_container))
-    else
-      fail (Execution_trace.gather_failures ws traces)
-
-and dep_path
+and workflow_path
   : type s. t -> in_container:bool -> s Workflow.t -> string
   = fun sched ~in_container w ->
-  let path =
-    if in_container then
-      Execution_env.container_path
-    else
-      Db.dep_path sched.config.db
-  in
-  path (Workflow.to_dep w)
+    if in_container then Execution_env.((container_mount sched.config.db w).file_container_location)
+    else Db.path sched.config.db w
 
 and task_trace sched t =
   let ready = Unix.gettimeofday () in

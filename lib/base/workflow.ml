@@ -4,11 +4,6 @@ open File_formats
 let digest x =
   Md5.to_hex (Md5.digest_string (Marshal.to_string x []))
 
-type dep = [
-  | `Cached of string
-  | `Select of [`Cached of string] * string list
-]
-
 type u =
   | Input of { id : string ; path : string }
   | Select of {
@@ -28,6 +23,10 @@ and 'a expr =
     } -> 'a expr
   | App : ('a ->'b) expr * 'a expr -> 'b expr
   | List : 'a expr list -> 'a list expr
+  | Map_list : {
+      xs : 'a list expr ;
+      f  : ('a -> 'b) expr ;
+    } -> 'b list expr
   | Glob : {
       dir : _ #directory t ;
       pattern : string ;
@@ -41,8 +40,7 @@ and 'a expr =
       ys : 'a t list expr ;
       f : ('a t -> 'b t -> 'c t) ;
     } -> 'b t list expr
-  | Dep   : _ t expr -> string expr
-  | Deps : _ t list expr -> string list expr
+  | Path_of_dep : (u -> string) expr
 
 and 'a step = {
   id : string ;
@@ -53,8 +51,8 @@ and 'a step = {
   version : int option ; (** Version number of the wrapper *)
 }
 and shell = shell_command step
-and shell_command = string expr Command.t
-and template = string expr Template.t
+and shell_command = u expr Command.t
+and template = u expr Template.t
 and env = <
   tmp : string ;
   dest : string ;
@@ -110,8 +108,8 @@ let rec digestible_expr : type s. s expr -> _ = function
     `Map_workflows (digestible_expr xs, digestible_dep (f (input "foobar")))
   | Map2_workflows { xs ; ys ; f } ->
     `Map2_workflows (digestible_expr xs, digestible_expr xs, digestible_dep (f (input "foobar") (input "barbaz")))
-  | Dep w -> `Dep (digestible_expr w)
-  | Deps ws -> `Deps (digestible_expr ws)
+  | Map_list { xs ; f } -> `Map_list (digestible_expr xs, digestible_expr f)
+  | Path_of_dep -> `Path_of_dep
 
 let digestible_cmd = Command.map ~f:digestible_expr
 
@@ -143,12 +141,14 @@ module Expr = struct
   let pure ~id value = Pure { id ; value }
   let pure_data value = Pure { id = digest value ; value }
   let pureW w = Pure { id = id w ; value = w }
-  let dep e = Dep e
-  let deps e = Deps e
+  let map_list xs ~f = Map_list { xs ; f }
+  let dep e = App (Path_of_dep, e)
+  let deps e = map_list e ~f:Path_of_dep
   let app f x = App (f, x)
   let ( $ ) f x = app f x
   let list f xs = List (List.map xs ~f)
   let string s = pure ~id:(digest s) s
+  let path_of_dep = Path_of_dep
 end
 
 let to_dep = function
