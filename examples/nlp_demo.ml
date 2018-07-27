@@ -25,7 +25,7 @@ let stanford_parser (x : text_file workflow) : stanford_parser_deps workflow =
       cmd ~env "lexparser.sh" ~stdout:dest [ dep x ]
     ]
 
-let sentences_of_stanford_deps (x : stanford_parser_deps workflow) : stanford_parser_deps workflow list Expr.t =
+let sentences_of_stanford_deps (x : stanford_parser_deps workflow) : stanford_parser_deps workflow list expr =
   shell ~descr:"sentences_of_stanford_deps" [
     mkdir_p dest ;
     cmd "csplit" [
