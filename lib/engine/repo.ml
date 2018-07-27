@@ -7,7 +7,7 @@ type item =
       base : string option ;
       ext : string option ;
       path : string list ;
-      expr : _ Workflow.t list Workflow.expr
+      expr : _ Workflow.t list Expr.t
     } -> item
 
 type t = item list
@@ -18,7 +18,7 @@ type normalized_repo_item = {
   cache_path : string ;
 }
 
-let normalized_repo_item db repo_path w cache_path = [
+let normalized_repo_item repo_path w cache_path = [
   {
     repo_path = Path.to_string repo_path ;
     file_path = Filename.concat "_files" (Workflow.id w) ;
@@ -26,11 +26,11 @@ let normalized_repo_item db repo_path w cache_path = [
   }
 ]
 
-let normalized_repo_items ?(base = "") ?ext db repo_path ws cache_paths =
+let normalized_repo_items ?(base = "") ?ext repo_path ws cache_paths =
   List.mapi (List.zip_exn ws cache_paths) ~f:(fun i (w, cache_path) ->
       let fn = sprintf "%s%06d%s" base i (match ext with None -> "" | Some e -> "." ^ e) in
       let repo_path = repo_path @ [ fn ] in
-      normalized_repo_item db repo_path w cache_path
+      normalized_repo_item repo_path w cache_path
     )
   |> List.concat
 
@@ -96,24 +96,24 @@ let generate outdir items =
     )
 
 let to_expr db ~outdir items =
-  let open Workflow.Expr in
-  List.map items ~f:(
-    function
-    | Item (path, w) ->
-      pure ~id:"normalized_repo_item" (normalized_repo_item db)
-      $ list string path
-      $ pureW w
-      $ (path_of_dep $ (pureW w))
-    | Items { base ; ext ; path ; expr } ->
-      pure ~id:"normalized_repo_items" (normalized_repo_items ?base ?ext db)
-      $ list string path
-      $ expr
-      $ deps expr
-  )
-  |> list ident
-  |> app (pure ~id:"List.concat" List.concat)
-  |> app (pure ~id:"remove_redundancies" remove_redundancies)
-  |> app (pure ~id:"generate" generate $ string outdir)
+  let open Expr.Let_syntax in
+  let%map normalized_items =
+    List.map items ~f:(
+      function
+      | Item (path, w) ->
+        let%map path_w = Expr.dep w in
+        normalized_repo_item path w path_w
+      | Items { base ; ext ; path ; expr } ->
+        let%map paths = Expr.(deps expr)
+        and        ws = expr in
+        normalized_repo_items ?base ?ext path ws paths
+    )
+    |> Expr.list
+  in
+  normalized_items
+  |> List.concat
+  |> remove_redundancies
+  |> generate outdir
 
 let build ?np ?mem ?loggers ?keep_all:_ ?use_docker ?(bistro_dir = "_bistro") ~outdir repo =
   let db = Db.init_exn bistro_dir in

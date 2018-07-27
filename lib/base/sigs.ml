@@ -167,24 +167,6 @@ module type DSL = sig
 
   type 'a expr
 
-  module Expr : sig
-    type 'a t = 'a expr
-    val pure : id:string -> 'a -> 'a t
-
-    val pure_data : 'a -> 'a t
-
-    val pureW : 'a workflow -> 'a workflow t
-
-    val app : ('a -> 'b) t -> 'a t -> 'b t
-
-    val ( $ ) : ('a -> 'b) t -> 'a t -> 'b t
-
-    val list : ('a -> 'b t) -> 'a list -> 'b list t
-
-    val dep : 'a workflow t -> string t
-    val deps : 'a workflow list t -> string list t
-  end
-
   type template
   module Template_dsl : Template_dsl with type 'a dep := 'a workflow
                                       and type template := template

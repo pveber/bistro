@@ -9,6 +9,7 @@ type t = {
   tmp : string ;     (* temp dir for the process *)
   stdout : string ;
   stderr : string ;
+  dep : Workflow.u -> string ;
   file_dump : Workflow.u Template.t -> string ;
   np : int ;
   mem : int ;
@@ -29,6 +30,7 @@ let make ~db  ~use_docker ~np ~mem ~id =
     stdout = Db.stdout db id ;
     stderr = Db.stderr db id ;
     file_dump ;
+    dep = Db.path db ;
     np ;
     mem ;
     uid = Unix.getuid () ;
@@ -92,6 +94,7 @@ let dockerize env = {
   dest = "/bistro/dest" ;
   tmp = "/bistro/tmp" ;
   file_dump = (fun toks -> Filename.concat docker_cache_dir (Misc.digest toks)) ;
+  dep = (fun u -> (container_mount env.db u).file_container_location) ;
   np = env.np ;
   mem = env.mem ;
   stdout = env.stdout ;

@@ -12,16 +12,23 @@ type docker_image = Command.docker_image = {
 type ('a, 'b) selector = Selector of string list
 
 type 'a workflow = 'a Workflow.t
-type 'a expr = 'a Workflow.expr
+type 'a expr = 'a Bistro_engine.Expr.t
 type shell_command = Workflow.shell_command
 let input = Workflow.input
 let shell = Workflow.shell
 let select dir (Selector path) = Workflow.select dir path
 let selector x = Selector x
 let ( /> ) = select
-let map_workflows = Workflow.map_workflows
-let map2_workflows = Workflow.map2_workflows
-let glob = Workflow.glob
+let map_workflows expr ~f =
+  Bistro_engine.Expr.(list_map expr ~f)
+
+let map2_workflows xs ys ~f =
+  let open Bistro_engine.Expr in
+  pair xs ys
+  |> map ~f:(fun (xs, ys) -> List.zip_exn xs ys)
+  |> list_map ~f:(fun (x, y) -> f x y)
+
+let glob = Bistro_engine.Expr.glob
 
 type any_workflow = Any_workflow : _ workflow -> any_workflow
 
@@ -35,10 +42,7 @@ type logger = Bistro_engine.Logger.t
 let null_logger () = Bistro_engine.Logger.null
 let console_logger () = Bistro_engine.Console_logger.create ()
 
-module Expr = struct
-  type 'a t = 'a Workflow.expr
-  include Workflow.Expr
-end
+module Expr = Bistro_engine.Expr
 
 let eval_expr ?np ?mem ?loggers ?use_docker ?(bistro_dir = "_bistro") expr =
   let open Bistro_engine in

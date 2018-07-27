@@ -75,6 +75,8 @@ module Private : sig
     ?mem:int ->
     ?np:int ->
     ?version:int ->
-    (Workflow.env -> unit) expr ->
+    string ->
+    Workflow.u list ->
+    (Workflow.env -> unit) ->
     'a workflow
 end

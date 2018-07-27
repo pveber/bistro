@@ -12,47 +12,22 @@ type u =
       sel : string list
     }
   | Shell of shell
-  | Closure of (env -> unit) expr step
+  | Closure of (env -> unit) step
 
 and 'a t = u
-
-and 'a expr =
-  | Pure : {
-      id : string ;
-      value : 'a ;
-    } -> 'a expr
-  | App : ('a ->'b) expr * 'a expr -> 'b expr
-  | List : 'a expr list -> 'a list expr
-  | Map_list : {
-      xs : 'a list expr ;
-      f  : ('a -> 'b) expr ;
-    } -> 'b list expr
-  | Glob : {
-      dir : _ #directory t ;
-      pattern : string ;
-    } -> 'a t list expr
-  | Map_workflows : {
-      xs : 'a t list expr ;
-      f : ('a t -> 'b t) ;
-    } -> 'b t list expr
-  | Map2_workflows : {
-      xs : 'a t list expr ;
-      ys : 'a t list expr ;
-      f : ('a t -> 'b t -> 'c t) ;
-    } -> 'b t list expr
-  | Path_of_dep : (u -> string) expr
 
 and 'a step = {
   id : string ;
   descr : string ;
   task : 'a ;
+  deps : u list ;
   np : int ; (** Required number of processors *)
   mem : int ; (** Required memory in MB *)
   version : int option ; (** Version number of the wrapper *)
 }
 and shell = shell_command step
-and shell_command = u expr Command.t
-and template = u expr Template.t
+and shell_command = u Command.t
+and template = u Template.t
 and env = <
   tmp : string ;
   dest : string ;
@@ -98,20 +73,7 @@ let rec digestible_dep = function
     `Select (digestible_dep dir, p)
   | Closure c -> `Closure c.id
 
-
-let rec digestible_expr : type s. s expr -> _ = function
-  | Pure { id ; _ } -> `Pure id
-  | App (f, x) -> `App (digestible_expr f, digestible_expr x)
-  | List xs -> `List (List.map xs ~f:digestible_expr)
-  | Glob { dir ; pattern } -> `Glob (digestible_dep dir, pattern)
-  | Map_workflows { xs ; f } ->
-    `Map_workflows (digestible_expr xs, digestible_dep (f (input "foobar")))
-  | Map2_workflows { xs ; ys ; f } ->
-    `Map2_workflows (digestible_expr xs, digestible_expr xs, digestible_dep (f (input "foobar") (input "barbaz")))
-  | Map_list { xs ; f } -> `Map_list (digestible_expr xs, digestible_expr f)
-  | Path_of_dep -> `Path_of_dep
-
-let digestible_cmd = Command.map ~f:digestible_expr
+let digestible_cmd = Command.map ~f:digestible_dep
 
 let shell
     ?(descr = "")
@@ -121,42 +83,30 @@ let shell
     cmds =
   let cmd = Command.And_list cmds in
   let id = digest ("shell", version, digestible_cmd cmd) in
-  Shell { descr ; task = cmd ; np ; mem ; version ; id }
+  let deps = Command.deps cmd in
+  Shell { descr ; task = cmd ; deps ; np ; mem ; version ; id }
 
 let closure
     ?(descr = "")
     ?(mem = 100)
     ?(np = 1)
     ?version
-    f =
-  let id = digest ("closure", version, digestible_expr f) in
-  Closure { descr ; task = f ; np ; mem ; version ; id }
+    id deps f =
+  let id = digest ("closure", version, id) in
+  Closure { descr ; task = f ; deps ; np ; mem ; version ; id }
 
-let glob ?(pattern = "") dir = Glob { pattern ; dir }
+let deps = function
+  | Input _ -> []
+  | Select { dir ;  _ } -> [ dir ]
+  | Shell s -> s.deps
+  | Closure s -> s.deps
 
-let map_workflows xs ~f = Map_workflows { xs ; f }
-let map2_workflows xs ys ~f = Map2_workflows { xs ; ys ; f }
-
-module Expr = struct
-  let pure ~id value = Pure { id ; value }
-  let pure_data value = Pure { id = digest value ; value }
-  let pureW w = Pure { id = id w ; value = w }
-  let map_list xs ~f = Map_list { xs ; f }
-  let dep e = App (Path_of_dep, e)
-  let deps e = map_list e ~f:Path_of_dep
-  let app f x = App (f, x)
-  let ( $ ) f x = app f x
-  let list f xs = List (List.map xs ~f)
-  let string s = pure ~id:(digest s) s
-  let path_of_dep = Path_of_dep
-end
-
-let to_dep = function
-  | Input { id ; _ }
-  | Closure { id ; _ }
-  | Shell { id ; _ } -> `Cached id
-  | Select { dir = (Input { id ; _ }
-                   | Closure { id ; _ }
-                   | Shell { id ; _ }) ; sel ; _ } ->
-    `Select (`Cached id, sel)
-  | Select { dir = Select _ ; _ } -> assert false
+(* let to_dep = function *)
+(*   | Input { id ; _ } *)
+(*   | Closure { id ; _ } *)
+(*   | Shell { id ; _ } -> `Cached id *)
+(*   | Select { dir = (Input { id ; _ } *)
+(*                    | Closure { id ; _ } *)
+(*                    | Shell { id ; _ }) ; sel ; _ } -> *)
+(*     `Select (`Cached id, sel) *)
+(*   | Select { dir = Select _ ; _ } -> assert false *)

@@ -59,7 +59,7 @@ let string_of_token (env : Execution_env.t) =
   let open Template in
   function
   | S s -> s
-  | D dep -> Execution_env.((container_mount env.db dep).file_container_location)
+  | D dep -> env.dep dep
   | F toks -> env.file_dump toks
   | DEST -> env.dest
   | TMP -> env.tmp
