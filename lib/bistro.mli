@@ -34,21 +34,24 @@ module Repo : Bistro_base.Sigs.Repo with type 'a workflow := 'a workflow
                                      and type 'a expr := 'a expr
                                      and type logger := logger
 
-val glob :
-  ?pattern:string ->
-  _ #directory workflow ->
-  _ workflow list expr
+module Expr : sig
+  val glob :
+    ?pattern:string ->
+    _ #directory workflow ->
+    _ workflow list expr
 
-val map_workflows :
-  'a workflow list expr ->
-  f:('a workflow -> 'b workflow) ->
-  'b workflow list expr
+  val glob_full :
+    ?pattern:string ->
+    _ #directory workflow ->
+    (string * _ workflow) list expr
 
-val map2_workflows :
-  'a workflow list expr ->
-  'b workflow list expr ->
-  f:('a workflow -> 'b workflow -> 'c workflow) ->
-  'c workflow list expr
+  val map : 'a expr -> f:('a -> 'b) -> 'b expr
+
+  module List : sig
+    val map : 'a list expr -> f:('a -> 'b) -> 'b list expr
+    val spawn : 'a list expr -> f:('a -> 'b expr) -> 'b list expr
+  end
+end
 
 val eval_expr :
   ?np:int ->

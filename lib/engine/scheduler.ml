@@ -144,7 +144,7 @@ and eval_expr : type s. t -> in_container:bool -> s Expr.t -> s Lwt_eval.t = fun
   | Glob { dir ; _ } ->
     submit_for_eval sched dir >>= fun _ ->
     Misc.files_in_dir (workflow_path sched ~in_container:false dir) >> fun files ->
-    return @@ List.map files ~f:(fun f -> Workflow.select dir [f])
+    return @@ List.map files ~f:(fun f -> f, Workflow.select dir [f])
 
 and workflow_path
   : type s. t -> in_container:bool -> s Workflow.t -> string

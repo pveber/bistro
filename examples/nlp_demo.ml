@@ -35,7 +35,7 @@ let sentences_of_stanford_deps (x : stanford_parser_deps workflow) : stanford_pa
       string "'/^$/' '{*}'"
     ] ;
   ]
-  |> glob
+  |> Expr.glob
 
 let dependensee (x : stanford_parser_deps workflow) : png workflow =
   shell ~descr:"stanford_dependensee" [
@@ -51,7 +51,7 @@ let definition_analysis w =
   let text = wikipedia_query w in
   let deps = stanford_parser text in
   let deps_graphs =
-    map_workflows (sentences_of_stanford_deps deps) ~f:dependensee in
+    Expr.List.map (sentences_of_stanford_deps deps) ~f:dependensee in
   Repo.[
     item [ "definition.txt" ] text ;
     item [ "deps" ] deps ;

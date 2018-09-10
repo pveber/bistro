@@ -19,16 +19,24 @@ let shell = Workflow.shell
 let select dir (Selector path) = Workflow.select dir path
 let selector x = Selector x
 let ( /> ) = select
-let map_workflows expr ~f =
-  Bistro_engine.Expr.(list_map expr ~f)
 
-let map2_workflows xs ys ~f =
-  let open Bistro_engine.Expr in
-  pair xs ys
-  |> map ~f:(fun (xs, ys) -> List.zip_exn xs ys)
-  |> list_map ~f:(fun (x, y) -> f x y)
+module Expr = struct
+  open Bistro_engine.Expr
 
-let glob = Bistro_engine.Expr.glob
+  let glob_full = glob
+
+  let glob ?pattern dir =
+    glob ?pattern dir
+    |> map ~f:(List.map ~f:snd)
+
+  let map = map
+
+  module List = struct
+    let map xs ~f =
+      spawn xs ~f:(fun x -> return (f x))
+    let spawn = spawn
+  end
+end
 
 type any_workflow = Any_workflow : _ workflow -> any_workflow
 
@@ -41,8 +49,6 @@ module Shell_dsl = Shell_dsl
 type logger = Bistro_engine.Logger.t
 let null_logger () = Bistro_engine.Logger.null
 let console_logger () = Bistro_engine.Console_logger.create ()
-
-module Expr = Bistro_engine.Expr
 
 let eval_expr ?np ?mem ?loggers ?use_docker ?(bistro_dir = "_bistro") expr =
   let open Bistro_engine in

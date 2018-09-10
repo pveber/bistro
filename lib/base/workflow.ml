@@ -100,13 +100,3 @@ let deps = function
   | Select { dir ;  _ } -> [ dir ]
   | Shell s -> s.deps
   | Closure s -> s.deps
-
-(* let to_dep = function *)
-(*   | Input { id ; _ } *)
-(*   | Closure { id ; _ } *)
-(*   | Shell { id ; _ } -> `Cached id *)
-(*   | Select { dir = (Input { id ; _ } *)
-(*                    | Closure { id ; _ } *)
-(*                    | Shell { id ; _ }) ; sel ; _ } -> *)
-(*     `Select (`Cached id, sel) *)
-(*   | Select { dir = Select _ ; _ } -> assert false *)
