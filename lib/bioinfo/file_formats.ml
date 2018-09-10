@@ -33,10 +33,14 @@ class type fasta = object
   method format : [`fasta]
 end
 
-class type ['a] fastq = object
+class type fastq = object
   inherit text_file
   method format : [`fastq]
-  method phred_encoding : 'a
+end
+
+class type sanger_fastq = object
+  inherit fastq
+  method phred_encoding : [`sanger]
 end
 
 class type gff = object

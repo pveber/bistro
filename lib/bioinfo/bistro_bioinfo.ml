@@ -27,14 +27,12 @@ end
 
 module Fastq = struct
 
-  type _ format =
-    | Sanger  : [`sanger] format
-    | Solexa  : [`solexa] format
-    | Phred64 : [`phred64] format
+  type format =
+    | Sanger
+    | Solexa
+    | Phred64
 
-  let to_sanger :
-    type s. s format -> s fastq workflow -> [`sanger] fastq workflow
-    = fun format fq ->
+  let to_sanger format fq =
       match format with
       | Sanger -> fq
       | Solexa -> failwith "not implemented"
@@ -169,7 +167,7 @@ module Bowtie2 = struct
       ]
     ]
 
-  let qual_option (type s) x = match (x : s Fastq.format) with
+  let qual_option = function
     | Fastq.Solexa  -> "--solexa-quals"
     | Fastq.Sanger -> "--phred33-quals"
     | Fastq. Phred64 -> "--phred64-quals"
@@ -262,11 +260,6 @@ module Bowtie = struct
       ]
     ]
 
-  let qual_option (type s) x = match (x : s Fastq.format) with
-    | Fastq.Solexa  -> "--solexa-quals"
-    | Fastq.Sanger -> "--phred33-quals"
-    | Fastq.Phred64 -> "--phred64-quals"
-
   let bowtie ?l ?e ?m ?fastq_format ?n ?v ?maxins index fastq_files =
     let args = match fastq_files with
       | `single_end fqs -> list dep ~sep:"," fqs
@@ -285,7 +278,7 @@ module Bowtie = struct
         option (opt "-e" int) e ;
         option (opt "-m" int) m ;
         option (opt "-v" int) v ;
-        option (opt "-q" (qual_option % string)) fastq_format ;
+        option (opt "-q" (Bowtie2.qual_option % string)) fastq_format ;
         opt "-p" ident np ;
         option (opt "--maxins" int) maxins ;
         seq [dep index ; string "/index"] ;

@@ -14,15 +14,18 @@ module type S = sig
   end
 
   module Fastq : sig
-    type _ format =
-      | Sanger  : [`sanger] format
-      | Solexa  : [`solexa] format
-      | Phred64 : [`phred64] format
+    type format =
+      | Sanger
+      | Solexa
+      | Phred64
 
-    val to_sanger : 'a format -> 'a fastq workflow -> [`sanger] fastq workflow
+    val to_sanger :
+      format ->
+      fastq workflow ->
+      fastq workflow
 
-    val concat : 'a fastq workflow list -> 'a fastq workflow
-    val head : int -> 'a fastq workflow -> 'a fastq workflow
+    val concat : (#fastq as 'a) workflow list -> 'a workflow
+    val head : int -> (#fastq as 'a) workflow -> 'a workflow
   end
 
   module Ucsc_gb : sig
@@ -235,17 +238,17 @@ module type S = sig
   module Sra_toolkit : sig
     val env : docker_image
 
-    val fastq_dump : sra workflow -> [`sanger] fastq workflow
+    val fastq_dump : sra workflow -> fastq workflow
 
     val fastq_dump_gz :
       [`id of string | `file of sra workflow] ->
-      [`sanger] fastq gz workflow
+      fastq gz workflow
 
-    val fastq_dump_pe : sra workflow -> [`sanger] fastq workflow * [`sanger] fastq workflow
+    val fastq_dump_pe : sra workflow -> fastq workflow * fastq workflow
 
     val fastq_dump_pe_gz :
       [`id of string | `file of sra workflow] ->
-      [`sanger] fastq gz workflow * [`sanger] fastq gz workflow
+      fastq gz workflow * fastq gz workflow
 
     val fastq_dump_to_fasta : sra workflow -> fasta workflow
   end
@@ -477,7 +480,7 @@ module type S = sig
   module FastQC : sig
     type report = [`fastQC_report] directory
 
-    val run : 'a fastq workflow -> report workflow
+    val run : #fastq workflow -> report workflow
     val html_report : report workflow -> html workflow
     val per_base_quality : report workflow -> png workflow
     val per_base_sequence_content : report workflow -> png workflow
@@ -495,7 +498,7 @@ module type S = sig
       ?threads:int ->
       ?top: [ `top1 of int | `top2 of int * int ] ->
       ?lightweight:bool ->
-      'a fastq workflow ->
+      #fastq workflow ->
       (string * fasta workflow) list ->
       [ `fastq_screen ] directory workflow
 
@@ -512,12 +515,12 @@ module type S = sig
 
     val bowtie :
       ?l:int -> ?e:int -> ?m:int ->
-      ?fastq_format:'a Fastq.format ->
+      ?fastq_format:Fastq.format ->
       ?n:int -> ?v:int ->
       ?maxins:int ->
       index workflow ->
-      [ `single_end of 'a fastq workflow list
-      | `paired_end of 'a fastq workflow list * 'a fastq workflow list ] ->
+      [ `single_end of fastq workflow list
+      | `paired_end of fastq workflow list * fastq workflow list ] ->
       sam workflow
   end
 
@@ -565,10 +568,10 @@ module type S = sig
       ?no_overlap:bool ->
       ?no_unal:bool ->
       ?seed:int ->
-      ?fastq_format:'a Fastq.format ->
+      ?fastq_format:Fastq.format ->
       index workflow ->
-      [ `single_end of 'a fastq workflow list
-      | `paired_end of 'a fastq workflow list * 'a fastq workflow list ] ->
+      [ `single_end of fastq workflow list
+      | `paired_end of 'a workflow list * 'a workflow list ] ->
       sam workflow
   end
 
@@ -783,14 +786,14 @@ module type S = sig
     val tophat1 :
       ?color:bool ->
       Bowtie.index workflow ->
-      [ `single_end of 'a fastq workflow list
-      | `paired_end of 'a fastq workflow list * 'a fastq workflow list ] ->
+      [ `single_end of fastq workflow list
+      | `paired_end of fastq workflow list * fastq workflow list ] ->
       [`tophat_output] directory workflow
 
     val tophat2 :
       Bowtie2.index workflow ->
-      [ `single_end of 'a fastq workflow list
-      | `paired_end of 'a fastq workflow list * 'a fastq workflow list ] ->
+      [ `single_end of fastq workflow list
+      | `paired_end of 'a workflow list * 'a workflow list ] ->
       [`tophat_output] directory workflow
 
     val accepted_hits : [`tophat_output] directory workflow -> bam workflow
@@ -846,7 +849,7 @@ module type S = sig
     val spades :
       ?single_cell:bool ->
       ?iontorrent:bool ->
-      ?pe:[`sanger] fastq workflow list * [`sanger] fastq workflow list ->
+      ?pe:fastq workflow list * fastq workflow list ->
       ?threads:int ->
       ?memory:int ->
       unit ->
@@ -879,7 +882,7 @@ module type S = sig
       ?report_new_consensus:bool ->
       ?report_all_consensus:bool ->
       ?threads:int ->
-      'a fastq workflow list ->
+      #fastq workflow list ->
       [ `srst2 ] directory workflow
 
 
@@ -905,7 +908,7 @@ module type S = sig
       ?report_new_consensus:bool ->
       ?report_all_consensus:bool ->
       ?threads:int ->
-      'a fastq workflow list ->
+      #fastq workflow list ->
       [ `srst2 ] directory workflow
   end
 
