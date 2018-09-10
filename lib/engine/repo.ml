@@ -95,7 +95,7 @@ let generate outdir items =
       link file_path cache_path
     )
 
-let to_expr db ~outdir items =
+let to_expr ~outdir items =
   let open Expr.Let_syntax in
   let%map normalized_items =
     List.map items ~f:(
@@ -117,7 +117,7 @@ let to_expr db ~outdir items =
 
 let build ?np ?mem ?loggers ?keep_all:_ ?use_docker ?(bistro_dir = "_bistro") ~outdir repo =
   let db = Db.init_exn bistro_dir in
-  let expr = to_expr ~outdir db repo in
+  let expr = to_expr ~outdir repo in
   match Scheduler.eval_expr_main ?np ?mem ?loggers ?use_docker db expr with
   | Ok () -> ()
   | Error report ->

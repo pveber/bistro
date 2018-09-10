@@ -197,7 +197,7 @@ module Render = struct
             p [ k "missing_output" ]
         ]
         ~body:(shell_result_details ~id:id ~cmd ~cache ~stderr ~stdout ~file_dumps)
-    | Closure { descr ; outcome } ->
+    | Closure { descr ; outcome ; _ } ->
       collapsible_panel
         ~title:[ k descr ]
         ~header:[
@@ -221,13 +221,13 @@ module Render = struct
     match t with
     | Workflow.Input { path ; _ } ->
       [ p [ k "input " ; k path ] ]
-    | Select { dir = Input { path = input_path } ; sel } ->
+    | Select { dir = Input { path = input_path ; _ } ; sel ; _ } ->
       [ p [ k "select " ;
             k (Path.to_string sel) ;
             k " in " ;
             k input_path ] ]
 
-    | Select { dir = (Shell { id ; _ } | Closure { id ; _ }) ; sel } ->
+    | Select { dir = (Shell { id ; _ } | Closure { id ; _ }) ; sel ; _ } ->
       [ p [ k "select " ;
             k (Path.to_string sel) ;
             k " in step " ;

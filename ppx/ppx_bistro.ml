@@ -50,7 +50,7 @@ class payload_rewriter = object
     match expr with
     | { pexp_desc = Pexp_extension ({txt = "dep" ; _}, payload) ; _ } -> (
         match payload with
-        | PStr [ { pstr_desc = Pstr_eval (e, _) ; pstr_loc = loc } ] ->
+        | PStr [ { pstr_desc = Pstr_eval (e, _) ; _ } ] ->
           let id = new_id () in
           let acc' = (id, Dep e) :: acc in
           let expr' = B.elident id in
@@ -59,7 +59,7 @@ class payload_rewriter = object
       )
     | { pexp_desc = Pexp_extension ({txt = "deps" ; _ }, payload) ;  _ } -> (
         match payload with
-        | PStr [ { pstr_desc = Pstr_eval (e, _) ; pstr_loc = loc } ] ->
+        | PStr [ { pstr_desc = Pstr_eval (e, _) ; _ } ] ->
           let id = new_id () in
           let acc' = (id, Deps e) :: acc in
           let expr' = B.elident id in
@@ -68,7 +68,7 @@ class payload_rewriter = object
       )
     | { pexp_desc = Pexp_extension ({ txt = "param" ; _ }, payload) ;  _ } -> (
         match payload with
-        | PStr [ { pstr_desc = Pstr_eval (e, _) ; pstr_loc = loc } ] ->
+        | PStr [ { pstr_desc = Pstr_eval (e, _) ; _ } ] ->
           let id = new_id () in
           let acc' = (id, Param e) :: acc in
           let expr' = [%expr [%e B.elident id]] in

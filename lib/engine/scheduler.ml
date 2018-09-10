@@ -33,11 +33,11 @@ module Lwt_eval = struct
   type 'a t = ('a, S.t) Lwt_result.t (* missing deps *)
   let ( >> ) = Lwt.( >>= )
   let ( >>= ) = Lwt_result.( >>= )
-  let ( >|= ) = Lwt_result.( >|= )
+  (* let ( >|= ) = Lwt_result.( >|= ) *)
 
   let return = Lwt_result.return
   let fail = Lwt_result.fail
-  let fail1 e = Lwt_result.fail (S.singleton e)
+  (* let fail1 e = Lwt_result.fail (S.singleton e) *)
 
   let map_p xs ~f =
     Lwt.bind (Lwt_list.map_p f xs) @@ fun results ->
@@ -81,7 +81,7 @@ let rec submit sched w : Execution_trace.t Lwt.t =
       )
       else (
         compute_deps sched w >>= function
-        | Ok t ->
+        | Ok _ ->
           task_trace sched (compute_task w)
         | Error missing_deps ->
           log sched Logger.(Workflow_skipped (w, `Missing_dep)) ;

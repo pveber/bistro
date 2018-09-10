@@ -62,7 +62,7 @@ let container_mount db =
       file_container_location = container_path ;
     }
 
-  | Select { dir = (Shell _ | Closure _) as dir ; sel } ->
+  | Select { dir = (Shell _ | Closure _) as dir ; sel ; _ } ->
     {
       mount_host_location = Db.cache_dir db ;
       mount_container_location = docker_cache_dir ;
@@ -73,7 +73,7 @@ let container_mount db =
           Path.to_string sel
         ]
     }
-  | Select { dir = Input { path ; id } ; sel } ->
+  | Select { dir = Input { path ; id } ; sel ; _ } ->
     {
       mount_host_location = path ;
       mount_container_location = Filename.concat docker_cache_dir id ;
@@ -84,7 +84,7 @@ let container_mount db =
           Path.to_string sel
         ]
     }
-  | Select { dir = (Select _) ; sel } -> assert false
+  | Select { dir = (Select _) ; _ } -> assert false
 
 
 let dockerize env = {

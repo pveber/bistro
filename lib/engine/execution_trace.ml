@@ -21,20 +21,18 @@ let is_errored = function
   | Canceled _ -> true
   | Done_already -> false
 
-let all_ok xs = not (List.exists ~f:is_errored xs)
-
-  let gather_failures workflows traces =
-    List.fold2_exn workflows traces ~init:S.empty ~f:(fun acc w t ->
-        match t with
-        | Done_already -> acc
-        | Run { outcome ; _ } ->
-          if Task_result.succeeded outcome then
-            acc
-          else
-            S.add acc (Workflow.id w)
-        | Canceled { missing_deps } -> S.union acc missing_deps
-        | Allocation_error _ -> S.add acc (Workflow.id w)
-      )
+let gather_failures workflows traces =
+  List.fold2_exn workflows traces ~init:S.empty ~f:(fun acc w t ->
+      match t with
+      | Done_already -> acc
+      | Run { outcome ; _ } ->
+        if Task_result.succeeded outcome then
+          acc
+        else
+          S.add acc (Workflow.id w)
+      | Canceled { missing_deps } -> S.union acc missing_deps
+      | Allocation_error _ -> S.add acc (Workflow.id w)
+    )
 
 let error_report trace db buf tid =
   match trace with

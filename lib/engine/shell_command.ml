@@ -72,7 +72,7 @@ let string_of_tokens env xs =
 
 let par x = "(" ^ x ^ ")"
 
-let deps_mount ~env ~dck_env deps =
+let deps_mount ~env deps =
   let open Execution_env in
   let mounts = List.map deps ~f:(Execution_env.container_mount env.db) in
   let host_paths, container_paths =
@@ -82,10 +82,10 @@ let deps_mount ~env ~dck_env deps =
   in
   Docker.mount_options ~host_paths ~container_paths
 
-let cache_mount env =
-  Docker.mount_options
-    ~host_paths:[Db.cache_dir env.Execution_env.db]
-    ~container_paths:[Execution_env.docker_cache_dir]
+(* let cache_mount env =
+ *   Docker.mount_options
+ *     ~host_paths:[Db.cache_dir env.Execution_env.db]
+ *     ~container_paths:[Execution_env.docker_cache_dir] *)
 
 let file_dumps_mount env dck_env file_dumps =
   let open Execution_env in
@@ -121,7 +121,7 @@ let rec string_of_command env =
       let dck_env = Execution_env.dockerize env in
       sprintf
         "docker run --log-driver=none --rm %s %s %s %s -i %s bash -c '%s'"
-        (deps_mount env dck_env (Command.deps cmd))
+        (deps_mount ~env (Command.deps cmd))
         (file_dumps_mount env dck_env (file_dumps_of_command true cmd))
         (tmp_mount env dck_env)
         (dest_mount env dck_env)

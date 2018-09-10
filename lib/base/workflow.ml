@@ -1,5 +1,4 @@
 open Core_kernel
-open File_formats
 
 let digest x =
   Md5.to_hex (Md5.digest_string (Marshal.to_string x []))
