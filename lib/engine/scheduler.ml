@@ -103,7 +103,7 @@ and compute_task = function
     Task.select ~dir ~sel
   | Shell { task = cmd ; id ; descr ; np ; mem ; _ } ->
     Task.shell ~id ~descr ~np ~mem cmd
-  | Closure { task = f ; id ; descr ; np ; mem; _} ->
+  | Plugin { task = f ; id ; descr ; np ; mem; _} ->
     Task.closure ~id ~descr ~np ~mem f
 
 and submit_for_eval sched w =
@@ -249,7 +249,7 @@ let eval_expr_main ?np ?mem ?loggers ?use_docker db expr =
  *             match w with
  *             | Input _ | Select _ | Shell _ ->
  *               regular_trace sched (Workflow.Any w)
- *             | Closure _ -> assert false
+ *             | Plugin _ -> assert false
  *           )
  *         | `Some_dep_failed ->
  *           Lwt.return (Execution_trace.Skipped `Missing_dep)
@@ -270,7 +270,7 @@ let eval_expr_main ?np ?mem ?loggers ?use_docker db expr =
  *         Task.perform_select sched.config.db dir path
  *       | Shell shell ->
  *         Task.perform_shell sched.config resource shell
- *       | Closure _ -> assert false
+ *       | Plugin _ -> assert false
  *     ) >>= fun outcome ->
  *     let _end_ = Unix.gettimeofday () in
  *     Allocator.release sched.allocator resource ;

@@ -23,7 +23,7 @@ let error_short_descr =
       | `Missing_output ->
         "missing output"
     )
-  | Closure { outcome ; _ } -> (
+  | Plugin { outcome ; _ } -> (
       match outcome with
       | `Succeeded -> assert false
       | `Failed -> "failed"

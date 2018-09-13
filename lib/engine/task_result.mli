@@ -12,7 +12,7 @@ type t =
       stdout : string ;
       stderr : string ;
     }
-  | Closure of {
+  | Plugin of {
       id : string ;
       descr : string ;
       outcome : [`Succeeded | `Missing_output | `Failed] ;

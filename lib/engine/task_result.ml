@@ -14,7 +14,7 @@ type t =
       stdout : string ;
       stderr : string ;
     }
-  | Closure of {
+  | Plugin of {
       id : string ;
       descr : string ;
       outcome : [`Succeeded | `Missing_output | `Failed] ;
@@ -23,7 +23,7 @@ type t =
 let succeeded = function
   | Input { pass ; _ }
   | Select { pass ; _ } -> pass
-  | Closure { outcome ; _ }
+  | Plugin { outcome ; _ }
   | Shell { outcome ; _ } -> (
       match outcome with
       | `Succeeded -> true
@@ -43,10 +43,10 @@ let error_short_descr = function
         let msg = "Task_outcome.error_short_descr: not an error result" in
         raise (Invalid_argument msg)
     )
-  | Closure { descr ; _ } -> sprintf "Closure %s failed" descr
+  | Plugin { descr ; _ } -> sprintf "Plugin %s failed" descr
 
 let error_long_descr x db buf id = match x with
-  | Input _ | Select _ | Closure _ -> ()
+  | Input _ | Select _ | Plugin _ -> ()
   | Shell x ->
     (
       bprintf buf "+------------------------------------------------------------------------------+\n" ;

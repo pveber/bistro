@@ -18,7 +18,7 @@ type t = private
       mem : int ;
       cmd : Workflow.u Command.t ;
     }
-  | Closure of {
+  | Plugin of {
       id : string ;
       descr : string ;
       np : int ;

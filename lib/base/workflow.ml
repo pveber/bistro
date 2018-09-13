@@ -11,7 +11,7 @@ type u =
       sel : string list
     }
   | Shell of shell
-  | Closure of (env -> unit) step
+  | Plugin of (env -> unit) step
 
 and 'a t = u
 
@@ -38,7 +38,7 @@ let id = function
   | Input { id ;  _ }
   | Select { id ;  _}
   | Shell { id ; _ } -> id
-  | Closure { id ; _  } -> id
+  | Plugin { id ; _  } -> id
 
 let compare u v =
   String.compare (id u) (id v)
@@ -54,7 +54,7 @@ let select u q =
   match u with
   | Select { dir ; sel = p ; _ } -> k dir (p @ q)
   | Input _
-  | Closure _
+  | Plugin _
   | Shell _ -> k u q
 
 let input ?(may_change = false) path =
@@ -70,7 +70,7 @@ let rec digestible_dep = function
     `Select ((`Input p), q)
   | Select { dir ; sel = p ; _ } ->
     `Select (digestible_dep dir, p)
-  | Closure c -> `Closure c.id
+  | Plugin c -> `Plugin c.id
 
 let digestible_cmd = Command.map ~f:digestible_dep
 
@@ -92,10 +92,10 @@ let closure
     ?version
     id deps f =
   let id = digest ("closure", version, id) in
-  Closure { descr ; task = f ; deps ; np ; mem ; version ; id }
+  Plugin { descr ; task = f ; deps ; np ; mem ; version ; id }
 
 let deps = function
   | Input _ -> []
   | Select { dir ;  _ } -> [ dir ]
   | Shell s -> s.deps
-  | Closure s -> s.deps
+  | Plugin s -> s.deps

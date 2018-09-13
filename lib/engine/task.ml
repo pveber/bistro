@@ -20,7 +20,7 @@ type t =
       mem : int ;
       cmd : Workflow.u Command.t ;
     }
-  | Closure of {
+  | Plugin of {
       id : string ;
       descr : string ;
       np : int ;
@@ -31,7 +31,7 @@ type t =
 let input ~id ~path = Input { id ; path }
 let select ~dir ~sel = Select { dir ; sel }
 let shell ~id ~descr ~np ~mem cmd = Shell { id ; cmd ; np ; mem ; descr }
-let closure  ~id ~descr ~np ~mem f = Closure { id ; f ; np ; mem ; descr }
+let closure  ~id ~descr ~np ~mem f = Plugin { id ; f ; np ; mem ; descr }
 
 let step_outcome ~exit_code ~dest_exists=
   match exit_code, dest_exists with
@@ -43,7 +43,7 @@ let requirement = function
   | Input _
   | Select _ ->
     Allocator.Request { np = 0 ; mem = 0 }
-  | Closure { np ; mem ; _ }
+  | Plugin { np ; mem ; _ }
   | Shell { np ; mem ; _ } ->
     Allocator.Request { np ; mem }
 
@@ -108,7 +108,7 @@ let perform t config (Allocator.Resource { np ; mem }) =
         stderr = env.stderr ;
       })
 
-  | Closure { f ; id ; descr ; _ } ->
+  | Plugin { f ; id ; descr ; _ } ->
     let env =
       Execution_env.make
         ~use_docker:config.use_docker
@@ -166,7 +166,7 @@ let perform t config (Allocator.Resource { np ; mem }) =
         else
           Lwt.return ()
       ) >>= fun () ->
-      Lwt.return (Task_result.Closure {
+      Lwt.return (Task_result.Plugin {
           id ;
           descr ;
           outcome ;
@@ -196,6 +196,6 @@ let is_done : type s. s Workflow.t -> Db.t -> bool Lwt.t = fun t db ->
     | Input { id ; _ } -> Db.cache db id
     | Select { dir ; sel ; _ } -> select_path db dir sel
     | Shell { id ; _ } -> Db.cache db id
-    | Closure { id ; _ } -> Db.cache db id
+    | Plugin { id ; _ } -> Db.cache db id
   in
   Lwt.return (Sys.file_exists path = `Yes)

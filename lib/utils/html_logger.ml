@@ -40,7 +40,7 @@ let create path = {
 let translate_event db _ = function
   | Logger.Task_started (
       (Task.Shell {id ; descr ; _}
-      | Closure { id ; descr ; _ }), _) ->
+      | Plugin { id ; descr ; _ }), _) ->
     Some (Step_task_started { id ; descr })
 
   | Task_ended { outcome ; _ } ->
@@ -197,7 +197,7 @@ module Render = struct
             p [ k "missing_output" ]
         ]
         ~body:(shell_result_details ~id:id ~cmd ~cache ~stderr ~stdout ~file_dumps)
-    | Closure { descr ; outcome ; _ } ->
+    | Plugin { descr ; outcome ; _ } ->
       collapsible_panel
         ~title:[ k descr ]
         ~header:[
@@ -227,14 +227,14 @@ module Render = struct
             k " in " ;
             k input_path ] ]
 
-    | Select { dir = (Shell { id ; _ } | Closure { id ; _ }) ; sel ; _ } ->
+    | Select { dir = (Shell { id ; _ } | Plugin { id ; _ }) ; sel ; _ } ->
       [ p [ k "select " ;
             k (Path.to_string sel) ;
             k " in step " ;
             k id ] ]
 
     | Select { dir = Select _ ; _} -> assert false
-    | Closure { descr ; id ; _ }
+    | Plugin { descr ; id ; _ }
     | Shell { descr ; id ; _ } ->
       collapsible_panel
         ~title:[ k descr ]
@@ -257,16 +257,16 @@ module Render = struct
 
     | Input { pass = false ; _ }
     | Select { pass = false ; _ }
-    | Closure { outcome = `Failed ; _ }
+    | Plugin { outcome = `Failed ; _ }
     | Shell { outcome = `Failed ; _ } ->
       event_label_text `RED "FAILED"
 
-    | Closure { outcome = `Missing_output ; _ }
+    | Plugin { outcome = `Missing_output ; _ }
     | Shell { outcome = `Missing_output ; _ } ->
       event_label_text `RED "MISSING OUTPUT"
 
     | Shell { outcome = `Succeeded ; _ }
-    | Closure { outcome = `Succeeded ; _ } ->
+    | Plugin { outcome = `Succeeded ; _ } ->
       event_label_text `GREEN "DONE"
 
 
