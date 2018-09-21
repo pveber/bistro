@@ -33,7 +33,7 @@ module Lwt_eval = struct
   type 'a t = ('a, S.t) Lwt_result.t (* missing deps *)
   let ( >> ) = Lwt.( >>= )
   let ( >>= ) = Lwt_result.( >>= )
-  (* let ( >|= ) = Lwt_result.( >|= ) *)
+  (* let ( >>| ) = Lwt_result.( >|= ) *)
 
   let return = Lwt_result.return
   let fail = Lwt_result.fail
@@ -132,21 +132,25 @@ and task_trace sched t =
     log sched (Logger.Task_allocation_error (t, msg)) ;
     Lwt.return (Execution_trace.Allocation_error msg)
 
-let rec eval_expr : type s. t -> in_container:bool -> s Expr.t -> s Lwt_eval.t = fun sched ~in_container expr ->
+let rec eval_expr : type s. t -> s Expr.t -> s Lwt_eval.t = fun sched expr ->
   let open Expr in
   let open Lwt_eval in
   match expr with
-  | Return x -> return x
-  | Bind (x, f) ->
-    eval_expr sched ~in_container x >>= fun x ->
-    eval_expr sched ~in_container (f x)
+  | Pure x -> return x
+  | App (f, x) ->
+    let f = eval_expr sched f in
+    let x = eval_expr sched x in
+    x >>= fun x ->
+    f >>= fun f ->
+    return (f x)
   | Pair (x, y) ->
-    let x = eval_expr sched ~in_container x
-    and y = eval_expr sched ~in_container y in
+    let x = eval_expr sched x
+    and y = eval_expr sched y in
     x >>= fun x ->
     y >>= fun y ->
     return (x, y)
   | Workflow_path w ->
+    eval_expr sched w >>= fun w ->
     let w = Bistro.Private.reveal w in
     submit_for_eval sched w >>= fun trace ->
     if Execution_trace.is_errored trace then
@@ -154,23 +158,24 @@ let rec eval_expr : type s. t -> in_container:bool -> s Expr.t -> s Lwt_eval.t =
     else
       return (Db.path sched.config.db w)
   | Spawn (xs, f) ->
-    eval_expr sched ~in_container:false xs >>= fun xs ->
-    let ys = List.map xs ~f in
-    map_p ys ~f:(eval_expr ~in_container sched)
+    eval_expr sched xs >>= fun xs ->
+    let ys = Base.List.map xs ~f:(fun x -> f (pure x)) in
+    map_p ys ~f:(eval_expr sched)
   | List xs ->
-    map_p ~f:(eval_expr ~in_container sched) xs
+    map_p ~f:(eval_expr sched) xs
 
   | Glob { dir ; _ } ->
+    eval_expr sched dir >>= fun dir ->
     submit_for_eval sched (Bistro.Private.reveal dir) >>= fun _ ->
-    Misc.files_in_dir (workflow_path sched ~in_container:false dir) >> fun files ->
-    return @@ List.map files ~f:(fun f -> f, Bistro.(dir /> selector [f]))
+    Misc.files_in_dir (workflow_path sched dir) >> fun files ->
+    return @@ Base.List.map files ~f:(fun f -> f, Bistro.(dir /> selector [f]))
 
 and workflow_path
-  : type s. t -> in_container:bool -> s Bistro.workflow -> string
-  = fun sched ~in_container w ->
+  : type s. t -> s Bistro.workflow -> string
+  = fun sched w ->
     let w = Bistro.Private.reveal w in
-    if in_container then Execution_env.((container_mount sched.config.db w).file_container_location)
-    else Db.path sched.config.db w
+    (* if in_container then Execution_env.((container_mount sched.config.db w).file_container_location)
+       else *) Db.path sched.config.db w
 
 let submit sched w = submit sched (Bistro.Private.reveal w)
 
@@ -180,7 +185,7 @@ let eval_expr sched e =
     Lwt_list.map_p (fun id -> Table.find_exn sched.traces id) ids >|= fun traces ->
     List.zip_exn ids traces
   in
-  Lwt_result.bind_lwt_err (eval_expr sched ~in_container:false e) f
+  Lwt_result.bind_lwt_err (eval_expr sched e) f
 
 let create
     ?(loggers = [])

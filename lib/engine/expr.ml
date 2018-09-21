@@ -1,40 +1,51 @@
+open Base
 open Bistro
 
-type _ t =
-  | Return : 'a -> 'a t
-  | Bind   : 'a t * ('a -> 'b t) -> 'b t
-  | Pair   : 'a t * 'b t -> ('a * 'b) t
-  | List : 'a t list -> 'a list t
-  | Workflow_path : _ workflow -> string t
-  | Spawn : 'a list t * ('a -> 'b t) -> 'b list t
-  | Glob : {
-      dir : _ #directory workflow ;
-      pattern : string option ;
-    } -> (string * _ workflow) list t
+module I = struct
+  type _ t =
+    | Pure : 'a -> 'a t
+    | App   : ('a -> 'b) t * 'a t -> 'b t
+    | Pair   : 'a t * 'b t -> ('a * 'b) t
+    | List : 'a t list -> 'a list t
+    | Workflow_path : _ workflow t -> string t
+    | Spawn : 'a list t * ('a t -> 'b t) -> 'b list t
+    | Glob : {
+        dir : _ #directory workflow t ;
+        pattern : string option ;
+      } -> (string * _ workflow) list t
+
+  let pure x = Pure x
+  let app f x = App (f, x)
+  let ( $ ) = app
+  let map x ~f = pure f $ x
+  let both x y = Pair (x, y)
+  let pair = both
+  let dep x = Workflow_path x
+  let deps xs = Spawn (xs, fun x -> Workflow_path x)
+  let list xs = List xs
+  let return x = pure x
+  let glob_full ?pattern dir = Glob { dir ; pattern }
+
+  let list_map xs ~f = map xs ~f:(List.map ~f)
+  let spawn xs ~f = Spawn (xs, f)
+
+  let glob ?pattern dir =
+    glob_full ?pattern dir
+    |> list_map ~f:snd
+
+end
+
 
 module Let_syntax = struct
   module Let_syntax = struct
-    let return x = Return x
-    let bind x ~f = Bind (x, f)
-    let map x ~f = Bind (x, fun x -> return (f x))
-    let both x y = Pair (x, y)
+    include I
     module Open_on_rhs = struct
-      let dep x = Workflow_path x
-      let deps xs = Spawn (xs, fun x -> Workflow_path x)
-      let list xs = List xs
-      let return x = Return x
-      let map x ~f = Bind (x, fun x -> return (f x))
-      let list_map_bind x ~f = Spawn (x, f)
-      let list_map  x ~f = Spawn (x, fun x -> return (f x))
-      let pair x y = Pair (x, y)
-      let glob ?pattern dir = Glob { dir ; pattern }
+      include I
     end
   end
 end
 
-include Let_syntax.Let_syntax
-include Let_syntax.Let_syntax.Open_on_rhs
-let spawn x ~f = Spawn (x, f)
+include I
 
 (* let bowtie w = *)
 (*   let%map size = file_size w in *)

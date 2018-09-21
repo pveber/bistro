@@ -97,14 +97,14 @@ let generate outdir items =
 
 let to_expr ~outdir items =
   let open Expr.Let_syntax in
-  let%map normalized_items =
+  let%map_open normalized_items =
     List.map items ~f:(
       function
       | Item (path, w) ->
-        let%map path_w = Expr.dep w in
+        let%map path_w = dep (pure w) in
         normalized_repo_item path w path_w
       | Items { base ; ext ; path ; expr } ->
-        let%map paths = Expr.(deps expr)
+        let%map paths = deps expr
         and        ws = expr in
         normalized_repo_items ?base ?ext path ws paths
     )
