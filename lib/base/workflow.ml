@@ -57,11 +57,9 @@ let select u q =
   | Plugin _
   | Shell _ -> k u q
 
-let input ?(may_change = false) path =
-  let hash = if may_change then Some (Md5.digest_file_blocking_without_releasing_runtime_lock path) else None in
-  let id = digest ("input", path, hash) in
+let input ?version path =
+  let id = digest ("input", path, version) in
   Input { id ; path }
-
 
 let rec digestible_dep = function
   | Shell s -> `Shell s.id

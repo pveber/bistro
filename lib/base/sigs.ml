@@ -140,11 +140,10 @@ module type DSL = sig
       - @param np maximum number of cores (could be given less at execution)
       - @param version version number, used to force the rebuild of a workflow *)
 
-  val input : ?may_change:bool -> string -> 'a workflow
+  val input : ?version:string -> string -> 'a workflow
   (** Constructs a workflow from an existing file on the
-      filesystem. The argument [may_change] indicates that the file
-      may be modified, which is detected by giving the workflow a
-      digest of the file as an input. *)
+      filesystem. The argument [version] can be used to force a
+      recomputation when the file was changed. *)
 
   (** Describes the (relative) path from a ['a directory workflow]
       target to some ['b workflow] target. This is useful to construct
