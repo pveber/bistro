@@ -114,44 +114,6 @@ and submit_for_eval sched w =
   else
     return trace
 
-and eval_expr : type s. t -> in_container:bool -> s Expr.t -> s Lwt_eval.t = fun sched ~in_container expr ->
-  let open Expr in
-  let open Lwt_eval in
-  match expr with
-  | Return x -> return x
-  | Bind (x, f) ->
-    eval_expr sched ~in_container x >>= fun x ->
-    eval_expr sched ~in_container (f x)
-  | Pair (x, y) ->
-    let x = eval_expr sched ~in_container x
-    and y = eval_expr sched ~in_container y in
-    x >>= fun x ->
-    y >>= fun y ->
-    return (x, y)
-  | Workflow_path w ->
-    submit_for_eval sched w >>= fun trace ->
-    if Execution_trace.is_errored trace then
-      fail (Execution_trace.gather_failures [w] [trace])
-    else
-      return (Db.path sched.config.db w)
-  | Spawn (xs, f) ->
-    eval_expr sched ~in_container:false xs >>= fun xs ->
-    let ys = List.map xs ~f in
-    map_p ys ~f:(eval_expr ~in_container sched)
-  | List xs ->
-    map_p ~f:(eval_expr ~in_container sched) xs
-
-  | Glob { dir ; _ } ->
-    submit_for_eval sched dir >>= fun _ ->
-    Misc.files_in_dir (workflow_path sched ~in_container:false dir) >> fun files ->
-    return @@ List.map files ~f:(fun f -> f, Workflow.select dir [f])
-
-and workflow_path
-  : type s. t -> in_container:bool -> s Workflow.t -> string
-  = fun sched ~in_container w ->
-    if in_container then Execution_env.((container_mount sched.config.db w).file_container_location)
-    else Db.path sched.config.db w
-
 and task_trace sched t =
   let ready = Unix.gettimeofday () in
   log ~time:ready sched (Logger.Task_ready t) ;
@@ -169,6 +131,48 @@ and task_trace sched t =
   | Error (`Msg msg) ->
     log sched (Logger.Task_allocation_error (t, msg)) ;
     Lwt.return (Execution_trace.Allocation_error msg)
+
+let rec eval_expr : type s. t -> in_container:bool -> s Expr.t -> s Lwt_eval.t = fun sched ~in_container expr ->
+  let open Expr in
+  let open Lwt_eval in
+  match expr with
+  | Return x -> return x
+  | Bind (x, f) ->
+    eval_expr sched ~in_container x >>= fun x ->
+    eval_expr sched ~in_container (f x)
+  | Pair (x, y) ->
+    let x = eval_expr sched ~in_container x
+    and y = eval_expr sched ~in_container y in
+    x >>= fun x ->
+    y >>= fun y ->
+    return (x, y)
+  | Workflow_path w ->
+    let w = Bistro.Private.reveal w in
+    submit_for_eval sched w >>= fun trace ->
+    if Execution_trace.is_errored trace then
+      fail (Execution_trace.gather_failures [w] [trace])
+    else
+      return (Db.path sched.config.db w)
+  | Spawn (xs, f) ->
+    eval_expr sched ~in_container:false xs >>= fun xs ->
+    let ys = List.map xs ~f in
+    map_p ys ~f:(eval_expr ~in_container sched)
+  | List xs ->
+    map_p ~f:(eval_expr ~in_container sched) xs
+
+  | Glob { dir ; _ } ->
+    submit_for_eval sched (Bistro.Private.reveal dir) >>= fun _ ->
+    Misc.files_in_dir (workflow_path sched ~in_container:false dir) >> fun files ->
+    return @@ List.map files ~f:(fun f -> f, Bistro.(dir /> selector [f]))
+
+and workflow_path
+  : type s. t -> in_container:bool -> s Bistro.workflow -> string
+  = fun sched ~in_container w ->
+    let w = Bistro.Private.reveal w in
+    if in_container then Execution_env.((container_mount sched.config.db w).file_container_location)
+    else Db.path sched.config.db w
+
+let submit sched w = submit sched (Bistro.Private.reveal w)
 
 let eval_expr sched e =
   let f ids =

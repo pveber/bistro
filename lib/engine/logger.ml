@@ -10,7 +10,7 @@ type event =
       start : time ;
       _end_ : time ;
     }
-  | Workflow_skipped of Workflow.u * [ `Done_already | `Missing_dep ]
+  | Workflow_skipped of Workflow.t * [ `Done_already | `Missing_dep ]
   | Task_allocation_error of Task.t * string
 
 class type t = object

@@ -1,13 +1,13 @@
 open Core
-open Bistro_base
+open Bistro
 
 type item =
-    Item  : string list * _ Workflow.t -> item
+    Item  : string list * _ workflow -> item
   | Items : {
       base : string option ;
       ext : string option ;
       path : string list ;
-      expr : _ Workflow.t list Expr.t
+      expr : _ workflow list Expr.t
     } -> item
 
 type t = item list
@@ -21,7 +21,7 @@ type normalized_repo_item = {
 let normalized_repo_item repo_path w cache_path = [
   {
     repo_path = Path.to_string repo_path ;
-    file_path = Filename.concat "_files" (Workflow.id w) ;
+    file_path = Filename.concat "_files" (Bistro_base.Workflow.id (Private.reveal w)) ;
     cache_path ;
   }
 ]

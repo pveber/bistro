@@ -11,7 +11,7 @@ type event =
     }
   | Task_ended of Task_result.t
   | Workflow_done_already of {
-      w : Workflow.u ;
+      w : Workflow.t ;
       path : string ;
     }
 

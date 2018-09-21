@@ -41,4 +41,4 @@ val fold_cache :
   f:('a -> string -> 'a) ->
   'a
 
-val path : t -> _ Bistro_base.Workflow.t -> string
+val path : t -> Bistro_base.Workflow.t -> string

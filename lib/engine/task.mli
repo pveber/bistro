@@ -8,7 +8,7 @@ type config = {
 type t = private
   | Input of { id : string ; path : string }
   | Select of {
-      dir : Workflow.u ;
+      dir : Workflow.t ;
       sel : string list
     }
   | Shell of {
@@ -16,7 +16,7 @@ type t = private
       descr : string ;
       np : int ;
       mem : int ;
-      cmd : Workflow.u Command.t ;
+      cmd : Workflow.t Command.t ;
     }
   | Plugin of {
       id : string ;
@@ -32,7 +32,7 @@ val input :
   t
 
 val select :
-  dir:_ Workflow.t ->
+  dir:Workflow.t ->
   sel:string list ->
   t
 
@@ -41,7 +41,7 @@ val shell :
   descr:string ->
   np:int ->
   mem:int ->
-  Workflow.u Command.t -> t
+  Workflow.t Command.t -> t
 
 val closure :
   id:string ->
@@ -54,4 +54,4 @@ val requirement : t -> Allocator.request
 
 val perform : t -> config -> Allocator.resource -> Task_result.t Lwt.t
 
-val is_done : _ Workflow.t -> Db.t -> bool Lwt.t
+val is_done : Workflow.t -> Db.t -> bool Lwt.t

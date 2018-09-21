@@ -8,7 +8,7 @@ type file_dump = File_dump of {
 
 
 type symbolic_file_dump = Symbolic_file_dump of {
-    contents : Workflow.u Template.t ;
+    contents : Workflow.t Template.t ;
     in_docker : bool ;
   }
 

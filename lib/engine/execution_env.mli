@@ -9,8 +9,8 @@ type t = {
   tmp : string ;     (* temp dir for the process *)
   stdout : string ;
   stderr : string ;
-  dep : Workflow.u -> string ;
-  file_dump : Workflow.u Template.t -> string ;
+  dep : Workflow.t -> string ;
+  file_dump : Workflow.t Template.t -> string ;
   np : int ;
   mem : int ;
   uid : int ;
@@ -30,6 +30,6 @@ type container_mount = {
   file_container_location : string ;
 }
 
-val container_mount : Db.t -> Workflow.u -> container_mount
+val container_mount : Db.t -> Workflow.t -> container_mount
 val dockerize : t -> t
 val docker_cache_dir : string

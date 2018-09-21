@@ -3,30 +3,28 @@ open Core_kernel
 let digest x =
   Md5.to_hex (Md5.digest_string (Marshal.to_string x []))
 
-type u =
+type t =
   | Input of { id : string ; path : string }
   | Select of {
       id : string ;
-      dir : u ; (* invariant: [dir] is not a select *)
+      dir : t ; (* invariant: [dir] is not a select *)
       sel : string list
     }
   | Shell of shell
   | Plugin of (env -> unit) step
 
-and 'a t = u
-
 and 'a step = {
   id : string ;
   descr : string ;
   task : 'a ;
-  deps : u list ;
+  deps : t list ;
   np : int ; (** Required number of processors *)
   mem : int ; (** Required memory in MB *)
   version : int option ; (** Version number of the wrapper *)
 }
 and shell = shell_command step
-and shell_command = u Command.t
-and template = u Template.t
+and shell_command = t Command.t
+and template = t Template.t
 and env = <
   tmp : string ;
   dest : string ;

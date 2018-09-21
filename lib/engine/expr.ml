@@ -1,16 +1,16 @@
-open Bistro_base
+open Bistro
 
 type _ t =
   | Return : 'a -> 'a t
   | Bind   : 'a t * ('a -> 'b t) -> 'b t
   | Pair   : 'a t * 'b t -> ('a * 'b) t
   | List : 'a t list -> 'a list t
-  | Workflow_path : _ Workflow.t -> string t
+  | Workflow_path : _ workflow -> string t
   | Spawn : 'a list t * ('a -> 'b t) -> 'b list t
   | Glob : {
-      dir : _ #File_formats.directory Workflow.t ;
+      dir : _ #directory workflow ;
       pattern : string option ;
-    } -> (string * _ Workflow.t) list t
+    } -> (string * _ workflow) list t
 
 module Let_syntax = struct
   module Let_syntax = struct

@@ -1,4 +1,4 @@
-open Bistro_base
+open Bistro
 
 type t
 
@@ -10,7 +10,7 @@ val create :
   Db.t -> t
 
 val submit :
-  t -> _ Workflow.t -> Execution_trace.t Lwt.t
+  t -> 'a workflow -> Execution_trace.t Lwt.t
 
 val eval_expr :
   t -> 'a Expr.t -> ('a, (string * Execution_trace.t) list) result Lwt.t

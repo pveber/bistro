@@ -3,6 +3,6 @@
 (library
  ((name bistro_engine)
   (public_name bistro.engine)
-  (libraries (bistro.base core lwt.unix rresult))
+  (libraries (bistro core lwt.unix rresult))
   (preprocess (pps (ppx_let)))
 ))

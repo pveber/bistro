@@ -164,8 +164,6 @@ module type DSL = sig
 
   type any_workflow = Any_workflow : _ workflow -> any_workflow
 
-  type 'a expr
-
   type template
   module Template_dsl : Template_dsl with type 'a dep := 'a workflow
                                       and type template := template

@@ -3,6 +3,6 @@
 (library
  ((name bistro)
   (public_name bistro)
-  (libraries (bistro.base bistro.engine core_kernel))
+  (libraries (base bistro.base))
   (preprocess (pps (ppx_sexp_conv)))
 ))

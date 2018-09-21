@@ -120,10 +120,10 @@ let fold_cache db ~init ~f =
     (Sys.readdir (cache_dir db))
     ~init ~f
 
-let rec path : type s. t -> s Bistro_base.Workflow.t -> string = fun db ->
+let rec path db =
   let open Bistro_base.Workflow in
   function
-  | Bistro_base.Workflow.Input i -> i.path
+  | Input i -> i.path
   | Select s ->
     Filename.concat (path db s.dir) (Path.to_string s.sel)
   | Shell s -> cache db s.id

@@ -26,52 +26,9 @@
 
 include Bistro_base.Sigs.DSL
 
-type logger = Bistro_engine.Logger.t
-val null_logger : unit -> logger
-val console_logger : unit -> logger
-
-module Repo : Bistro_base.Sigs.Repo with type 'a workflow := 'a workflow
-                                     and type 'a expr := 'a expr
-                                     and type logger := logger
-
-module Expr : sig
-  val glob :
-    ?pattern:string ->
-    _ #directory workflow ->
-    _ workflow list expr
-
-  val glob_full :
-    ?pattern:string ->
-    _ #directory workflow ->
-    (string * _ workflow) list expr
-
-  val map : 'a expr -> f:('a -> 'b) -> 'b expr
-
-  module List : sig
-    val map : 'a list expr -> f:('a -> 'b) -> 'b list expr
-    val spawn : 'a list expr -> f:('a -> 'b expr) -> 'b list expr
-  end
-end
-
-val eval_expr :
-  ?np:int ->
-  ?mem:[`GB of int] ->
-  ?loggers:logger list ->
-  ?use_docker:bool ->
-  ?bistro_dir:string ->
-  'a expr -> ('a, string) result
-
-val eval_expr_exn :
-  ?np:int ->
-  ?mem:[`GB of int] ->
-  ?loggers:logger list ->
-  ?use_docker:bool ->
-  ?bistro_dir:string ->
-  'a expr -> 'a
-
 module Private : sig
   open Bistro_base
-  val reveal : 'a workflow -> 'a Bistro_base.Workflow.t
+  val reveal : 'a workflow -> Workflow.t
 
   val closure :
     ?descr:string ->
@@ -79,7 +36,7 @@ module Private : sig
     ?np:int ->
     ?version:int ->
     string ->
-    Workflow.u list ->
+    Workflow.t list ->
     (Workflow.env -> unit) ->
     'a workflow
 end

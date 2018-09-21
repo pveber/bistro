@@ -9,8 +9,8 @@ type t = {
   tmp : string ;     (* temp dir for the process *)
   stdout : string ;
   stderr : string ;
-  dep : Workflow.u -> string ;
-  file_dump : Workflow.u Template.t -> string ;
+  dep : Workflow.t -> string ;
+  file_dump : Workflow.t Template.t -> string ;
   np : int ;
   mem : int ;
   uid : int ;

@@ -10,7 +10,7 @@ type config = {
 type t =
   | Input of { id : string ; path : string }
   | Select of {
-      dir : Workflow.u ;
+      dir : Workflow.t ;
       sel : string list
     }
   | Shell of {
@@ -18,7 +18,7 @@ type t =
       descr : string ;
       np : int ;
       mem : int ;
-      cmd : Workflow.u Command.t ;
+      cmd : Workflow.t Command.t ;
     }
   | Plugin of {
       id : string ;
@@ -190,7 +190,7 @@ let perform t config (Allocator.Resource { np ; mem }) =
  *     }
  *   ) *)
 
-let is_done : type s. s Workflow.t -> Db.t -> bool Lwt.t = fun t db ->
+let is_done t db =
   let open Workflow in
   let path = match t with
     | Input { id ; _ } -> Db.cache db id

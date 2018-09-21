@@ -25,6 +25,6 @@ val error_report :
 val all_ok : t list -> bool
 
 val gather_failures :
-  Workflow.u list ->
+  Workflow.t list ->
   t list ->
   String.Set.t
