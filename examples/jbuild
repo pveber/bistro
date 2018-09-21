@@ -2,5 +2,5 @@
 
 (executables
  ((names (chipseq ngs_qc nlp_demo))
-  (libraries (bistro bistro.unix bistro.bioinfo))
+  (libraries (bistro.pack bistro.bioinfo))
   (preprocess (pps (ppx_bistro)))))

@@ -5,8 +5,9 @@
    utop minimal.ml
 
 *)
+#require "bistro.pack bistro.unix";;
 
-open Bistro
+open Bistro_pack
 
 let url = "https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?tool=portal&save=file&log$=seqview&db=nuccore&report=fasta&id=215104&extrafeat=null&conwithfeat=on"
 

@@ -1,5 +1,5 @@
 open Core_kernel
-open Bistro
+open Bistro_pack
 open Shell_dsl
 
 let wikipedia_query q : text_file workflow =
@@ -35,6 +35,7 @@ let sentences_of_stanford_deps (x : stanford_parser_deps workflow) : stanford_pa
       string "'/^$/' '{*}'"
     ] ;
   ]
+  |> Expr.pure
   |> Expr.glob
 
 let dependensee (x : stanford_parser_deps workflow) : png workflow =
@@ -51,7 +52,7 @@ let definition_analysis w =
   let text = wikipedia_query w in
   let deps = stanford_parser text in
   let deps_graphs =
-    Expr.List.map (sentences_of_stanford_deps deps) ~f:dependensee in
+    Expr.list_map (sentences_of_stanford_deps deps) ~f:dependensee in
   Repo.[
     item [ "definition.txt" ] text ;
     item [ "deps" ] deps ;

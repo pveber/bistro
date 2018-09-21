@@ -1,4 +1,4 @@
-open Bistro
+open Bistro_pack
 open Bistro_bioinfo
 
 let sample = Sra.fetch_srr "SRR217304"                         (* Fetch a sample from the SRA database *)
