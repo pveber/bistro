@@ -1,0 +1,8 @@
+(jbuild_version 1)
+
+(library
+ ((name bistro_pack)
+  (public_name bistro.pack)
+  (libraries (bistro.bioinfo bistro.engine))
+  (preprocess (pps (ppx_sexp_conv)))
+))
