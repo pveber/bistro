@@ -1,4 +1,4 @@
-open Core_kernel
+open Base
 open Bistro_base
 
 type docker_image = Command.docker_image = {

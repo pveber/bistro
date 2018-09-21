@@ -1,7 +1,7 @@
-open Core_kernel
+open Base
 
 let digest x =
-  Md5.to_hex (Md5.digest_string (Marshal.to_string x []))
+  Caml.(Digest.to_hex (Digest.string (Marshal.to_string x [])))
 
 type t =
   | Input of { id : string ; path : string }

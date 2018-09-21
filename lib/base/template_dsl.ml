@@ -1,4 +1,4 @@
-open Core_kernel
+open Base
 
 type template = Workflow.template
 
@@ -8,7 +8,7 @@ let np = [ Template.NP ]
 let mem = [ Template.MEM ]
 
 let string s = [ Template.S s ]
-let int i = string (string_of_int i)
+let int i = string (Int.to_string i)
 let float f = string (Float.to_string f)
 let dep w = [ Template.D w ]
 
@@ -27,11 +27,11 @@ let list f ?(sep = ",") l =
 
 let seq ?sep xs =
   let format = match sep with
-    | None -> ident
+    | None -> Fn.id
     | Some sep -> List.intersperse ~sep:(string sep)
   in
   List.concat (format xs)
 
-let enum dic x = string (List.Assoc.find_exn ~equal:( = ) dic x)
+let enum dic x = string (List.Assoc.find_exn ~equal:Caml.( = ) dic x)
 
 let file_dump contents = [ Template.F contents ] (* FIXME: should check that there is no file_dump in contents *)

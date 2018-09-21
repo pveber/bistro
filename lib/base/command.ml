@@ -1,4 +1,4 @@
-open Core_kernel
+open Base
 
 type docker_image = {
   dck_account : string ;

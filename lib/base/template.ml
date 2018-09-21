@@ -1,4 +1,4 @@
-open Core_kernel
+open Base
 
 type 'a token =
   | S of string

@@ -1,4 +1,4 @@
-open Core_kernel
+open Base
 
 include Template_dsl
 
@@ -24,7 +24,7 @@ let gen_cmd prog_expr ?env ?stdin ?stdout ?stderr args =
   in
   let tokens =
     [ prog_expr ] @ args @ [ stdin_expr ; stdout_expr ; stderr_expr ]
-    |> List.filter ~f:(( <> ) [])
+    |> List.filter ~f:(Caml.( <> ) [])
     |> List.intersperse ~sep:(string " ")
     |> List.concat
   in
