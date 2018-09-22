@@ -1,11 +1,4 @@
-(* A minimal pipeline.
-
-   This can be run by typing:
-
-   utop minimal.ml
-
-*)
-#require "bistro.pack bistro.unix";;
+(* A minimal pipeline fetching the lambda phage genome. *)
 
 open Bistro_pack
 

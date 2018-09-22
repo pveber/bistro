@@ -15,5 +15,7 @@ let repo = Repo.[
   [ "peaks" ] %> sample_peaks
 ]
 
+let loggers = [ console_logger () ]
+
 (** Actually run the pipeline *)
-let () = Repo.build ~outdir:"res" repo
+let () = Repo.build ~outdir:"res" ~loggers ~mem:(`GB 3) repo
