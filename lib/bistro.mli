@@ -30,13 +30,13 @@ module Private : sig
   open Bistro_base
   val reveal : 'a workflow -> Workflow.t
 
-  val closure :
+  val plugin :
     ?descr:string ->
     ?mem:int ->
     ?np:int ->
     ?version:int ->
     string ->
-    Workflow.t list ->
+    Workflow.dep list ->
     (Workflow.env -> unit) ->
     'a workflow
 end

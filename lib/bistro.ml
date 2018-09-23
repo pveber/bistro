@@ -30,5 +30,5 @@ module Shell_dsl = Shell_dsl
 module Private = struct
   let reveal (x : 'a workflow) = (x : Workflow.t)
 
-  let closure = Workflow.closure
+  let plugin = Workflow.plugin
 end
