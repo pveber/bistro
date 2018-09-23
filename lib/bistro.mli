@@ -29,6 +29,8 @@ include Bistro_base.Sigs.DSL
 module Private : sig
   open Bistro_base
   val reveal : 'a workflow -> Workflow.t
+  val laever : Workflow.t -> 'a workflow
+  val collection : 'a collection -> Workflow.t_list
 
   val plugin :
     ?descr:string ->

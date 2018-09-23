@@ -174,6 +174,17 @@ module type DSL = sig
                                 and type docker_image := docker_image
                                 and type template := template
 
+  type 'a collection
+
+  val glob :
+    ?pattern:string ->
+    _ #directory workflow ->
+    'a collection
+
+  val collection_map :
+    'a collection ->
+    f:('a workflow -> 'b workflow) ->
+    'b collection
 end
 
 module type Term = sig
@@ -217,7 +228,7 @@ end
 
 module type Repo = sig
   type 'a workflow
-  type 'a expr
+  type 'a collection
   type logger
 
   type item
@@ -231,7 +242,7 @@ module type Repo = sig
   val items :
     ?base:string ->
     ?ext:string ->
-    string list -> 'a workflow list expr -> item
+    string list -> 'a collection -> item
 
   val singleton : string -> 'a workflow -> t
 

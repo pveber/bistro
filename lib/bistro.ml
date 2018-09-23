@@ -27,8 +27,15 @@ type template = Workflow.template
 module Template_dsl = Template_dsl
 module Shell_dsl = Shell_dsl
 
+type 'a collection = Workflow.t_list
+
+let glob = Workflow.glob
+let collection_map = Workflow.list_map
+
 module Private = struct
   let reveal (x : 'a workflow) = (x : Workflow.t)
+  let laever x = x
+  let collection (x : 'a collection) = (x : Workflow.t_list)
 
   let plugin = Workflow.plugin
 end

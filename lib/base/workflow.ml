@@ -106,6 +106,19 @@ let shell
   let deps = Command.deps cmd in
   Shell { descr ; task = cmd ; deps ; np ; mem ; version ; id }
 
+let glob ?pattern dir =
+  let id = digest ("glob", pattern, id dir) in
+  Glob { id ; pattern ; dir }
+
+let list_id = function
+  | List { id ; _ }
+  | Glob { id ; _ }
+  | ListMap { id ; _ } -> id
+
+let list_map elts ~f =
+  let id = digest ("list_map", list_id elts, id (f (input "foo"))) in
+  ListMap { id ; elts ; f }
+
 let plugin
     ?(descr = "")
     ?(mem = 100)
