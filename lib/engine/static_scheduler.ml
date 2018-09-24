@@ -118,6 +118,14 @@ let rec expand_command db =
     expand_command db c >>= fun c ->
     Lwt.return (Docker (img, c))
 
+let task_of_workflow db = function
+  | Workflow.Input { id ; path } -> Lwt.return (Task.input ~id ~path)
+  | Select { dir ; sel ; id } -> Lwt.return (Task.select ~id ~dir ~sel)
+  | Shell { id ; descr ; np ; mem ; task = cmd ; _ } ->
+    expand_command db cmd >|= Task.shell ~id ~descr ~np ~mem
+  | Plugin { id ; descr ; np ; mem ; task = f ; _ } ->
+    Lwt.return (Task.plugin ~id ~descr ~np ~mem f)
+
 let task_trace sched t =
   let ready = Unix.gettimeofday () in
   log ~time:ready sched (Logger.Task_ready t) ;
@@ -152,7 +160,7 @@ let rec schedule_workflow sched w =
     Lwt_result.return ()
 
 and workflow_trace sched w =
-  let t = Task.of_workflow w in
+  task_of_workflow sched.config.db w >>= fun t ->
   Task.is_done t sched.config.db >>= fun is_done ->
   if is_done then (
     log sched (Logger.Workflow_skipped (w, `Done_already)) ;

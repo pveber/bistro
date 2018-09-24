@@ -8,7 +8,7 @@ type file_dump = File_dump of {
 
 
 type symbolic_file_dump = Symbolic_file_dump of {
-    contents : Workflow.dep Template.t ;
+    contents : Workflow.t Template.t ;
     in_docker : bool ;
   }
 
@@ -59,8 +59,7 @@ let string_of_token (env : Execution_env.t) =
   let open Template in
   function
   | S s -> s
-  | D (Workflow.WDep w) -> env.dep w
-  | D (Workflow.WLDep ws) -> String.concat ~sep:"," (env.deps ws) (* FIXME *)
+  | D w -> env.dep w
   | F toks -> env.file_dump toks
   | DEST -> env.dest
   | TMP -> env.tmp
@@ -75,9 +74,7 @@ let par x = "(" ^ x ^ ")"
 
 let deps_mount ~env deps =
   let open Execution_env in
-  let mounts = List.map deps ~f:(function
-      | Workflow.WDep w -> Execution_env.container_mount env.db w
-      | WLDep _ -> assert false (* FIXME*)) in
+  let mounts = List.map deps ~f:(Execution_env.container_mount env.db) in
   let host_paths, container_paths =
     List.map mounts ~f:Execution_env.(fun m -> m.mount_host_location, m.mount_container_location)
     |> List.dedup_and_sort ~compare:Caml.compare

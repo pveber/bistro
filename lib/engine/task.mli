@@ -5,7 +5,7 @@ type config = {
   use_docker : bool ;
 }
 
-type t =
+type t = private
   | Input of { id : string ; path : string }
   | Select of {
       id : string ;
@@ -17,7 +17,7 @@ type t =
       descr : string ;
       np : int ;
       mem : int ;
-      cmd : Workflow.dep Command.t ;
+      cmd : Workflow.t Command.t ;
     }
   | Plugin of {
       id : string ;
@@ -43,7 +43,7 @@ val shell :
   descr:string ->
   np:int ->
   mem:int ->
-  Workflow.dep Command.t -> t
+  Workflow.t Command.t -> t
 
 val plugin :
   id:string ->
@@ -51,8 +51,6 @@ val plugin :
   np:int ->
   mem:int ->
   (Workflow.env -> unit) -> t
-
-val of_workflow : Workflow.t -> t
 
 val id : t -> string
 

@@ -19,7 +19,7 @@ type t =
       descr : string ;
       np : int ;
       mem : int ;
-      cmd : Workflow.dep Command.t ;
+      cmd : Workflow.t Command.t ;
     }
   | Plugin of {
       id : string ;
@@ -33,11 +33,6 @@ let input ~id ~path = Input { id ; path }
 let select ~id ~dir ~sel = Select { id ; dir ; sel }
 let shell ~id ~descr ~np ~mem cmd = Shell { id ; cmd ; np ; mem ; descr }
 let plugin ~id ~descr ~np ~mem f = Plugin { id ; f ; np ; mem ; descr }
-let of_workflow = function
-  | Workflow.Input { id ; path } -> input ~id ~path
-  | Select { dir ; sel ; id } -> select ~id ~dir ~sel
-  | Shell { id ; descr ; np ; mem ; task = cmd ; _ } -> shell ~id ~descr ~np ~mem cmd
-  | Plugin { id ; descr ; np ; mem ; task = f ; _ } -> plugin ~id ~descr ~np ~mem f
 
 let id = function
   | Input { id ;  _ }

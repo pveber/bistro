@@ -10,8 +10,7 @@ type t = {
   stdout : string ;
   stderr : string ;
   dep : Workflow.t -> string ;
-  deps : Workflow.t_list -> string list ;
-  file_dump : Workflow.dep Template.t -> string ;
+  file_dump : Workflow.t Template.t -> string ;
   np : int ;
   mem : int ;
   uid : int ;
