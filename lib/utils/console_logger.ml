@@ -32,7 +32,7 @@ let error_short_descr =
     )
 
 let output_event t = function
-  | Logger.Task_started (Task.Shell { id ; descr ; _ }, _) ->
+  | Logger.Task_started (Shell { id ; descr ; _ }, _) ->
     let id = String.prefix id 6 in
     msg t "started %s.%s" descr id
 

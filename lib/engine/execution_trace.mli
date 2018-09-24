@@ -1,4 +1,3 @@
-open Core_kernel
 open Bistro_base
 
 type time = float
@@ -9,9 +8,15 @@ type t =
              _end_ : time ;
              outcome : Task_result.t }
 
-  | Done_already
-  | Canceled of { missing_deps : String.Set.t }
-  | Allocation_error of string
+  | Done_already of Task.t
+  | Canceled of {
+      task : Task.t ;
+      missing_deps : t list ;
+    }
+  | Allocation_error of Task.t * string
+  | Invalid_glob of {
+      dir : Workflow.t ;
+    }
 
 val is_errored : t -> bool
 
@@ -19,12 +24,8 @@ val error_report :
   t ->
   Db.t ->
   Buffer.t ->
-  string ->
   unit
 
 val all_ok : t list -> bool
 
-val gather_failures :
-  Workflow.t list ->
-  t list ->
-  String.Set.t
+val gather_failures : t list -> t list

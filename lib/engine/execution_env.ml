@@ -10,11 +10,21 @@ type t = {
   stdout : string ;
   stderr : string ;
   dep : Workflow.t -> string ;
-  file_dump : Workflow.t Template.t -> string ;
+  deps : Workflow.t_list -> string list ;
+  file_dump : Workflow.dep Template.t -> string ;
   np : int ;
   mem : int ;
   uid : int ;
 }
+
+let rec expand_workflow_list db : Workflow.t_list -> Workflow.t list = function
+  | List l -> l.elts
+  | Glob g ->
+    let dir_path = Db.path db g.dir in
+    let files = Misc.files_in_dir_blocking dir_path in
+    List.map files ~f:(fun fn -> Workflow.select g.dir [fn])
+  | ListMap lm ->
+    List.map (expand_workflow_list db lm.elts) ~f:lm.f
 
 let make ~db  ~use_docker ~np ~mem ~id =
   let tmp_dir = Db.tmp db id in
@@ -31,6 +41,7 @@ let make ~db  ~use_docker ~np ~mem ~id =
     stderr = Db.stderr db id ;
     file_dump ;
     dep = Db.path db ;
+    deps = (fun wl -> List.map (expand_workflow_list db wl) ~f:(Db.path db)) ;
     np ;
     mem ;
     uid = Unix.getuid () ;
@@ -87,17 +98,22 @@ let container_mount db =
   | Select { dir = (Select _) ; _ } -> assert false
 
 
-let dockerize env = {
-  db = env.db ;
-  tmp_dir = "/bistro" ;
-  using_docker = false ;
-  dest = "/bistro/dest" ;
-  tmp = "/bistro/tmp" ;
-  file_dump = (fun toks -> Filename.concat docker_cache_dir (Misc.digest toks)) ;
-  dep = (fun u -> (container_mount env.db u).file_container_location) ;
-  np = env.np ;
-  mem = env.mem ;
-  stdout = env.stdout ;
-  stderr = env.stderr ;
-  uid = env.uid ;
-}
+let dockerize env =
+  let container_location u =
+    (container_mount env.db u).file_container_location
+  in
+  {
+    db = env.db ;
+    tmp_dir = "/bistro" ;
+    using_docker = false ;
+    dest = "/bistro/dest" ;
+    tmp = "/bistro/tmp" ;
+    file_dump = (fun toks -> Filename.concat docker_cache_dir (Misc.digest toks)) ;
+    dep = container_location ;
+    deps = (fun wl -> List.map (expand_workflow_list env.db wl) ~f:container_location) ;
+    np = env.np ;
+    mem = env.mem ;
+    stdout = env.stdout ;
+    stderr = env.stderr ;
+    uid = env.uid ;
+  }

@@ -39,7 +39,7 @@ let create path = {
 
 let translate_event db _ = function
   | Logger.Task_started (
-      (Task.Shell {id ; descr ; _}
+      (Shell {id ; descr ; _}
       | Plugin { id ; descr ; _ }), _) ->
     Some (Step_task_started { id ; descr })
 
@@ -53,7 +53,7 @@ let translate_event db _ = function
   | Task_ready _
   | Task_allocation_error _
   | Workflow_skipped (_, `Missing_dep)
-  | Task_started ((Task.Input _ | Select _), _) -> None
+  | Task_started ((Input _ | Select _), _) -> None
 
 let update model db time evt =
   {
@@ -168,13 +168,13 @@ module Render = struct
     ]
 
   let task_result = function
-    | Task_result.Input { path ; pass } ->
+    | Task_result.Input { path ; pass ; _ } ->
       [ p [ k "input " ; k path ] ;
         if pass then k"" else (
           p [ k"Input doesn't exist" ]
         ) ]
 
-    | Select { dir_path ; sel ; pass } ->
+    | Select { dir_path ; sel ; pass ; _ } ->
       [ p [ k "select " ;
             k (Bistro_engine.Path.to_string sel) ;
             k " in " ;

@@ -63,3 +63,11 @@ let files_in_dir dir =
       | "." | ".." -> false
       | _ -> true
     )
+
+let files_in_dir_blocking dir =
+  Sys.readdir dir
+  |> Array.to_list
+  |> List.filter ~f:(function
+      | "." | ".." -> false
+      | _ -> true
+    )

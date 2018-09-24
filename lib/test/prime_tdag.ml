@@ -98,7 +98,7 @@ module Task = struct
     performed := i :: !performed ;
     t, Ok ()
 
-  let post_revdeps_hook (Push i) _ ~all_revdeps_succeeded:_ =
+  let post_revdeps_hook (Push _) _ ~all_revdeps_succeeded:_ =
     Lwt.return ()
 
   let clean _ _ = Lwt.return ()
@@ -149,7 +149,7 @@ module TG = struct
 end
 
 
-let check_state remaining started ended not_needed_anymore =
+let check_state remaining started _ended not_needed_anymore =
   Int.Set.iter started ~f:(fun i ->
       Int.Set.iter started ~f:(fun j ->
           if i <> j && (i mod 2 = j mod 2)

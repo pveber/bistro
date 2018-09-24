@@ -2,12 +2,12 @@ open Core
 open Bistro
 
 type item =
-    Item  : string list * _ workflow -> item
+  | Item  : string list * _ workflow -> item
   | Items : {
       base : string option ;
       ext : string option ;
       path : string list ;
-      expr : _ workflow list Expr.t
+      collection : _ collection ;
     } -> item
 
 type t = item list
@@ -26,8 +26,8 @@ let normalized_repo_item repo_path w cache_path = [
   }
 ]
 
-let normalized_repo_items ?(base = "") ?ext repo_path ws cache_paths =
-  List.mapi (List.zip_exn ws cache_paths) ~f:(fun i (w, cache_path) ->
+let normalized_repo_items ?(base = "") ?ext repo_path results =
+  List.mapi results ~f:(fun i (w, cache_path) ->
       let fn = sprintf "%s%06d%s" base i (match ext with None -> "" | Some e -> "." ^ e) in
       let repo_path = repo_path @ [ fn ] in
       normalized_repo_item repo_path w cache_path
@@ -35,7 +35,8 @@ let normalized_repo_items ?(base = "") ?ext repo_path ws cache_paths =
   |> List.concat
 
 let item path w = Item (path, w)
-let items ?base ?ext path expr = Items { base ; ext ; path ; expr }
+let items ?base ?ext path collection =
+  Items { base ; ext ; path ; collection }
 
 let ( %> ) path w = item path w
 
@@ -96,19 +97,18 @@ let generate outdir items =
     )
 
 let to_expr ~outdir items =
-  let open Expr.Let_syntax in
+  let open Static_scheduler.Let_syntax in
   let%map_open normalized_items =
     List.map items ~f:(
       function
       | Item (path, w) ->
-        let%map path_w = dep (pure w) in
+        let%map path_w = dep w in
         normalized_repo_item path w path_w
-      | Items { base ; ext ; path ; expr } ->
-        let%map paths = deps expr
-        and        ws = expr in
-        normalized_repo_items ?base ?ext path ws paths
+      | Items { base ; ext ; path ; collection } ->
+        let%map paths = deps collection in
+        normalized_repo_items ?base ?ext path paths
     )
-    |> Expr.list
+    |> Static_scheduler.Expr.list
   in
   normalized_items
   |> List.concat
@@ -118,13 +118,11 @@ let to_expr ~outdir items =
 let build ?np ?mem ?loggers ?keep_all:_ ?use_docker ?(bistro_dir = "_bistro") ~outdir repo =
   let db = Db.init_exn bistro_dir in
   let expr = to_expr ~outdir repo in
-  match Scheduler.eval_expr_main ?np ?mem ?loggers ?use_docker db expr with
+  match Static_scheduler.eval_main ?np ?mem ?loggers ?use_docker db expr with
   | Ok () -> ()
   | Error report ->
     prerr_endline report ;
     failwith "Some workflow failed!"
-
-
 
 let add_prefix prefix items =
   List.map items ~f:(function

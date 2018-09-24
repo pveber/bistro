@@ -1,6 +1,6 @@
 (jbuild_version 1)
 
 (executables
- ((names (chipseq ngs_qc nlp_demo))
+ ((names (chipseq ngs_qc nlp_demo workflow_example))
   (libraries (bistro.pack bistro.bioinfo))
   (preprocess (pps (ppx_bistro)))))

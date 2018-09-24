@@ -1,6 +1,6 @@
 type t =
-  | Input of { path : string ; pass : bool }
-  | Select of { dir_path : string ; sel : string list ; pass : bool }
+  | Input of { id : string ; path : string ; pass : bool }
+  | Select of { id : string ; dir_path : string ; sel : string list ; pass : bool }
   | Shell of {
       id : string ;
       descr : string ;
@@ -17,6 +17,8 @@ type t =
       descr : string ;
       outcome : [`Succeeded | `Missing_output | `Failed] ;
     }
+
+val id : t -> string
 
 val succeeded : t -> bool
 

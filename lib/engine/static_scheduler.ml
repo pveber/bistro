@@ -1,73 +1,53 @@
 open Core_kernel
 open Lwt.Infix
-(* open Bistro_base *)
+open Bistro_base
 
-module S = String.Set
+module S = Caml.Set.Make(struct
+    type t = Execution_trace.t
+    let compare = compare
+  end)
 
-module Semaphore = struct
-  type t = {
-    mutable state : bool ;
-    cond : unit Lwt_condition.t ;
-  }
-
-  let create state = {
-    state ;
-    cond = Lwt_condition.create () ;
-  }
-
-  let go s =
-    s.state <- true ;
-    Lwt_condition.broadcast s.cond ()
-
-  (* let stop s =
-   *   s.state <- false *)
-
-  (* let wait s =
-   *   if s.state then Lwt.return ()
-   *   else Lwt_condition.wait s.cond *)
-end
 
 module Table = String.Table
 
-(* module Lwt_eval = struct
- *   type 'a t = ('a, S.t) Lwt_result.t (\* missing deps *\)
- *   let ( >> ) = Lwt.( >>= )
- *   let ( >>= ) = Lwt_result.( >>= )
- *   (\* let ( >>| ) = Lwt_result.( >|= ) *\)
- * 
- *   let return = Lwt_result.return
- *   let fail = Lwt_result.fail
- *   (\* let fail1 e = Lwt_result.fail (S.singleton e) *\)
- * 
- *   let map_p xs ~f =
- *     Lwt.bind (Lwt_list.map_p f xs) @@ fun results ->
- *     let res =
- *       List.fold results ~init:(Ok []) ~f:(fun acc res ->
- *           match acc, res with
- *           | Ok xs, Ok x -> Ok (x :: xs)
- *           | Ok _, Error e -> Error e
- *           | Error e, Ok _ -> Error e
- *           | Error e, Error e' -> Error (S.union e e')
- *         )
- *       |> (
- *         function
- *         | Ok xs -> Ok (List.rev xs)
- *         | Error _ as e -> e
- *       )
- *     in
- *     Lwt.return res
- * end *)
+module Lwt_eval = struct
+  type 'a t = ('a, S.t) Lwt_result.t (* missing deps *)
+  let ( >> ) = Lwt.( >>= )
+  let ( >>= ) = Lwt_result.( >>= )
+  let ( >>| ) = Lwt_result.( >|= )
+
+  let return = Lwt_result.return
+  let fail = Lwt_result.fail
+  let fail1 e = Lwt_result.fail (S.singleton e)
+
+  let map_p xs ~f =
+    Lwt.bind (Lwt_list.map_p f xs) @@ fun results ->
+    let res =
+      List.fold results ~init:(Ok []) ~f:(fun acc res ->
+          match acc, res with
+          | Ok xs, Ok x -> Ok (x :: xs)
+          | Ok _, Error e -> Error e
+          | Error e, Ok _ -> Error e
+          | Error e, Error e' -> Error (S.union e e')
+        )
+      |> (
+        function
+        | Ok xs -> Ok (List.rev xs)
+        | Error _ as e -> e
+      )
+    in
+    Lwt.return res
+end
 
 type t = {
   allocator : Allocator.t ;
   config : Task.config ;
   traces : Execution_trace.t Lwt.t Table.t ;
-  start_signal : Semaphore.t ;
   logger : Logger.t ;
 }
 
-(* let log ?(time = Unix.gettimeofday ()) sched event =
- *   sched.logger#event sched.config.db time event *)
+let log ?(time = Unix.gettimeofday ()) sched event =
+  sched.logger#event sched.config.db time event
 
 
 let create
@@ -77,25 +57,156 @@ let create
   {
     allocator = Allocator.create ~np ~mem:(mem * 1024) ;
     config = { Task.db ; use_docker } ;
-    start_signal = Semaphore.create false ;
     traces = String.Table.create () ;
     logger = Logger.tee loggers ;
   }
 
-let join sched =
-  Table.to_alist sched.traces
-  |> List.map ~f:(fun (_, trace) -> trace >|= ignore)
-  |> Lwt.join
+let error_report db traces =
+  let buf = Buffer.create 1024 in
+  List.iter traces ~f:(fun trace ->
+      Execution_trace.error_report trace db buf
+    ) ;
+  Buffer.contents buf
 
-let start sched =
-  Semaphore.go sched.start_signal
+let task_trace sched t =
+  let ready = Unix.gettimeofday () in
+  log ~time:ready sched (Logger.Task_ready t) ;
+  Allocator.request sched.allocator (Task.requirement t) >>= function
+  | Ok resource ->
+    let start = Unix.gettimeofday () in
+    log ~time:start sched (Logger.Task_started (t, resource)) ;
+    Task.perform t sched.config resource >>= fun outcome ->
+    let _end_ = Unix.gettimeofday () in
+    log ~time:_end_ sched (Logger.Task_ended { outcome ; start ; _end_ }) ;
+    Allocator.release sched.allocator resource ;
+    Lwt.return (
+      Execution_trace.Run { ready ; start  ; _end_ ; outcome }
+    )
+  | Error (`Msg msg) ->
+    log sched (Logger.Task_allocation_error (t, msg)) ;
+    Lwt.return (Execution_trace.Allocation_error (t, msg))
 
-(* let error_report db traces =
- *   let buf = Buffer.create 1024 in
- *   List.iter traces ~f:(fun (id, trace) ->
- *       Execution_trace.error_report trace db buf id
- *     ) ;
- *   Buffer.contents buf *)
+let rec schedule_workflow sched w =
+  let id = Workflow.id w in
+  (
+    match Table.find sched.traces id with
+    | None ->
+      let trace = workflow_trace sched w in
+      Table.set sched.traces ~key:id ~data:trace ;
+      trace
+    | Some trace -> trace
+  ) >>= fun trace ->
+  if Execution_trace.is_errored trace then
+    Lwt_eval.fail1 trace
+  else
+    Lwt_result.return ()
+
+and workflow_trace sched w =
+  Task.is_done w sched.config.db >>= fun is_done ->
+  if is_done then (
+    log sched (Logger.Workflow_skipped (w, `Done_already)) ;
+    Lwt.return (Execution_trace.Done_already w)
+  )
+  else (
+    schedule_deps sched w >>= function
+    | Ok _ ->
+      task_trace sched w
+    | Error missing_deps ->
+      log sched Logger.(Workflow_skipped (w, `Missing_dep)) ;
+      Lwt.return (Execution_trace.Canceled { task = w ; missing_deps = S.elements missing_deps})
+  )
+
+and schedule_deps sched w =
+  let deps = Workflow.deps w in
+  let f = function
+    | Workflow.WDep w -> schedule_workflow sched w
+    | Workflow.WLDep wl -> Lwt_eval.(schedule_collection sched wl >>| ignore)
+  in
+  Lwt_eval.map_p ~f deps >>= function
+  | Ok _ -> Lwt_eval.return ()
+  | Error traces -> Lwt_eval.fail (S.filter Execution_trace.is_errored traces)
+
+and schedule_collection sched =
+  let open Lwt_eval in
+  function
+  | List l ->
+    map_p l.elts ~f:(schedule_workflow sched) >>= fun _ ->
+    return (List.map ~f:Bistro.Private.laever l.elts)
+  | Glob g ->
+    schedule_workflow sched g.dir >>= fun () ->
+    Lwt.(Misc.files_in_dir (Db.path sched.config.db g.dir) >|= fun x -> Ok x) >>= fun files ->
+    return (List.map files ~f:Bistro.(fun f -> select (Private.laever g.dir) (selector [f])))
+  | ListMap lm ->
+    schedule_collection sched lm.elts >>= fun elts ->
+    let targets = List.map ~f:(fun x -> lm.f (Bistro.Private.reveal x)) elts in
+    map_p targets ~f:(fun w -> schedule_workflow sched w) >>= fun _ ->
+    return (List.map ~f:Bistro.Private.laever targets)
+
+module Expr = struct
+  type scheduler = t
+  type _ t =
+    | Pure : 'a -> 'a t
+    | App : ('a -> 'b) t * 'a t -> 'b t
+    | Workflow : _ Bistro.workflow -> string t
+    | Collection : 'a Bistro.collection -> (('a workflow * string) list) t
+    | List : 'a t list -> 'a list t
+  and 'a workflow = W of 'a Bistro.workflow [@@unboxed]
+  (* this type definition is to avoid a typing error, see
+     https://caml.inria.fr/mantis/print_bug_page.php?bug_id=7605 *)
+
+  let rec eval
+    : type s. scheduler -> s t -> (s, S.t) Lwt_result.t
+    = fun sched expr ->
+      let open Lwt_eval in
+      match expr with
+      | Pure x -> return x
+      | App (f, x) ->
+        let f = eval sched f and x = eval sched x in
+        f >>= fun f ->
+        x >>= fun x -> (* FIXME: ici il faudrait renvoyer l'union des erreurs *)
+        return (f x)
+      | Workflow w ->
+        let w = Bistro.Private.reveal w in
+        schedule_workflow sched w >>= fun _ ->
+        return (Db.path sched.config.db w)
+      | Collection c ->
+        let c = Bistro.Private.collection c in
+        schedule_collection sched c >>= fun workflows ->
+        return (List.map workflows ~f:(fun w -> W w, Db.path sched.config.db (Bistro.Private.reveal w)))
+      | List xs ->
+        map_p xs ~f:(eval sched)
+
+  let pure x = Pure x
+  let app f x = App (f, x)
+  let ( $ ) = app
+  let map x ~f = pure f $ x
+  let both x y = pure (fun x y -> x, y) $ x $ y
+  let dep x = Workflow x
+  let deps xs =
+    pure (List.map ~f:(fun (W w, s) -> w, s)) $ (Collection xs)
+  let list xs = List xs
+  let return x = pure x
+end
+
+module Let_syntax = struct
+  module Let_syntax = struct
+    include Expr
+    module Open_on_rhs = struct
+      include Expr
+    end
+  end
+end
+
+let eval ?loggers ?np ?mem ?use_docker db expr =
+  let sched = create ?loggers ?np ?mem ?use_docker db in
+  Expr.eval sched expr
+
+let eval_main ?np ?mem ?loggers ?use_docker db expr =
+  let sched = create ?loggers ?np ?mem ?use_docker db in
+  let t = Expr.eval sched expr in
+  match Lwt_main.run t with
+  | Ok _ as x -> x
+  | Error traces -> Error (error_report db (S.elements traces))
 
 (* let rec submit sched w : Execution_trace.t Lwt.t =
  *   match Table.find sched.traces (Workflow.id w) with
@@ -142,23 +253,6 @@ let start sched =
  *   else
  *     return trace
  * 
- * and task_trace sched t =
- *   let ready = Unix.gettimeofday () in
- *   log ~time:ready sched (Logger.Task_ready t) ;
- *   Allocator.request sched.allocator (Task.requirement t) >>= function
- *   | Ok resource ->
- *     let start = Unix.gettimeofday () in
- *     log ~time:start sched (Logger.Task_started (t, resource)) ;
- *     Task.perform t sched.config resource >>= fun outcome ->
- *     let _end_ = Unix.gettimeofday () in
- *     log ~time:_end_ sched (Logger.Task_ended { outcome ; start ; _end_ }) ;
- *     Allocator.release sched.allocator resource ;
- *     Lwt.return (
- *       Execution_trace.Run { ready ; start  ; _end_ ; outcome }
- *     )
- *   | Error (`Msg msg) ->
- *     log sched (Logger.Task_allocation_error (t, msg)) ;
- *     Lwt.return (Execution_trace.Allocation_error msg)
  * 
  * let rec eval_expr : type s. t -> s Expr.t -> s Lwt_eval.t = fun sched expr ->
  *   let open Expr in
@@ -202,8 +296,8 @@ let start sched =
  *   : type s. t -> s Bistro.workflow -> string
  *   = fun sched w ->
  *     let w = Bistro.Private.reveal w in
- *     (\* if in_container then Execution_env.((container_mount sched.config.db w).file_container_location)
- *        else *\) Db.path sched.config.db w
+ *     (* if in_container then Execution_env.((container_mount sched.config.db w).file_container_location)
+ *        else *) Db.path sched.config.db w
  * 
  * let submit sched w = submit sched (Bistro.Private.reveal w)
  * 
@@ -215,13 +309,6 @@ let start sched =
  *   in
  *   Lwt_result.bind_lwt_err (eval_expr sched e) f *)
 
-(* let eval_expr_main ?np ?mem ?loggers ?use_docker db expr =
- *   let sched = create ?loggers ?np ?mem ?use_docker db in
- *   let t = eval_expr sched expr in
- *   start sched ;
- *   match Lwt_main.run t with
- *   | Ok _ as x -> x
- *   | Error traces -> Error (error_report db traces) *)
 
 
 
@@ -235,7 +322,7 @@ let start sched =
  *         | Run { outcome } -> Task_result.succeeded outcome
  *       )
  *     | None ->
- *       (\* never call [wait4deps] before having registered the deps *\)
+ *       (* never call [wait4deps] before having registered the deps *)
  *       assert false
  *   in
  *   let deps = Command.deps w.Workflow.task in
@@ -310,7 +397,7 @@ let start sched =
  *       let start = Unix.gettimeofday () in
  *       Task.perform_map_dir sched.config.db ~files_in_dir ~goals w >>= fun outcome ->
  *       let _end_ = Unix.gettimeofday () in
- *       (\* FIXME: delete all intermediates *\)
+ *       (* FIXME: delete all intermediates *)
  *       Lwt.return (Execution_trace.Run { ready ; start ; _end_ ; outcome })
  *
  *     | Some failed_trace ->
