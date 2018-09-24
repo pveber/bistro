@@ -39,6 +39,73 @@ module Lwt_eval = struct
     Lwt.return res
 end
 
+module Gc : sig
+  type t
+  val create : Db.t -> t
+  val protect : t -> Workflow.dep -> unit
+  val uses : t -> Workflow.dep -> Workflow.dep -> unit
+end
+=
+struct
+  module Dep = struct
+    type t = Workflow.dep
+    let id = Workflow.(function
+        | WDep w -> id w
+        | WLDep ws -> list_id ws
+      )
+    let compare x y =
+      String.compare (id x) (id y)
+
+    let equal x y =
+      String.equal (id x) (id y)
+
+    let hash x =
+      let open Workflow in
+      Hashtbl.hash (
+        match x with
+        | WDep w -> digestible_workflow w
+        | WLDep ws -> digestible_workflow_list ws
+      )
+  end
+
+  module T = Caml.Hashtbl.Make(Dep)
+  module S = Caml.Set.Make(Dep)
+  type t = {
+    db : Db.t ;
+    revdeps : S.t T.t ;
+    mutable protected : S.t ;
+  }
+  let create db = {
+    db ;
+    revdeps = T.create 253 ;
+    protected = S.empty ;
+  }
+
+  let protect gc x =
+    gc.protected <- S.add x gc.protected
+
+  let uses gc x y =
+    match T.find gc.revdeps y with
+    | exception Caml.Not_found -> T.add gc.revdeps y (S.singleton x)
+    | s -> T.replace gc.revdeps y (S.add x s)
+
+  let rec fold_dep_aux seen d ~init ~f =
+    if S.mem d seen then (seen, init)
+    else (
+      match d with
+      | WDep w ->
+        List.fold (Workflow.deps w) ~init:(seen, init) ~f:(fun (seen, init) d -> fold_dep_aux seen d ~init ~f)
+      | WLDep (List l) -> assert false
+      | WLDep (ListMap lm) -> assert false
+      | WLDep (Glob g) -> assert false
+    )
+
+  let fold_dep d ~init ~f =
+    let seen = S.empty in
+    fold_dep_aux seen d ~init ~f
+    |> snd
+end
+
 type t = {
   allocator : Allocator.t ;
   config : Task.config ;
@@ -48,7 +115,6 @@ type t = {
 
 let log ?(time = Unix.gettimeofday ()) sched event =
   sched.logger#event sched.config.db time event
-
 
 let create
     ?(loggers = [])
