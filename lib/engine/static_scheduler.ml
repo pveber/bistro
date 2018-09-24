@@ -68,6 +68,56 @@ let error_report db traces =
     ) ;
   Buffer.contents buf
 
+
+let rec expand_collection db : Workflow.t_list -> Workflow.t list Lwt.t = function
+  | List l -> Lwt.return l.elts
+  | Glob g ->
+    let dir_path = Db.path db g.dir in
+    Misc.files_in_dir dir_path >>= fun files ->
+    let ws = List.map files ~f:(fun fn -> Workflow.select g.dir [fn]) in
+    Lwt.return ws
+  | ListMap lm ->
+    expand_collection db lm.elts >>= fun ws ->
+    Lwt.return (List.map ws ~f:lm.f)
+
+let rec expand_template db =
+  let open Template in
+  let ret1 x = Lwt.return [ x ] in
+  function
+  | S s -> ret1 (S s)
+  | DEST -> ret1 DEST
+  | TMP -> ret1 TMP
+  | NP -> ret1 NP
+  | MEM -> ret1 MEM
+  | F tmpl ->
+    Lwt_list.map_p (expand_template db) tmpl >>= fun tmpl ->
+    ret1 (Template.F (List.concat tmpl))
+  | D (Workflow.WDep w) -> ret1 (D w)
+  | D (Workflow.WLDep ws) ->
+    expand_collection db ws >>= fun ws ->
+    List.map ws ~f:(fun w -> Template.D w)
+    |> List.intersperse ~sep:(S ",") (* FIXME!!! *)
+    |> Lwt.return
+
+let rec expand_command db =
+  let open Command in
+  function
+  | Simple_command c ->
+    Lwt_list.map_p (expand_template db) c >|= List.concat >>= fun c ->
+    Lwt.return (Simple_command c)
+  | And_list xs ->
+    Lwt_list.map_p (expand_command db) xs >>= fun xs ->
+    Lwt.return (And_list xs)
+  | Or_list xs ->
+    Lwt_list.map_p (expand_command db) xs >>= fun xs ->
+    Lwt.return (Or_list xs)
+  | Pipe_list xs ->
+    Lwt_list.map_p (expand_command db) xs >>= fun xs ->
+    Lwt.return (Pipe_list xs)
+  | Docker (img, c) ->
+    expand_command db c >>= fun c ->
+    Lwt.return (Docker (img, c))
+
 let task_trace sched t =
   let ready = Unix.gettimeofday () in
   log ~time:ready sched (Logger.Task_ready t) ;
@@ -231,11 +281,11 @@ let eval_main ?np ?mem ?loggers ?use_docker db expr =
  *     Table.set sched.traces ~key:(Workflow.id w) ~data:trace ;
  *     trace
  *   | Some trace -> trace
- * 
+ *
  * and compute_deps sched w =
  *   let deps = Workflow.deps w in
  *   Lwt_eval.map_p ~f:(submit_for_eval sched) deps
- * 
+ *
  * and compute_task = function
  *   | Input { path ; id } ->
  *     Task.input ~path ~id
@@ -245,7 +295,7 @@ let eval_main ?np ?mem ?loggers ?use_docker db expr =
  *     Task.shell ~id ~descr ~np ~mem cmd
  *   | Plugin { task = f ; id ; descr ; np ; mem; _} ->
  *     Task.plugin ~id ~descr ~np ~mem f
- * 
+ *
  * and submit_for_eval sched w =
  *   let open Lwt_eval in
  *   submit sched w >> fun trace ->
@@ -253,8 +303,8 @@ let eval_main ?np ?mem ?loggers ?use_docker db expr =
  *     fail (Execution_trace.gather_failures [w] [trace])
  *   else
  *     return trace
- * 
- * 
+ *
+ *
  * let rec eval_expr : type s. t -> s Expr.t -> s Lwt_eval.t = fun sched expr ->
  *   let open Expr in
  *   let open Lwt_eval in
@@ -286,22 +336,22 @@ let eval_main ?np ?mem ?loggers ?use_docker db expr =
  *     map_p ys ~f:(eval_expr sched)
  *   | List xs ->
  *     map_p ~f:(eval_expr sched) xs
- * 
+ *
  *   | Glob { dir ; _ } ->
  *     eval_expr sched dir >>= fun dir ->
  *     submit_for_eval sched (Bistro.Private.reveal dir) >>= fun _ ->
  *     Misc.files_in_dir (workflow_path sched dir) >> fun files ->
  *     return @@ Base.List.map files ~f:(fun f -> f, Bistro.(dir /> selector [f]))
- * 
+ *
  * and workflow_path
  *   : type s. t -> s Bistro.workflow -> string
  *   = fun sched w ->
  *     let w = Bistro.Private.reveal w in
  *     (* if in_container then Execution_env.((container_mount sched.config.db w).file_container_location)
  *        else *) Db.path sched.config.db w
- * 
+ *
  * let submit sched w = submit sched (Bistro.Private.reveal w)
- * 
+ *
  * let eval_expr sched e =
  *   let f ids =
  *     let ids = S.to_list ids in
