@@ -5,54 +5,7 @@ type config = {
   use_docker : bool ;
 }
 
-type t = private
-  | Input of { id : string ; path : string }
-  | Select of {
-      id : string ;
-      dir : Workflow.t ;
-      sel : string list
-    }
-  | Shell of {
-      id : string ;
-      descr : string ;
-      np : int ;
-      mem : int ;
-      cmd : Workflow.t Command.t ;
-    }
-  | Plugin of {
-      id : string ;
-      descr : string ;
-      np : int ;
-      mem : int ;
-      f : Workflow.env -> unit ;
-    }
-
-val input :
-  id:string ->
-  path:string ->
-  t
-
-val select :
-  id:string ->
-  dir:Workflow.t ->
-  sel:string list ->
-  t
-
-val shell :
-  id:string ->
-  descr:string ->
-  np:int ->
-  mem:int ->
-  Workflow.t Command.t -> t
-
-val plugin :
-  id:string ->
-  descr:string ->
-  np:int ->
-  mem:int ->
-  (Workflow.env -> unit) -> t
-
-val id : t -> string
+type t = Workflow.t
 
 val requirement : t -> Allocator.request
 

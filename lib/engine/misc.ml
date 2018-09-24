@@ -58,16 +58,9 @@ let cp from _to_ =
 
 let files_in_dir dir =
   Lwt_unix.files_of_directory dir
-  |> Lwt_stream.to_list >|=
-  List.filter ~f:(function
+  |> Lwt_stream.to_list
+  >|= List.filter ~f:(function
       | "." | ".." -> false
       | _ -> true
     )
-
-let files_in_dir_blocking dir =
-  Sys.readdir dir
-  |> Array.to_list
-  |> List.filter ~f:(function
-      | "." | ".." -> false
-      | _ -> true
-    )
+  >|= List.sort ~compare:String.compare 

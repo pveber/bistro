@@ -68,64 +68,6 @@ let error_report db traces =
     ) ;
   Buffer.contents buf
 
-
-let rec expand_collection db : Workflow.t_list -> Workflow.t list Lwt.t = function
-  | List l -> Lwt.return l.elts
-  | Glob g ->
-    let dir_path = Db.path db g.dir in
-    Misc.files_in_dir dir_path >>= fun files ->
-    let ws = List.map files ~f:(fun fn -> Workflow.select g.dir [fn]) in
-    Lwt.return ws
-  | ListMap lm ->
-    expand_collection db lm.elts >>= fun ws ->
-    Lwt.return (List.map ws ~f:lm.f)
-
-let rec expand_template db =
-  let open Template in
-  let ret1 x = Lwt.return [ x ] in
-  function
-  | S s -> ret1 (S s)
-  | DEST -> ret1 DEST
-  | TMP -> ret1 TMP
-  | NP -> ret1 NP
-  | MEM -> ret1 MEM
-  | F tmpl ->
-    Lwt_list.map_p (expand_template db) tmpl >>= fun tmpl ->
-    ret1 (Template.F (List.concat tmpl))
-  | D (Workflow.WDepT w) -> ret1 (D w)
-  | D (Workflow.WLDepT (ws, sep)) ->
-    expand_collection db ws >>= fun ws ->
-    List.map ws ~f:(fun w -> Template.D w)
-    |> List.intersperse ~sep:(S sep)
-    |> Lwt.return
-
-let rec expand_command db =
-  let open Command in
-  function
-  | Simple_command c ->
-    Lwt_list.map_p (expand_template db) c >|= List.concat >>= fun c ->
-    Lwt.return (Simple_command c)
-  | And_list xs ->
-    Lwt_list.map_p (expand_command db) xs >>= fun xs ->
-    Lwt.return (And_list xs)
-  | Or_list xs ->
-    Lwt_list.map_p (expand_command db) xs >>= fun xs ->
-    Lwt.return (Or_list xs)
-  | Pipe_list xs ->
-    Lwt_list.map_p (expand_command db) xs >>= fun xs ->
-    Lwt.return (Pipe_list xs)
-  | Docker (img, c) ->
-    expand_command db c >>= fun c ->
-    Lwt.return (Docker (img, c))
-
-let task_of_workflow db = function
-  | Workflow.Input { id ; path } -> Lwt.return (Task.input ~id ~path)
-  | Select { dir ; sel ; id } -> Lwt.return (Task.select ~id ~dir ~sel)
-  | Shell { id ; descr ; np ; mem ; task = cmd ; _ } ->
-    expand_command db cmd >|= Task.shell ~id ~descr ~np ~mem
-  | Plugin { id ; descr ; np ; mem ; task = f ; _ } ->
-    Lwt.return (Task.plugin ~id ~descr ~np ~mem f)
-
 let task_trace sched t =
   let ready = Unix.gettimeofday () in
   log ~time:ready sched (Logger.Task_ready t) ;
@@ -160,19 +102,18 @@ let rec schedule_workflow sched w =
     Lwt_result.return ()
 
 and workflow_trace sched w =
-  task_of_workflow sched.config.db w >>= fun t ->
-  Task.is_done t sched.config.db >>= fun is_done ->
+  Task.is_done w sched.config.db >>= fun is_done ->
   if is_done then (
     log sched (Logger.Workflow_skipped (w, `Done_already)) ;
-    Lwt.return (Execution_trace.Done_already t)
+    Lwt.return (Execution_trace.Done_already w)
   )
   else (
     schedule_deps sched w >>= function
     | Ok _ ->
-      task_trace sched t
+      task_trace sched w
     | Error missing_deps ->
       log sched Logger.(Workflow_skipped (w, `Missing_dep)) ;
-      Lwt.return (Execution_trace.Canceled { task = t ; missing_deps = S.elements missing_deps})
+      Lwt.return (Execution_trace.Canceled { task = w ; missing_deps = S.elements missing_deps})
   )
 
 and schedule_deps sched w =

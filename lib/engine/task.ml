@@ -7,38 +7,7 @@ type config = {
   use_docker : bool ;
 }
 
-type t =
-  | Input of { id : string ; path : string }
-  | Select of {
-      id : string ;
-      dir : Workflow.t ;
-      sel : string list
-    }
-  | Shell of {
-      id : string ;
-      descr : string ;
-      np : int ;
-      mem : int ;
-      cmd : Workflow.t Command.t ;
-    }
-  | Plugin of {
-      id : string ;
-      descr : string ;
-      np : int ;
-      mem : int ;
-      f : Workflow.env -> unit ;
-    }
-
-let input ~id ~path = Input { id ; path }
-let select ~id ~dir ~sel = Select { id ; dir ; sel }
-let shell ~id ~descr ~np ~mem cmd = Shell { id ; cmd ; np ; mem ; descr }
-let plugin ~id ~descr ~np ~mem f = Plugin { id ; f ; np ; mem ; descr }
-
-let id = function
-  | Input { id ;  _ }
-  | Select { id ;  _}
-  | Shell { id ; _ } -> id
-  | Plugin { id ; _  } -> id
+type t = Workflow.t
 
 let step_outcome ~exit_code ~dest_exists=
   match exit_code, dest_exists with
@@ -47,7 +16,7 @@ let step_outcome ~exit_code ~dest_exists=
   | _ -> `Failed
 
 let requirement = function
-  | Input _
+  | Workflow.Input _
   | Select _ ->
     Allocator.Request { np = 0 ; mem = 0 }
   | Plugin { np ; mem ; _ }
@@ -64,9 +33,59 @@ let rec waitpid pid =
   try Unix.waitpid pid
   with Unix.Unix_error (Unix.EINTR, _, _) -> waitpid pid
 
+
+let rec expand_collection db : Workflow.t_list -> Workflow.t list Lwt.t = function
+  | List l -> Lwt.return l.elts
+  | Glob g ->
+    let dir_path = Db.path db g.dir in
+    Misc.files_in_dir dir_path >>= fun files ->
+    let ws = List.map files ~f:(fun fn -> Workflow.select g.dir [fn]) in
+    Lwt.return ws
+  | ListMap lm ->
+    expand_collection db lm.elts >>= fun ws ->
+    Lwt.return (List.map ws ~f:lm.f)
+
+let rec expand_template db =
+  let open Template in
+  let ret1 x = Lwt.return [ x ] in
+  function
+  | S s -> ret1 (S s)
+  | DEST -> ret1 DEST
+  | TMP -> ret1 TMP
+  | NP -> ret1 NP
+  | MEM -> ret1 MEM
+  | F tmpl ->
+    Lwt_list.map_p (expand_template db) tmpl >>= fun tmpl ->
+    ret1 (Template.F (List.concat tmpl))
+  | D (Workflow.WDepT w) -> ret1 (D w)
+  | D (Workflow.WLDepT (ws, sep)) ->
+    expand_collection db ws >>= fun ws ->
+    List.map ws ~f:(fun w -> Template.D w)
+    |> List.intersperse ~sep:(S sep)
+    |> Lwt.return
+
+let rec expand_command db =
+  let open Command in
+  function
+  | Simple_command c ->
+    Lwt_list.map_p (expand_template db) c >|= List.concat >>= fun c ->
+    Lwt.return (Simple_command c)
+  | And_list xs ->
+    Lwt_list.map_p (expand_command db) xs >>= fun xs ->
+    Lwt.return (And_list xs)
+  | Or_list xs ->
+    Lwt_list.map_p (expand_command db) xs >>= fun xs ->
+    Lwt.return (Or_list xs)
+  | Pipe_list xs ->
+    Lwt_list.map_p (expand_command db) xs >>= fun xs ->
+    Lwt.return (Pipe_list xs)
+  | Docker (img, c) ->
+    expand_command db c >>= fun c ->
+    Lwt.return (Docker (img, c))
+
 let perform t config (Allocator.Resource { np ; mem }) =
   match t with
-  | Input { path ; id } ->
+  | Workflow.Input { path ; id } ->
     let pass = Sys.file_exists path = `Yes in
     (
       if pass then Misc.cp path (Db.cache config.db id)
@@ -86,14 +105,14 @@ let perform t config (Allocator.Resource { np ; mem }) =
         }
       )
 
-  | Shell { cmd ; id ; descr ; _ } ->
+  | Shell { task = cmd ; id ; descr ; _ } ->
     let env =
       Execution_env.make
         ~use_docker:config.use_docker
         ~db:config.db
         ~np ~mem ~id
     in
-    let cmd = Shell_command.make env cmd in
+    expand_command config.db cmd >|= Shell_command.make env >>= fun cmd ->
     Shell_command.run cmd >>= fun (exit_code, dest_exists) ->
     let cache_dest = Db.cache config.db id in
     let outcome = step_outcome ~exit_code ~dest_exists in
@@ -116,7 +135,7 @@ let perform t config (Allocator.Resource { np ; mem }) =
         stderr = env.stderr ;
       })
 
-  | Plugin { f ; id ; descr ; _ } ->
+  | Plugin { task = f ; id ; descr ; _ } ->
     let env =
       Execution_env.make
         ~use_docker:config.use_docker
@@ -180,27 +199,9 @@ let perform t config (Allocator.Resource { np ; mem }) =
           outcome ;
         })
 
-(* let perform_map_dir db ~files_in_dir ~goals w =
- *   let dest = Workflow.path db w in
- *   Unix.mkdir_p dest ;
- *   List.map2_exn files_in_dir goals ~f:(fun fn g ->
- *       let dest = Filename.concat dest fn in
- *       match (g : Workflow.t) with
- *       | Input { path ; _ } ->
- *         Misc.ln path dest
- *       | (Select _ | Shell _ | Map_dir _) ->
- *         Misc.mv (Workflow.path db g) dest
- *     ) |> Lwt.join >>= fun () ->
- *   Lwt.return (
- *     `Map_dir {
- *       Task_result.Map_dir.pass = true ;
- *       cache = Some dest ;
- *     }
- *   ) *)
-
 let is_done t db =
   let path = match t with
-    | Input { id ; _ } -> Db.cache db id
+    | Workflow.Input { id ; _ } -> Db.cache db id
     | Select { dir ; sel ; _ } -> select_path db dir sel
     | Shell { id ; _ } -> Db.cache db id
     | Plugin { id ; _ } -> Db.cache db id

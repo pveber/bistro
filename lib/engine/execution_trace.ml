@@ -71,7 +71,7 @@ let error_report trace db buf =
       error_title buf title short_descr ;
       Task_result.error_long_descr outcome db buf tid
   | Allocation_error (w, err) ->
-    let title = sprintf "Task %s failed\n" (Task.id w) in
+    let title = sprintf "Task %s failed\n" (Workflow.id w) in
     let short_descr = sprintf "Allocation error: %s\n" err in
     error_title buf title short_descr
   | Invalid_glob g ->
