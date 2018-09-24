@@ -19,9 +19,15 @@ let wc (f : text_file workflow) : text_file workflow =
 let wc_dir =
   collection_map (glob dir) ~f:wc
 
+let concat =
+  shell ~descr:"concat" [
+    cmd "cat" ~stdout:dest [ deps ~sep:" " wc_dir ]
+  ]
+
 let repo = Bistro_engine.Repo.[
     item ["src"] dir ;
     items ["wc"] wc_dir ;
+    item ["concat"] concat ;
   ]
 
 let () =

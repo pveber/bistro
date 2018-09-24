@@ -92,11 +92,11 @@ let rec expand_template db =
   | F tmpl ->
     Lwt_list.map_p (expand_template db) tmpl >>= fun tmpl ->
     ret1 (Template.F (List.concat tmpl))
-  | D (Workflow.WDep w) -> ret1 (D w)
-  | D (Workflow.WLDep ws) ->
+  | D (Workflow.WDepT w) -> ret1 (D w)
+  | D (Workflow.WLDepT (ws, sep)) ->
     expand_collection db ws >>= fun ws ->
     List.map ws ~f:(fun w -> Template.D w)
-    |> List.intersperse ~sep:(S ",") (* FIXME!!! *)
+    |> List.intersperse ~sep:(S sep)
     |> Lwt.return
 
 let rec expand_command db =

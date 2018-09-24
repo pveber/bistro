@@ -23,8 +23,8 @@ and 'a step = {
   version : int option ; (** Version number of the wrapper *)
 }
 and shell = shell_command step
-and shell_command = dep Command.t
-and template = dep Template.t
+and shell_command = dep_token Command.t
+and template = dep_token Template.t
 and env = <
   tmp : string ;
   dest : string ;
@@ -32,6 +32,7 @@ and env = <
   mem : int
 >
 and dep = WDep of t | WLDep of t_list
+and dep_token = WDepT of t | WLDepT of t_list * string
 and t_list =
   | List of {
       id : string ;
@@ -47,6 +48,10 @@ and t_list =
       elts : t_list ;
       f : t -> t ;
     }
+
+let dep_of_dep_token = function
+  | WDepT w -> WDep w
+  | WLDepT (ws, _) -> WLDep ws
 
 let id = function
   | Input { id ;  _ }
@@ -89,11 +94,11 @@ let digestible_workflow_list = function
   | Glob g -> `Glob g.id
   | ListMap lm -> `ListMap lm.id
 
-let digestible_dep = function
-  | WDep w -> digestible_workflow w
-  | WLDep wl -> digestible_workflow_list wl
+let digestible_dep_token = function
+  | WDepT w -> digestible_workflow w
+  | WLDepT (wl, sep) -> `Pair (digestible_workflow_list wl, sep)
 
-let digestible_cmd = Command.map ~f:digestible_dep
+let digestible_cmd = Command.map ~f:digestible_dep_token
 
 let shell
     ?(descr = "")
@@ -103,7 +108,10 @@ let shell
     cmds =
   let cmd = Command.And_list cmds in
   let id = digest ("shell", version, digestible_cmd cmd) in
-  let deps = Command.deps cmd in
+  let deps =
+    Command.deps cmd
+    |> List.map ~f:dep_of_dep_token
+  in
   Shell { descr ; task = cmd ; deps ; np ; mem ; version ; id }
 
 let glob ?pattern dir =

@@ -1,5 +1,6 @@
 module type Template_dsl = sig
   type 'a dep
+  type 'a deps
   type template
 
   val dest : template
@@ -29,6 +30,10 @@ module type Template_dsl = sig
 
   val dep : _ dep -> template
   (** [dep w] is interpreted as the path where to find the result of
+      workflow [w] *)
+
+  val deps : sep:string -> _ deps -> template
+  (** [deps w] is interpreted as the path where to find the result of
       workflow [w] *)
 
   val quote : ?using:char -> template -> template
@@ -164,16 +169,6 @@ module type DSL = sig
 
   type any_workflow = Any_workflow : _ workflow -> any_workflow
 
-  type template
-  module Template_dsl : Template_dsl with type 'a dep := 'a workflow
-                                      and type template := template
-
-  type docker_image
-  module Shell_dsl : Shell_dsl with type 'a dep := 'a workflow
-                                and type command = shell_command
-                                and type docker_image := docker_image
-                                and type template := template
-
   type 'a collection
 
   val glob :
@@ -185,6 +180,18 @@ module type DSL = sig
     'a collection ->
     f:('a workflow -> 'b workflow) ->
     'b collection
+
+  type template
+  module Template_dsl : Template_dsl with type 'a dep := 'a workflow
+                                      and type 'a deps := 'a collection
+                                      and type template := template
+
+  type docker_image
+  module Shell_dsl : Shell_dsl with type 'a dep := 'a workflow
+                                and type 'a deps := 'a collection
+                                and type command = shell_command
+                                and type docker_image := docker_image
+                                and type template := template
 end
 
 module type Term = sig
