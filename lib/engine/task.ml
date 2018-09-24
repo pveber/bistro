@@ -7,7 +7,43 @@ type config = {
   use_docker : bool ;
 }
 
-type t = Workflow.t
+type t =
+  | Input of { id : string ; path : string }
+  | Select of {
+      id : string ;
+      dir : Workflow.t ;
+      sel : string list
+    }
+  | Shell of {
+      id : string ;
+      descr : string ;
+      np : int ;
+      mem : int ;
+      cmd : Workflow.dep Command.t ;
+    }
+  | Plugin of {
+      id : string ;
+      descr : string ;
+      np : int ;
+      mem : int ;
+      f : Workflow.env -> unit ;
+    }
+
+let input ~id ~path = Input { id ; path }
+let select ~id ~dir ~sel = Select { id ; dir ; sel }
+let shell ~id ~descr ~np ~mem cmd = Shell { id ; cmd ; np ; mem ; descr }
+let plugin ~id ~descr ~np ~mem f = Plugin { id ; f ; np ; mem ; descr }
+let of_workflow = function
+  | Workflow.Input { id ; path } -> input ~id ~path
+  | Select { dir ; sel ; id } -> select ~id ~dir ~sel
+  | Shell { id ; descr ; np ; mem ; task = cmd ; _ } -> shell ~id ~descr ~np ~mem cmd
+  | Plugin { id ; descr ; np ; mem ; task = f ; _ } -> plugin ~id ~descr ~np ~mem f
+
+let id = function
+  | Input { id ;  _ }
+  | Select { id ;  _}
+  | Shell { id ; _ } -> id
+  | Plugin { id ; _  } -> id
 
 let step_outcome ~exit_code ~dest_exists=
   match exit_code, dest_exists with
@@ -15,7 +51,7 @@ let step_outcome ~exit_code ~dest_exists=
   | 0, false -> `Missing_output
   | _ -> `Failed
 
-let requirement : t -> _ = function
+let requirement = function
   | Input _
   | Select _ ->
     Allocator.Request { np = 0 ; mem = 0 }
@@ -34,7 +70,7 @@ let rec waitpid pid =
   with Unix.Unix_error (Unix.EINTR, _, _) -> waitpid pid
 
 let perform t config (Allocator.Resource { np ; mem }) =
-  match (t : t) with
+  match t with
   | Input { path ; id } ->
     let pass = Sys.file_exists path = `Yes in
     (
@@ -48,14 +84,14 @@ let perform t config (Allocator.Resource { np ; mem }) =
         let p = select_path config.db dir sel in
         let pass = Sys.file_exists p = `Yes in
         Task_result.Select {
-          id ; 
+          id ;
           pass ;
           dir_path = Db.path config.db dir ;
           sel ;
         }
       )
 
-  | Shell { task = cmd ; id ; descr ; _ } ->
+  | Shell { cmd ; id ; descr ; _ } ->
     let env =
       Execution_env.make
         ~use_docker:config.use_docker
@@ -85,7 +121,7 @@ let perform t config (Allocator.Resource { np ; mem }) =
         stderr = env.stderr ;
       })
 
-  | Plugin { task = f ; id ; descr ; _ } ->
+  | Plugin { f ; id ; descr ; _ } ->
     let env =
       Execution_env.make
         ~use_docker:config.use_docker
@@ -149,8 +185,25 @@ let perform t config (Allocator.Resource { np ; mem }) =
           outcome ;
         })
 
+(* let perform_map_dir db ~files_in_dir ~goals w =
+ *   let dest = Workflow.path db w in
+ *   Unix.mkdir_p dest ;
+ *   List.map2_exn files_in_dir goals ~f:(fun fn g ->
+ *       let dest = Filename.concat dest fn in
+ *       match (g : Workflow.t) with
+ *       | Input { path ; _ } ->
+ *         Misc.ln path dest
+ *       | (Select _ | Shell _ | Map_dir _) ->
+ *         Misc.mv (Workflow.path db g) dest
+ *     ) |> Lwt.join >>= fun () ->
+ *   Lwt.return (
+ *     `Map_dir {
+ *       Task_result.Map_dir.pass = true ;
+ *       cache = Some dest ;
+ *     }
+ *   ) *)
+
 let is_done t db =
-  let open Workflow in
   let path = match t with
     | Input { id ; _ } -> Db.cache db id
     | Select { dir ; sel ; _ } -> select_path db dir sel

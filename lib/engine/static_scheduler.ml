@@ -102,18 +102,19 @@ let rec schedule_workflow sched w =
     Lwt_result.return ()
 
 and workflow_trace sched w =
-  Task.is_done w sched.config.db >>= fun is_done ->
+  let t = Task.of_workflow w in
+  Task.is_done t sched.config.db >>= fun is_done ->
   if is_done then (
     log sched (Logger.Workflow_skipped (w, `Done_already)) ;
-    Lwt.return (Execution_trace.Done_already w)
+    Lwt.return (Execution_trace.Done_already t)
   )
   else (
     schedule_deps sched w >>= function
     | Ok _ ->
-      task_trace sched w
+      task_trace sched t
     | Error missing_deps ->
       log sched Logger.(Workflow_skipped (w, `Missing_dep)) ;
-      Lwt.return (Execution_trace.Canceled { task = w ; missing_deps = S.elements missing_deps})
+      Lwt.return (Execution_trace.Canceled { task = t ; missing_deps = S.elements missing_deps})
   )
 
 and schedule_deps sched w =
