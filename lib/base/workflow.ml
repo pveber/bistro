@@ -12,52 +12,46 @@ type t =
     }
   | Shell of shell
   | Plugin of (env -> unit) step
+  | MapDir of {
+      id : string ;
+      pattern : string option ;
+      dir : t ;
+      f : t -> t ;
+      deps : t list ;
+    }
 
 and 'a step = {
   id : string ;
   descr : string ;
   task : 'a ;
-  deps : dep list ;
+  deps : t list ;
   np : int ; (** Required number of processors *)
   mem : int ; (** Required memory in MB *)
   version : int option ; (** Version number of the wrapper *)
 }
 and shell = shell_command step
-and shell_command = dep_token Command.t
-and template = dep_token Template.t
+and shell_command = t Command.t
+and template = t Template.t
 and env = <
   tmp : string ;
   dest : string ;
   np : int ;
   mem : int
 >
-and dep = WDep of t | WLDep of t_list
-and dep_token = WDepT of t | WLDepT of t_list * string
-and t_list =
-  | List of {
-      id : string ;
-      elts : t list ;
-    }
-  | Glob of {
-      id : string ;
-      dir : t ;
-      pattern : string option ;
-    }
-  | ListMap of {
-      id : string ;
-      elts : t_list ;
-      f : t -> t ;
-    }
-
-let dep_of_dep_token = function
-  | WDepT w -> WDep w
-  | WLDepT (ws, _) -> WLDep ws
 
 let id = function
   | Input { id ;  _ }
   | Select { id ;  _}
-  | Shell { id ; _ } -> id
-  | Plugin { id ; _  } -> id
+  | Shell { id ; _ }
+  | Plugin { id ; _  }
+  | MapDir { id ; _ } -> id
+
+let deps = function
+  | Input _ -> []
+  | Select { dir ;  _ } -> [ dir ]
+  | MapDir s -> s.deps
+  | Shell s -> s.deps
+  | Plugin s -> s.deps
 
 let compare u v =
   String.compare (id u) (id v)
@@ -74,7 +68,8 @@ let select u q =
   | Select { dir ; sel = p ; _ } -> k dir (p @ q)
   | Input _
   | Plugin _
-  | Shell _ -> k u q
+  | Shell _
+  | MapDir _ -> k u q
 
 let input ?version path =
   let id = digest ("input", path, version) in
@@ -88,17 +83,9 @@ let rec digestible_workflow = function
   | Select { dir ; sel = p ; _ } ->
     `Select (digestible_workflow dir, p)
   | Plugin c -> `Plugin c.id
+  | MapDir md -> `MapDir md.id
 
-let digestible_workflow_list = function
-  | List l -> `List l.id
-  | Glob g -> `Glob g.id
-  | ListMap lm -> `ListMap lm.id
-
-let digestible_dep_token = function
-  | WDepT w -> digestible_workflow w
-  | WLDepT (wl, sep) -> `Pair (digestible_workflow_list wl, sep)
-
-let digestible_cmd = Command.map ~f:digestible_dep_token
+let digestible_cmd = Command.map ~f:digestible_workflow
 
 let shell
     ?(descr = "")
@@ -108,24 +95,8 @@ let shell
     cmds =
   let cmd = Command.And_list cmds in
   let id = digest ("shell", version, digestible_cmd cmd) in
-  let deps =
-    Command.deps cmd
-    |> List.map ~f:dep_of_dep_token
-  in
+  let deps = Command.deps cmd in
   Shell { descr ; task = cmd ; deps ; np ; mem ; version ; id }
-
-let glob ?pattern dir =
-  let id = digest ("glob", pattern, id dir) in
-  Glob { id ; pattern ; dir }
-
-let list_id = function
-  | List { id ; _ }
-  | Glob { id ; _ }
-  | ListMap { id ; _ } -> id
-
-let list_map elts ~f =
-  let id = digest ("list_map", list_id elts, id (f (input "foo"))) in
-  ListMap { id ; elts ; f }
 
 let plugin
     ?(descr = "")
@@ -136,8 +107,32 @@ let plugin
   let id = digest ("closure", version, id) in
   Plugin { descr ; task = f ; deps ; np ; mem ; version ; id }
 
-let deps = function
-  | Input _ -> []
-  | Select { dir ;  _ } -> [ WDep dir ]
-  | Shell s -> s.deps
-  | Plugin s -> s.deps
+module S = Caml.Set.Make(struct type nonrec t = t let compare = compare end)
+module M = Caml.Map.Make(struct type nonrec t = t let compare = compare end)
+
+let rec independant_workflows_aux cache w ~from:u =
+  if equal w u then M.add w (true, S.empty) cache
+  else if M.mem w cache then cache
+  else (
+    let cache = List.fold (deps w) ~init:cache ~f:(fun acc w ->
+        independant_workflows_aux acc w ~from:u
+      )
+    in
+    let children = List.map (deps w) ~f:(Fn.flip M.find cache) in
+    if List.exists children ~f:fst
+    then
+      let union = List.fold children ~init:S.empty ~f:(fun acc (_, s) -> S.union acc s) in
+      M.add w (true, union) cache
+        else M.add w (false, S.singleton w) cache
+  )
+
+let independant_workflows w ~from:u =
+  let cache = independant_workflows_aux M.empty w ~from:u in
+  M.find w cache |> snd |> S.elements
+
+let mapdir ?pattern dir ~f =
+  let u = input "string that could'nt possibly be a filename" in
+  let f_u = f u in
+  let id = digest ("mapdir", id dir, id f_u) in
+  let deps = independant_workflows f_u ~from:u in
+  MapDir { id ; pattern ; dir ; f ; deps }

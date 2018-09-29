@@ -10,8 +10,7 @@ let mem = [ Template.MEM ]
 let string s = [ Template.S s ]
 let int i = string (Int.to_string i)
 let float f = string (Float.to_string f)
-let dep w = [ Template.D (Workflow.WDepT w) ]
-let deps ~sep ws = [ Template.D (Workflow.WLDepT (ws, sep)) ]
+let dep w = [ Template.D w ]
 
 let quote ?using:(c = '"') e =
   let quote_symbol = Template.S (Char.to_string c) in
