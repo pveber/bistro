@@ -126,5 +126,6 @@ let rec path db =
   | Input i -> i.path
   | Select s ->
     Filename.concat (path db s.dir) (Path.to_string s.sel)
-  | Shell s -> cache db s.id
-  | Plugin s -> cache db s.id
+  | Shell { id ; _ }
+  | Plugin { id ; _ }
+  | MapDir { id ; _ } -> cache db id

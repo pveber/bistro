@@ -42,30 +42,19 @@ end
 module Gc : sig
   type t
   val create : Db.t -> t
-  val protect : t -> Workflow.dep -> unit
-  val uses : t -> Workflow.dep -> Workflow.dep -> unit
+  val protect : t -> Workflow.t -> unit
+  val uses : t -> Workflow.t -> Workflow.t -> unit
 end
 =
 struct
   module Dep = struct
-    type t = Workflow.dep
-    let id = Workflow.(function
-        | WDep w -> id w
-        | WLDep ws -> list_id ws
-      )
-    let compare x y =
-      String.compare (id x) (id y)
+    include Workflow
 
     let equal x y =
       String.equal (id x) (id y)
 
-    let hash x =
-      let open Workflow in
-      Hashtbl.hash (
-        match x with
-        | WDep w -> digestible_workflow w
-        | WLDep ws -> digestible_workflow_list ws
-      )
+    let hash w =
+      Hashtbl.hash (Workflow.digestible_workflow w)
   end
 
   module T = Caml.Hashtbl.Make(Dep)
@@ -89,21 +78,16 @@ struct
     | exception Caml.Not_found -> T.add gc.revdeps y (S.singleton x)
     | s -> T.replace gc.revdeps y (S.add x s)
 
-  let rec fold_dep_aux seen d ~init ~f =
-    if S.mem d seen then (seen, init)
-    else (
-      match d with
-      | WDep w ->
-        List.fold (Workflow.deps w) ~init:(seen, init) ~f:(fun (seen, init) d -> fold_dep_aux seen d ~init ~f)
-      | WLDep (List l) -> assert false
-      | WLDep (ListMap lm) -> assert false
-      | WLDep (Glob g) -> assert false
-    )
-
-  let fold_dep d ~init ~f =
-    let seen = S.empty in
-    fold_dep_aux seen d ~init ~f
-    |> snd
+  (* let rec fold_dep_aux seen d ~init ~f =
+   *   if S.mem d seen then (seen, init)
+   *   else (
+   *       List.fold (Workflow.deps d) ~init:(seen, init) ~f:(fun (seen, init) d -> fold_dep_aux seen d ~init ~f)
+   *   )
+   * 
+   * let fold_dep d ~init ~f =
+   *   let seen = S.empty in
+   *   fold_dep_aux seen d ~init ~f
+   *   |> snd *)
 end
 
 type t = {
@@ -134,23 +118,23 @@ let error_report db traces =
     ) ;
   Buffer.contents buf
 
-let task_trace sched t =
+let task_trace sched w t =
   let ready = Unix.gettimeofday () in
-  log ~time:ready sched (Logger.Task_ready t) ;
+  log ~time:ready sched (Logger.Workflow_ready w) ;
   Allocator.request sched.allocator (Task.requirement t) >>= function
   | Ok resource ->
     let start = Unix.gettimeofday () in
-    log ~time:start sched (Logger.Task_started (t, resource)) ;
+    log ~time:start sched (Logger.Workflow_started (w, resource)) ;
     Task.perform t sched.config resource >>= fun outcome ->
     let _end_ = Unix.gettimeofday () in
-    log ~time:_end_ sched (Logger.Task_ended { outcome ; start ; _end_ }) ;
+    log ~time:_end_ sched (Logger.Workflow_ended { outcome ; start ; _end_ }) ;
     Allocator.release sched.allocator resource ;
     Lwt.return (
       Execution_trace.Run { ready ; start  ; _end_ ; outcome }
     )
   | Error (`Msg msg) ->
-    log sched (Logger.Task_allocation_error (t, msg)) ;
-    Lwt.return (Execution_trace.Allocation_error (t, msg))
+    log sched (Logger.Workflow_allocation_error (w, msg)) ;
+    Lwt.return (Execution_trace.Allocation_error (w, msg))
 
 let rec schedule_workflow sched w =
   let id = Workflow.id w in
@@ -174,39 +158,39 @@ and workflow_trace sched w =
     Lwt.return (Execution_trace.Done_already w)
   )
   else (
-    schedule_deps sched w >>= function
-    | Ok _ ->
-      task_trace sched w
+    Lwt_eval.(
+      schedule_deps sched w >>= fun _ ->
+      task_of_workflow sched w
+    ) >>=function
+    | Ok t -> task_trace sched w t
     | Error missing_deps ->
       log sched Logger.(Workflow_skipped (w, `Missing_dep)) ;
-      Lwt.return (Execution_trace.Canceled { task = w ; missing_deps = S.elements missing_deps})
+      Lwt.return (Execution_trace.Canceled { workflow = w ; missing_deps = S.elements missing_deps})
   )
+
+and task_of_workflow sched =
+  let open Lwt_eval in
+  function
+  | Workflow.Input { id ; path } -> return (Task.input ~id ~path)
+  | Select { dir ; sel ; id } -> return (Task.select ~id ~dir ~sel)
+  | Shell { id ; descr ; np ; mem ; task = cmd ; _ } ->
+    return (Task.shell ~id ~descr ~np ~mem cmd)
+  | Plugin { id ; descr ; np ; mem ; task = f ; _ } ->
+    return (Task.plugin ~id ~descr ~np ~mem f)
+  | MapDir md ->
+    Misc.files_in_dir (Db.path sched.config.db md.dir) >> fun files ->
+    let inputs = List.map files ~f:Bistro.(fun f ->
+        select (Private.laever md.dir) (selector [f])
+      ) in
+    let targets = List.map ~f:(fun x -> md.f (Bistro.Private.reveal x)) inputs in
+    Lwt_eval.map_p targets ~f:(fun w -> schedule_workflow sched w) >>= fun _ ->
+    return (Task.mapdir ~id:md.id ~names:files ~targets)
 
 and schedule_deps sched w =
   let deps = Workflow.deps w in
-  let f = function
-    | Workflow.WDep w -> schedule_workflow sched w
-    | Workflow.WLDep wl -> Lwt_eval.(schedule_collection sched wl >>| ignore)
-  in
-  Lwt_eval.map_p ~f deps >>= function
+  Lwt_eval.map_p ~f:(schedule_workflow sched) deps >>= function
   | Ok _ -> Lwt_eval.return ()
   | Error traces -> Lwt_eval.fail (S.filter Execution_trace.is_errored traces)
-
-and schedule_collection sched =
-  let open Lwt_eval in
-  function
-  | List l ->
-    map_p l.elts ~f:(schedule_workflow sched) >>= fun _ ->
-    return (List.map ~f:Bistro.Private.laever l.elts)
-  | Glob g ->
-    schedule_workflow sched g.dir >>= fun () ->
-    Lwt.(Misc.files_in_dir (Db.path sched.config.db g.dir) >|= fun x -> Ok x) >>= fun files ->
-    return (List.map files ~f:Bistro.(fun f -> select (Private.laever g.dir) (selector [f])))
-  | ListMap lm ->
-    schedule_collection sched lm.elts >>= fun elts ->
-    let targets = List.map ~f:(fun x -> lm.f (Bistro.Private.reveal x)) elts in
-    map_p targets ~f:(fun w -> schedule_workflow sched w) >>= fun _ ->
-    return (List.map ~f:Bistro.Private.laever targets)
 
 module Expr = struct
   type scheduler = t
@@ -214,11 +198,7 @@ module Expr = struct
     | Pure : 'a -> 'a t
     | App : ('a -> 'b) t * 'a t -> 'b t
     | Workflow : _ Bistro.workflow -> string t
-    | Collection : 'a Bistro.collection -> (('a workflow * string) list) t
     | List : 'a t list -> 'a list t
-  and 'a workflow = W of 'a Bistro.workflow [@@unboxed]
-  (* this type definition is to avoid a typing error, see
-     https://caml.inria.fr/mantis/print_bug_page.php?bug_id=7605 *)
 
   let rec eval
     : type s. scheduler -> s t -> (s, S.t) Lwt_result.t
@@ -235,10 +215,6 @@ module Expr = struct
         let w = Bistro.Private.reveal w in
         schedule_workflow sched w >>= fun _ ->
         return (Db.path sched.config.db w)
-      | Collection c ->
-        let c = Bistro.Private.collection c in
-        schedule_collection sched c >>= fun workflows ->
-        return (List.map workflows ~f:(fun w -> W w, Db.path sched.config.db (Bistro.Private.reveal w)))
       | List xs ->
         map_p xs ~f:(eval sched)
 
@@ -248,8 +224,6 @@ module Expr = struct
   let map x ~f = pure f $ x
   let both x y = pure (fun x y -> x, y) $ x $ y
   let dep x = Workflow x
-  let deps xs =
-    pure (List.map ~f:(fun (W w, s) -> w, s)) $ (Collection xs)
   let list xs = List xs
   let return x = pure x
 end

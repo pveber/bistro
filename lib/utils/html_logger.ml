@@ -5,11 +5,11 @@ open Bistro_engine
 type time = float
 
 type event =
-  | Step_task_started of {
+  | Step_workflow_started of {
       id : string ;
       descr : string ;
     }
-  | Task_ended of Task_result.t
+  | Workflow_ended of Task_result.t
   | Workflow_done_already of {
       w : Workflow.t ;
       path : string ;
@@ -38,22 +38,22 @@ let create path = {
 }
 
 let translate_event db _ = function
-  | Logger.Task_started (
+  | Logger.Workflow_started (
       (Shell {id ; descr ; _}
       | Plugin { id ; descr ; _ }), _) ->
-    Some (Step_task_started { id ; descr })
+    Some (Step_workflow_started { id ; descr })
 
-  | Task_ended { outcome ; _ } ->
-    Some (Task_ended outcome)
+  | Workflow_ended { outcome ; _ } ->
+    Some (Workflow_ended outcome)
 
   | Workflow_skipped (w, `Done_already) ->
     let path = Db.cache db (Workflow.id w) in
     Some (Workflow_done_already { w ; path })
 
-  | Task_ready _
-  | Task_allocation_error _
+  | Workflow_ready _
+  | Workflow_allocation_error _
   | Workflow_skipped (_, `Missing_dep)
-  | Task_started ((Input _ | Select _), _) -> None
+  | Workflow_started ((Input _ | Select _ | MapDir _), _) -> None
 
 let update model db time evt =
   {
@@ -185,6 +185,12 @@ module Render = struct
               a ~a:[a_href dir_path] [k dir_path ] ]
         ) ]
 
+    | MapDir { pass ; id } ->
+      [ p [ k "mapdir " ; k id ] ;
+        if pass then k"" else (
+          p [ k"Wrong mapdir pattern" ]
+        ) ]
+
     | Shell { exit_code ; outcome ; stdout ; stderr ; cache ; file_dumps ; cmd ; descr ; id } ->
       collapsible_panel
         ~title:[ k descr ]
@@ -209,7 +215,7 @@ module Render = struct
         ]
         ~body:[]
 
-  let task_start ~descr ~id =
+  let workflow_start ~descr ~id =
     collapsible_panel
       ~title:[ k descr ]
       ~header:[]
@@ -227,13 +233,18 @@ module Render = struct
             k " in " ;
             k input_path ] ]
 
-    | Select { dir = (Shell { id ; _ } | Plugin { id ; _ }) ; sel ; _ } ->
+    | Select { dir = (Shell { id ; _ } | Plugin { id ; _ } | MapDir { id ; _ }) ; sel ; _ } ->
       [ p [ k "select " ;
             k (Path.to_string sel) ;
             k " in step " ;
             k id ] ]
 
     | Select { dir = Select _ ; _} -> assert false
+    | MapDir { id ; _ } ->
+      collapsible_panel
+        ~title:[]
+        ~header:[]
+        ~body:[ item "id" [ a ~a:[a_href path] [ k id ] ] ]
     | Plugin { descr ; id ; _ }
     | Shell { descr ; id ; _ } ->
       collapsible_panel
@@ -252,11 +263,13 @@ module Render = struct
 
   let result_label = function
     | Task_result.Input { pass = true ; _ }
-    | Select { pass = true ; _ } ->
+    | Select { pass = true ; _ }
+    | MapDir { pass = true ; _ } ->
       event_label_text `BLACK "CHECKED"
 
     | Input { pass = false ; _ }
     | Select { pass = false ; _ }
+    | MapDir { pass = false ; _ }
     | Plugin { outcome = `Failed ; _ }
     | Shell { outcome = `Failed ; _ } ->
       event_label_text `RED "FAILED"
@@ -279,12 +292,12 @@ module Render = struct
       ]
     in
     match evt with
-    | Step_task_started { id ; descr } ->
+    | Step_workflow_started { id ; descr } ->
       table_line
         (event_label_text `BLACK "STARTED")
-        (task_start ~id ~descr)
+        (workflow_start ~id ~descr)
 
-    | Task_ended result ->
+    | Workflow_ended result ->
       table_line (result_label result) (task_result result)
 
     | Workflow_done_already { w = t ; path } ->

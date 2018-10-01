@@ -30,7 +30,6 @@ module Private : sig
   open Bistro_base
   val reveal : 'a workflow -> Workflow.t
   val laever : Workflow.t -> 'a workflow
-  val collection : 'a collection -> Workflow.t_list
 
   val plugin :
     ?descr:string ->
@@ -38,7 +37,7 @@ module Private : sig
     ?np:int ->
     ?version:int ->
     string ->
-    Workflow.dep list ->
+    Workflow.t list ->
     (Workflow.env -> unit) ->
     'a workflow
 end

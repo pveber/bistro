@@ -11,7 +11,7 @@ type t =
       sel : string list
     }
   | Shell of shell
-  | Plugin of (env -> unit) step
+  | Plugin of plugin
   | MapDir of {
       id : string ;
       pattern : string option ;
@@ -30,6 +30,7 @@ and 'a step = {
   version : int option ; (** Version number of the wrapper *)
 }
 and shell = shell_command step
+and plugin = (env -> unit) step
 and shell_command = t Command.t
 and template = t Template.t
 and env = <

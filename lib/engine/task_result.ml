@@ -19,16 +19,19 @@ type t =
       descr : string ;
       outcome : [`Succeeded | `Missing_output | `Failed] ;
     }
+  | MapDir of { id : string ; pass : bool }
 
 let id = function
   | Input { id ;  _ }
   | Select { id ;  _}
-  | Shell { id ; _ } -> id
-  | Plugin { id ; _  } -> id
+  | Shell { id ; _ }
+  | Plugin { id ; _  }
+  | MapDir { id ; _ } -> id
 
 let succeeded = function
   | Input { pass ; _ }
-  | Select { pass ; _ } -> pass
+  | Select { pass ; _ }
+  | MapDir { pass ; _ } -> pass
   | Plugin { outcome ; _ }
   | Shell { outcome ; _ } -> (
       match outcome with
@@ -40,6 +43,7 @@ let error_short_descr = function
   | Input { path ; _ } -> sprintf "Input %s doesn't exist" path
   | Select { dir_path ; sel ; _ } ->
     sprintf "Path %s doesn't exist in %s" (Path.to_string sel) dir_path
+  | MapDir _ -> "Failed to create directory"
   | Shell x -> (
       match x.outcome with
       | `Missing_output -> "Missing output"
@@ -52,7 +56,7 @@ let error_short_descr = function
   | Plugin { descr ; _ } -> sprintf "Plugin %s failed" descr
 
 let error_long_descr x db buf id = match x with
-  | Input _ | Select _ | Plugin _ -> ()
+  | Input _ | Select _ | Plugin _ | MapDir _ -> ()
   | Shell x ->
     (
       bprintf buf "+------------------------------------------------------------------------------+\n" ;

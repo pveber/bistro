@@ -16,6 +16,7 @@ let error_short_descr =
   function
   | Input _ -> "input doesn't exist"
   | Select _ -> "invalid select"
+  | MapDir _ -> "invalid mapdir pattern"
   | Shell { exit_code ; outcome ; _ } -> (
       match outcome with
       | `Succeeded -> assert false
@@ -32,11 +33,11 @@ let error_short_descr =
     )
 
 let output_event t = function
-  | Logger.Task_started (Shell { id ; descr ; _ }, _) ->
+  | Logger.Workflow_started (Shell { id ; descr ; _ }, _) ->
     let id = String.prefix id 6 in
     msg t "started %s.%s" descr id
 
-  | Task_ended { outcome = (Task_result.Shell { id ; descr ; _ } as outcome) ; _ } ->
+  | Workflow_ended { outcome = (Task_result.Shell { id ; descr ; _ } as outcome) ; _ } ->
     let id = String.prefix id 6 in
     let outcome_msg =
       if Task_result.succeeded outcome then
@@ -45,7 +46,7 @@ let output_event t = function
     in
     msg t "ended %s.%s (%s)" descr id outcome_msg
 
-  | Logger.Task_allocation_error (Shell s, err) ->
+  | Logger.Workflow_allocation_error (Shell s, err) ->
     msg t "allocation error for %s.%s (%s)" s.descr s.id err
 
   | _ -> ()

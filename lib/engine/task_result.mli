@@ -17,6 +17,7 @@ type t =
       descr : string ;
       outcome : [`Succeeded | `Missing_output | `Failed] ;
     }
+  | MapDir of { id : string ; pass : bool }
 
 val id : t -> string
 
