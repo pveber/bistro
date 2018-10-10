@@ -3,12 +3,6 @@ open Bistro
 
 type item =
   | Item  : string list * _ workflow -> item
-  | Items : {
-      base : string option ;
-      ext : string option ;
-      path : string list ;
-      collection : _ collection ;
-    } -> item
 
 type t = item list
 
@@ -26,17 +20,7 @@ let normalized_repo_item repo_path w cache_path = [
   }
 ]
 
-let normalized_repo_items ?(base = "") ?ext repo_path results =
-  List.mapi results ~f:(fun i (w, cache_path) ->
-      let fn = sprintf "%s%06d%s" base i (match ext with None -> "" | Some e -> "." ^ e) in
-      let repo_path = repo_path @ [ fn ] in
-      normalized_repo_item repo_path w cache_path
-    )
-  |> List.concat
-
 let item path w = Item (path, w)
-let items ?base ?ext path collection =
-  Items { base ; ext ; path ; collection }
 
 let ( %> ) path w = item path w
 
@@ -104,9 +88,6 @@ let to_expr ~outdir items =
       | Item (path, w) ->
         let%map path_w = dep w in
         normalized_repo_item path w path_w
-      | Items { base ; ext ; path ; collection } ->
-        let%map paths = deps collection in
-        normalized_repo_items ?base ?ext path paths
     )
     |> Static_scheduler.Expr.list
   in
@@ -127,7 +108,6 @@ let build ?np ?mem ?loggers ?keep_all:_ ?use_docker ?(bistro_dir = "_bistro") ~o
 let add_prefix prefix items =
   List.map items ~f:(function
       | Item  (p, w) -> Item  (prefix @ p, w)
-      | Items i -> Items { i with path = prefix @ i.path }
     )
 
 let shift dir items = add_prefix [ dir ] items

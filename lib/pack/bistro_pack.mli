@@ -28,7 +28,6 @@ val null_logger : unit -> logger
 val console_logger : unit -> logger
 
 module Repo : Bistro_base.Sigs.Repo with type 'a workflow := 'a workflow
-                                     and type 'a collection := 'a collection
                                      and type logger := logger
 
 (* val eval_expr :

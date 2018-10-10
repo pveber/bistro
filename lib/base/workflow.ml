@@ -12,6 +12,11 @@ type t =
     }
   | Shell of shell
   | Plugin of plugin
+  | Collect_in_directory of {
+      id : string ;
+      elts : collection ;
+      ext : string option ;
+    }
 
 and 'a step = {
   id : string ;
@@ -35,10 +40,6 @@ and env = <
 and dep = WDep of t | CDep of collection
 and dep_token = WDepT of t | CDepT of collection * string
 and collection =
-  | List of {
-      id : string ;
-      elts : t list ;
-    }
   | Glob of {
       id : string ;
       dir : t ;
@@ -57,8 +58,9 @@ let dep_of_dep_token = function
 let id = function
   | Input { id ;  _ }
   | Select { id ;  _}
-  | Shell { id ; _ } -> id
-  | Plugin { id ; _  } -> id
+  | Shell { id ; _ }
+  | Plugin { id ; _  }
+  | Collect_in_directory { id ; _ } -> id
 
 let compare u v =
   String.compare (id u) (id v)
@@ -75,7 +77,8 @@ let select u q =
   | Select { dir ; sel = p ; _ } -> k dir (p @ q)
   | Input _
   | Plugin _
-  | Shell _ -> k u q
+  | Shell _
+  | Collect_in_directory _ -> k u q
 
 let input ?version path =
   let id = digest ("input", path, version) in
@@ -89,9 +92,9 @@ let rec digestible_workflow = function
   | Select { dir ; sel = p ; _ } ->
     `Select (digestible_workflow dir, p)
   | Plugin c -> `Plugin c.id
+  | Collect_in_directory c -> `Collect_in_directory c.id
 
 let digestible_workflow_list = function
-  | List l -> `List l.id
   | Glob g -> `Glob g.id
   | ListMap lm -> `ListMap lm.id
 
@@ -120,7 +123,6 @@ let glob ?pattern dir =
   Glob { id ; pattern ; dir }
 
 let list_id = function
-  | List { id ; _ }
   | Glob { id ; _ }
   | ListMap { id ; _ } -> id
 
@@ -137,8 +139,13 @@ let plugin
   let id = digest ("closure", version, id) in
   Plugin { descr ; task = f ; deps ; np ; mem ; version ; id }
 
+let collect_in_directory ?ext elts =
+  let id = digest ("collect_in_directory", ext, list_id elts) in
+  Collect_in_directory { id ; elts ; ext }
+
 let deps = function
   | Input _ -> []
   | Select { dir ;  _ } -> [ WDep dir ]
   | Shell s -> s.deps
   | Plugin s -> s.deps
+  | Collect_in_directory c -> [ CDep c.elts ]

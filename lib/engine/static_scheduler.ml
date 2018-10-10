@@ -195,9 +195,6 @@ and schedule_deps sched w =
 and schedule_collection sched =
   let open Lwt_eval in
   function
-  | List l ->
-    map_p l.elts ~f:(schedule_workflow sched) >>= fun _ ->
-    return (List.map ~f:Bistro.Private.laever l.elts)
   | Glob g ->
     schedule_workflow sched g.dir >>= fun () ->
     Lwt.(Misc.files_in_dir (Db.path sched.config.db g.dir) >|= fun x -> Ok x) >>= fun files ->
@@ -214,11 +211,7 @@ module Expr = struct
     | Pure : 'a -> 'a t
     | App : ('a -> 'b) t * 'a t -> 'b t
     | Workflow : _ Bistro.workflow -> string t
-    | Collection : 'a Bistro.collection -> (('a workflow * string) list) t
     | List : 'a t list -> 'a list t
-  and 'a workflow = W of 'a Bistro.workflow [@@unboxed]
-  (* this type definition is to avoid a typing error, see
-     https://caml.inria.fr/mantis/print_bug_page.php?bug_id=7605 *)
 
   let rec eval
     : type s. scheduler -> s t -> (s, S.t) Lwt_result.t
@@ -235,10 +228,6 @@ module Expr = struct
         let w = Bistro.Private.reveal w in
         schedule_workflow sched w >>= fun _ ->
         return (Db.path sched.config.db w)
-      | Collection c ->
-        let c = Bistro.Private.collection c in
-        schedule_collection sched c >>= fun workflows ->
-        return (List.map workflows ~f:(fun w -> W w, Db.path sched.config.db (Bistro.Private.reveal w)))
       | List xs ->
         map_p xs ~f:(eval sched)
 
@@ -248,8 +237,6 @@ module Expr = struct
   let map x ~f = pure f $ x
   let both x y = pure (fun x y -> x, y) $ x $ y
   let dep x = Workflow x
-  let deps xs =
-    pure (List.map ~f:(fun (W w, s) -> w, s)) $ (Collection xs)
   let list xs = List xs
   let return x = pure x
 end

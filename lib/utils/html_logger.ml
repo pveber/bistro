@@ -53,7 +53,7 @@ let translate_event db _ = function
   | Task_ready _
   | Task_allocation_error _
   | Workflow_skipped (_, `Missing_dep)
-  | Task_started ((Input _ | Select _), _) -> None
+  | Task_started ((Input _ | Select _ | Collect_in_directory _), _) -> None
 
 let update model db time evt =
   {
@@ -185,6 +185,12 @@ module Render = struct
               a ~a:[a_href dir_path] [k dir_path ] ]
         ) ]
 
+    | Collect_in_directory { pass ; _ } -> (* FIXME *)
+      [ p [ k "collect_in_dir " ] ;
+        if pass then k"" else (
+          p [ k"Failed to collect files" ]
+        ) ]
+
     | Shell { exit_code ; outcome ; stdout ; stderr ; cache ; file_dumps ; cmd ; descr ; id } ->
       collapsible_panel
         ~title:[ k descr ]
@@ -221,13 +227,15 @@ module Render = struct
     match t with
     | Workflow.Input { path ; _ } ->
       [ p [ k "input " ; k path ] ]
+    | Collect_in_directory { id ; _ } -> (* FIXME *)
+      [ p [ k "collect_in_dir " ; k id ] ]
     | Select { dir = Input { path = input_path ; _ } ; sel ; _ } ->
       [ p [ k "select " ;
             k (Path.to_string sel) ;
             k " in " ;
             k input_path ] ]
 
-    | Select { dir = (Shell { id ; _ } | Plugin { id ; _ }) ; sel ; _ } ->
+    | Select { dir = (Shell { id ; _ } | Plugin { id ; _ } | Collect_in_directory { id ; _ }) ; sel ; _ } ->
       [ p [ k "select " ;
             k (Path.to_string sel) ;
             k " in step " ;
@@ -252,13 +260,15 @@ module Render = struct
 
   let result_label = function
     | Task_result.Input { pass = true ; _ }
-    | Select { pass = true ; _ } ->
+    | Select { pass = true ; _ }
+    | Collect_in_directory { pass = true ; _ } ->
       event_label_text `BLACK "CHECKED"
 
     | Input { pass = false ; _ }
     | Select { pass = false ; _ }
     | Plugin { outcome = `Failed ; _ }
-    | Shell { outcome = `Failed ; _ } ->
+    | Shell { outcome = `Failed ; _ }
+    | Collect_in_directory { pass = false ; _ } ->
       event_label_text `RED "FAILED"
 
     | Plugin { outcome = `Missing_output ; _ }

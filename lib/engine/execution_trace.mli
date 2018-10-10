@@ -8,12 +8,12 @@ type t =
              _end_ : time ;
              outcome : Task_result.t }
 
-  | Done_already of Task.t
+  | Done_already of Workflow.t
   | Canceled of {
-      task : Task.t ;
+      task : Workflow.t ;
       missing_deps : t list ;
     }
-  | Allocation_error of Task.t * string
+  | Allocation_error of Workflow.t * string
   | Invalid_glob of {
       dir : Workflow.t ;
     }

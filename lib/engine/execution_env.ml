@@ -47,7 +47,7 @@ type container_mount = {
 let container_mount db =
   let open Workflow in
   function
-  | Shell _ | Plugin _ as u ->
+  | Shell _ | Plugin _ | Collect_in_directory _ as u ->
     {
       mount_host_location = Db.cache_dir db ;
       mount_container_location = docker_cache_dir ;
@@ -62,7 +62,7 @@ let container_mount db =
       file_container_location = container_path ;
     }
 
-  | Select { dir = (Shell _ | Plugin _) as dir ; sel ; _ } ->
+  | Select { dir = (Shell _ | Plugin _ | Collect_in_directory _) as dir ; sel ; _ } ->
     {
       mount_host_location = Db.cache_dir db ;
       mount_container_location = docker_cache_dir ;

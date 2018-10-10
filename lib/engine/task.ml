@@ -1,13 +1,11 @@
 open Core
-open Lwt
+open Lwt.Infix
 open Bistro_base
 
 type config = {
   db : Db.t ;
   use_docker : bool ;
 }
-
-type t = Workflow.t
 
 let step_outcome ~exit_code ~dest_exists=
   match exit_code, dest_exists with
@@ -17,7 +15,8 @@ let step_outcome ~exit_code ~dest_exists=
 
 let requirement = function
   | Workflow.Input _
-  | Select _ ->
+  | Select _
+  | Collect_in_directory _ ->
     Allocator.Request { np = 0 ; mem = 0 }
   | Plugin { np ; mem ; _ }
   | Shell { np ; mem ; _ } ->
@@ -35,7 +34,6 @@ let rec waitpid pid =
 
 
 let rec expand_collection db : Workflow.collection -> Workflow.t list Lwt.t = function
-  | List l -> Lwt.return l.elts
   | Glob g ->
     let dir_path = Db.path db g.dir in
     Misc.files_in_dir dir_path >>= fun files ->
@@ -83,39 +81,107 @@ let rec expand_command db =
     expand_command db c >>= fun c ->
     Lwt.return (Docker (img, c))
 
-let perform t config (Allocator.Resource { np ; mem }) =
-  match t with
-  | Workflow.Input { path ; id } ->
-    let pass = Sys.file_exists path = `Yes in
-    (
+let perform_input config ~path ~id =
+  let pass = Sys.file_exists path = `Yes in
+  (
       if pass then Misc.cp path (Db.cache config.db id)
       else Lwt.return ()
     ) >>= fun () ->
-    Lwt.return (Task_result.Input { id ; path ; pass })
+  Lwt.return (Task_result.Input { id ; path ; pass })
 
-  | Select { id ; dir ; sel } ->
-    Lwt.wrap (fun () ->
-        let p = select_path config.db dir sel in
-        let pass = Sys.file_exists p = `Yes in
-        Task_result.Select {
-          id ;
-          pass ;
-          dir_path = Db.path config.db dir ;
-          sel ;
-        }
-      )
+let perform_select config ~id ~dir ~sel =
+  Lwt.wrap (fun () ->
+      let p = select_path config.db dir sel in
+      let pass = Sys.file_exists p = `Yes in
+      Task_result.Select {
+        id ;
+        pass ;
+        dir_path = Db.path config.db dir ;
+        sel ;
+      }
+    )
 
-  | Shell { task = cmd ; id ; descr ; _ } ->
-    let env =
-      Execution_env.make
-        ~use_docker:config.use_docker
-        ~db:config.db
-        ~np ~mem ~id
+let perform_shell ~config ~id ~descr ~np ~mem ~cmd =
+  let env =
+    Execution_env.make
+      ~use_docker:config.use_docker
+      ~db:config.db
+      ~np ~mem ~id
+  in
+  expand_command config.db cmd >|= Shell_command.make env >>= fun cmd ->
+  Shell_command.run cmd >>= fun (exit_code, dest_exists) ->
+  let cache_dest = Db.cache config.db id in
+  let outcome = step_outcome ~exit_code ~dest_exists in
+  Misc.(
+    if outcome = `Succeeded then
+      mv env.dest cache_dest >>= fun () ->
+      remove_if_exists env.tmp_dir
+    else
+      Lwt.return ()
+  ) >>= fun () ->
+  Lwt.return (Task_result.Shell {
+      outcome ;
+      id ;
+      descr ;
+      exit_code ;
+      cmd = Shell_command.text cmd ;
+      file_dumps = Shell_command.file_dumps cmd ;
+      cache = if outcome = `Succeeded then Some cache_dest else None ;
+      stdout = env.stdout ;
+      stderr = env.stderr ;
+    })
+
+let perform_plugin ~config ~id ~np ~mem ~descr ~f =
+  let env =
+    Execution_env.make
+      ~use_docker:config.use_docker
+      ~db:config.db
+      ~np ~mem ~id
+  in
+  let obj_env = object
+    method np = env.np
+    method mem = env.mem
+    method tmp = env.tmp
+    method dest = env.dest
+  end
+  in
+  Misc.touch env.stdout >>= fun () ->
+  Misc.touch env.stderr >>= fun () ->
+  let (read_from_child, write_to_parent) = Unix.pipe () in
+  let (read_from_parent, write_to_child) = Unix.pipe () in
+  Misc.remove_if_exists env.tmp_dir >>= fun () ->
+  Unix.mkdir_p env.tmp ;
+  match Unix.fork () with
+  | `In_the_child ->
+    Unix.close read_from_child ;
+    Unix.close write_to_child ;
+    let exit_code =
+      try f obj_env ; 0
+      with e ->
+        Out_channel.with_file env.stderr ~f:(fun oc ->
+            fprintf oc "%s\n" (Exn.to_string e) ;
+            Printexc.print_backtrace oc
+          ) ;
+        1
     in
-    expand_command config.db cmd >|= Shell_command.make env >>= fun cmd ->
-    Shell_command.run cmd >>= fun (exit_code, dest_exists) ->
+    let oc = Unix.out_channel_of_descr write_to_parent in
+    Marshal.to_channel oc exit_code [] ;
+    Caml.flush oc ;
+    Unix.close write_to_parent ;
+    ignore (Caml.input_value (Unix.in_channel_of_descr read_from_parent)) ;
+    assert false
+  | `In_the_parent pid ->
+    Unix.close write_to_parent ;
+    Unix.close read_from_parent ;
+    let ic = Lwt_io.of_unix_fd ~mode:Lwt_io.input read_from_child in
+    Lwt_io.read_value ic >>= fun (exit_code : int) ->
+    Caml.Unix.kill (Pid.to_int pid) Caml.Sys.sigkill;
+    ignore (waitpid pid) ;
+    Unix.close read_from_child ;
+    Unix.close write_to_child ;
     let cache_dest = Db.cache config.db id in
-    let outcome = step_outcome ~exit_code ~dest_exists in
+    let dest_exists = Sys.file_exists env.dest = `Yes in
+    let outcome = step_outcome ~dest_exists ~exit_code in
     Misc.(
       if outcome = `Succeeded then
         mv env.dest cache_dest >>= fun () ->
@@ -123,87 +189,43 @@ let perform t config (Allocator.Resource { np ; mem }) =
       else
         Lwt.return ()
     ) >>= fun () ->
-    Lwt.return (Task_result.Shell {
-        outcome ;
+    Lwt.return (Task_result.Plugin {
         id ;
         descr ;
-        exit_code ;
-        cmd = Shell_command.text cmd ;
-        file_dumps = Shell_command.file_dumps cmd ;
-        cache = if outcome = `Succeeded then Some cache_dest else None ;
-        stdout = env.stdout ;
-        stderr = env.stderr ;
+        outcome ;
       })
 
-  | Plugin { task = f ; id ; descr ; _ } ->
-    let env =
-      Execution_env.make
-        ~use_docker:config.use_docker
-        ~db:config.db
-        ~np ~mem ~id
-    in
-    let obj_env = object
-      method np = env.np
-      method mem = env.mem
-      method tmp = env.tmp
-      method dest = env.dest
-    end
-    in
-    Misc.touch env.stdout >>= fun () ->
-    Misc.touch env.stderr >>= fun () ->
-    let (read_from_child, write_to_parent) = Unix.pipe () in
-    let (read_from_parent, write_to_child) = Unix.pipe () in
-    Misc.remove_if_exists env.tmp_dir >>= fun () ->
-    Unix.mkdir_p env.tmp ;
-    match Unix.fork () with
-    | `In_the_child ->
-      Unix.close read_from_child ;
-      Unix.close write_to_child ;
-      let exit_code =
-        try f obj_env ; 0
-        with e ->
-          Out_channel.with_file env.stderr ~f:(fun oc ->
-              fprintf oc "%s\n" (Exn.to_string e) ;
-              Printexc.print_backtrace oc
-            ) ;
-          1
-      in
-      let oc = Unix.out_channel_of_descr write_to_parent in
-      Marshal.to_channel oc exit_code [] ;
-      Caml.flush oc ;
-      Unix.close write_to_parent ;
-      ignore (Caml.input_value (Unix.in_channel_of_descr read_from_parent)) ;
-      assert false
-    | `In_the_parent pid ->
-      Unix.close write_to_parent ;
-      Unix.close read_from_parent ;
-      let ic = Lwt_io.of_unix_fd ~mode:Lwt_io.input read_from_child in
-      Lwt_io.read_value ic >>= fun (exit_code : int) ->
-      Caml.Unix.kill (Pid.to_int pid) Caml.Sys.sigkill;
-      ignore (waitpid pid) ;
-      Unix.close read_from_child ;
-      Unix.close write_to_child ;
-      let cache_dest = Db.cache config.db id in
-      let dest_exists = Sys.file_exists env.dest = `Yes in
-      let outcome = step_outcome ~dest_exists ~exit_code in
-      Misc.(
-        if outcome = `Succeeded then
-          mv env.dest cache_dest >>= fun () ->
-          remove_if_exists env.tmp_dir
-        else
-          Lwt.return ()
-      ) >>= fun () ->
-      Lwt.return (Task_result.Plugin {
-          id ;
-          descr ;
-          outcome ;
-        })
+let perform_collect ~config ~id ~elts ~ext =
+  let rename = match ext with
+    | None -> Fn.id
+    | Some ext -> (fun fn -> (Filename.chop_extension fn) ^ "." ^ ext)
+  in
+  let dest_dir = Db.tmp config.db id in
+  let f w =
+    let src_fn = Db.cache config.db (Workflow.id w) in
+    let dst_fn = Filename.concat dest_dir (rename src_fn) in
+    Misc.cp src_fn dst_fn (* FIXME: we should check that after replacing ext, no two files have equal names *)
+  in
+  expand_collection config.db elts >>= fun ws ->
+  Unix.mkdir_p dest_dir ; (* FIXME *)
+  Lwt_list.iter_p f ws >>= fun () ->
+  Misc.mv dest_dir (Db.cache config.db id) >>= fun () ->
+  Lwt.return (Task_result.Collect_in_directory { id ; pass = true })
+
+let perform t config (Allocator.Resource { np ; mem }) =
+  match t with
+  | Workflow.Input { path ; id } -> perform_input config ~path ~id
+  | Select { id ; dir ; sel } -> perform_select config ~dir ~id ~sel
+  | Shell { task = cmd ; id ; descr ; _ } -> perform_shell ~config ~id ~descr ~cmd ~np ~mem
+  | Plugin { task = f ; id ; descr ; _ } -> perform_plugin ~config ~f ~id ~descr ~np ~mem
+  | Collect_in_directory { elts ; ext ; id } -> perform_collect ~id ~config ~elts ~ext
 
 let is_done t db =
   let path = match t with
-    | Workflow.Input { id ; _ } -> Db.cache db id
+    | Workflow.Input { id ; _ }
+    | Shell { id ; _ }
+    | Plugin { id ; _ }
+    | Collect_in_directory { id ; _ } -> Db.cache db id
     | Select { dir ; sel ; _ } -> select_path db dir sel
-    | Shell { id ; _ } -> Db.cache db id
-    | Plugin { id ; _ } -> Db.cache db id
   in
   Lwt.return (Sys.file_exists path = `Yes)

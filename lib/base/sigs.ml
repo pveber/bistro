@@ -181,6 +181,11 @@ module type DSL = sig
     f:('a workflow -> 'b workflow) ->
     'b collection
 
+  val collect_in_directory :
+    ?ext:string ->
+    'a collection ->
+    _ directory workflow
+
   type template
   module Template_dsl : Template_dsl with type 'a dep := 'a workflow
                                       and type 'a deps := 'a collection
@@ -235,7 +240,6 @@ end
 
 module type Repo = sig
   type 'a workflow
-  type 'a collection
   type logger
 
   type item
@@ -245,11 +249,6 @@ module type Repo = sig
   val ( %> ) : string list -> 'a workflow -> item
 
   val item : string list -> 'a workflow -> item
-
-  val items :
-    ?base:string ->
-    ?ext:string ->
-    string list -> 'a collection -> item
 
   val singleton : string -> 'a workflow -> t
 

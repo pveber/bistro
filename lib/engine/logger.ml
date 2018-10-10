@@ -3,15 +3,15 @@ open Bistro_base
 type time = float
 
 type event =
-  | Task_ready of Task.t
-  | Task_started of Task.t * Allocator.resource
+  | Task_ready of Workflow.t
+  | Task_started of Workflow.t * Allocator.resource
   | Task_ended of {
       outcome : Task_result.t ;
       start : time ;
       _end_ : time ;
     }
   | Workflow_skipped of Workflow.t * [ `Done_already | `Missing_dep ]
-  | Task_allocation_error of Task.t * string
+  | Task_allocation_error of Workflow.t * string
 
 class type t = object
   method event : Db.t -> time -> event -> unit

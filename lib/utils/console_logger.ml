@@ -16,6 +16,7 @@ let error_short_descr =
   function
   | Input _ -> "input doesn't exist"
   | Select _ -> "invalid select"
+  | Collect_in_directory _ -> "collect_in_dir failed"
   | Shell { exit_code ; outcome ; _ } -> (
       match outcome with
       | `Succeeded -> assert false

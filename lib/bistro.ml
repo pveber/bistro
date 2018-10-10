@@ -31,6 +31,7 @@ type 'a collection = Workflow.collection
 
 let glob = Workflow.glob
 let collection_map = Workflow.list_map
+let collect_in_directory = Workflow.collect_in_directory
 
 module Private = struct
   let reveal (x : 'a workflow) = (x : Workflow.t)

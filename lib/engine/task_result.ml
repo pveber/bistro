@@ -19,16 +19,19 @@ type t =
       descr : string ;
       outcome : [`Succeeded | `Missing_output | `Failed] ;
     }
+  | Collect_in_directory of { id : string ; pass : bool }
 
 let id = function
   | Input { id ;  _ }
   | Select { id ;  _}
-  | Shell { id ; _ } -> id
-  | Plugin { id ; _  } -> id
+  | Shell { id ; _ }
+  | Plugin { id ; _  }
+  | Collect_in_directory { id ; _ } -> id
 
 let succeeded = function
   | Input { pass ; _ }
-  | Select { pass ; _ } -> pass
+  | Select { pass ; _ }
+  | Collect_in_directory { pass ; _ } -> pass
   | Plugin { outcome ; _ }
   | Shell { outcome ; _ } -> (
       match outcome with
@@ -50,9 +53,10 @@ let error_short_descr = function
         raise (Invalid_argument msg)
     )
   | Plugin { descr ; _ } -> sprintf "Plugin %s failed" descr
+  | Collect_in_directory _ -> "failed to collect files in directory" (* FIXME *)
 
 let error_long_descr x db buf id = match x with
-  | Input _ | Select _ | Plugin _ -> ()
+  | Input _ | Select _ | Plugin _ | Collect_in_directory _ -> ()
   | Shell x ->
     (
       bprintf buf "+------------------------------------------------------------------------------+\n" ;

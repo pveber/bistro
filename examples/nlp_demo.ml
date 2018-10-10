@@ -51,11 +51,13 @@ let definition_analysis w =
   let text = wikipedia_query w in
   let deps = stanford_parser text in
   let deps_graphs =
-    collection_map (sentences_of_stanford_deps deps) ~f:dependensee in
+    collection_map (sentences_of_stanford_deps deps) ~f:dependensee
+    |> collect_in_directory ~ext:"png"
+  in
   Bistro_pack.Repo.[
     item [ "definition.txt" ] text ;
     item [ "deps" ] deps ;
-    items [ "deps_graphs" ] ~base:"sentence" ~ext:"png" deps_graphs ;
+    item [ "deps_graphs" ] deps_graphs ;
   ]
   |> Repo.shift w
 
