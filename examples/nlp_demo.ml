@@ -25,7 +25,7 @@ let stanford_parser (x : text_file workflow) : stanford_parser_deps workflow =
       cmd ~env "lexparser.sh" ~stdout:dest [ dep x ]
     ]
 
-let sentences_of_stanford_deps (x : stanford_parser_deps workflow) : stanford_parser_deps workflow list expr =
+let sentences_of_stanford_deps (x : stanford_parser_deps workflow) : stanford_parser_deps collection =
   shell ~descr:"sentences_of_stanford_deps" [
     mkdir_p dest ;
     cmd "csplit" [
@@ -35,8 +35,7 @@ let sentences_of_stanford_deps (x : stanford_parser_deps workflow) : stanford_pa
       string "'/^$/' '{*}'"
     ] ;
   ]
-  |> Expr.pure
-  |> Expr.glob
+  |> glob ~pattern:"*"
 
 let dependensee (x : stanford_parser_deps workflow) : png workflow =
   shell ~descr:"stanford_dependensee" [
@@ -52,8 +51,8 @@ let definition_analysis w =
   let text = wikipedia_query w in
   let deps = stanford_parser text in
   let deps_graphs =
-    Expr.list_map (sentences_of_stanford_deps deps) ~f:dependensee in
-  Repo.[
+    collection_map (sentences_of_stanford_deps deps) ~f:dependensee in
+  Bistro_pack.Repo.[
     item [ "definition.txt" ] text ;
     item [ "deps" ] deps ;
     items [ "deps_graphs" ] ~base:"sentence" ~ext:"png" deps_graphs ;
