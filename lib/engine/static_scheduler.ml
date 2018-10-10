@@ -51,7 +51,7 @@ struct
     type t = Workflow.dep
     let id = Workflow.(function
         | WDep w -> id w
-        | WLDep ws -> list_id ws
+        | CDep ws -> list_id ws
       )
     let compare x y =
       String.compare (id x) (id y)
@@ -64,7 +64,7 @@ struct
       Hashtbl.hash (
         match x with
         | WDep w -> digestible_workflow w
-        | WLDep ws -> digestible_workflow_list ws
+        | CDep ws -> digestible_workflow_list ws
       )
   end
 
@@ -89,21 +89,21 @@ struct
     | exception Caml.Not_found -> T.add gc.revdeps y (S.singleton x)
     | s -> T.replace gc.revdeps y (S.add x s)
 
-  let rec fold_dep_aux seen d ~init ~f =
-    if S.mem d seen then (seen, init)
-    else (
-      match d with
-      | WDep w ->
-        List.fold (Workflow.deps w) ~init:(seen, init) ~f:(fun (seen, init) d -> fold_dep_aux seen d ~init ~f)
-      | WLDep (List l) -> assert false
-      | WLDep (ListMap lm) -> assert false
-      | WLDep (Glob g) -> assert false
-    )
-
-  let fold_dep d ~init ~f =
-    let seen = S.empty in
-    fold_dep_aux seen d ~init ~f
-    |> snd
+  (* let rec fold_dep_aux seen d ~init ~f =
+   *   if S.mem d seen then (seen, init)
+   *   else (
+   *     match d with
+   *     | WDep w ->
+   *       List.fold (Workflow.deps w) ~init:(seen, init) ~f:(fun (seen, init) d -> fold_dep_aux seen d ~init ~f)
+   *     | CDep (List l) -> assert false
+   *     | CDep (ListMap lm) -> assert false
+   *     | CDep (Glob g) -> assert false
+   *   )
+   * 
+   * let fold_dep d ~init ~f =
+   *   let seen = S.empty in
+   *   fold_dep_aux seen d ~init ~f
+   *   |> snd *)
 end
 
 type t = {
@@ -186,7 +186,7 @@ and schedule_deps sched w =
   let deps = Workflow.deps w in
   let f = function
     | Workflow.WDep w -> schedule_workflow sched w
-    | Workflow.WLDep wl -> Lwt_eval.(schedule_collection sched wl >>| ignore)
+    | Workflow.CDep wl -> Lwt_eval.(schedule_collection sched wl >>| ignore)
   in
   Lwt_eval.map_p ~f deps >>= function
   | Ok _ -> Lwt_eval.return ()

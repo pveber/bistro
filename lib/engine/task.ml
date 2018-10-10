@@ -34,7 +34,7 @@ let rec waitpid pid =
   with Unix.Unix_error (Unix.EINTR, _, _) -> waitpid pid
 
 
-let rec expand_collection db : Workflow.t_list -> Workflow.t list Lwt.t = function
+let rec expand_collection db : Workflow.collection -> Workflow.t list Lwt.t = function
   | List l -> Lwt.return l.elts
   | Glob g ->
     let dir_path = Db.path db g.dir in
@@ -58,7 +58,7 @@ let rec expand_template db =
     Lwt_list.map_p (expand_template db) tmpl >>= fun tmpl ->
     ret1 (Template.F (List.concat tmpl))
   | D (Workflow.WDepT w) -> ret1 (D w)
-  | D (Workflow.WLDepT (ws, sep)) ->
+  | D (Workflow.CDepT (ws, sep)) ->
     expand_collection db ws >>= fun ws ->
     List.map ws ~f:(fun w -> Template.D w)
     |> List.intersperse ~sep:(S sep)
