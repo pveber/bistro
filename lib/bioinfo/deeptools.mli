@@ -16,8 +16,7 @@ val bamcoverage :
   ?binsize:int ->
   ?blacklist:#bed3 workflow ->
   ?threads:int ->
-  ?normalizeto1x:int ->
-  ?normalizeusingrpkm:bool ->
+  ?normalizeUsing:[`RPKM | `CPM | `BPM | `RPGC] ->
   ?ignorefornormalization:string list ->
   ?skipnoncoveredregions:bool ->
   ?smoothlength:int ->
@@ -45,8 +44,7 @@ val bamcompare :
   ?region:string ->
   ?blacklist:#bed3 workflow ->
   ?threads:int ->
-  ?normalizeto1x:int ->
-  ?normalizeusingrpkm:bool ->
+  ?normalizeUsing:[`RPKM | `CPM | `BPM | `RPGC] ->
   ?ignorefornormalization:string list ->
   ?skipnoncoveredregions:bool ->
   ?smoothlength:int ->

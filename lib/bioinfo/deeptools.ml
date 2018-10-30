@@ -49,24 +49,14 @@ let slist f x = list ~sep:" " f x
 
 let dep_list xs = slist dep xs
 
-(*Transform a number from French format into an US format.*)
-let normalizeto1x_expr nbr =
-  let nbr_s = string_of_int nbr in
-  let lgth = String.length nbr_s in
-  let rec compute acc idx nbr_s = match idx with
-    | 0 -> string acc
-    | l ->
-      if l <= 3 then
-        string (String.sub nbr_s ~pos:0 ~len:l ^ acc)
-      else
-        let acc = "," ^ String.sub nbr_s ~pos:(l - 3) ~len:3 ^ acc in
-        compute acc (l-3) nbr_s
-  in
-  compute "" lgth nbr_s
+let normalization_method_expr = function
+  | `RPKM -> string "RPKM"
+  | `CPM -> string "CPM"
+  | `BPM -> string "BPM"
+  | `RPGC -> string "RPGC"
 
-
-let bam_gen_cmd ?outfileformat ?scalefactor ?blacklist ?normalizeto1x
-    ?centerreads ?normalizeusingrpkm ?ignorefornormalization ?skipnoncoveredregions
+let bam_gen_cmd ?outfileformat ?scalefactor ?blacklist
+    ?centerreads ?normalizeUsing ?ignorefornormalization ?skipnoncoveredregions
     ?smoothlength ?extendreads ?ignoreduplicates ?minmappingquality
     ?samflaginclude ?samflagexclude ?minfragmentlength ?maxfragmentlength
     cmd_name other_args =
@@ -75,8 +65,7 @@ let bam_gen_cmd ?outfileformat ?scalefactor ?blacklist ?normalizeto1x
       option (opt "--outFileFormat" file_format_expr) outfileformat ;
       option (opt "--scaleFactor" float) scalefactor ;
       option (opt "--blackListFileName" dep) blacklist ;
-      option (opt "--normalizeTo1x" normalizeto1x_expr) normalizeto1x ;
-      option (flag string "--normalizeUsingRPKM") normalizeusingrpkm ;
+      option (opt "--normalizeUsing" normalization_method_expr) normalizeUsing ;
       option (opt "--ignoreForNormalization" (list string ~sep:" ")) ignorefornormalization ;
       option (flag string "--skipNonCoveredRegions") skipnoncoveredregions ;
       option (opt "--smoothLength" int) smoothlength ;
@@ -95,13 +84,13 @@ let bam_gen_cmd ?outfileformat ?scalefactor ?blacklist ?normalizeto1x
 let ( /// ) x (Bistro.Selector s) = x // Bistro.Path.to_string s
 
 let bamcoverage ?scalefactor ?filterrnastrand ?binsize ?blacklist
-    ?(threads = 1) ?normalizeto1x ?normalizeusingrpkm ?ignorefornormalization
+    ?(threads = 1) ?normalizeUsing ?ignorefornormalization
     ?skipnoncoveredregions ?smoothlength ?extendreads ?ignoreduplicates
     ?minmappingquality ?centerreads ?samflaginclude ?samflagexclude
     ?minfragmentlength ?maxfragmentlength outfileformat indexed_bam =
   workflow ~descr:"bamcoverage" ~np:threads [
     bam_gen_cmd "bamCoverage" ?scalefactor ?blacklist
-    ?normalizeto1x ?normalizeusingrpkm ?ignorefornormalization
+    ?normalizeUsing ?ignorefornormalization
     ?skipnoncoveredregions ?smoothlength ?extendreads ?ignoreduplicates
     ?minmappingquality ?centerreads ?samflaginclude ?samflagexclude
     ?minfragmentlength ?maxfragmentlength [
@@ -116,14 +105,14 @@ let bamcoverage ?scalefactor ?filterrnastrand ?binsize ?blacklist
 
 let bamcompare ?scalefactormethod ?samplelength ?numberofsamples
     ?scalefactor ?ratio ?pseudocount ?binsize ?region ?blacklist ?(threads = 1)
-    ?normalizeto1x ?normalizeusingrpkm ?ignorefornormalization ?skipnoncoveredregions
+    ?normalizeUsing ?ignorefornormalization ?skipnoncoveredregions
     ?smoothlength ?extendreads ?ignoreduplicates ?minmappingquality
     ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
     ?maxfragmentlength outfileformat indexed_bam1 indexed_bam2 =
   workflow ~descr:"bamcompare" ~np:threads [
     bam_gen_cmd "bamCompare"
       ?scalefactor ?blacklist
-      ?normalizeto1x ?normalizeusingrpkm ?ignorefornormalization ?skipnoncoveredregions
+      ?normalizeUsing ?ignorefornormalization ?skipnoncoveredregions
       ?smoothlength ?extendreads ?ignoreduplicates ?minmappingquality
       ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
       ?maxfragmentlength [
