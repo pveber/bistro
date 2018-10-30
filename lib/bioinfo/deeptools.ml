@@ -2,7 +2,7 @@ open Core_kernel
 open Bistro.Std
 open Bistro.EDSL
 
-let env = docker_image ~account:"pveber" ~name:"deeptools" ~tag:"2.4.1" ()
+let env = docker_image ~account:"pveber" ~name:"deeptools" ~tag:"3.1.3" ()
 
 type 'a signal_format = [ `bigWig | `bedGraph ]
 type 'a img_format = [ `png | `pdf | ` svg ]
