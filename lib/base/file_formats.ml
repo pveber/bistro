@@ -12,6 +12,10 @@ class type ['a] directory = object
   method contents : 'a
 end
 
+class type ['a] collection = object
+  inherit [[`Collection of 'a]] directory
+end
+
 class type text_file = object
   inherit file
   method encoding : [`text]

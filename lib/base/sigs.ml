@@ -164,8 +164,10 @@ module type DSL = sig
 
   val mapdir :
     ?pattern:string ->   
-    _ #directory workflow ->
-    f:(
+    'a #collection workflow ->
+    f:('a workflow -> 'b workflow) ->
+    'b collection workflow
+
   type any_workflow = Any_workflow : _ workflow -> any_workflow
 
   type template

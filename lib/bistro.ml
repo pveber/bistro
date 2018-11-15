@@ -18,6 +18,7 @@ let shell = Workflow.shell
 let select dir (Selector path) = Workflow.select dir path
 let selector x = Selector x
 let ( /> ) = select
+let mapdir = Workflow.mapdir
 
 type any_workflow = Any_workflow : _ workflow -> any_workflow
 
