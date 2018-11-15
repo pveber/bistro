@@ -25,7 +25,7 @@ let stanford_parser (x : text_file workflow) : stanford_parser_deps workflow =
       cmd ~env "lexparser.sh" ~stdout:dest [ dep x ]
     ]
 
-let sentences_of_stanford_deps (x : stanford_parser_deps workflow) : stanford_parser_deps directory workflow =
+let sentences_of_stanford_deps (x : stanford_parser_deps workflow) : stanford_parser_deps collection workflow =
   shell ~descr:"sentences_of_stanford_deps" [
     mkdir_p dest ;
     cmd "csplit" [
@@ -54,7 +54,7 @@ let definition_analysis w =
   Repo.[
     item [ "definition.txt" ] text ;
     item [ "deps" ] deps ;
-    item [ "deps_graphs" ] ~base:"sentence" ~ext:"png" deps_graphs ;
+    item [ "deps_graphs" ] deps_graphs ;
   ]
   |> Repo.shift w
 
