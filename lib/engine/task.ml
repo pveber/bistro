@@ -198,12 +198,12 @@ let perform_plugin ~config ~id ~np ~mem ~descr ~f =
 let perform_collect ~config ~id ~elts ~ext =
   let rename = match ext with
     | None -> Fn.id
-    | Some ext -> (fun fn -> (Filename.chop_extension fn) ^ "." ^ ext)
+    | Some ext -> (fun fn -> (Caml.Filename.remove_extension fn) ^ "." ^ ext)
   in
   let dest_dir = Db.tmp config.db id in
   let f w =
     let src_fn = Db.cache config.db (Workflow.id w) in
-    let dst_fn = Filename.concat dest_dir (rename src_fn) in
+    let dst_fn = Filename.concat dest_dir (rename (Filename.basename src_fn)) in
     Misc.cp src_fn dst_fn (* FIXME: we should check that after replacing ext, no two files have equal names *)
   in
   expand_collection config.db elts >>= fun ws ->
