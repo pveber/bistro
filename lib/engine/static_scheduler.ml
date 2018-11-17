@@ -179,12 +179,18 @@ and task_of_workflow sched =
     return (Task.plugin ~id ~descr ~np ~mem f)
   | MapDir md ->
     Misc.files_in_dir (Db.path sched.config.db md.dir) >> fun files ->
+    let names = match md.ext with
+      | None -> files
+      | Some ext ->
+        let f fn = (Filename.remove_extension fn) ^ "." ^ ext in
+        List.map ~f files
+    in
     let inputs = List.map files ~f:Bistro.(fun f ->
         select (Private.laever md.dir) (selector [f])
       ) in
     let targets = List.map ~f:(fun x -> md.f (Bistro.Private.reveal x)) inputs in
     Lwt_eval.map_p targets ~f:(fun w -> schedule_workflow sched w) >>= fun _ ->
-    return (Task.mapdir ~id:md.id ~names:files ~targets)
+    return (Task.mapdir ~id:md.id ~names ~targets)
 
 and schedule_deps sched w =
   let deps = Workflow.deps w in

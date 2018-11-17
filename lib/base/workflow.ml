@@ -14,7 +14,7 @@ type t =
   | Plugin of plugin
   | MapDir of {
       id : string ;
-      pattern : string option ;
+      ext : string option ;
       dir : t ;
       f : t -> t ;
       deps : t list ;
@@ -131,9 +131,9 @@ let independent_workflows w ~from:u =
   let cache = independent_workflows_aux M.empty w ~from:u in
   M.find w cache |> snd |> S.elements
 
-let mapdir ?pattern dir ~f =
+let mapdir ?ext dir ~f =
   let u = input "string that could'nt possibly be a filename" in
   let f_u = f u in
   let id = digest ("mapdir", id dir, id f_u) in
   let deps = dir :: independent_workflows f_u ~from:u in
-  MapDir { id ; pattern ; dir ; f ; deps }
+  MapDir { id ; ext ; dir ; f ; deps }

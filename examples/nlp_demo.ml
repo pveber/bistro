@@ -50,7 +50,7 @@ let definition_analysis w =
   let text = wikipedia_query w in
   let deps = stanford_parser text in
   let deps_graphs =
-    mapdir (sentences_of_stanford_deps deps) ~f:dependensee in
+    mapdir ~ext:"png" (sentences_of_stanford_deps deps) ~f:dependensee in
   Repo.[
     item [ "definition.txt" ] text ;
     item [ "deps" ] deps ;

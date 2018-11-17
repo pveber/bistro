@@ -163,7 +163,7 @@ module type DSL = sig
       directory workflow *)
 
   val mapdir :
-    ?pattern:string ->   
+    ?ext:string ->
     'a #collection workflow ->
     f:('a workflow -> 'b workflow) ->
     'b collection workflow
