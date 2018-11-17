@@ -135,5 +135,5 @@ let mapdir ?pattern dir ~f =
   let u = input "string that could'nt possibly be a filename" in
   let f_u = f u in
   let id = digest ("mapdir", id dir, id f_u) in
-  let deps = independant_workflows f_u ~from:u in
+  let deps = dir :: independant_workflows f_u ~from:u in
   MapDir { id ; pattern ; dir ; f ; deps }
