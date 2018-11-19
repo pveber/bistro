@@ -1,0 +1,4 @@
+(library
+ (name bistro_bioinfo)
+ (public_name bistro.bioinfo)
+ (libraries bistro core))

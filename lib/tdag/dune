@@ -1,0 +1,4 @@
+(library
+ (name bistro_tdag)
+ (public_name bistro.tdag)
+ (libraries core_kernel ocamlgraph rresult))
