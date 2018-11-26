@@ -1,4 +1,4 @@
-(executable
-  (name test)
-  (libraries bistro core)
+(executables
+  (names test1 test)
+  (libraries bistro.engine core lwt.unix)
   (preprocess (pps ppx_bistro)))
