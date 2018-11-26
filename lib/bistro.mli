@@ -37,4 +37,32 @@ val spawn :
   f:('a workflow -> 'b workflow) ->
   'b list workflow
 
+module Internals : sig
+  module Workflow : sig
+    type _ t =
+      | Pure : { id : string ; value : 'a } -> 'a t
+      | App : ('a -> 'b) t * 'a t -> 'b t
+      | Both : 'a t * 'b t -> ('a *'b) t
+      | Eval_path : string t -> string t
+      | Spawn : {
+          elts : 'a list t ;
+          f : 'a t -> 'b t ;
+        } -> 'b list t
 
+      | Input : { id : string ; path : string } -> string t
+      | Select : {
+          id : string ;
+          dir : #directory path t ;
+          sel : string list ;
+        } -> string t
+      | Value : (unit -> 'a) step -> 'a t
+      | Path : (string -> unit) step -> string t
+
+    and 'a step = {
+      id : string ;
+      descr : string ;
+      workflow : 'a t ;
+    }
+    val reveal : 'a workflow -> 'a t
+  end
+end

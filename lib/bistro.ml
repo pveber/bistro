@@ -4,30 +4,38 @@ class type directory = object
   method file_kind : [`directory]
 end
 
-type _ workflow =
-  | Pure : { id : string ; value : 'a } -> 'a workflow
-  | App : ('a -> 'b) workflow * 'a workflow -> 'b workflow
-  | Both : 'a workflow * 'b workflow -> ('a *'b) workflow
-  | Eval_path : 'a path workflow -> string workflow
-  | Spawn : {
-      elts : 'a list workflow ;
-      f : 'a workflow -> 'b workflow ;
-    } -> 'b list workflow
+module Workflow = struct
+  type _ t =
+    | Pure : { id : string ; value : 'a } -> 'a t
+    | App : ('a -> 'b) t * 'a t -> 'b t
+    | Both : 'a t * 'b t -> ('a *'b) t
+    | Eval_path : string t -> string t
+    | Spawn : {
+        elts : 'a list t ;
+        f : 'a t -> 'b t ;
+      } -> 'b list t
 
-  | Input : { id : string ; path : string } -> 'a path workflow
-  | Select : {
-      id : string ;
-      dir : #directory path workflow ;
-      sel : string list ;
-    } -> 'a path workflow
-  | Value : (unit -> 'a) step -> 'a workflow
-  | Path : (string -> unit) step -> 'a path workflow
+    | Input : { id : string ; path : string } -> string t
+    | Select : {
+        id : string ;
+        dir : #directory path t ;
+        sel : string list ;
+      } -> string t
+    | Value : (unit -> 'a) step -> 'a t
+    | Path : (string -> unit) step -> string t
 
-and 'a step = {
-  id : string ;
-  descr : string ;
-  workflow : 'a workflow ;
-}
+  and 'a step = {
+    id : string ;
+    descr : string ;
+    workflow : 'a t ;
+  }
+
+  let reveal x = x
+end
+
+type 'a workflow = 'a Workflow.t
+
+open Workflow
 
 let digest x =
   Digest.to_hex (Digest.string (Marshal.to_string x []))
@@ -67,3 +75,7 @@ let app f x = App (f, x)
 let both x y = Both (x, y)
 let eval_path w = Eval_path w
 let spawn elts ~f = Spawn { elts ; f }
+
+module Internals = struct
+  module Workflow = Workflow
+end
