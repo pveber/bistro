@@ -1,9 +1,10 @@
 open Core
 open Bistro
 
-let echo3 x = cached_path (fun%bistro dest ->
+let echo3 ~sep x = cached_path (fun%bistro dest ->
     let x = [%eval x] in
-    Out_channel.write_lines dest [ x ; x ; x ]
+    let sep = [%param sep] in
+    Out_channel.write_lines dest [ x ; sep ; x ; sep ; x ]
   )
 
 let wc x = cached_value (fun%bistro () ->
@@ -12,12 +13,12 @@ let wc x = cached_value (fun%bistro () ->
   )
 
 let request x =
-  cached_value (fun%bistro () -> String.split ~on:' ' x)
+  cached_value (fun%bistro () -> String.split ~on:' ' [%param x])
 
 let main () =
   request "am stram gram"
   |> spawn ~f:(fun x ->
-      echo3 x
+      echo3 ~sep:"foo" x
       |> wc
     )
 

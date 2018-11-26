@@ -62,6 +62,7 @@ let cached_path ?(descr = "") workflow =
   Path { id ; descr ; workflow }
 
 let pure ~id value = Pure { id ; value }
+let pure_data value = pure ~id:(digest value) value
 let app f x = App (f, x)
 let both x y = Both (x, y)
 let eval_path w = Eval_path w

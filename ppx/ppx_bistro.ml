@@ -42,10 +42,12 @@ end
 type insert_type =
   | Value
   | Path
+  | Param
 
 let insert_type_of_ext = function
-  | "eval" -> Value
-  | "path" -> Path
+  | "eval"  -> Value
+  | "path"  -> Path
+  | "param" -> Param
   | ext -> failwith ("Unknown insert " ^ ext)
 
 class payload_rewriter = object
@@ -73,6 +75,7 @@ let rewriter ~loc ~path:_ expr =
     List.fold deps ~init ~f:(fun acc (tmpvar, expr, ext) ->
         let rhs = match ext with
           | Path  -> [%expr Bistro.eval_path [%e expr]]
+          | Param -> [%expr Bistro.pure_data [%e expr]]
           | Value -> expr
         in
         [%expr let [%p B.pvar tmpvar] = [%e rhs] in [%e acc]]

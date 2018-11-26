@@ -26,6 +26,7 @@ val select :
 
 
 val pure : id:string -> 'a -> 'a workflow
+val pure_data : 'a -> 'a workflow
 val app : ('a -> 'b) workflow -> 'a workflow -> 'b workflow
 val both : 'a workflow -> 'b workflow -> ('a * 'b) workflow
 
