@@ -1,4 +1,4 @@
-module W = Bistro.Internals.Workflow
+module W = Bistro_internals.Workflow
 
 type error = [
   | `Msg of string
@@ -33,4 +33,4 @@ let rec eval_main : type s. s W.t -> (s, [> error]) Lwt_result.t = function
   | W.Spawn _ -> assert false
 
 let eval : type s. s Bistro.workflow -> (s, [> error]) Lwt_result.t =
-  fun w -> eval_main (W.reveal w)
+  fun w -> eval_main (Bistro.Private.reveal w)

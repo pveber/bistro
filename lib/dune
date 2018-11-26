@@ -1,3 +1,4 @@
 (library
   (name bistro)
-  (public_name bistro))
+  (public_name bistro)
+  (libraries bistro.internals))
