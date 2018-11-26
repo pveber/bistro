@@ -32,8 +32,10 @@ module Expr : sig
 
   val pure : id:string -> 'a -> 'a t
   val app : ('a -> 'b) t -> 'a t -> 'b t
+  val both : 'a t -> 'b t -> ('a * 'b) t
 
   val eval_workflow : 'a workflow -> 'a t
+  val eval_path : 'a path workflow -> string t
 
   val spawn :
     'a list t ->

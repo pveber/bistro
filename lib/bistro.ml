@@ -17,6 +17,7 @@ type _ workflow =
 and _ expr =
   | Pure : { id : string ; value : 'a } -> 'a expr
   | App : ('a -> 'b) expr * 'a expr -> 'b expr
+  | Both : 'a expr * 'b expr -> ('a *'b) expr
   | Eval_workflow : 'a workflow -> 'a expr
   | Spawn : {
       elts : 'a list expr ;
@@ -67,6 +68,8 @@ module Expr = struct
   type 'a t = 'a expr
   let pure ~id value = Pure { id ; value }
   let app f x = App (f, x)
+  let both x y = Both (x, y)
   let eval_workflow w = Eval_workflow w
+  let eval_path w = Eval_workflow w
   let spawn elts ~f = Spawn { elts ; f }
 end

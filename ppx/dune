@@ -1,0 +1,6 @@
+(library
+  (name ppx_bistro)
+  (public_name bistro.ppx)
+  (kind ppx_rewriter)
+  (libraries ppxlib)
+  (preprocess (pps ppxlib.metaquot ppxlib.runner)))
