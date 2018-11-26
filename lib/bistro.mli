@@ -27,6 +27,8 @@ val select :
 
 val pure : id:string -> 'a -> 'a workflow
 val pure_data : 'a -> 'a workflow
+val int : int -> int workflow
+val string : string -> string workflow
 val app : ('a -> 'b) workflow -> 'a workflow -> 'b workflow
 val both : 'a workflow -> 'b workflow -> ('a * 'b) workflow
 
@@ -41,10 +43,19 @@ module Internals : sig
   module Workflow : sig
     type _ t =
       | Pure : { id : string ; value : 'a } -> 'a t
-      | App : ('a -> 'b) t * 'a t -> 'b t
-      | Both : 'a t * 'b t -> ('a *'b) t
-      | Eval_path : string t -> string t
+      | App : {
+          id : string ;
+          f : ('a -> 'b) t ;
+          x : 'a t ;
+        } -> 'b t
+      | Both : {
+          id : string ;
+          fst : 'a t ;
+          snd : 'b t ;
+        } -> ('a *'b) t
+      | Eval_path : { id : string ; workflow : string t } -> string t
       | Spawn : {
+          id : string ;
           elts : 'a list t ;
           f : 'a t -> 'b t ;
         } -> 'b list t

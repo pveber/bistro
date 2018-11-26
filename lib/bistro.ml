@@ -7,10 +7,19 @@ end
 module Workflow = struct
   type _ t =
     | Pure : { id : string ; value : 'a } -> 'a t
-    | App : ('a -> 'b) t * 'a t -> 'b t
-    | Both : 'a t * 'b t -> ('a *'b) t
-    | Eval_path : string t -> string t
+    | App : {
+        id : string ;
+        f : ('a -> 'b) t ;
+        x : 'a t ;
+      } -> 'b t
+    | Both : {
+        id : string ;
+        fst : 'a t ;
+        snd : 'b t ;
+      } -> ('a *'b) t
+    | Eval_path : { id : string ; workflow : string t } -> string t
     | Spawn : {
+        id : string ;
         elts : 'a list t ;
         f : 'a t -> 'b t ;
       } -> 'b list t
@@ -40,12 +49,16 @@ open Workflow
 let digest x =
   Digest.to_hex (Digest.string (Marshal.to_string x []))
 
-let id = function
-  | Input { id ; _ }
-  | Select { id ; _ }
-  | Value { id ; _ }
+let id : type s. s workflow -> string = function
+  | Input { id ; _ } -> id
+  | Select { id ; _ } -> id
+  | Value { id ; _ } -> id
   | Path { id ; _ } -> id
-  | _ -> assert false
+  | Pure { id ; _ } -> id
+  | App { id ; _ } -> id
+  | Spawn { id ; _ } -> id
+  | Both { id ; _ } -> id
+  | Eval_path { id ; _ } -> id
 
 let input path =
   let id = digest (`Input path) in
@@ -62,7 +75,7 @@ let select dir sel =
   Select { id ; dir ; sel }
 
 let cached_value ?(descr = "") workflow =
-  let id = digest (`Value, workflow) in
+  let id = digest (`Value, id workflow) in
   Value { id ; descr ; workflow }
 
 let cached_path ?(descr = "") workflow =
@@ -71,10 +84,23 @@ let cached_path ?(descr = "") workflow =
 
 let pure ~id value = Pure { id ; value }
 let pure_data value = pure ~id:(digest value) value
-let app f x = App (f, x)
-let both x y = Both (x, y)
-let eval_path w = Eval_path w
-let spawn elts ~f = Spawn { elts ; f }
+let int = pure_data
+let string = pure_data
+let app f x =
+  let id = digest (`App, id f, id x) in
+  App { id ; f ; x }
+let both fst snd =
+  let id = digest (`Both, id fst, id snd) in
+  Both { id ; fst ; snd }
+
+let eval_path w = Eval_path { id = digest (`Eval_path, id w) ; workflow = w }
+
+
+
+let spawn elts ~f =
+  let hd = pure ~id:"__should_never_be_executed__" List.hd in
+  let id = digest (`Spawn, id elts, id (f (app hd elts))) in
+  Spawn { id ; elts ; f }
 
 module Internals = struct
   module Workflow = Workflow
