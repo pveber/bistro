@@ -1,46 +1,39 @@
 type 'a workflow
-type 'a expr
+
+val cached_value :
+  ?descr:string ->
+  (unit -> 'a) workflow ->
+  'a workflow
+
 type 'a path
+
+val input : string -> 'a path workflow
+
+val cached_path :
+  ?descr:string ->
+  (string -> unit) workflow ->
+  'a path workflow
+
 
 class type directory = object
   method file_kind : [`directory]
 end
 
-module Workflow : sig
-  type 'a t = 'a workflow
-  val input : string -> 'a path workflow
+val select :
+  #directory path workflow ->
+  string list ->
+  'a path workflow
 
-  val make :
-    ?descr:string ->
-    'a expr ->
-    'a t
 
-  val makep :
-    ?descr:string ->
-    (string -> unit) expr ->
-    'a path t
+val pure : id:string -> 'a -> 'a workflow
+val app : ('a -> 'b) workflow -> 'a workflow -> 'b workflow
+val both : 'a workflow -> 'b workflow -> ('a * 'b) workflow
 
-  val select :
-    #directory path t ->
-    string list ->
-    'a path t
+val eval_path : 'a path workflow -> string workflow
 
-end
-
-module Expr : sig
-  type 'a t = 'a expr
-
-  val pure : id:string -> 'a -> 'a t
-  val app : ('a -> 'b) t -> 'a t -> 'b t
-  val both : 'a t -> 'b t -> ('a * 'b) t
-
-  val eval_workflow : 'a workflow -> 'a t
-  val eval_path : 'a path workflow -> string t
-
-  val spawn :
-    'a list t ->
-    f:('a t -> 'b t) ->
-    'b list t
-end
+val spawn :
+  'a list workflow ->
+  f:('a workflow -> 'b workflow) ->
+  'b list workflow
 
 

@@ -40,14 +40,12 @@ module B = struct
 end
 
 type insert_type =
-  | Workflow
-  | Expr
-  | Path_workflow
+  | Value
+  | Path
 
 let insert_type_of_ext = function
-  | "workflow" -> Workflow
-  | "eval" -> Expr
-  | "path" -> Path_workflow
+  | "eval" -> Value
+  | "path" -> Path
   | ext -> failwith ("Unknown insert " ^ ext)
 
 class payload_rewriter = object
@@ -67,32 +65,26 @@ class payload_rewriter = object
 
 end
 
-let rewriter ~loc ~path:_ (* descr version mem np *) expr =
-  (* let np = Option.value np ~default:(B.eint 1) in *)
-  (* let mem = Option.value mem ~default:(B.eint 100) in *)
-  (* let descr = Option.value descr ~default:(B.estring var) in *)
-  (* let version = Option.value version ~default:(B.eint 0) in *)
-  (* let body, body_type = extract_body expr in *)
+let rewriter ~loc ~path:_ expr =
   let rewriter = new payload_rewriter in
   let code, deps = rewriter#expression expr [] in
   let id = digest (string_of_expression code) in
   let add_renamings init =
     List.fold deps ~init ~f:(fun acc (tmpvar, expr, ext) ->
         let rhs = match ext with
-          | Workflow      -> [%expr Bistro.Expr.eval_workflow [%e expr]]
-          | Path_workflow -> [%expr Bistro.Expr.eval_path [%e expr]]
-          | Expr          -> expr
+          | Path  -> [%expr Bistro.eval_path [%e expr]]
+          | Value -> expr
         in
         [%expr let [%p B.pvar tmpvar] = [%e rhs] in [%e acc]]
       )
   in
   match deps with
   | [] ->
-    [%expr Bistro.Expr.pure ~id:[%e B.estring id] [%e code]]
+    [%expr Bistro.pure ~id:[%e B.estring id] [%e code]]
   | (h_tmpvar, _, _) :: t ->
     let tuple_expr =
       List.fold_right t ~init:(B.elident h_tmpvar) ~f:(fun (tmpvar,_,_) acc ->
-          [%expr Bistro.Expr.both [%e B.elident tmpvar] [%e acc]]
+          [%expr Bistro.both [%e B.elident tmpvar] [%e acc]]
         )
     in
     let tuple_pat =
@@ -101,90 +93,10 @@ let rewriter ~loc ~path:_ (* descr version mem np *) expr =
         )
     in
     [%expr
-      Bistro.Expr.app
-        (Bistro.Expr.pure ~id:[%e B.estring id] (fun [%p tuple_pat] -> [%e code]))
+      Bistro.app
+        (Bistro.pure ~id:[%e B.estring id] (fun [%p tuple_pat] -> [%e code]))
         [%e tuple_expr]]
     |> add_renamings
-
-(* let code_with_arguments = *)
-  (*   List.fold *)
-  (*     deps *)
-  (*     ~init:[%expr fun env -> [%e code]] *)
-  (*     ~f:(fun acc (tmpvar, _) -> *)
-  (*         [%expr fun [%p B.pvar tmpvar] -> [%e acc]] *)
-  (*       ) *)
-  (* in *)
-  (* let id = digest (string_of_expression code) in *)
-  (* let workflow_expr = *)
-  (*   List.fold_right *)
-  (*     deps *)
-  (*     ~init:[%expr Bistro.Expr.pure ~id f] *)
-  (*     ~f:(fun (tmpvar, payload) acc -> *)
-  (*         let arg = match payload with *)
-  (*           | Param _ -> *)
-  (*             [%expr Bistro.Expr.(pure_data [%e B.elident tmpvar])] *)
-  (*           | Dep _  -> *)
-  (*             [%expr Bistro.Expr.(dep (pureW [%e B.elident tmpvar]))] *)
-  (*           | Deps _ -> *)
-  (*             [%expr Bistro.Expr.(deps [%e B.elident tmpvar])] *)
-  (*         in *)
-  (*         [%expr Bistro.Expr.app [%e acc] [%e arg]] *)
-  (*       ) *)
-  (* in *)
-  (* let add_bindings body = List.fold deps ~init:body ~f:(fun acc (tmpvar, payload) -> *)
-  (*     match payload with *)
-  (*     | Param expr *)
-  (*     | Dep expr *)
-  (*     | Deps expr -> *)
-  (*       [%expr *)
-  (*         let [%p B.pvar tmpvar] = [%e expr] in *)
-  (*         [%e acc]] *)
-  (*   ) *)
-  (* in *)
-  (* let new_body = *)
-  (*   [%expr *)
-  (*     let id = [%e B.estring id] in *)
-  (*     let f = [%e code_with_arguments] in *)
-  (*     let expr = [%e workflow_expr] in *)
-  (*     Bistro.Private.closure *)
-  (*       (\* ~descr:[%e descr] *\) *)
-  (*       (\* ~np:[%e np] *\) *)
-  (*       (\* ~mem:[%e mem] *\) *)
-  (*       (\* ~version:[%e version] *\) *)
-  (*       expr *)
-  (*   ] *)
-  (*   |> add_bindings *)
-  (*   |> (fun body -> *)
-  (*       match body_type with *)
-  (*       | None -> body *)
-  (*       | Some ty -> [%expr ([%e body] : [%t ty])] *)
-  (*     ) *)
-  (* in *)
-  (* [%stri let [%p B.pvar var] = [%e replace_body new_body expr]] *)
-
-(* let np_attr = *)
-(*   Attribute.declare "bistro.np" *)
-(*     Attribute.Context.value_binding *)
-(*     Ast_pattern.(single_expr_payload (__)) *)
-(*     (fun x -> x) *)
-
-(* let mem_attr = *)
-(*   Attribute.declare "bistro.mem" *)
-(*     Attribute.Context.value_binding *)
-(*     Ast_pattern.(single_expr_payload (__)) *)
-(*     (fun x -> x) *)
-
-(* let descr_attr = *)
-(*   Attribute.declare "bistro.descr" *)
-(*     Attribute.Context.value_binding *)
-(*     Ast_pattern.(single_expr_payload (__)) *)
-(*     (fun x -> x) *)
-
-(* let version_attr = *)
-(*   Attribute.declare "bistro.version" *)
-(*     Attribute.Context.value_binding *)
-(*     Ast_pattern.(single_expr_payload (__)) *)
-(*     (fun x -> x) *)
 
 let ext =
   let open Extension in
