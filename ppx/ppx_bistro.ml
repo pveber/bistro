@@ -1,16 +1,6 @@
 open Base
 open Ppxlib
 
-let rec extract_body = function
-  | { pexp_desc = Pexp_fun (_,_,_,body) ; _ } -> extract_body body
-  | { pexp_desc = Pexp_constraint (expr, ty) ; _ } -> expr, Some ty
-  | expr -> expr, None
-
-let rec replace_body new_body = function
-  | ({ pexp_desc = Pexp_fun (lab, e1, p, e2) ; _ } as expr) ->
-    { expr with pexp_desc = Pexp_fun (lab, e1, p, replace_body new_body e2) }
-  | _ -> new_body
-
 let digest x =
   Caml.Digest.to_hex (Caml.Digest.string (Caml.Marshal.to_string x []))
 
@@ -67,20 +57,18 @@ class payload_rewriter = object
 
 end
 
-let rewriter ~loc ~path:_ expr =
-  let rewriter = new payload_rewriter in
-  let code, deps = rewriter#expression expr [] in
+let add_renamings ~loc deps init =
+  List.fold deps ~init ~f:(fun acc (tmpvar, expr, ext) ->
+      let rhs = match ext with
+        | Path  -> [%expr Bistro.Workflow.eval_path [%e expr]]
+        | Param -> [%expr Bistro.Workflow.pure_data [%e expr]]
+        | Value -> expr
+      in
+      [%expr let [%p B.pvar tmpvar] = [%e rhs] in [%e acc]]
+    )
+
+let build_applicative ~loc deps code =
   let id = digest (string_of_expression code) in
-  let add_renamings init =
-    List.fold deps ~init ~f:(fun acc (tmpvar, expr, ext) ->
-        let rhs = match ext with
-          | Path  -> [%expr Bistro.Workflow.eval_path [%e expr]]
-          | Param -> [%expr Bistro.Workflow.pure_data [%e expr]]
-          | Value -> expr
-        in
-        [%expr let [%p B.pvar tmpvar] = [%e rhs] in [%e acc]]
-      )
-  in
   match deps with
   | [] ->
     [%expr Bistro.Workflow.pure ~id:[%e B.estring id] [%e code]]
@@ -99,11 +87,51 @@ let rewriter ~loc ~path:_ expr =
       Bistro.Workflow.app
         (Bistro.Workflow.pure ~id:[%e B.estring id] (fun [%p tuple_pat] -> [%e code]))
         [%e tuple_expr]]
-    |> add_renamings
+    |> add_renamings deps ~loc
 
-let ext =
+let expression_rewriter ~loc ~path:_ expr =
+  let code, deps = new payload_rewriter#expression expr [] in
+  build_applicative ~loc deps code
+
+let rec extract_body = function
+  | { pexp_desc = Pexp_fun (_,_,_,body) ; _ } -> extract_body body
+  | { pexp_desc = Pexp_constraint (expr, ty) ; _ } -> expr, Some ty
+  | expr -> expr, None
+
+let rec replace_body new_body = function
+  | ({ pexp_desc = Pexp_fun (lab, e1, p, e2) ; _ } as expr) ->
+    { expr with pexp_desc = Pexp_fun (lab, e1, p, replace_body new_body e2) }
+  | _ -> new_body
+
+let str_item_rewriter ~loc ~path:_ var expr =
+  let body, body_type = extract_body expr in
+  let rewritten_body, deps = new payload_rewriter#expression body [] in
+  let applicative_body = build_applicative ~loc deps [%expr fun () -> [%e rewritten_body]] in
+  let workflow_body = [%expr Bistro.Workflow.cached_value [%e applicative_body]] in
+  let workflow_body_with_type = match body_type with
+    | None -> workflow_body
+    | Some ty -> [%expr ([%e workflow_body] : [%t ty])]
+  in
+  [%stri let [%p B.pvar var] = [%e replace_body workflow_body_with_type expr]]
+
+let expression_ext =
   let open Extension in
-  declare "bistro" Context.expression Ast_pattern.(single_expr_payload __) rewriter
+  declare "workflow" Context.expression Ast_pattern.(single_expr_payload __) expression_rewriter
+
+let str_item_ext =
+  let open Extension in
+  let pattern =
+    let open Ast_pattern in
+    let vb =
+      value_binding ~expr:__ ~pat:(ppat_var __)
+      (* |> Attribute.pattern np_attr *)
+      (* |> Attribute.pattern mem_attr *)
+      (* |> Attribute.pattern version_attr *)
+      (* |> Attribute.pattern descr_attr *)
+    in
+    pstr ((pstr_value nonrecursive ((vb ^:: nil))) ^:: nil)
+  in
+    declare "workflow" Context.structure_item pattern str_item_rewriter
 
 let () =
-  Driver.register_transformation "bistro" ~extensions:[ ext ]
+  Driver.register_transformation "bistro" ~extensions:[ expression_ext ; str_item_ext ]
