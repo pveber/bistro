@@ -63,4 +63,8 @@ let files_in_dir dir =
       | "." | ".." -> false
       | _ -> true
     )
-  >|= List.sort ~compare:String.compare 
+  >|= List.sort ~compare:String.compare
+
+let rec waitpid pid =
+  try Lwt_unix.waitpid [] pid
+  with Unix.Unix_error (Unix.EINTR, _, _) -> waitpid pid

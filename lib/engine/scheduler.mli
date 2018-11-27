@@ -3,4 +3,4 @@ type error = [
 ]
 
 val eval :
-  'a Bistro.workflow -> ('a, [> error]) Lwt_result.t
+  'a Bistro.workflow -> 'a Lwt.t

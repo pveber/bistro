@@ -74,8 +74,8 @@ let rewriter ~loc ~path:_ expr =
   let add_renamings init =
     List.fold deps ~init ~f:(fun acc (tmpvar, expr, ext) ->
         let rhs = match ext with
-          | Path  -> [%expr Bistro.eval_path [%e expr]]
-          | Param -> [%expr Bistro.pure_data [%e expr]]
+          | Path  -> [%expr Bistro.Workflow.eval_path [%e expr]]
+          | Param -> [%expr Bistro.Workflow.pure_data [%e expr]]
           | Value -> expr
         in
         [%expr let [%p B.pvar tmpvar] = [%e rhs] in [%e acc]]
@@ -83,11 +83,11 @@ let rewriter ~loc ~path:_ expr =
   in
   match deps with
   | [] ->
-    [%expr Bistro.pure ~id:[%e B.estring id] [%e code]]
+    [%expr Bistro.Workflow.pure ~id:[%e B.estring id] [%e code]]
   | (h_tmpvar, _, _) :: t ->
     let tuple_expr =
       List.fold_right t ~init:(B.elident h_tmpvar) ~f:(fun (tmpvar,_,_) acc ->
-          [%expr Bistro.both [%e B.elident tmpvar] [%e acc]]
+          [%expr Bistro.Workflow.both [%e B.elident tmpvar] [%e acc]]
         )
     in
     let tuple_pat =
@@ -96,8 +96,8 @@ let rewriter ~loc ~path:_ expr =
         )
     in
     [%expr
-      Bistro.app
-        (Bistro.pure ~id:[%e B.estring id] (fun [%p tuple_pat] -> [%e code]))
+      Bistro.Workflow.app
+        (Bistro.Workflow.pure ~id:[%e B.estring id] (fun [%p tuple_pat] -> [%e code]))
         [%e tuple_expr]]
     |> add_renamings
 

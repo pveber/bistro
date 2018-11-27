@@ -75,6 +75,7 @@ let string = pure_data
 let app f x =
   let id = digest (`App, id f, id x) in
   App { id ; f ; x }
+let ( $ ) = app
 let both fst snd =
   let id = digest (`Both, id fst, id snd) in
   Both { id ; fst ; snd }

@@ -1,12 +1,12 @@
 open Core
 open Bistro
-open Lwt_result.Infix
+open Lwt.Infix
 
-let add x y = cached_value (fun%bistro () ->
+let add x y = Workflow.cached_value (fun%bistro () ->
     [%eval x] + [%eval y]
   )
 
-let pipeline = add (int 1) (int 41)
+let pipeline = add (Workflow.int 1) (Workflow.int 41)
 
 let _ =
   Bistro_engine.Scheduler.eval pipeline >|= Printf.printf "%d\n"
