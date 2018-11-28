@@ -107,7 +107,7 @@ let rec build : type s. s W.t -> unit Lwt.t = function
     |> Lwt.join
   | W.Input _ -> Lwt.return () (* FIXME: check path *)
   | W.Select _ -> Lwt.return () (* FIXME: check path *)
-  | W.Value { workflow ; id ; _ } ->
+  | W.Value { task = workflow ; id ; _ } ->
     if Sys.file_exists (Db.cache db id) = `Yes
     then Lwt.return ()
     else

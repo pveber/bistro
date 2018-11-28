@@ -17,19 +17,22 @@ type _ t =
       f : 'a t -> 'b t ;
     } -> 'b list t
 
-  | Input : { id : string ; path : string } -> string t
+  | Input : { id : string ; path : string ; version : int option } -> string t
   | Select : {
       id : string ;
       dir : string t ;
       sel : string list ;
     } -> string t
-  | Value : (unit -> 'a) step -> 'a t
-  | Path : (string -> unit) step -> string t
+  | Value : (unit -> 'a) t step -> 'a t
+  | Path : (string -> unit) t step -> string t
 
 and 'a step = {
   id : string ;
   descr : string ;
-  workflow : 'a t ;
+  task : 'a ;
+  np : int ; (** Required number of processors *)
+  mem : int ; (** Required memory in MB *)
+  version : int option ; (** Version number of the wrapper *)
 }
 
 let digest x =
@@ -46,9 +49,9 @@ let id : type s. s t -> string = function
   | Both { id ; _ } -> id
   | Eval_path { id ; _ } -> id
 
-let input path =
-  let id = digest (`Input path) in
-  Input { id ; path }
+let input ?version path =
+  let id = digest (`Input, path, version) in
+  Input { id ; path ; version }
 
 let select dir sel =
   let dir, sel =
@@ -60,13 +63,13 @@ let select dir sel =
   let id = digest ("select", id dir, sel) in
   Select { id ; dir ; sel }
 
-let cached_value ?(descr = "") workflow =
-  let id = digest (`Value, id workflow) in
-  Value { id ; descr ; workflow }
+let cached_value ?(descr = "") ?(np = 1) ?(mem = 0) ?version workflow =
+  let id = digest (`Value, id workflow, version) in
+  Value { id ; descr ; task = workflow ; np ; mem ; version }
 
-let cached_path ?(descr = "") workflow =
-  let id = digest (`Value, workflow) in
-  Path { id ; descr ; workflow }
+let cached_path ?(descr = "") ?(np = 1) ?(mem = 0) ?version workflow =
+  let id = digest (`Value, workflow, version) in
+  Path { id ; descr ; task = workflow ; np ; mem ; version }
 
 let pure ~id value = Pure { id ; value }
 let pure_data value = pure ~id:(digest value) value

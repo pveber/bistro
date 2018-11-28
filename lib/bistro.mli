@@ -9,13 +9,21 @@ end
 module Workflow : sig
   val cached_value :
     ?descr:string ->
+    ?np:int ->
+    ?mem:int ->
+    ?version:int ->
     (unit -> 'a) workflow ->
     'a workflow
 
-  val input : string -> 'a path workflow
+  val input :
+    ?version:int ->
+    string -> 'a path workflow
 
   val cached_path :
     ?descr:string ->
+    ?np:int ->
+    ?mem:int ->
+    ?version:int ->
     (string -> unit) workflow ->
     'a path workflow
 
