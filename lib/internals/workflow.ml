@@ -41,8 +41,7 @@ and 'a step = {
   version : int option ; (** Version number of the wrapper *)
 }
 
-and shell_command = shell_token t Command.t
-and shell_token = [`Path of string | `String of string]
+and shell_command = path t Command.t
 
 let digest x =
   Digest.to_hex (Digest.string (Marshal.to_string x []))

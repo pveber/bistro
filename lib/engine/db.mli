@@ -38,3 +38,8 @@ val fold_cache :
   init:'a ->
   f:('a -> string -> 'a) ->
   'a
+
+val path :
+  t ->
+  Bistro_internals.Workflow.path ->
+  string

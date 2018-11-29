@@ -68,11 +68,13 @@ let rec blocking_evaluator : type s. s W.t -> (unit -> s) = function
     fun () -> (fst (), snd ())
   | W.Eval_path _ -> assert false
   | W.Select _ -> assert false
-  | W.Input { path ; _ } -> fun () -> path
+  | W.Input { path ; _ } -> fun () -> W.FS_path path
   | W.Value { id ; _ } ->
     fun () -> (load_value (Db.cache db id))
   | W.Path _ -> assert false
   | W.Spawn _ -> assert false
+  | W.Shell _s ->
+    assert false
 
 let rec shallow_eval : type s. s W.t -> s Lwt.t = function
   | W.Pure { value ; _ } -> Lwt.return value
@@ -85,11 +87,13 @@ let rec shallow_eval : type s. s W.t -> s Lwt.t = function
     Lwt.return (fst, snd)
   | W.Eval_path _ -> assert false
   | W.Select _ -> assert false
-  | W.Input { path ; _ } -> Lwt.return path
+  | W.Input { path ; _ } -> Lwt.return (W.FS_path path)
   | W.Value { id ; _ } ->
     Lwt.return (load_value (Db.cache db id))
   | W.Path _ -> assert false
   | W.Spawn _ -> assert false
+  | W.Shell _s ->
+    assert false
 
 let rec build : type s. s W.t -> unit Lwt.t = function
   | W.Pure _ -> Lwt.return ()
@@ -119,6 +123,8 @@ let rec build : type s. s W.t -> unit Lwt.t = function
         ) ()
       >|= ignore (* FIXME *)
   | W.Path _ -> assert false
+  | W.Shell _s ->
+    assert false
 
 let eval : type s. s Bistro.workflow -> s Lwt.t =
   fun w ->

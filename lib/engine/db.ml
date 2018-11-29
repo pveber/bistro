@@ -119,3 +119,10 @@ let fold_cache db ~init ~f =
   Array.fold
     (Sys.readdir (cache_dir db))
     ~init ~f
+
+let rec path : t -> Bistro_internals.Workflow.path -> string = fun db p ->
+  match p with
+  | FS_path x -> x
+  | Cache_id id -> cache db id
+  | Cd (dir, sel) ->
+    Filename.concat (path db dir) (Path.to_string sel)
