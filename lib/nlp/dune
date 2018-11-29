@@ -1,0 +1,4 @@
+(library
+  (name bistro_nlp)
+  (public_name bistro.nlp)
+  (libraries bistro))
