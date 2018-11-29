@@ -30,6 +30,57 @@ class type binary_file = object
   method encoding : [`binary]
 end
 
+class type pdf = object
+  inherit text_file
+  method format : [`pdf]
+end
+
+class type html = object
+  inherit text_file
+  method format : [`html]
+end
+
+class type png = object
+  inherit binary_file
+  method format : [`png]
+end
+
+class type svg = object
+  inherit text_file
+  method format : [`svg]
+end
+
+class type tsv = object
+  inherit text_file
+  method colum_separator : [`tab]
+end
+
+class type ['a] zip = object
+  inherit binary_file
+  method format : [`zip]
+  method content_format : 'a
+end
+
+class type ['a] gz = object
+  constraint 'a = #file
+  inherit binary_file
+  method format : [`gz]
+  method content_format : 'a
+end
+
+class type ['a] bz2 = object
+  constraint 'a = #file
+  inherit binary_file
+  method format : [`bz2]
+  method content_format : 'a
+end
+
+class type ['a] tar = object
+  inherit binary_file
+  method format : [`tar]
+  method content_format : 'a
+end
+
 module Template_dsl = struct
   type template = Workflow.path Workflow.t Template.t
 
