@@ -15,5 +15,9 @@ module Stanford_parser : sig
   val lexparser :
     text_file path workflow ->
     deps path workflow
+
+  val dependensee :
+    deps path workflow ->
+    png path workflow
 end
 

@@ -24,4 +24,14 @@ module Stanford_parser = struct
     Workflow.shell ~descr:"stanford_parser" [
       cmd ~env "lexparser.sh" ~stdout:dest [ dep x ]
     ]
+
+  let dependensee (x : deps path workflow) : png path workflow =
+    Workflow.shell ~descr:"stanford_dependensee" [
+      cmd "java" ~env [
+        opt "-cp" string "/usr/bin/DependenSee.2.0.5.jar:/usr/bin/stanford-parser.jar:/usr/bin/stanford-parser-3.3.0-models.jar" ;
+        string "com.chaoticity.dependensee.Main" ;
+        opt "-t" dep x ;
+        dest ;
+      ]
+    ]
 end
