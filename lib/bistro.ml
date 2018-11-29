@@ -1,6 +1,6 @@
 open Bistro_internals
 
-type 'a path = string
+type 'a path = Workflow.path
 
 class type directory = object
   method file_kind : [`directory]

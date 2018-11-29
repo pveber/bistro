@@ -1,3 +1,8 @@
+type path =
+  | FS_path of string
+  | Cache_id of string
+  | Cd of path * string list
+
 type _ t =
   | Pure : { id : string ; value : 'a } -> 'a t
   | App : {
@@ -10,21 +15,22 @@ type _ t =
       fst : 'a t ;
       snd : 'b t ;
     } -> ('a *'b) t
-  | Eval_path : { id : string ; workflow : string t } -> string t
+  | Eval_path : { id : string ; workflow : path t } -> string t
   | Spawn : {
       id : string ;
       elts : 'a list t ;
       f : 'a t -> 'b t ;
     } -> 'b list t
 
-  | Input : { id : string ; path : string ; version : int option } -> string t
+  | Input : { id : string ; path : string ; version : int option } -> path t
   | Select : {
       id : string ;
-      dir : string t ;
+      dir : path t ;
       sel : string list ;
-    } -> string t
+    } -> path t
   | Value : (unit -> 'a) t step -> 'a t
-  | Path : (string -> unit) t step -> string t
+  | Path : (string -> unit) t step -> path t
+  | Shell : shell_command step -> path t
 
 and 'a step = {
   id : string ;
@@ -34,6 +40,9 @@ and 'a step = {
   mem : int ; (** Required memory in MB *)
   version : int option ; (** Version number of the wrapper *)
 }
+
+and shell_command = shell_token t Command.t
+and shell_token = [`Path of string | `String of string]
 
 let digest x =
   Digest.to_hex (Digest.string (Marshal.to_string x []))
@@ -48,6 +57,7 @@ let id : type s. s t -> string = function
   | Spawn { id ; _ } -> id
   | Both { id ; _ } -> id
   | Eval_path { id ; _ } -> id
+  | Shell { id ; _ } -> id
 
 let input ?version path =
   let id = digest (`Input, path, version) in
@@ -57,7 +67,7 @@ let select dir sel =
   let dir, sel =
     match dir with
     | Select { dir ; sel = root ; _ } -> dir, root @ sel
-    | Input _ | Value _ | Path _ -> dir, sel
+    | Input _ | Path _ -> dir, sel
     | _ -> assert false
   in
   let id = digest ("select", id dir, sel) in
@@ -89,3 +99,15 @@ let spawn elts ~f =
   let hd = pure ~id:"__should_never_be_executed__" List.hd in
   let id = digest (`Spawn, id elts, id (f (app hd elts))) in
   Spawn { id ; elts ; f }
+
+let digestible_cmd = Command.map ~f:id
+
+let shell
+    ?(descr = "")
+    ?(mem = 100)
+    ?(np = 1)
+    ?version
+    cmds =
+  let cmd = Command.And_list cmds in
+  let id = digest ("shell", version, digestible_cmd cmd) in
+  Shell { descr ; task = cmd ; np ; mem ; version ; id }
