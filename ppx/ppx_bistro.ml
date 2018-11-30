@@ -44,6 +44,21 @@ class payload_rewriter = object
   inherit [(string * expression * insert_type) list] Ast_traverse.fold_map as super
   method! expression expr acc =
     match expr with
+    | { pexp_desc = Pexp_extension ({txt = ("dest" | "np" | "mem" | "tmp" as ext) ; _ }, payload) ; pexp_loc = loc ; _ } -> (
+        match payload with
+        | PStr [] -> (
+            let expr' = match ext with
+              | "dest" -> [%expr __dest__]
+              (* | "tmp" -> [%expr env#tmp] *)
+              (* | "np" -> [%expr env#np] *)
+              (* | "mem" -> [%expr env#mem] *)
+              | _ -> assert false
+            in
+            expr', acc
+          )
+        | _ -> failwith "expected empty payload"
+
+      )
     | { pexp_desc = Pexp_extension ({txt = ext ; _}, payload) ; _ } -> (
         match payload with
         | PStr [ { pstr_desc = Pstr_eval (e, _) ; _ } ] ->
@@ -114,11 +129,23 @@ let str_item_rewriter ~loc ~path:_ var expr =
   in
   [%stri let [%p B.pvar var] = [%e replace_body workflow_body_with_type expr]]
 
+
+let pstr_item_rewriter ~loc ~path:_ var expr =
+  let body, body_type = extract_body expr in
+  let rewritten_body, deps = new payload_rewriter#expression body [] in
+  let applicative_body = build_applicative ~loc deps [%expr fun __dest__ -> [%e rewritten_body]] in
+  let workflow_body = [%expr Bistro.Workflow.cached_path [%e applicative_body]] in
+  let workflow_body_with_type = match body_type with
+    | None -> workflow_body
+    | Some ty -> [%expr ([%e workflow_body] : [%t ty])]
+  in
+  [%stri let [%p B.pvar var] = [%e replace_body workflow_body_with_type expr]]
+
 let expression_ext =
   let open Extension in
   declare "workflow" Context.expression Ast_pattern.(single_expr_payload __) expression_rewriter
 
-let str_item_ext =
+let str_item_ext label rewriter =
   let open Extension in
   let pattern =
     let open Ast_pattern in
@@ -131,7 +158,11 @@ let str_item_ext =
     in
     pstr ((pstr_value nonrecursive ((vb ^:: nil))) ^:: nil)
   in
-    declare "workflow" Context.structure_item pattern str_item_rewriter
+    declare label Context.structure_item pattern rewriter
 
 let () =
-  Driver.register_transformation "bistro" ~extensions:[ expression_ext ; str_item_ext ]
+  Driver.register_transformation "bistro" ~extensions:[
+    expression_ext ;
+    str_item_ext "workflow" str_item_rewriter ;
+    str_item_ext "pworkflow" pstr_item_rewriter ;
+  ]
