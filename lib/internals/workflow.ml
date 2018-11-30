@@ -77,7 +77,7 @@ let cached_value ?(descr = "") ?(np = 1) ?(mem = 0) ?version workflow =
   Value { id ; descr ; task = workflow ; np ; mem ; version }
 
 let cached_path ?(descr = "") ?(np = 1) ?(mem = 0) ?version workflow =
-  let id = digest (`Value, workflow, version) in
+  let id = digest (`Value, id workflow, version) in
   Path { id ; descr ; task = workflow ; np ; mem ; version }
 
 let pure ~id value = Pure { id ; value }
