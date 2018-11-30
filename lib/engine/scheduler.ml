@@ -213,9 +213,12 @@ let rec build : type s. s W.t -> unit Lwt.t = function
       worker (Fn.flip evaluator (Db.cache db id)) ()
       >|= ignore (* FIXME *)
   | W.Shell s ->
-    build_command_deps s.task >>= fun () ->
-    shallow_eval_command s.task >>= fun cmd ->
-    perform_shell s.id cmd
+    if Sys.file_exists (Db.cache db s.id) = `Yes
+    then Lwt.return ()
+    else
+      build_command_deps s.task >>= fun () ->
+      shallow_eval_command s.task >>= fun cmd ->
+      perform_shell s.id cmd
 
 and build_command_deps
   : W.path W.t Command.t -> unit Lwt.t
