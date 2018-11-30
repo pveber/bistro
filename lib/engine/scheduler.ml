@@ -137,8 +137,11 @@ let rec shallow_eval : type s. s W.t -> s Lwt.t = function
   | W.Input { path ; _ } -> Lwt.return (W.FS_path path)
   | W.Value { id ; _ } ->
     Lwt.return (load_value (Db.cache db id)) (* FIXME: blocking call *)
-  | W.Path _ -> assert false
-  | W.Spawn _ -> assert false
+  | W.Spawn s -> (* FIXME: much room for improvement *)
+    shallow_eval s.elts >>= fun elts ->
+    let targets = List.init (List.length elts) ~f:(fun i -> s.f (list_nth s.elts i)) in
+    Lwt_list.map_p shallow_eval targets
+  | W.Path s -> Lwt.return (W.Cache_id s.id)
   | W.Shell s -> Lwt.return (W.Cache_id s.id)
 
 and shallow_eval_command =
@@ -195,7 +198,20 @@ let rec build : type s. s W.t -> unit Lwt.t = function
           save_value ~data:y (Db.cache db id)
         ) ()
       >|= ignore (* FIXME *)
-  | W.Path _ -> assert false
+  | W.Path { id ; task = workflow ; _ } ->
+    if Sys.file_exists (Db.cache db id) = `Yes
+    then Lwt.return ()
+    else
+      let () = printf "build %s\n" id in
+      let evaluator = blocking_evaluator workflow in
+      (* let env = *) (* FIXME: use this *)
+      (*   Execution_env.make *)
+      (*     ~use_docker:config.use_docker *)
+      (*     ~db:config.db *)
+      (*     ~np ~mem ~id *)
+      (* in *)
+      worker (Fn.flip evaluator (Db.cache db id)) ()
+      >|= ignore (* FIXME *)
   | W.Shell s ->
     build_command_deps s.task >>= fun () ->
     shallow_eval_command s.task >>= fun cmd ->
