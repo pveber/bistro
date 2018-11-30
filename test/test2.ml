@@ -1,5 +1,4 @@
 open Core_kernel
-open Lwt.Infix
 open Bistro
 open Bistro_nlp
 
@@ -24,7 +23,7 @@ let pipeline w =
 let _ =
   let open Bistro_engine in
   let config = { Scheduler.db = Db.init_exn "_bistro" ; use_docker = true } in
-  Lwt_main.run (
+  Lwt_main.run Lwt_result.(
     Bistro_engine.Scheduler.eval config (pipeline "Protein") >|= fun files ->
     Printf.printf "%s\n" (String.concat ~sep:"\n" files)
   )

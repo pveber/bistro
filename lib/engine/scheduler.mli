@@ -10,4 +10,4 @@ type config = {
 val eval :
   config ->
   'a Bistro.workflow ->
-  'a Lwt.t
+  ('a, Execution_trace.t list) Lwt_result.t

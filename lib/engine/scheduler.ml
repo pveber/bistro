@@ -12,6 +12,79 @@ type config = {
   use_docker : bool ;
 }
 
+module Traces = Caml.Set.Make(struct
+    type t = Execution_trace.t
+    let compare = compare
+  end)
+
+(* Lwt threads that accumulate errors *)
+module Eval_thread : sig
+  type 'a t = ('a, Traces.t) Lwt_result.t
+  val return : 'a -> 'a t
+  (* val fail : Traces.t -> 'a t *)
+  (* val fail1 : Execution_trace.t -> 'a t *)
+  val both : 'a t -> 'b t -> ('a * 'b) t
+  (* val list_map : *)
+  (*   'a list -> *)
+  (*   f:('a -> 'b t) -> *)
+  (*   'b list t *)
+  val join :
+    'a list ->
+    f:('a -> unit t) ->
+    unit t
+
+  module Infix : sig
+    val ( >>= ) : 'a t -> ('a -> 'b t) -> 'b t
+    val ( >>| ) : 'a t -> ('a -> 'b) -> 'b t
+    val ( >> ) : 'a Lwt.t -> ('a -> 'b t) -> 'b t
+  end
+end
+=
+struct
+  type 'a t = ('a, Traces.t) Lwt_result.t
+
+  module Infix = struct
+    let ( >> ) = Lwt.( >>= )
+    let ( >>= ) = Lwt_result.( >>= )
+    let ( >>| ) = Lwt_result.( >|= )
+  end
+
+  let return = Lwt_result.return
+  (* let fail = Lwt_result.fail *)
+  (* let fail1 e = Lwt_result.fail (Traces.singleton e) *)
+  let result_both x y =
+    match x, y with
+    | Ok x, Ok y -> Ok (x, y)
+    | Ok _, Error e -> Error e
+    | Error e, Ok _ -> Error e
+    | Error e, Error e' -> Error (Traces.union e e')
+
+  let both x y =
+    Lwt.(x >>= fun x ->
+         y >>= fun y ->
+         return (result_both x y))
+
+  let list_map xs ~f =
+    Lwt.bind (Lwt_list.map_p f xs) @@ fun results ->
+    let res =
+      List.fold results ~init:(Ok []) ~f:(fun acc res ->
+          Result.map (result_both acc res) ~f:(fun (xs, x) -> x :: xs)
+        )
+      |> (
+        function
+        | Ok xs -> Ok (List.rev xs)
+        | Error _ as e -> e
+      )
+    in
+    Lwt.return res
+
+  let join xs ~f =
+    let open Lwt_result in
+    list_map xs ~f >|= ignore
+end
+
+type 'a thread = 'a Eval_thread.t
+
 let worker f x =
   let (read_from_child, write_to_parent) = Unix.pipe () in
   let (read_from_parent, write_to_child) = Unix.pipe () in
@@ -66,7 +139,7 @@ let step_outcome ~exit_code ~dest_exists=
   | 0, false -> `Missing_output
   | _ -> `Failed
 
-let perform_shell config id cmd =
+let perform_shell config ~id ~descr cmd =
   let env =
     Execution_env.make
       ~use_docker:config.use_docker
@@ -84,7 +157,7 @@ let perform_shell config id cmd =
     else
       Lwt.return ()
   ) >>= fun () ->
-  Lwt.return ((*Task_result.Shell {
+  Eval_thread.return (Task_result.Shell {
       outcome ;
       id ;
       descr ;
@@ -94,7 +167,7 @@ let perform_shell config id cmd =
       cache = if outcome = `Succeeded then Some cache_dest else None ;
       stdout = env.stdout ;
       stderr = env.stderr ;
-                }*)())
+    })
 
 let rec blocking_evaluator
   : type s. Db.t -> s W.t -> (unit -> s)
@@ -175,27 +248,27 @@ and shallow_eval_token config =
   | DEST | TMP | NP | MEM | S _ as tok -> Lwt.return tok
 
 let rec build
-  : type s. config -> s W.t -> unit Lwt.t
+  : type s. config -> s W.t -> unit thread
   = fun config w ->
+    let open Eval_thread.Infix in
     match w with
-    | W.Pure _ -> Lwt.return ()
+    | W.Pure _ -> Eval_thread.return ()
     | W.App { x ; f ; _ } ->
-      lwt_both (build config x) (build config f) >|= ignore
+      Eval_thread.both (build config x) (build config f) >>| ignore
     | W.Both { fst ; snd ; _ } ->
-      lwt_both (build config fst) (build config snd) >|= ignore
+      Eval_thread.both (build config fst) (build config snd) >>| ignore
     | W.Eval_path { workflow ; _ } -> build config workflow
     | W.Spawn { elts ; f ; _ } ->
       build config elts >>= fun () ->
-      shallow_eval config elts >>= fun elts_value ->
+      shallow_eval config elts >> fun elts_value ->
       let n = List.length elts_value in
       List.init n ~f:(fun i -> f (list_nth elts i))
-      |> List.map ~f:(build config)
-      |> Lwt.join
-    | W.Input _ -> Lwt.return () (* FIXME: check path *)
-    | W.Select _ -> Lwt.return () (* FIXME: check path *)
+      |> Eval_thread.join ~f:(build config)
+    | W.Input _ -> Eval_thread.return () (* FIXME: check path *)
+    | W.Select _ -> Eval_thread.return () (* FIXME: check path *)
     | W.Value { task = workflow ; id ; _ } ->
       if Sys.file_exists (Db.cache config.db id) = `Yes
-      then Lwt.return ()
+      then Eval_thread.return ()
       else
         let () = printf "build %s\n" id in
         let evaluator = blocking_evaluator config.db workflow in
@@ -203,10 +276,10 @@ let rec build
             let y = evaluator () () in
             save_value ~data:y (Db.cache config.db id)
           ) ()
-        >|= ignore (* FIXME *)
+        >> fun _ -> Eval_thread.return () (* FIXME *)
     | W.Path { id ; task = workflow ; _ } ->
       if Sys.file_exists (Db.cache config.db id) = `Yes
-      then Lwt.return ()
+      then Eval_thread.return ()
       else
         let () = printf "build %s\n" id in
         let evaluator = blocking_evaluator config.db workflow in
@@ -217,40 +290,40 @@ let rec build
         (*     ~np ~mem ~id *)
         (* in *)
         worker (Fn.flip evaluator (Db.cache config.db id)) ()
-        >|= ignore (* FIXME *)
+        >> fun _ -> Eval_thread.return () (* FIXME *)
     | W.Shell s ->
       if Sys.file_exists (Db.cache config.db s.id) = `Yes
-      then Lwt.return ()
+      then Eval_thread.return ()
       else
         build_command_deps config s.task >>= fun () ->
-        shallow_eval_command config s.task >>= fun cmd ->
-        perform_shell config s.id cmd
+        shallow_eval_command config s.task >> fun cmd ->
+        perform_shell config ~id:s.id ~descr:s.descr cmd >>= fun _ -> (* FIXME *)
+        Eval_thread.return ()
 
 and build_command_deps config
-  : W.path W.t Command.t -> unit Lwt.t
+  : W.path W.t Command.t -> unit Eval_thread.t
   = function
     | Simple_command cmd -> build_template_deps config cmd
     | And_list xs
     | Or_list xs
     | Pipe_list xs ->
-      List.map ~f:(build_command_deps config) xs
-      |> Lwt.join
+      Eval_thread.join ~f:(build_command_deps config) xs
     | Docker (_, cmd) -> build_command_deps config cmd
 
 and build_template_deps config toks =
-    List.map ~f:(build_template_token_deps config) toks
-    |> Lwt.join
+    Eval_thread.join ~f:(build_template_token_deps config) toks
 
 and build_template_token_deps config
-  : W.path W.t Template.token -> unit Lwt.t
+  : W.path W.t Template.token -> unit thread
   = function
     | D w -> build config w
     | F f -> build_template_deps config f
-    | DEST | TMP | NP | MEM | S _ -> Lwt.return ()
+    | DEST | TMP | NP | MEM | S _ -> Eval_thread.return ()
 
 let eval
-  : type s. config -> s Bistro.workflow -> s Lwt.t
+  : type s. config -> s Bistro.workflow -> (s, Execution_trace.t list) Lwt_result.t
   = fun config w ->
     let w = Bistro.Private.reveal w in
-    build config w >>= fun () ->
-    shallow_eval config w
+    build config w
+    |> Fn.flip Lwt_result.bind Lwt.(fun () -> shallow_eval config w >|= Result.return)
+    |> Lwt_result.map_err Traces.elements
