@@ -12,5 +12,8 @@ let%workflow mul x y : int workflow =
 let pipeline = add (Workflow.int 1) (Workflow.int 41)
 
 let _ =
-  Bistro_engine.Scheduler.eval pipeline >|= Printf.printf "%d\n"
+  let open Bistro_engine in
+  let config = { Scheduler.db = Db.init_exn "_bistro" ; use_docker = true } in
+  Scheduler.eval config pipeline
+  >|= Printf.printf "%d\n"
   |> Lwt_main.run

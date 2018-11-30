@@ -2,5 +2,12 @@ type error = [
   | `Msg of string
 ]
 
+type config = {
+  db : Db.t ;
+  use_docker : bool ;
+}
+
 val eval :
-  'a Bistro.workflow -> 'a Lwt.t
+  config ->
+  'a Bistro.workflow ->
+  'a Lwt.t

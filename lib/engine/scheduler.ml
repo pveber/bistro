@@ -12,9 +12,6 @@ type config = {
   use_docker : bool ;
 }
 
-let db = Db.init_exn "_bistro" (* FIXME *)
-let config = { db ; use_docker = true }
-
 let worker f x =
   let (read_from_child, write_to_parent) = Unix.pipe () in
   let (read_from_parent, write_to_child) = Unix.pipe () in
@@ -69,7 +66,7 @@ let step_outcome ~exit_code ~dest_exists=
   | 0, false -> `Missing_output
   | _ -> `Failed
 
-let perform_shell id cmd =
+let perform_shell config id cmd =
   let env =
     Execution_env.make
       ~use_docker:config.use_docker
@@ -99,57 +96,63 @@ let perform_shell id cmd =
       stderr = env.stderr ;
                 }*)())
 
-let rec blocking_evaluator : type s. s W.t -> (unit -> s) = function
-  | W.Pure { value ; _ } -> fun () -> value
-  | W.App { f ; x ; _ } ->
-    let f = blocking_evaluator f in
-    let x = blocking_evaluator x in
-    fun () -> (f ()) (x ())
-  | W.Both { fst ; snd ; _ } ->
-    let fst = blocking_evaluator fst in
-    let snd = blocking_evaluator snd in
-    fun () -> (fst (), snd ())
-  | W.Eval_path x ->
-    let f = blocking_evaluator x.workflow in
-    fun () -> Db.path db (f ())
-  | W.Select _ -> assert false
-  | W.Input { path ; _ } -> fun () -> W.FS_path path
-  | W.Value { id ; _ } ->
-    fun () -> (load_value (Db.cache db id))
-  | W.Path _ -> assert false
-  | W.Spawn _ -> assert false
-  | W.Shell s -> fun () -> W.Cache_id s.id
+let rec blocking_evaluator
+  : type s. Db.t -> s W.t -> (unit -> s)
+  = fun db w ->
+    match w with
+    | W.Pure { value ; _ } -> fun () -> value
+    | W.App { f ; x ; _ } ->
+      let f = blocking_evaluator db f in
+      let x = blocking_evaluator db x in
+      fun () -> (f ()) (x ())
+    | W.Both { fst ; snd ; _ } ->
+      let fst = blocking_evaluator db fst in
+      let snd = blocking_evaluator db snd in
+      fun () -> (fst (), snd ())
+    | W.Eval_path x ->
+      let f = blocking_evaluator db x.workflow in
+      fun () -> Db.path db (f ())
+    | W.Select _ -> assert false
+    | W.Input { path ; _ } -> fun () -> W.FS_path path
+    | W.Value { id ; _ } ->
+      fun () -> (load_value (Db.cache db id))
+    | W.Path _ -> assert false
+    | W.Spawn _ -> assert false
+    | W.Shell s -> fun () -> W.Cache_id s.id
 
-let rec shallow_eval : type s. s W.t -> s Lwt.t = function
-  | W.Pure { value ; _ } -> Lwt.return value
-  | W.App { f ; x ; _ } ->
-    lwt_both (shallow_eval f) (shallow_eval x) >>= fun (f, x) ->
-    let y = f x in
-    Lwt.return y
-  | W.Both { fst ; snd ; _ } ->
-    lwt_both (shallow_eval fst) (shallow_eval snd) >>= fun (fst, snd) ->
-    Lwt.return (fst, snd)
-  | W.Eval_path w ->
-    shallow_eval w.workflow >|= Db.path db
-  | W.Select s ->
-    shallow_eval s.dir >>= fun dir ->
-    Lwt.return (W.Cd (dir, s.sel))
-  | W.Input { path ; _ } -> Lwt.return (W.FS_path path)
-  | W.Value { id ; _ } ->
-    Lwt.return (load_value (Db.cache db id)) (* FIXME: blocking call *)
-  | W.Spawn s -> (* FIXME: much room for improvement *)
-    shallow_eval s.elts >>= fun elts ->
-    let targets = List.init (List.length elts) ~f:(fun i -> s.f (list_nth s.elts i)) in
-    Lwt_list.map_p shallow_eval targets
-  | W.Path s -> Lwt.return (W.Cache_id s.id)
-  | W.Shell s -> Lwt.return (W.Cache_id s.id)
+let rec shallow_eval
+  : type s. config -> s W.t -> s Lwt.t
+  = fun config w ->
+    match w with
+    | W.Pure { value ; _ } -> Lwt.return value
+    | W.App { f ; x ; _ } ->
+      lwt_both (shallow_eval config f) (shallow_eval config x) >>= fun (f, x) ->
+      let y = f x in
+      Lwt.return y
+    | W.Both { fst ; snd ; _ } ->
+      lwt_both (shallow_eval config fst) (shallow_eval config snd) >>= fun (fst, snd) ->
+      Lwt.return (fst, snd)
+    | W.Eval_path w ->
+      shallow_eval config w.workflow >|= Db.path config.db
+    | W.Select s ->
+      shallow_eval config s.dir >>= fun dir ->
+      Lwt.return (W.Cd (dir, s.sel))
+    | W.Input { path ; _ } -> Lwt.return (W.FS_path path)
+    | W.Value { id ; _ } ->
+      Lwt.return (load_value (Db.cache config.db id)) (* FIXME: blocking call *)
+    | W.Spawn s -> (* FIXME: much room for improvement *)
+      shallow_eval config s.elts >>= fun elts ->
+      let targets = List.init (List.length elts) ~f:(fun i -> s.f (list_nth s.elts i)) in
+      Lwt_list.map_p (shallow_eval config) targets
+    | W.Path s -> Lwt.return (W.Cache_id s.id)
+    | W.Shell s -> Lwt.return (W.Cache_id s.id)
 
-and shallow_eval_command =
-  let list xs = Lwt_list.map_p shallow_eval_command xs in
+and shallow_eval_command config =
+  let list xs = Lwt_list.map_p (shallow_eval_command config) xs in
   let open Command in
   function
   | Simple_command cmd ->
-    shallow_eval_template cmd >|= fun cmd ->
+    shallow_eval_template config cmd >|= fun cmd ->
     Simple_command cmd
   | And_list xs ->
     list xs >|= fun xs -> And_list xs
@@ -158,94 +161,96 @@ and shallow_eval_command =
   | Pipe_list xs ->
     list xs >|= fun xs -> Pipe_list xs
   | Docker (env, cmd) ->
-    shallow_eval_command cmd >|= fun cmd ->
+    shallow_eval_command config cmd >|= fun cmd ->
     Docker (env, cmd)
 
-and shallow_eval_template = fun toks ->
-    Lwt_list.map_p shallow_eval_token toks
+and shallow_eval_template config toks =
+    Lwt_list.map_p (shallow_eval_token config) toks
 
-and shallow_eval_token =
+and shallow_eval_token config =
   let open Template in
   function
-  | D w -> shallow_eval w >|= fun p -> D p
-  | F f -> shallow_eval_template f >|= fun t -> F t
+  | D w -> shallow_eval config w >|= fun p -> D p
+  | F f -> shallow_eval_template config f >|= fun t -> F t
   | DEST | TMP | NP | MEM | S _ as tok -> Lwt.return tok
 
-let rec build : type s. s W.t -> unit Lwt.t = function
-  | W.Pure _ -> Lwt.return ()
-  | W.App { x ; f ; _ } ->
-    lwt_both (build x) (build f) >|= ignore
-  | W.Both { fst ; snd ; _ } ->
-    lwt_both (build fst) (build snd) >|= ignore
-  | W.Eval_path { workflow ; _ } -> build workflow
-  | W.Spawn { elts ; f ; _ } ->
-    build elts >>= fun () ->
-    shallow_eval elts >>= fun elts_value ->
-    let n = List.length elts_value in
-    List.init n ~f:(fun i -> f (list_nth elts i))
-    |> List.map ~f:build
-    |> Lwt.join
-  | W.Input _ -> Lwt.return () (* FIXME: check path *)
-  | W.Select _ -> Lwt.return () (* FIXME: check path *)
-  | W.Value { task = workflow ; id ; _ } ->
-    if Sys.file_exists (Db.cache db id) = `Yes
-    then Lwt.return ()
-    else
-      let () = printf "build %s\n" id in
-      let evaluator = blocking_evaluator workflow in
-      worker (fun () ->
-          let y = evaluator () () in
-          save_value ~data:y (Db.cache db id)
-        ) ()
-      >|= ignore (* FIXME *)
-  | W.Path { id ; task = workflow ; _ } ->
-    if Sys.file_exists (Db.cache db id) = `Yes
-    then Lwt.return ()
-    else
-      let () = printf "build %s\n" id in
-      let evaluator = blocking_evaluator workflow in
-      (* let env = *) (* FIXME: use this *)
-      (*   Execution_env.make *)
-      (*     ~use_docker:config.use_docker *)
-      (*     ~db:config.db *)
-      (*     ~np ~mem ~id *)
-      (* in *)
-      worker (Fn.flip evaluator (Db.cache db id)) ()
-      >|= ignore (* FIXME *)
-  | W.Shell s ->
-    if Sys.file_exists (Db.cache db s.id) = `Yes
-    then Lwt.return ()
-    else
-      build_command_deps s.task >>= fun () ->
-      shallow_eval_command s.task >>= fun cmd ->
-      perform_shell s.id cmd
+let rec build
+  : type s. config -> s W.t -> unit Lwt.t
+  = fun config w ->
+    match w with
+    | W.Pure _ -> Lwt.return ()
+    | W.App { x ; f ; _ } ->
+      lwt_both (build config x) (build config f) >|= ignore
+    | W.Both { fst ; snd ; _ } ->
+      lwt_both (build config fst) (build config snd) >|= ignore
+    | W.Eval_path { workflow ; _ } -> build config workflow
+    | W.Spawn { elts ; f ; _ } ->
+      build config elts >>= fun () ->
+      shallow_eval config elts >>= fun elts_value ->
+      let n = List.length elts_value in
+      List.init n ~f:(fun i -> f (list_nth elts i))
+      |> List.map ~f:(build config)
+      |> Lwt.join
+    | W.Input _ -> Lwt.return () (* FIXME: check path *)
+    | W.Select _ -> Lwt.return () (* FIXME: check path *)
+    | W.Value { task = workflow ; id ; _ } ->
+      if Sys.file_exists (Db.cache config.db id) = `Yes
+      then Lwt.return ()
+      else
+        let () = printf "build %s\n" id in
+        let evaluator = blocking_evaluator config.db workflow in
+        worker (fun () ->
+            let y = evaluator () () in
+            save_value ~data:y (Db.cache config.db id)
+          ) ()
+        >|= ignore (* FIXME *)
+    | W.Path { id ; task = workflow ; _ } ->
+      if Sys.file_exists (Db.cache config.db id) = `Yes
+      then Lwt.return ()
+      else
+        let () = printf "build %s\n" id in
+        let evaluator = blocking_evaluator config.db workflow in
+        (* let env = *) (* FIXME: use this *)
+        (*   Execution_env.make *)
+        (*     ~use_docker:config.use_docker *)
+        (*     ~db:config.db *)
+        (*     ~np ~mem ~id *)
+        (* in *)
+        worker (Fn.flip evaluator (Db.cache config.db id)) ()
+        >|= ignore (* FIXME *)
+    | W.Shell s ->
+      if Sys.file_exists (Db.cache config.db s.id) = `Yes
+      then Lwt.return ()
+      else
+        build_command_deps config s.task >>= fun () ->
+        shallow_eval_command config s.task >>= fun cmd ->
+        perform_shell config s.id cmd
 
-and build_command_deps
+and build_command_deps config
   : W.path W.t Command.t -> unit Lwt.t
   = function
-    | Simple_command cmd -> build_template_deps cmd
+    | Simple_command cmd -> build_template_deps config cmd
     | And_list xs
     | Or_list xs
     | Pipe_list xs ->
-      List.map ~f:build_command_deps xs
+      List.map ~f:(build_command_deps config) xs
       |> Lwt.join
-    | Docker (_, cmd) -> build_command_deps cmd
+    | Docker (_, cmd) -> build_command_deps config cmd
 
-and build_template_deps
-  : W.path W.t Template.t -> unit Lwt.t
-  = fun toks ->
-    List.map ~f:build_template_token_deps toks
+and build_template_deps config toks =
+    List.map ~f:(build_template_token_deps config) toks
     |> Lwt.join
 
-and build_template_token_deps
+and build_template_token_deps config
   : W.path W.t Template.token -> unit Lwt.t
   = function
-    | D w -> build w
-    | F f -> build_template_deps f
+    | D w -> build config w
+    | F f -> build_template_deps config f
     | DEST | TMP | NP | MEM | S _ -> Lwt.return ()
 
-let eval : type s. s Bistro.workflow -> s Lwt.t =
-  fun w ->
+let eval
+  : type s. config -> s Bistro.workflow -> s Lwt.t
+  = fun config w ->
     let w = Bistro.Private.reveal w in
-    build w >>= fun () ->
-    shallow_eval w
+    build config w >>= fun () ->
+    shallow_eval config w
