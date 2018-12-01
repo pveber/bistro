@@ -5,6 +5,7 @@ open Bistro_nlp
 let cut_deps x = [%workflow
   let lines = In_channel.read_lines [%path x] in
   List.group lines ~break:(fun _ l -> l = "")
+  |> List.filter ~f:(( <> ) [""])
 ]
 
 let%pworkflow dump_lines x =
