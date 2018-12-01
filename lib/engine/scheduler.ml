@@ -156,34 +156,25 @@ let step_outcome ~exit_code ~dest_exists=
 
 let perform_input sched ~path ~id =
   let pass = Sys.file_exists path = `Yes in
-  if pass then
-    Misc.cp path (Db.cache sched.db id) >>= fun () ->
-    Eval_thread.return (
-      Task_result.Other {
-        id ;
-        outcome = `Succeeded ;
-        summary = "" ;
-        msg = None ;
-      })
-  else
-    Eval_thread.return (Task_result.Other {
-        id ;
-        outcome = `Failed ;
-        summary = sprintf "Input %s doesn't exist" path ;
-        msg = None ;
-      })
+  (
+    if pass then Misc.cp path (Db.cache sched.db id)
+    else Lwt.return ()
+  ) >>= fun () -> 
+  Eval_thread.return (
+    Task_result.Input { id ; pass ; path }
+  )
 
-(* let perform_select sched ~id ~dir ~sel =
- *   Lwt.wrap (fun () ->
- *       let p = select_path sched.db dir sel in
- *       let pass = Sys.file_exists p = `Yes in
- *       Task_result.Select {
- *         id ;
- *         pass ;
- *         dir_path = Db.path sched.db dir ;
- *         sel ;
- *       }
- *     ) *)
+let perform_select sched ~id ~dir ~sel =
+  let p = Filename.concat (Db.path sched.db dir) (Path.to_string sel) in
+  let pass = Sys.file_exists p = `Yes in
+  Eval_thread.return (
+    Task_result.Select {
+      id ;
+      pass ;
+      dir_path = Db.path sched.db dir ;
+      sel ;
+    }
+  )
 
 let perform_shell sched ~id ~descr cmd =
   let env =
@@ -360,7 +351,12 @@ let rec build
       register_build sched ~id ~build_trace:(fun () ->
           build_trace sched (fun () -> perform_input sched ~id ~path)
         )
-    | W.Select _ -> Eval_thread.return () (* FIXME: check path *)
+    | W.Select { id ; dir ; sel ; _ } ->
+      build sched dir >>= fun () ->
+      shallow_eval sched dir >> fun dir ->
+      register_build sched ~id ~build_trace:(fun () ->
+          build_trace sched (fun () -> perform_select sched ~id ~dir ~sel)
+        )
     | W.Value { task = workflow ; id ; _ } ->
       schedule_cached_workflow sched ~id ~f:(fun () ->
           let evaluator = blocking_evaluator sched.db workflow in

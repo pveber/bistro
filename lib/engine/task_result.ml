@@ -1,6 +1,8 @@
 open Core_kernel
 
 type t =
+  | Input of { id : string ; path : string ; pass : bool }
+  | Select of { id : string ; dir_path : string ; sel : string list ; pass : bool }
   | Shell of {
       id : string ;
       descr : string ;
@@ -20,10 +22,14 @@ type t =
     }
 
 let id = function
+  | Input { id ;  _ }
+  | Select { id ;  _}
   | Shell { id ; _ }
   | Other { id ; _ } -> id
 
 let succeeded = function
+  | Input { pass ; _ }
+  | Select { pass ; _ } -> pass
   | Other { outcome ; _ }
   | Shell { outcome ; _ } -> (
       match outcome with
@@ -32,6 +38,9 @@ let succeeded = function
     )
 
 let error_short_descr = function
+  | Input { path ; _ } -> sprintf "Input %s doesn't exist" path
+  | Select { dir_path ; sel ; _ } ->
+    sprintf "Path %s doesn't exist in %s" (Path.to_string sel) dir_path
   | Shell x -> (
       match x.outcome with
       | `Missing_output -> "Missing output"
@@ -44,6 +53,7 @@ let error_short_descr = function
   | Other o -> o.summary
 
 let error_long_descr x db buf id = match x with
+  | Input _ | Select _ -> ()
   | Other o -> Option.iter o.msg ~f:(Buffer.add_string buf)
   | Shell x ->
     (

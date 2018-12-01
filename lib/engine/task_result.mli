@@ -1,4 +1,6 @@
 type t =
+  | Input of { id : string ; path : string ; pass : bool }
+  | Select of { id : string ; dir_path : string ; sel : string list ; pass : bool }
   | Shell of {
       id : string ;
       descr : string ;
