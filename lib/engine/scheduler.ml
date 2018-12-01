@@ -164,7 +164,7 @@ let perform_input sched ~path ~id =
   (
     if pass then Misc.cp path (Db.cache sched.db id)
     else Lwt.return ()
-  ) >>= fun () -> 
+  ) >>= fun () ->
   Eval_thread.return (
     Task_result.Input { id ; pass ; path }
   )
@@ -234,6 +234,9 @@ let rec blocking_evaluator
     | W.Path _ -> assert false
     | W.Spawn _ -> assert false
     | W.Shell s -> fun () -> W.Cache_id s.id
+    | W.List l ->
+      let l = List.map l.elts ~f:(blocking_evaluator db) in
+      fun () -> List.map l ~f:(fun f -> f())
 
 let rec shallow_eval
   : type s. t -> s W.t -> s Lwt.t
@@ -261,6 +264,8 @@ let rec shallow_eval
       Lwt_list.map_p (shallow_eval sched) targets
     | W.Path s -> Lwt.return (W.Cache_id s.id)
     | W.Shell s -> Lwt.return (W.Cache_id s.id)
+    | W.List l ->
+      Lwt_list.map_p (shallow_eval sched) l.elts
 
 and shallow_eval_command sched =
   let list xs = Lwt_list.map_p (shallow_eval_command sched) xs in
@@ -315,6 +320,7 @@ let requirement
       | Eval_path _ -> 0, 0
       | Input _ -> 0, 0
       | Select _ -> 0, 0
+      | List _ -> 0, 0
       | Value x -> x.np, x.mem
       | Path x -> x.np, x.mem
       | Shell x -> x.np, x.mem
@@ -351,7 +357,7 @@ let schedule_cached_workflow sched ~id w ~f =
           build_trace sched w f
         )
     )
-  
+
 let rec build
   : type s. t -> s W.t -> unit thread
   = fun sched w ->
@@ -410,6 +416,8 @@ let rec build
           shallow_eval_command sched task >> fun cmd ->
           perform_shell sched resource ~id ~descr cmd
         )
+    | List l ->
+      Eval_thread.join l.elts ~f:(build sched)
 
 and build_command_deps sched
   : W.path W.t Command.t -> unit Eval_thread.t

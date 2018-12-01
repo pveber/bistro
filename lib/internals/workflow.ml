@@ -15,6 +15,10 @@ type _ t =
       fst : 'a t ;
       snd : 'b t ;
     } -> ('a *'b) t
+  | List : {
+      id : string ;
+      elts : 'a t list ;
+    } -> 'a list t
   | Eval_path : { id : string ; workflow : path t } -> string t
   | Spawn : {
       id : string ;
@@ -57,6 +61,7 @@ let id : type s. s t -> string = function
   | Both { id ; _ } -> id
   | Eval_path { id ; _ } -> id
   | Shell { id ; _ } -> id
+  | List { id ; _ } -> id
 
 let input ?version path =
   let id = digest (`Input, path, version) in
@@ -110,3 +115,7 @@ let shell
   let cmd = Command.And_list cmds in
   let id = digest ("shell", version, digestible_cmd cmd) in
   Shell { descr ; task = cmd ; np ; mem ; version ; id }
+
+let list elts =
+  let id = digest ("list", List.map id elts) in
+  List { id ; elts }
