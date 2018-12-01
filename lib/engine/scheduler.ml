@@ -7,10 +7,7 @@ type error = [
   | `Msg of string
 ]
 
-type t = {
-  db : Db.t ;
-  use_docker : bool ;
-}
+module Table = String.Table
 
 module Traces = Caml.Set.Make(struct
     type t = Execution_trace.t
@@ -22,7 +19,7 @@ module Eval_thread : sig
   type 'a t = ('a, Traces.t) Lwt_result.t
   val return : 'a -> 'a t
   (* val fail : Traces.t -> 'a t *)
-  (* val fail1 : Execution_trace.t -> 'a t *)
+  val fail1 : Execution_trace.t -> 'a t
   val both : 'a t -> 'b t -> ('a * 'b) t
   (* val list_map : *)
   (*   'a list -> *)
@@ -51,7 +48,7 @@ struct
 
   let return = Lwt_result.return
   (* let fail = Lwt_result.fail *)
-  (* let fail1 e = Lwt_result.fail (Traces.singleton e) *)
+  let fail1 e = Lwt_result.fail (Traces.singleton e)
   let result_both x y =
     match x, y with
     | Ok x, Ok y -> Ok (x, y)
@@ -84,6 +81,24 @@ struct
 end
 
 type 'a thread = 'a Eval_thread.t
+
+type t = {
+  db : Db.t ;
+  use_docker : bool ;
+  traces : Execution_trace.t thread Table.t ;
+}
+
+let create
+    (* ?(loggers = []) *)
+    (* ?(np = 1) ?mem:(`GB mem = `GB 1) *)
+    ?(use_docker = true) db =
+  {
+    (* allocator = Allocator.create ~np ~mem:(mem * 1024) ; *)
+    db ;
+    use_docker ;
+    traces = String.Table.create () ;
+    (* logger = Logger.tee loggers ; *)
+  }
 
 let worker f x =
   let (read_from_child, write_to_parent) = Unix.pipe () in
@@ -138,6 +153,37 @@ let step_outcome ~exit_code ~dest_exists=
     0, true -> `Succeeded
   | 0, false -> `Missing_output
   | _ -> `Failed
+
+let perform_input sched ~path ~id =
+  let pass = Sys.file_exists path = `Yes in
+  if pass then
+    Misc.cp path (Db.cache sched.db id) >>= fun () ->
+    Eval_thread.return (
+      Task_result.Other {
+        id ;
+        outcome = `Succeeded ;
+        summary = "" ;
+        msg = None ;
+      })
+  else
+    Eval_thread.return (Task_result.Other {
+        id ;
+        outcome = `Failed ;
+        summary = sprintf "Input %s doesn't exist" path ;
+        msg = None ;
+      })
+
+(* let perform_select sched ~id ~dir ~sel =
+ *   Lwt.wrap (fun () ->
+ *       let p = select_path sched.db dir sel in
+ *       let pass = Sys.file_exists p = `Yes in
+ *       Task_result.Select {
+ *         id ;
+ *         pass ;
+ *         dir_path = Db.path sched.db dir ;
+ *         sel ;
+ *       }
+ *     ) *)
 
 let perform_shell sched ~id ~descr cmd =
   let env =
@@ -247,6 +293,45 @@ and shallow_eval_token sched =
   | F f -> shallow_eval_template sched f >|= fun t -> F t
   | DEST | TMP | NP | MEM | S _ as tok -> Lwt.return tok
 
+let schedule_workflow sched ~id ~build_trace =
+  let open Eval_thread.Infix in
+  (
+    match Table.find sched.traces id with
+    | None ->
+      let trace = build_trace () in
+      Table.set sched.traces ~key:id ~data:trace ;
+      trace
+    | Some trace -> trace
+  ) >>= fun trace ->
+  if Execution_trace.is_errored trace then
+    Eval_thread.fail1 trace
+  else
+    Lwt_result.return ()
+
+let task_trace _sched perform =
+  let open Eval_thread.Infix in
+  let ready = Unix.gettimeofday () in
+  (* log ~time:ready sched (Logger.Task_ready t) ; *)
+  (* Allocator.request sched.allocator (Task.requirement t) >>= function
+   * | Ok resource -> *)
+    let start = Unix.gettimeofday () in
+    (* log ~time:start sched (Logger.Task_started (t, resource)) ; *)
+  perform () (* resource *) >>= fun outcome ->
+    let _end_ = Unix.gettimeofday () in
+    (* log ~time:_end_ sched (Logger.Task_ended { outcome ; start ; _end_ }) ;
+     * Allocator.release sched.allocator resource ; *)
+    Eval_thread.return (
+      Execution_trace.Run { ready ; start  ; _end_ ; outcome }
+    )
+  (* | Error (`Msg msg) ->
+   *   log sched (Logger.Task_allocation_error (t, msg)) ;
+   *   Lwt.return (Execution_trace.Allocation_error (t, msg)) *)
+
+let cached_task_trace sched ~id ~f =
+  if Sys.file_exists (Db.cache sched.db id) = `Yes
+  then Eval_thread.return (Execution_trace.Done_already { id })
+  else f ()
+  
 let rec build
   : type s. t -> s W.t -> unit thread
   = fun sched w ->
@@ -264,43 +349,54 @@ let rec build
       let n = List.length elts_value in
       List.init n ~f:(fun i -> f (list_nth elts i))
       |> Eval_thread.join ~f:(build sched)
-    | W.Input (* { id ; path ; *) _ (* } *) ->
-      Eval_thread.return () (* FIXME: check path *)
-        (* perform_input sched ~id ~path *)
+    | W.Input { id ; path ; _ } ->
+      schedule_workflow sched ~id ~build_trace:(fun () ->
+          task_trace sched (fun () -> perform_input sched ~id ~path)
+        )
     | W.Select _ -> Eval_thread.return () (* FIXME: check path *)
     | W.Value { task = workflow ; id ; _ } ->
-      if Sys.file_exists (Db.cache sched.db id) = `Yes
-      then Eval_thread.return ()
-      else
-        let () = printf "build %s\n" id in
-        let evaluator = blocking_evaluator sched.db workflow in
-        worker (fun () ->
-            let y = evaluator () () in
-            save_value ~data:y (Db.cache sched.db id)
-          ) ()
-        >> fun _ -> Eval_thread.return () (* FIXME *)
+      schedule_workflow sched ~id ~build_trace:(fun () ->
+          cached_task_trace sched ~id ~f:(fun () ->
+              task_trace sched (fun () ->
+                  let evaluator = blocking_evaluator sched.db workflow in
+                  worker (fun () ->
+                      let y = evaluator () () in
+                      save_value ~data:y (Db.cache sched.db id)
+                    ) () >|=
+                  function
+                  | Ok () -> Ok (Task_result.Other { id ; outcome = `Succeeded ; msg = None ; summary = "" })
+                  | Error msg -> Ok (Task_result.Other { id ; outcome = `Failed ; msg = None ; summary = msg })
+                )
+            )
+        )
     | W.Path { id ; task = workflow ; _ } ->
-      if Sys.file_exists (Db.cache sched.db id) = `Yes
-      then Eval_thread.return ()
-      else
-        let () = printf "build %s\n" id in
-        let evaluator = blocking_evaluator sched.db workflow in
-        (* let env = *) (* FIXME: use this *)
-        (*   Execution_env.make *)
-        (*     ~use_docker:sched.use_docker *)
-        (*     ~db:sched.db *)
-        (*     ~np ~mem ~id *)
-        (* in *)
-        worker (Fn.flip evaluator (Db.cache sched.db id)) ()
-        >> fun _ -> Eval_thread.return () (* FIXME *)
-    | W.Shell s ->
-      if Sys.file_exists (Db.cache sched.db s.id) = `Yes
-      then Eval_thread.return ()
-      else
-        build_command_deps sched s.task >>= fun () ->
-        shallow_eval_command sched s.task >> fun cmd ->
-        perform_shell sched ~id:s.id ~descr:s.descr cmd >>= fun _ -> (* FIXME *)
-        Eval_thread.return ()
+      schedule_workflow sched ~id ~build_trace:(fun () ->
+          cached_task_trace sched ~id ~f:(fun () ->
+              task_trace sched (fun () ->
+                  let evaluator = blocking_evaluator sched.db workflow in
+                  (* let env = *) (* FIXME: use this *)
+                  (*   Execution_env.make *)
+                  (*     ~use_docker:sched.use_docker *)
+                  (*     ~db:sched.db *)
+                  (*     ~np ~mem ~id *)
+                  (* in *)
+                  worker (Fn.flip evaluator (Db.cache sched.db id)) () >|=
+                  function
+                  | Ok () -> Ok (Task_result.Other { id ; outcome = `Succeeded ; msg = None ; summary = "" })
+                  | Error msg -> Ok (Task_result.Other { id ; outcome = `Failed ; msg = None ; summary = msg })
+                )
+            )
+        )
+    | W.Shell { id ; task ; descr ; _ } ->
+      schedule_workflow sched ~id ~build_trace:(fun () ->
+          cached_task_trace sched ~id ~f:(fun () ->
+               task_trace sched (fun () ->
+                  build_command_deps sched task >>= fun () ->
+                  shallow_eval_command sched task >> fun cmd ->
+                  perform_shell sched ~id ~descr cmd
+                )
+            )
+        )
 
 and build_command_deps sched
   : W.path W.t Command.t -> unit Eval_thread.t
@@ -322,9 +418,9 @@ and build_template_token_deps sched
     | F f -> build_template_deps sched f
     | DEST | TMP | NP | MEM | S _ -> Eval_thread.return ()
 
-let eval ?(use_docker = true) db w =
+let eval ?use_docker db w =
   let w = Bistro.Private.reveal w in
-  let sched = { use_docker ; db } in
+  let sched = create ?use_docker db in
   build sched w
   |> Fn.flip Lwt_result.bind Lwt.(fun () -> shallow_eval sched w >|= Result.return)
   |> Lwt_result.map_err Traces.elements
