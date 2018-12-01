@@ -83,22 +83,27 @@ end
 type 'a thread = 'a Eval_thread.t
 
 type t = {
+  allocator : Allocator.t ;
   db : Db.t ;
+  logger : Logger.t ;
   use_docker : bool ;
   traces : Execution_trace.t thread Table.t ;
 }
 
 let create
-    (* ?(loggers = []) *)
-    (* ?(np = 1) ?mem:(`GB mem = `GB 1) *)
+    ?(loggers = [])
+    ?(np = 1) ?mem:(`GB mem = `GB 1)
     ?(use_docker = true) db =
   {
-    (* allocator = Allocator.create ~np ~mem:(mem * 1024) ; *)
+    allocator = Allocator.create ~np ~mem:(mem * 1024) ;
     db ;
     use_docker ;
     traces = String.Table.create () ;
-    (* logger = Logger.tee loggers ; *)
+    logger = Logger.tee loggers ;
   }
+
+let log ?(time = Unix.gettimeofday ()) sched event =
+  sched.logger#event sched.db time event
 
 let worker f x =
   let (read_from_child, write_to_parent) = Unix.pipe () in
@@ -176,12 +181,12 @@ let perform_select sched ~id ~dir ~sel =
     }
   )
 
-let perform_shell sched ~id ~descr cmd =
+let perform_shell sched (Allocator.Resource { np ; mem }) ~id ~descr cmd =
   let env =
     Execution_env.make
       ~use_docker:sched.use_docker
       ~db:sched.db
-      ~np:1 ~mem:0 ~id
+      ~np ~mem ~id
   in
   let cmd = Shell_command.make env cmd in
   Shell_command.run cmd >>= fun (exit_code, dest_exists) ->
@@ -299,34 +304,51 @@ let register_build sched ~id ~build_trace =
   else
     Lwt_result.return ()
 
-let build_trace _sched perform =
-  let open Eval_thread.Infix in
+let requirement
+  : type s. s Workflow.t -> Allocator.request
+  = fun w ->
+    let np, mem = match w with
+      | Pure _ -> 0, 0
+      | App _  -> 0, 0
+      | Spawn _ -> 0, 0
+      | Both _ -> 0, 0
+      | Eval_path _ -> 0, 0
+      | Input _ -> 0, 0
+      | Select _ -> 0, 0
+      | Value x -> x.np, x.mem
+      | Path x -> x.np, x.mem
+      | Shell x -> x.np, x.mem
+    in
+    Allocator.Request { np ; mem }
+
+let build_trace sched w perform =
   let ready = Unix.gettimeofday () in
-  (* log ~time:ready sched (Logger.Task_ready t) ; *)
-  (* Allocator.request sched.allocator (Task.requirement t) >>= function
-   * | Ok resource -> *)
+  log ~time:ready sched (Logger.Workflow_ready w) ;
+  Allocator.request sched.allocator (requirement w) >>= function
+  | Ok resource ->
+    let open Eval_thread.Infix in
     let start = Unix.gettimeofday () in
-    (* log ~time:start sched (Logger.Task_started (t, resource)) ; *)
-  perform () (* resource *) >>= fun outcome ->
+    log ~time:start sched (Logger.Workflow_started (w, resource)) ;
+    perform resource >>= fun outcome ->
     let _end_ = Unix.gettimeofday () in
-    (* log ~time:_end_ sched (Logger.Task_ended { outcome ; start ; _end_ }) ;
-     * Allocator.release sched.allocator resource ; *)
+    log ~time:_end_ sched (Logger.Workflow_ended { outcome ; start ; _end_ }) ;
+    Allocator.release sched.allocator resource ;
     Eval_thread.return (
       Execution_trace.Run { ready ; start  ; _end_ ; outcome }
     )
-  (* | Error (`Msg msg) ->
-   *   log sched (Logger.Task_allocation_error (t, msg)) ;
-   *   Lwt.return (Execution_trace.Allocation_error (t, msg)) *)
+  | Error (`Msg msg) ->
+    log sched (Logger.Workflow_allocation_error (w, msg)) ;
+    Eval_thread.return (Execution_trace.Allocation_error { id = Workflow.id w ; msg })
 
 let cached_build sched ~id ~f =
   if Sys.file_exists (Db.cache sched.db id) = `Yes
   then Eval_thread.return (Execution_trace.Done_already { id })
   else f ()
 
-let schedule_cached_workflow sched ~id ~f =
+let schedule_cached_workflow sched ~id w ~f =
   register_build sched ~id ~build_trace:(fun () ->
       cached_build sched ~id ~f:(fun () ->
-          build_trace sched f
+          build_trace sched w f
         )
     )
   
@@ -349,16 +371,16 @@ let rec build
       |> Eval_thread.join ~f:(build sched)
     | W.Input { id ; path ; _ } ->
       register_build sched ~id ~build_trace:(fun () ->
-          build_trace sched (fun () -> perform_input sched ~id ~path)
+          build_trace sched w (fun _ -> perform_input sched ~id ~path)
         )
     | W.Select { id ; dir ; sel ; _ } ->
       build sched dir >>= fun () ->
       shallow_eval sched dir >> fun dir ->
       register_build sched ~id ~build_trace:(fun () ->
-          build_trace sched (fun () -> perform_select sched ~id ~dir ~sel)
+          build_trace sched w (fun _ -> perform_select sched ~id ~dir ~sel)
         )
     | W.Value { task = workflow ; id ; _ } ->
-      schedule_cached_workflow sched ~id ~f:(fun () ->
+      schedule_cached_workflow sched ~id w ~f:(fun _ ->
           let evaluator = blocking_evaluator sched.db workflow in
           worker (fun () ->
               let y = evaluator () () in
@@ -369,7 +391,7 @@ let rec build
           | Error msg -> Ok (Task_result.Other { id ; outcome = `Failed ; msg = None ; summary = msg })
         )
     | W.Path { id ; task = workflow ; _ } ->
-      schedule_cached_workflow sched ~id ~f:(fun () ->
+      schedule_cached_workflow sched ~id w ~f:(fun _ ->
           let evaluator = blocking_evaluator sched.db workflow in
           (* let env = *) (* FIXME: use this *)
           (*   Execution_env.make *)
@@ -383,10 +405,10 @@ let rec build
           | Error msg -> Ok (Task_result.Other { id ; outcome = `Failed ; msg = None ; summary = msg })
         )
     | W.Shell { id ; task ; descr ; _ } ->
-      schedule_cached_workflow sched ~id ~f:(fun () ->
+      schedule_cached_workflow sched ~id w ~f:(fun resource ->
           build_command_deps sched task >>= fun () ->
           shallow_eval_command sched task >> fun cmd ->
-          perform_shell sched ~id ~descr cmd
+          perform_shell sched resource ~id ~descr cmd
         )
 
 and build_command_deps sched
