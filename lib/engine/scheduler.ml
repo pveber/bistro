@@ -439,9 +439,16 @@ and build_template_token_deps sched
     | F f -> build_template_deps sched f
     | DEST | TMP | NP | MEM | S _ -> Eval_thread.return ()
 
-let eval ?use_docker db w =
+let eval ?np ?mem ?use_docker ?loggers db w =
   let w = Bistro.Private.reveal w in
-  let sched = create ?use_docker db in
+  let sched = create ?np ?mem ?use_docker ?loggers db in
   build sched w
   |> Fn.flip Lwt_result.bind Lwt.(fun () -> shallow_eval sched w >|= Result.return)
   |> Lwt_result.map_err Traces.elements
+
+let error_report db traces =
+  let buf = Buffer.create 1024 in
+  List.iter traces ~f:(fun trace ->
+      Execution_trace.error_report trace db buf
+    ) ;
+  Buffer.contents buf
