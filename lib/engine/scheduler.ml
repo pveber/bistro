@@ -293,7 +293,7 @@ and shallow_eval_token sched =
   | F f -> shallow_eval_template sched f >|= fun t -> F t
   | DEST | TMP | NP | MEM | S _ as tok -> Lwt.return tok
 
-let schedule_workflow sched ~id ~build_trace =
+let register_build sched ~id ~build_trace =
   let open Eval_thread.Infix in
   (
     match Table.find sched.traces id with
@@ -308,7 +308,7 @@ let schedule_workflow sched ~id ~build_trace =
   else
     Lwt_result.return ()
 
-let task_trace _sched perform =
+let build_trace _sched perform =
   let open Eval_thread.Infix in
   let ready = Unix.gettimeofday () in
   (* log ~time:ready sched (Logger.Task_ready t) ; *)
@@ -327,10 +327,17 @@ let task_trace _sched perform =
    *   log sched (Logger.Task_allocation_error (t, msg)) ;
    *   Lwt.return (Execution_trace.Allocation_error (t, msg)) *)
 
-let cached_task_trace sched ~id ~f =
+let cached_build sched ~id ~f =
   if Sys.file_exists (Db.cache sched.db id) = `Yes
   then Eval_thread.return (Execution_trace.Done_already { id })
   else f ()
+
+let schedule_cached_workflow sched ~id ~f =
+  register_build sched ~id ~build_trace:(fun () ->
+      cached_build sched ~id ~f:(fun () ->
+          build_trace sched f
+        )
+    )
   
 let rec build
   : type s. t -> s W.t -> unit thread
@@ -350,52 +357,40 @@ let rec build
       List.init n ~f:(fun i -> f (list_nth elts i))
       |> Eval_thread.join ~f:(build sched)
     | W.Input { id ; path ; _ } ->
-      schedule_workflow sched ~id ~build_trace:(fun () ->
-          task_trace sched (fun () -> perform_input sched ~id ~path)
+      register_build sched ~id ~build_trace:(fun () ->
+          build_trace sched (fun () -> perform_input sched ~id ~path)
         )
     | W.Select _ -> Eval_thread.return () (* FIXME: check path *)
     | W.Value { task = workflow ; id ; _ } ->
-      schedule_workflow sched ~id ~build_trace:(fun () ->
-          cached_task_trace sched ~id ~f:(fun () ->
-              task_trace sched (fun () ->
-                  let evaluator = blocking_evaluator sched.db workflow in
-                  worker (fun () ->
-                      let y = evaluator () () in
-                      save_value ~data:y (Db.cache sched.db id)
-                    ) () >|=
-                  function
-                  | Ok () -> Ok (Task_result.Other { id ; outcome = `Succeeded ; msg = None ; summary = "" })
-                  | Error msg -> Ok (Task_result.Other { id ; outcome = `Failed ; msg = None ; summary = msg })
-                )
-            )
+      schedule_cached_workflow sched ~id ~f:(fun () ->
+          let evaluator = blocking_evaluator sched.db workflow in
+          worker (fun () ->
+              let y = evaluator () () in
+              save_value ~data:y (Db.cache sched.db id)
+            ) () >|=
+          function
+          | Ok () -> Ok (Task_result.Other { id ; outcome = `Succeeded ; msg = None ; summary = "" })
+          | Error msg -> Ok (Task_result.Other { id ; outcome = `Failed ; msg = None ; summary = msg })
         )
     | W.Path { id ; task = workflow ; _ } ->
-      schedule_workflow sched ~id ~build_trace:(fun () ->
-          cached_task_trace sched ~id ~f:(fun () ->
-              task_trace sched (fun () ->
-                  let evaluator = blocking_evaluator sched.db workflow in
-                  (* let env = *) (* FIXME: use this *)
-                  (*   Execution_env.make *)
-                  (*     ~use_docker:sched.use_docker *)
-                  (*     ~db:sched.db *)
-                  (*     ~np ~mem ~id *)
-                  (* in *)
-                  worker (Fn.flip evaluator (Db.cache sched.db id)) () >|=
-                  function
-                  | Ok () -> Ok (Task_result.Other { id ; outcome = `Succeeded ; msg = None ; summary = "" })
-                  | Error msg -> Ok (Task_result.Other { id ; outcome = `Failed ; msg = None ; summary = msg })
-                )
-            )
+      schedule_cached_workflow sched ~id ~f:(fun () ->
+          let evaluator = blocking_evaluator sched.db workflow in
+          (* let env = *) (* FIXME: use this *)
+          (*   Execution_env.make *)
+          (*     ~use_docker:sched.use_docker *)
+          (*     ~db:sched.db *)
+          (*     ~np ~mem ~id *)
+          (* in *)
+          worker (Fn.flip evaluator (Db.cache sched.db id)) () >|=
+          function
+          | Ok () -> Ok (Task_result.Other { id ; outcome = `Succeeded ; msg = None ; summary = "" })
+          | Error msg -> Ok (Task_result.Other { id ; outcome = `Failed ; msg = None ; summary = msg })
         )
     | W.Shell { id ; task ; descr ; _ } ->
-      schedule_workflow sched ~id ~build_trace:(fun () ->
-          cached_task_trace sched ~id ~f:(fun () ->
-               task_trace sched (fun () ->
-                  build_command_deps sched task >>= fun () ->
-                  shallow_eval_command sched task >> fun cmd ->
-                  perform_shell sched ~id ~descr cmd
-                )
-            )
+      schedule_cached_workflow sched ~id ~f:(fun () ->
+          build_command_deps sched task >>= fun () ->
+          shallow_eval_command sched task >> fun cmd ->
+          perform_shell sched ~id ~descr cmd
         )
 
 and build_command_deps sched
