@@ -11,6 +11,13 @@ val item : string list -> 'a path workflow -> item
 
 val singleton : string -> 'a path workflow -> t
 
+val items :
+  string list ->
+  prefix:string ->
+  ?ext:string ->
+  'a path list workflow ->
+  item
+
 val add_prefix : string list -> t -> t
 
 val shift : string -> t -> t

@@ -7,6 +7,12 @@ module W = Bistro_internals.Workflow
 
 type item =
   | Item  : string list * _ path workflow -> item
+  | Item_list : {
+      path : string list ;
+      prefix : string ;
+      ext : string option ;
+      elts : _ path list workflow ;
+    } -> item
 
 type t = item list
 
@@ -16,15 +22,15 @@ type normalized_repo_item = {
   cache_path : string ;
 }
 
-let normalized_repo_item repo_path w cache_path = [
-  {
+let normalized_repo_item ~repo_path ~id ~cache_path = {
     repo_path = Path.to_string repo_path ;
-    file_path = Filename.concat "_files" (W.id (Private.reveal w)) ;
+    file_path = Filename.concat "_files" id ;
     cache_path ;
   }
-]
 
 let item path w = Item (path, w)
+
+let items path ~prefix ?ext elts = Item_list { path ; prefix ; ext ; elts }
 
 let ( %> ) path w = item path w
 
@@ -86,8 +92,29 @@ let generate outdir items =
 
 let to_workflow ~outdir items =
   let normalized_items =
-    List.map items ~f:(fun (Item (path, w)) ->
-        [%workflow normalized_repo_item path w [%path w]]
+    List.map items ~f:(function
+        | Item (path, w) ->
+          [%workflow [ normalized_repo_item ~repo_path:path ~id:(W.id (Private.reveal w)) ~cache_path:[%path w] ]]
+        | Item_list l ->
+          [%workflow
+            let id = W.id (Private.reveal l.elts) in
+            let elts = [%eval Workflow.spawn l.elts ~f:Workflow.eval_path] in
+            let n = List.length elts in
+            let m = Float.(n |> of_int |> log10 |> to_int) in
+            let ext = match l.ext with
+              | None -> ""
+              | Some s -> "." ^ s
+            in
+            let format =
+              Scanf.format_from_string
+                (sprintf {|%%s_%%0%dd%%s|} m)
+                "%s%d%s" in
+            let list_elt_path i =
+              l.path @ [ sprintf format l.prefix i ext ]
+            in
+            List.mapi elts ~f:(fun i path_w ->
+                normalized_repo_item ~repo_path:(list_elt_path i) ~id:(Misc.digest (id, i)) ~cache_path:path_w
+              )]
       )
     |> Workflow.list
   in
@@ -108,7 +135,10 @@ let build ?np ?mem ?loggers ?keep_all:_ ?use_docker ?(bistro_dir = "_bistro") ~o
     failwith "Some workflow failed!"
 
 let add_prefix prefix items =
-  List.map items ~f:(fun (Item  (p, w)) -> Item  (prefix @ p, w))
+  List.map items ~f:(function
+      | Item  (p, w) -> Item  (prefix @ p, w)
+      | Item_list l -> Item_list { l with path = prefix @ l.path}
+    )
 
 let shift dir items = add_prefix [ dir ] items
 
