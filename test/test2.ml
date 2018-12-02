@@ -1,6 +1,7 @@
 open Core_kernel
 open Bistro
 open Bistro_nlp
+open Bistro_utils
 
 let cut_deps x = [%workflow
   let lines = In_channel.read_lines [%path x] in
@@ -18,13 +19,13 @@ let pipeline w =
   |> Workflow.spawn ~f:(fun deps ->
       dump_lines deps
       |> Stanford_parser.dependensee
-      |> Workflow.eval_path
     )
+  |> Repo.(items [ w ] ~prefix:"sentence" ~ext:"png")
 
-let _ =
-  let open Bistro_engine in
-  let db = Db.init_exn "_bistro" in
-  Lwt_main.run Lwt_result.(
-    Bistro_engine.Scheduler.eval db (pipeline "Protein") >|= fun files ->
-    Printf.printf "%s\n" (String.concat ~sep:"\n" files)
-  )
+let repo =
+  [ "Protein" ; "Cell_(biology)" ]
+  |> List.map ~f:pipeline
+  
+let () =
+  Repo.build ~outdir:"res" repo
+  |> Lwt_main.run
