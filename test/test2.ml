@@ -27,5 +27,8 @@ let repo =
   |> List.map ~f:pipeline
   
 let () =
-  Repo.build ~outdir:"res" repo
+  Repo.build ~np:4 ~outdir:"res" repo ~loggers:[
+    Console_logger.create () ;
+    Html_logger.create "report.html" ;
+  ]
   |> Lwt_main.run
