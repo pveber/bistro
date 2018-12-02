@@ -351,10 +351,12 @@ let cached_build sched ~id ~f =
   then Eval_thread.return (Execution_trace.Done_already { id })
   else f ()
 
-let schedule_cached_workflow sched ~id w ~f =
+let schedule_cached_workflow sched ~id w ~deps ~perform =
+  let open Eval_thread.Infix in
   register_build sched ~id ~build_trace:(fun () ->
       cached_build sched ~id ~f:(fun () ->
-          build_trace sched w f
+          deps () >>= fun () ->
+          build_trace sched w perform
         )
     )
 
@@ -386,7 +388,9 @@ let rec build
           build_trace sched w (fun _ -> perform_select sched ~id ~dir ~sel)
         )
     | W.Value { task = workflow ; id ; _ } ->
-      schedule_cached_workflow sched ~id w ~f:(fun _ ->
+      schedule_cached_workflow sched ~id w
+        ~deps:(fun () -> build sched workflow)
+        ~perform:(fun _ ->
           let evaluator = blocking_evaluator sched.db workflow in
           worker (fun () ->
               let y = evaluator () () in
@@ -397,7 +401,9 @@ let rec build
           | Error msg -> Ok (Task_result.Other { id ; outcome = `Failed ; msg = None ; summary = msg })
         )
     | W.Path { id ; task = workflow ; _ } ->
-      schedule_cached_workflow sched ~id w ~f:(fun _ ->
+      schedule_cached_workflow sched ~id w
+        ~deps:(fun () -> build sched workflow)
+        ~perform:(fun _ ->
           let evaluator = blocking_evaluator sched.db workflow in
           (* let env = *) (* FIXME: use this *)
           (*   Execution_env.make *)
@@ -411,11 +417,11 @@ let rec build
           | Error msg -> Ok (Task_result.Other { id ; outcome = `Failed ; msg = None ; summary = msg })
         )
     | W.Shell { id ; task ; descr ; _ } ->
-      schedule_cached_workflow sched ~id w ~f:(fun resource ->
-          build_command_deps sched task >>= fun () ->
-          shallow_eval_command sched task >> fun cmd ->
-          perform_shell sched resource ~id ~descr cmd
-        )
+      schedule_cached_workflow sched ~id w
+        ~deps:(fun () -> build_command_deps sched task)
+        ~perform:(fun resource ->
+            shallow_eval_command sched task >> fun cmd ->
+            perform_shell sched resource ~id ~descr cmd)
     | List l ->
       Eval_thread.join l.elts ~f:(build sched)
 
