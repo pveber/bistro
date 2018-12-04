@@ -7,6 +7,7 @@ val eval :
   ?mem:[`GB of int] ->
   ?use_docker:bool ->
   ?loggers:Logger.t list ->
+  ?collect:bool ->
   Db.t ->
   'a Bistro.workflow ->
   ('a, Execution_trace.t list) Lwt_result.t

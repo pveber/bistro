@@ -91,6 +91,7 @@ module Gc : sig
   type t
   val create : Db.t -> t
   val register : t -> _ W.t -> unit Lwt.t
+  val tag_as_built : t -> _ W.t -> unit
 end
 =
 struct
@@ -110,17 +111,34 @@ struct
   module T = Caml.Hashtbl.Make(Dep)
   module S = Caml.Set.Make(Dep)
 
+  type msg =
+    | Built of Dep.t
+
   type t = {
     db : Db.t ;
     revdeps : S.t T.t ;
     mutable protected : S.t ;
+    inbox : msg Queue.t ;
+    stop_switch : unit Lwt.u ;
+    main : unit Lwt.t ;
   }
 
-  let create db = {
-    db ;
-    revdeps = T.create 253 ;
-    protected = S.empty ;
-  }
+  let main poweroff =
+    poweroff
+
+  let create db =
+    let poweroff,  stop_switch = Lwt.wait () in
+    {
+      db ;
+      revdeps = T.create 253 ;
+      protected = S.empty ;
+      inbox = Queue.create () ;
+      stop_switch ;
+      main = main poweroff ;
+    }
+
+  let tag_as_built gc w =
+    Queue.enqueue gc.inbox (Built (Dep.Workflow w))
 
   let uses gc u v =
     match u with
@@ -195,20 +213,20 @@ type t = {
   logger : Logger.t ;
   use_docker : bool ;
   traces : Execution_trace.t thread Table.t ;
-  gc : Gc.t ;
+  gc : Gc.t option ;
 }
 
 let create
     ?(loggers = [])
     ?(np = 1) ?mem:(`GB mem = `GB 1)
-    ?(use_docker = true) db =
+    ?(use_docker = true) ~collect db =
   {
     allocator = Allocator.create ~np ~mem:(mem * 1024) ;
     db ;
     use_docker ;
     traces = String.Table.create () ;
     logger = Logger.tee loggers ;
-    gc = Gc.create db ;
+    gc = if collect then Some (Gc.create db) else None ;
   }
 
 let log ?(time = Unix.gettimeofday ()) sched event =
@@ -465,7 +483,7 @@ let schedule_cached_workflow sched ~id w ~deps ~perform =
     )
 
 let rec build
-  : type u v. t -> v W.t -> unit thread
+  : type u. t -> u W.t -> unit thread
   = fun sched w ->
     let open Eval_thread.Infix in
     match w with
@@ -504,7 +522,9 @@ let rec build
               save_value ~data:y (Db.cache sched.db id)
             ) () >|=
           function
-          | Ok () -> Ok (Task_result.Other { id ; outcome = `Succeeded ; msg = None ; summary = "" })
+          | Ok () ->
+            Option.iter sched.gc ~f:(Fn.flip Gc.tag_as_built w) ;
+            Ok (Task_result.Other { id ; outcome = `Succeeded ; msg = None ; summary = "" })
           | Error msg -> Ok (Task_result.Other { id ; outcome = `Failed ; msg = None ; summary = msg })
         )
     | W.Path { id ; task = workflow ; _ } ->
@@ -520,7 +540,9 @@ let rec build
           (* in *)
           worker (Fn.flip evaluator (Db.cache sched.db id)) () >|=
           function
-          | Ok () -> Ok (Task_result.Other { id ; outcome = `Succeeded ; msg = None ; summary = "" })
+          | Ok () ->
+            Option.iter sched.gc ~f:(Fn.flip Gc.tag_as_built w) ;
+            Ok (Task_result.Other { id ; outcome = `Succeeded ; msg = None ; summary = "" })
           | Error msg -> Ok (Task_result.Other { id ; outcome = `Failed ; msg = None ; summary = msg })
         )
     | W.Shell { id ; task ; descr ; _ } ->
@@ -528,12 +550,14 @@ let rec build
         ~deps:(fun () -> build_command_deps sched task)
         ~perform:(fun resource ->
             shallow_eval_command sched task >> fun cmd ->
-            perform_shell sched resource ~id ~descr cmd)
+            perform_shell sched resource ~id ~descr cmd >>= fun r ->
+            Option.iter sched.gc ~f:(Fn.flip Gc.tag_as_built w) ;
+            Eval_thread.return r)
     | List l ->
       Eval_thread.join l.elts ~f:(build sched)
 
 and build_command_deps
-  : type u. t -> W.path W.t Command.t -> unit Eval_thread.t
+  : t -> W.path W.t Command.t -> unit Eval_thread.t
   = fun sched cmd ->
     match cmd with
     | Simple_command cmd -> build_template_deps sched cmd
@@ -544,21 +568,22 @@ and build_command_deps
     | Docker (_, cmd) -> build_command_deps sched cmd
 
 and build_template_deps
-  : type u. t -> W.path W.t Template.t -> unit Eval_thread.t
+  : t -> W.path W.t Template.t -> unit Eval_thread.t
   = fun sched toks ->
     Eval_thread.join ~f:(build_template_token_deps sched) toks
 
 and build_template_token_deps
-  : type u. t -> W.path W.t Template.token -> unit Eval_thread.t
+  : t -> W.path W.t Template.token -> unit Eval_thread.t
   = fun sched tok ->
     match tok with
     | D w -> build sched w
     | F f -> build_template_deps sched f
     | DEST | TMP | NP | MEM | S _ -> Eval_thread.return ()
 
-let eval ?np ?mem ?use_docker ?loggers db w =
+let eval ?np ?mem ?use_docker ?loggers ?(collect = false) db w =
   let w = Bistro.Private.reveal w in
-  let sched = create ?np ?mem ?use_docker ?loggers db in
+  let sched = create ?np ?mem ?use_docker ?loggers ~collect db in
+  Option.iter sched.gc ~f:(fun gc -> Lwt.async (fun () -> Gc.register gc w)) ;
   build sched w
   |> Fn.flip Lwt_result.bind Lwt.(fun () -> shallow_eval sched w >|= Result.return)
   |> Lwt_result.map_err Traces.elements
