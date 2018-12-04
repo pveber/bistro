@@ -29,7 +29,7 @@ module Eval_thread : sig
     'a list ->
     f:('a -> unit t) ->
     unit t
-
+  val ignore : 'a t -> unit t
   module Infix : sig
     val ( >>= ) : 'a t -> ('a -> 'b t) -> 'b t
     val ( >>| ) : 'a t -> ('a -> 'b) -> 'b t
@@ -78,6 +78,8 @@ struct
   let join xs ~f =
     let open Lwt_result in
     list_map xs ~f >|= ignore
+
+  let ignore x = Infix.(x >>| ignore)
 end
 
 type 'a thread = 'a Eval_thread.t
@@ -195,13 +197,18 @@ struct
   let update_counts_and_collect gc (Dep.Workflow w as dep_w) =
     let n = T.decr_count gc.counts dep_w in
     if n = 0 then (
-      gc.log (Logger.Workflow_collected w)
+      gc.log (Logger.Workflow_collected w) ;
+      Misc.remove_if_exists (Db.cache gc.db (W.id w))
     )
+    else Lwt.return ()
 
   let rec main gc =
     Lwt_queue.pop gc.inbox >>= function
     | Built w ->
-      S.iter (update_counts_and_collect gc) (T.adj_find gc.depends_on (Dep.Workflow w)) ;
+      T.adj_find gc.depends_on (Dep.Workflow w)
+      |> S.elements
+      |> List.map ~f:(update_counts_and_collect gc)
+      |> Lwt.join >>= fun () ->
       main gc
     | Stop ->
       Lwt.wakeup gc.end_listener () ;
@@ -293,6 +300,28 @@ struct
     | F t -> register_template gc ?target t
 
   let register gc w = register gc w
+end
+
+module Maybe_gc : sig
+  type t = Gc.t option
+  val register : t -> _ W.t -> unit Lwt.t
+  val tag_as_built : t -> _ W.t -> unit
+  val stop : t -> unit Lwt.t
+end
+=
+struct
+  type t = Gc.t option
+  let register o w = match o with
+    | Some gc -> Gc.register gc w
+    | None -> Lwt.return ()
+
+  let tag_as_built o w = match o with
+    | Some gc -> Gc.tag_as_built gc w
+    | None -> ()
+
+  let stop = function
+    | Some gc -> Gc.stop gc
+    | None -> Lwt.return ()
 end
 
 
@@ -523,7 +552,7 @@ let register_build sched ~id ~build_trace =
   if Execution_trace.is_errored trace then
     Eval_thread.fail1 trace
   else
-    Lwt_result.return ()
+    Lwt_result.return trace
 
 let requirement
   : type s. s Workflow.t -> Allocator.request
@@ -567,6 +596,11 @@ let cached_build sched ~id ~f =
   then Eval_thread.return (Execution_trace.Done_already { id })
   else f ()
 
+let signal_trace_to_gc sched w t =
+  if not (Execution_trace.is_errored t) then (
+    Maybe_gc.tag_as_built sched.gc w
+  )
+
 let schedule_cached_workflow sched ~id w ~deps ~perform =
   let open Eval_thread.Infix in
   register_build sched ~id ~build_trace:(fun () ->
@@ -574,9 +608,9 @@ let schedule_cached_workflow sched ~id w ~deps ~perform =
           deps () >>= fun () ->
           build_trace sched w perform
         )
-    ) >|= fun r ->
-  Option.iter sched.gc ~f:(Fn.flip Gc.tag_as_built w) ;
-  r
+    )
+  >>| signal_trace_to_gc sched w
+  |> Eval_thread.ignore
 
 let rec build
   : type u. t -> u W.t -> unit thread
@@ -602,12 +636,15 @@ let rec build
       register_build sched ~id ~build_trace:(fun () ->
           build_trace sched w (fun _ -> perform_input sched ~id ~path)
         )
+      |> Eval_thread.ignore
+
     | W.Select { id ; dir ; sel ; _ } ->
       build sched dir >>= fun () ->
       shallow_eval sched dir >> fun dir ->
       register_build sched ~id ~build_trace:(fun () ->
           build_trace sched w (fun _ -> perform_select sched ~id ~dir ~sel)
         )
+      |> Eval_thread.ignore
 
     | W.Value { task = workflow ; id ; _ } ->
       schedule_cached_workflow sched ~id w
@@ -680,9 +717,9 @@ and build_template_token_deps
 let eval ?np ?mem ?use_docker ?loggers ?(collect = false) db w =
   let w = Bistro.Private.reveal w in
   let sched = create ?np ?mem ?use_docker ?loggers ~collect db in
-  Option.iter sched.gc ~f:(fun gc -> Lwt.async (fun () -> Gc.register gc w)) ;
+  Lwt.async (fun () -> Maybe_gc.register sched.gc w) ;
   build sched w
-  >>= (fun r -> (match sched.gc with None -> Lwt.return () | Some gc -> Gc.stop gc) >|= fun () -> r)
+  >>= (fun r -> Maybe_gc.stop sched.gc >|= fun () -> r)
   |> Fn.flip Lwt_result.bind Lwt.(fun () -> shallow_eval sched w >|= Result.return)
   |> Lwt_result.map_err Traces.elements
 

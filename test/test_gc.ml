@@ -31,6 +31,7 @@ let pipeline =
   start "foo"
   |> append "bar"
   |> append "baz"
+  |> append "gee"
 
 let _ =
   let open Bistro_engine in
