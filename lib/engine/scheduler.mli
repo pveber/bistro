@@ -12,6 +12,16 @@ val eval :
   'a Bistro.workflow ->
   ('a, Execution_trace.t list) Lwt_result.t
 
+val eval_exn :
+  ?np:int ->
+  ?mem:[`GB of int] ->
+  ?use_docker:bool ->
+  ?loggers:Logger.t list ->
+  ?collect:bool ->
+  Db.t ->
+  'a Bistro.workflow ->
+  'a Lwt.t
+
 val error_report :
   Db.t ->
   Execution_trace.t list ->

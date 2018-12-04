@@ -87,11 +87,42 @@ let lwt_both x y =
   y >>= fun y ->
   Lwt.return (x, y)
 
+module Lwt_queue : sig
+  type 'a t
+  val create : unit -> 'a t
+  val push : 'a t -> 'a -> unit
+  val pop : 'a t -> 'a Lwt.t
+end
+=
+struct
+  type 'a t = {
+    queue : 'a Queue.t ;
+    condition : unit Lwt_condition.t ;
+  }
+
+  let create () = {
+    queue = Queue.create () ;
+    condition = Lwt_condition.create () ;
+  }
+
+  let push q x =
+    Queue.enqueue q.queue x ;
+    Lwt_condition.signal q.condition ()
+
+  let rec pop q =
+    match Queue.dequeue q.queue with
+    | None ->
+      Lwt_condition.wait q.condition >>= fun () ->
+      pop q
+    | Some x -> Lwt.return x
+end
+
 module Gc : sig
   type t
-  val create : Db.t -> t
+  val create : Db.t -> (Logger.event -> unit) -> t
   val register : t -> _ W.t -> unit Lwt.t
   val tag_as_built : t -> _ W.t -> unit
+  val stop : t -> unit Lwt.t
 end
 =
 struct
@@ -108,37 +139,95 @@ struct
     let hash x = Hashtbl.hash (id x)
   end
 
-  module T = Caml.Hashtbl.Make(Dep)
   module S = Caml.Set.Make(Dep)
+  module T = struct
+    include Caml.Hashtbl.Make(Dep)
+    let update t ~key ~default ~f =
+      let data = match find t key with
+        | d -> d
+        | exception Caml.Not_found -> default
+      in
+      replace t key (f data)
+
+    let adj_add t u v =
+      update t ~key:u ~default:S.empty ~f:(S.add v)
+
+    let adj_find t u = match find t u with
+      | x -> x
+      | exception Caml.Not_found -> S.empty
+
+    let incr_count t u =
+      update t ~key:u ~default:0 ~f:succ
+
+    let decr_count t u =
+      let n = match find t u with
+        | n -> n - 1
+        | exception Caml.Not_found -> assert false
+      in
+      replace t u n ;
+      n
+
+    let _dump t =
+      iter (fun k s -> printf "%s %d\n%!" (Dep.id k) (S.cardinal s)) t
+  end
+
 
   type msg =
-    | Built of Dep.t
+    | Built : _ W.t -> msg
+    | Stop : msg
 
   type t = {
     db : Db.t ;
-    revdeps : S.t T.t ;
+    log : Logger.event -> unit ;
+    depends_on : S.t T.t ;
+    is_used_by : S.t T.t ;
+    counts : int T.t ;
     mutable protected : S.t ;
-    inbox : msg Queue.t ;
-    stop_switch : unit Lwt.u ;
-    main : unit Lwt.t ;
+    inbox : msg Lwt_queue.t ;
+    end_listener : unit Lwt.u ;
+    _end_ : unit Lwt.t ;
   }
 
-  let main poweroff =
-    poweroff
+  let stop x =
+    Lwt_queue.push x.inbox Stop ;
+    x._end_
 
-  let create db =
-    let poweroff,  stop_switch = Lwt.wait () in
-    {
+  let update_counts_and_collect gc (Dep.Workflow w as dep_w) =
+    let n = T.decr_count gc.counts dep_w in
+    if n = 0 then (
+      gc.log (Logger.Workflow_collected w)
+    )
+
+  let rec main gc =
+    Lwt_queue.pop gc.inbox >>= function
+    | Built w ->
+      S.iter (update_counts_and_collect gc) (T.adj_find gc.depends_on (Dep.Workflow w)) ;
+      main gc
+    | Stop ->
+      Lwt.wakeup gc.end_listener () ;
+      Lwt.return ()
+
+  let create db log =
+    let inbox = Lwt_queue.create () in
+    let counts = T.create 253 in
+    let _end_, end_listener = Lwt.wait () in
+    let gc = {
       db ;
-      revdeps = T.create 253 ;
+      log ;
+      depends_on = T.create 253 ;
+      is_used_by = T.create 253 ;
+      counts ;
       protected = S.empty ;
-      inbox = Queue.create () ;
-      stop_switch ;
-      main = main poweroff ;
+      inbox ;
+      _end_ ;
+      end_listener ;
     }
+    in
+    Lwt.async (fun () -> main gc) ;
+    gc
 
   let tag_as_built gc w =
-    Queue.enqueue gc.inbox (Built (Dep.Workflow w))
+    Lwt_queue.push gc.inbox (Built w)
 
   let uses gc u v =
     match u with
@@ -146,11 +235,9 @@ struct
       gc.protected <- S.add (Dep.Workflow v) gc.protected
     | Some u ->
       let u = Dep.Workflow u and v = Dep.Workflow v in
-      let deps = match T.find gc.revdeps u with
-        | deps -> S.add v deps
-        | exception Caml.Not_found -> S.empty
-      in
-      T.add gc.revdeps u deps
+      T.adj_add gc.depends_on u v ;
+      T.adj_add gc.is_used_by v u ;
+      T.incr_count gc.counts v
 
   let rec register : type u v. t -> ?target:u W.t -> v W.t -> unit Lwt.t = fun gc ?target w ->
     match w with
@@ -171,12 +258,13 @@ struct
     | Input _ -> Lwt.return ()
     | Select x -> register gc ?target x.dir
     | Value v ->
-      uses gc target v.task ;
+      uses gc target w ;
       register gc ~target:w v.task
     | Path p ->
-      uses gc target p.task ;
+      uses gc target w ;
       register gc ~target:w p.task
     | Shell s ->
+      uses gc target w ;
       register_command gc ~target:w s.task
 
   and register_command
@@ -199,7 +287,8 @@ struct
   and register_token
     : type u. t -> ?target:u W.t -> W.path W.t Template.token -> unit Lwt.t = fun gc ?target tok ->
     match tok with
-    | D w -> register gc ?target w
+    | D w ->
+      register gc ?target w
     | S _ | TMP | NP | MEM | DEST -> Lwt.return ()
     | F t -> register_template gc ?target t
 
@@ -220,13 +309,18 @@ let create
     ?(loggers = [])
     ?(np = 1) ?mem:(`GB mem = `GB 1)
     ?(use_docker = true) ~collect db =
+  let logger = Logger.tee loggers in
   {
     allocator = Allocator.create ~np ~mem:(mem * 1024) ;
     db ;
     use_docker ;
     traces = String.Table.create () ;
-    logger = Logger.tee loggers ;
-    gc = if collect then Some (Gc.create db) else None ;
+    logger ;
+    gc =
+      if collect then
+        let gc_log event = logger#event db (Unix.gettimeofday ()) event in
+        Some (Gc.create db gc_log)
+      else None ;
   }
 
 let log ?(time = Unix.gettimeofday ()) sched event =
@@ -480,7 +574,9 @@ let schedule_cached_workflow sched ~id w ~deps ~perform =
           deps () >>= fun () ->
           build_trace sched w perform
         )
-    )
+    ) >|= fun r ->
+  Option.iter sched.gc ~f:(Fn.flip Gc.tag_as_built w) ;
+  r
 
 let rec build
   : type u. t -> u W.t -> unit thread
@@ -512,6 +608,7 @@ let rec build
       register_build sched ~id ~build_trace:(fun () ->
           build_trace sched w (fun _ -> perform_select sched ~id ~dir ~sel)
         )
+
     | W.Value { task = workflow ; id ; _ } ->
       schedule_cached_workflow sched ~id w
         ~deps:(fun () -> build sched workflow)
@@ -523,10 +620,10 @@ let rec build
             ) () >|=
           function
           | Ok () ->
-            Option.iter sched.gc ~f:(Fn.flip Gc.tag_as_built w) ;
             Ok (Task_result.Other { id ; outcome = `Succeeded ; msg = None ; summary = "" })
           | Error msg -> Ok (Task_result.Other { id ; outcome = `Failed ; msg = None ; summary = msg })
         )
+
     | W.Path { id ; task = workflow ; _ } ->
       schedule_cached_workflow sched ~id w
         ~deps:(fun () -> build sched workflow)
@@ -541,18 +638,18 @@ let rec build
           worker (Fn.flip evaluator (Db.cache sched.db id)) () >|=
           function
           | Ok () ->
-            Option.iter sched.gc ~f:(Fn.flip Gc.tag_as_built w) ;
             Ok (Task_result.Other { id ; outcome = `Succeeded ; msg = None ; summary = "" })
           | Error msg -> Ok (Task_result.Other { id ; outcome = `Failed ; msg = None ; summary = msg })
         )
+
     | W.Shell { id ; task ; descr ; _ } ->
       schedule_cached_workflow sched ~id w
         ~deps:(fun () -> build_command_deps sched task)
         ~perform:(fun resource ->
             shallow_eval_command sched task >> fun cmd ->
             perform_shell sched resource ~id ~descr cmd >>= fun r ->
-            Option.iter sched.gc ~f:(Fn.flip Gc.tag_as_built w) ;
             Eval_thread.return r)
+
     | List l ->
       Eval_thread.join l.elts ~f:(build sched)
 
@@ -585,6 +682,7 @@ let eval ?np ?mem ?use_docker ?loggers ?(collect = false) db w =
   let sched = create ?np ?mem ?use_docker ?loggers ~collect db in
   Option.iter sched.gc ~f:(fun gc -> Lwt.async (fun () -> Gc.register gc w)) ;
   build sched w
+  >>= (fun r -> (match sched.gc with None -> Lwt.return () | Some gc -> Gc.stop gc) >|= fun () -> r)
   |> Fn.flip Lwt_result.bind Lwt.(fun () -> shallow_eval sched w >|= Result.return)
   |> Lwt_result.map_err Traces.elements
 
@@ -594,3 +692,8 @@ let error_report db traces =
       Execution_trace.error_report trace db buf
     ) ;
   Buffer.contents buf
+
+let eval_exn ?np ?mem ?use_docker ?loggers ?collect db w =
+  eval ?np ?mem ?use_docker ?loggers ?collect db w >|= function
+  | Ok r -> r
+  | Error errors -> failwith (error_report db errors)

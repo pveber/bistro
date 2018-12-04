@@ -12,6 +12,7 @@ type event =
     } -> event
   | Workflow_skipped : _ Workflow.t * [ `Done_already | `Missing_dep ] -> event
   | Workflow_allocation_error : _ Workflow.t * string -> event
+  | Workflow_collected : _ Workflow.t -> event
 
 class type t = object
   method event : Db.t -> time -> event -> unit
