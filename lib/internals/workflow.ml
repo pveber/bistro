@@ -119,3 +119,22 @@ let shell
 let list elts =
   let id = digest ("list", List.map id elts) in
   List { id ; elts }
+
+type any = Any : _ t -> any
+
+module Any = struct
+  type t = any
+
+  let id (Any w) = id w
+
+  let compare x y =
+    String.compare (id x) (id y)
+
+  let equal x y =
+    String.equal (id x) (id y)
+
+  let hash x = Hashtbl.hash (id x)
+end
+
+module Set = Set.Make(Any)
+module Table = Hashtbl.Make(Any)

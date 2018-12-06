@@ -128,22 +128,9 @@ module Gc : sig
 end
 =
 struct
-  module Dep = struct
-    type t = Workflow : _ W.t -> t
-    let id (Workflow w) = W.id w
-
-    let compare x y =
-      String.compare (id x) (id y)
-
-    let equal x y =
-      String.equal (id x) (id y)
-
-    let hash x = Hashtbl.hash (id x)
-  end
-
-  module S = Caml.Set.Make(Dep)
+  module S = W.Set
   module T = struct
-    include Caml.Hashtbl.Make(Dep)
+    include W.Table
     let update t ~key ~default ~f =
       let data = match find t key with
         | d -> d
@@ -170,7 +157,7 @@ struct
       n
 
     let _dump t =
-      iter (fun k s -> printf "%s %d\n%!" (Dep.id k) (S.cardinal s)) t
+      iter (fun k s -> printf "%s %d\n%!" (W.Any.id k) (S.cardinal s)) t
   end
 
 
@@ -194,7 +181,7 @@ struct
     Lwt_queue.push x.inbox Stop ;
     x._end_
 
-  let update_counts_and_collect gc (Dep.Workflow w as dep_w) =
+  let update_counts_and_collect gc (Workflow.Any w as dep_w) =
     let n = T.decr_count gc.counts dep_w in
     if n = 0 then (
       gc.log (Logger.Workflow_collected w) ;
@@ -205,7 +192,7 @@ struct
   let rec main gc =
     Lwt_queue.pop gc.inbox >>= function
     | Built w ->
-      T.adj_find gc.depends_on (Dep.Workflow w)
+      T.adj_find gc.depends_on (Workflow.Any w)
       |> S.elements
       |> List.map ~f:(update_counts_and_collect gc)
       |> Lwt.join >>= fun () ->
@@ -239,15 +226,15 @@ struct
   let uses gc u v =
     match u with
     | None ->
-      gc.protected <- S.add (Dep.Workflow v) gc.protected
+      gc.protected <- S.add (Workflow.Any v) gc.protected
     | Some u ->
-      let u = Dep.Workflow u and v = Dep.Workflow v in
+      let u = Workflow.Any u and v = Workflow.Any v in
       T.adj_add gc.depends_on u v ;
       T.adj_add gc.is_used_by v u ;
       T.incr_count gc.counts v
 
   let rec register : type u v. t -> ?target:u W.t -> v W.t -> unit Lwt.t = fun gc ?target w ->
-    if T.mem gc.depends_on (Workflow w) then Lwt.return ()
+    if T.mem gc.depends_on (Workflow.Any w) then Lwt.return ()
     else match w with
       | Pure _ -> Lwt.return ()
       | App app ->
