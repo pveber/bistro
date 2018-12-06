@@ -591,12 +591,12 @@ let rec build
       >>| ignore
     | W.Eval_path { workflow ; _ } -> build sched workflow
     | W.Spawn { elts ; f ; _ } ->
-      (* FIXME: Gc call *)
       build sched elts >>= fun () ->
       shallow_eval sched elts >> fun elts_value ->
       let n = List.length elts_value in
-      List.init n ~f:(fun i -> f (list_nth elts i))
-      |> Eval_thread.join ~f:(build sched)
+      let targets = List.init n ~f:(fun i -> f (list_nth elts i)) in
+      Lwt_list.iter_p (Maybe_gc.register sched.gc) targets >> fun () ->
+      Eval_thread.join ~f:(build sched) targets
     | W.Input { id ; path ; _ } ->
       register_build sched ~id ~build_trace:(fun () ->
           build_trace sched w (fun _ -> perform_input sched ~id ~path)
