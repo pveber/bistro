@@ -248,8 +248,7 @@ struct
         |> Lwt.join
       | Eval_path x -> register gc ?target x.workflow
       | Spawn x ->
-        (* FIXME: more to do here *)
-        register gc ?target x.elts
+        Lwt_list.iter_p (register_any gc ?target) x.deps
       | Input _ -> Lwt.return ()
       | Select x -> register gc ?target x.dir
       | Value v ->
@@ -260,32 +259,10 @@ struct
         register gc ~target:w p.task
       | Shell s ->
         uses gc target w ;
-        register_command gc ~target:w s.task
+        Lwt_list.iter_p (register_any gc ?target) s.deps
 
-  and register_command
-    : type u. t -> ?target:u W.t -> W.path W.t Command.t -> unit Lwt.t = fun gc ?target cmd ->
-    match cmd with
-    | Simple_command t ->
-      register_template gc ?target t
-    | And_list xs
-    | Or_list xs
-    | Pipe_list xs ->
-      List.map ~f:(register_command gc ?target) xs
-      |> Lwt.join
-    | Docker (_, cmd) -> register_command gc ?target cmd
-
-  and register_template
-    : type u. t -> ?target:u W.t -> W.path W.t Template.t -> unit Lwt.t = fun gc ?target t ->
-    List.map ~f:(register_token gc ?target) t
-    |> Lwt.join
-
-  and register_token
-    : type u. t -> ?target:u W.t -> W.path W.t Template.token -> unit Lwt.t = fun gc ?target tok ->
-    match tok with
-    | D w ->
-      register gc ?target w
-    | S _ | TMP | NP | MEM | DEST -> Lwt.return ()
-    | F t -> register_template gc ?target t
+  and register_any : type u. t -> ?target:u W.t -> W.any -> unit Lwt.t = fun gc ?target (Workflow.Any w) ->
+    register gc ?target w
 
   let register gc w = register gc w
 end
