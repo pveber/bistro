@@ -24,6 +24,7 @@ type _ t =
       id : string ;
       elts : 'a list t ;
       f : 'a t -> 'b t ;
+      deps : any list ;
     } -> 'b list t
 
   | Input : { id : string ; path : string ; version : int option } -> path t
@@ -43,9 +44,12 @@ and 'a step = {
   np : int ; (** Required number of processors *)
   mem : int ; (** Required memory in MB *)
   version : int option ; (** Version number of the wrapper *)
+  deps : any list ;
 }
 
 and shell_command = path t Command.t
+
+and any = Any : _ t -> any
 
 let digest x =
   Digest.to_hex (Digest.string (Marshal.to_string x []))
@@ -63,6 +67,22 @@ let id : type s. s t -> string = function
   | Shell { id ; _ } -> id
   | List { id ; _ } -> id
 
+let any x = Any x
+
+module Any = struct
+  type t = any
+
+  let id (Any w) = id w
+
+  let compare x y =
+    String.compare (id x) (id y)
+
+  let equal x y =
+    String.equal (id x) (id y)
+
+  let hash x = Hashtbl.hash (id x)
+end
+
 let input ?version path =
   let id = digest (`Input, path, version) in
   Input { id ; path ; version }
@@ -79,11 +99,11 @@ let select dir sel =
 
 let cached_value ?(descr = "") ?(np = 1) ?(mem = 0) ?version workflow =
   let id = digest (`Value, id workflow, version) in
-  Value { id ; descr ; task = workflow ; np ; mem ; version }
+  Value { id ; descr ; task = workflow ; np ; mem ; version ; deps = [ any workflow ] }
 
 let cached_path ?(descr = "") ?(np = 1) ?(mem = 0) ?version workflow =
   let id = digest (`Value, id workflow, version) in
-  Path { id ; descr ; task = workflow ; np ; mem ; version }
+  Path { id ; descr ; task = workflow ; np ; mem ; version ; deps = [ any workflow ] }
 
 let pure ~id value = Pure { id ; value }
 let pure_data value = pure ~id:(digest value) value
@@ -99,11 +119,6 @@ let both fst snd =
 
 let eval_path w = Eval_path { id = digest (`Eval_path, id w) ; workflow = w }
 
-let spawn elts ~f =
-  let hd = pure ~id:"__should_never_be_executed__" List.hd in
-  let id = digest (`Spawn, id elts, id (f (app hd elts))) in
-  Spawn { id ; elts ; f }
-
 let digestible_cmd = Command.map ~f:id
 
 let shell
@@ -114,27 +129,56 @@ let shell
     cmds =
   let cmd = Command.And_list cmds in
   let id = digest ("shell", version, digestible_cmd cmd) in
-  Shell { descr ; task = cmd ; np ; mem ; version ; id }
+  let deps = Command.deps cmd |> List.map any in
+  Shell { descr ; task = cmd ; np ; mem ; version ; id ; deps }
 
 let list elts =
   let id = digest ("list", List.map id elts) in
   List { id ; elts }
 
-type any = Any : _ t -> any
-
-module Any = struct
-  type t = any
-
-  let id (Any w) = id w
-
-  let compare x y =
-    String.compare (id x) (id y)
-
-  let equal x y =
-    String.equal (id x) (id y)
-
-  let hash x = Hashtbl.hash (id x)
-end
-
 module Set = Set.Make(Any)
 module Table = Hashtbl.Make(Any)
+module Map = Map.Make(Any)
+
+let deps (Any w) = match w with
+  | Pure _ -> []
+  | App app -> [ Any app.f ; Any app.x ]
+  | Both p -> [ Any p.fst ; Any p.snd ]
+  | List l -> List.map any l.elts
+  | Eval_path { workflow ; _ } -> [ Any workflow ]
+  | Spawn s -> s.deps
+  | Input _ -> []
+  | Select sel -> [ any sel.dir ]
+  | Value v -> v.deps
+  | Path p -> p.deps
+  | Shell s -> s.deps
+
+let rec independent_workflows_aux cache w ~from:u =
+  if Any.equal w u then Map.add w (true, Set.empty) cache
+  else if Map.mem w cache then cache
+  else (
+    let deps = deps w in
+    let f acc w = independent_workflows_aux acc w ~from:u in
+    let cache = List.fold_left f cache deps in
+    let children = List.map (fun k -> Map.find k cache) deps in
+    if List.exists fst children
+    then
+      let union =
+        List.fold_left
+          (fun acc (_, s) -> Set.union acc s)
+          Set.empty children in
+      Map.add w (true, union) cache
+    else Map.add w (false, Set.singleton w) cache
+  )
+
+let independent_workflows w ~from:u =
+  let cache = independent_workflows_aux Map.empty w ~from:u in
+  Map.find w cache |> snd |> Set.elements
+
+let spawn elts ~f =
+  let hd = pure ~id:"__should_never_be_executed__" List.hd in
+  let u = app hd elts in
+  let f_u = f u in
+  let id = digest (`Spawn, id elts, id f_u) in
+  let deps = any elts :: independent_workflows (any f_u) ~from:(any u) in
+  Spawn { id ; elts ; f ; deps }
