@@ -247,32 +247,33 @@ struct
       T.incr_count gc.counts v
 
   let rec register : type u v. t -> ?target:u W.t -> v W.t -> unit Lwt.t = fun gc ?target w ->
-    match w with
-    | Pure _ -> Lwt.return ()
-    | App app ->
-      lwt_both (register gc ?target app.f) (register gc ?target app.x)
-      >|= ignore
-    | Both both ->
-      lwt_both (register gc ?target both.fst) (register gc ?target both.snd)
-      >|= ignore
-    | List l ->
-      List.map ~f:(register ?target gc) l.elts
-      |> Lwt.join
-    | Eval_path x -> register gc ?target x.workflow
-    | Spawn x ->
-      (* FIXME: more to do here *)
-      register gc ?target x.elts
-    | Input _ -> Lwt.return ()
-    | Select x -> register gc ?target x.dir
-    | Value v ->
-      uses gc target w ;
-      register gc ~target:w v.task
-    | Path p ->
-      uses gc target w ;
-      register gc ~target:w p.task
-    | Shell s ->
-      uses gc target w ;
-      register_command gc ~target:w s.task
+    if T.mem gc.depends_on (Workflow w) then Lwt.return ()
+    else match w with
+      | Pure _ -> Lwt.return ()
+      | App app ->
+        lwt_both (register gc ?target app.f) (register gc ?target app.x)
+        >|= ignore
+      | Both both ->
+        lwt_both (register gc ?target both.fst) (register gc ?target both.snd)
+        >|= ignore
+      | List l ->
+        List.map ~f:(register ?target gc) l.elts
+        |> Lwt.join
+      | Eval_path x -> register gc ?target x.workflow
+      | Spawn x ->
+        (* FIXME: more to do here *)
+        register gc ?target x.elts
+      | Input _ -> Lwt.return ()
+      | Select x -> register gc ?target x.dir
+      | Value v ->
+        uses gc target w ;
+        register gc ~target:w v.task
+      | Path p ->
+        uses gc target w ;
+        register gc ~target:w p.task
+      | Shell s ->
+        uses gc target w ;
+        register_command gc ~target:w s.task
 
   and register_command
     : type u. t -> ?target:u W.t -> W.path W.t Command.t -> unit Lwt.t = fun gc ?target cmd ->
