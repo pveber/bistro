@@ -25,10 +25,28 @@ let pipeline w =
 let repo =
   [ "Protein" ; "Cell_(biology)" ]
   |> List.map ~f:pipeline
-  
+
+let logger = object
+  method event _ _ : Bistro_engine.Logger.event -> unit = function
+    | Workflow_started (w, _) ->
+      printf "started %s\n%!" (Bistro_internals.Workflow.id w)
+    | Workflow_ended { outcome ; _ } -> (
+        match outcome with
+        | Input { id ; _ }
+        | Select { id ; _ }
+        | Shell { id ; _ }
+        | Other { id ; _ } -> printf "ended %s\n%!" id
+      )
+    | Workflow_collected w ->
+      printf "collected %s\n%!" (Bistro_internals.Workflow.id w)
+    | _ -> ()
+  method stop = Lwt.return ()
+end
+
 let () =
-  Repo.build ~np:4 ~outdir:"res" repo ~loggers:[
-    Console_logger.create () ;
+  Repo.build ~np:4 ~collect:true ~outdir:"res" repo ~loggers:[
+    (* Console_logger.create () ; *)
+    logger ;
     Html_logger.create "report.html" ;
   ]
   |> Lwt_main.run
