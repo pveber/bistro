@@ -49,7 +49,11 @@ let black = 0
 let shape = function
   | _ -> `Box
 
-let dot_output oc g ~needed ~already_done =
+let dot_output ?db oc g ~needed =
+  let already_done = match db with
+    | None -> Fn.const false
+    | Some db -> Db.is_in_cache db
+  in
   let vertex_attributes u =
     let needed = S.mem needed u in
     let color = if needed then black else light_gray in
@@ -63,7 +67,7 @@ let dot_output oc g ~needed ~already_done =
       let label = Path.to_string s.sel in
       [ `Label label ; `Fontcolor color ; `Color color ; shape ]
     | Shell { descr ; _ } ->
-      let already_done  = S.mem already_done u in
+      let already_done  = already_done u in
       (* let precious = String.Set.mem precious id in
        * let label_suffix = if precious then "*" else "" in *)
       [ `Label (descr (* ^ label_suffix *)) ;
@@ -81,7 +85,7 @@ let dot_output oc g ~needed ~already_done =
     in
     let color =
       if S.mem needed u
-      && not (S.mem already_done u)
+      && not (already_done u)
       then black else light_gray in
     style @ [ `Color color ]
   in
@@ -114,8 +118,8 @@ let dot_output oc g ~needed ~already_done =
  * 
  * let create path = new logger path *)
 
-let to_channel oc w =
-  dot_output ~needed:S.empty ~already_done:S.empty oc (G.of_workflow (Bistro.Private.reveal w))
+let to_channel ?db oc w =
+  dot_output ~needed:S.empty ?db oc (G.of_workflow (Bistro.Private.reveal w))
 
 let to_file fn w =
   Out_channel.with_file fn ~f:(fun oc -> to_channel oc w)
