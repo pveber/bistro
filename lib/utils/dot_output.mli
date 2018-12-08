@@ -14,12 +14,14 @@ val workflow_to_file :
   unit
 
 val gc_state_to_channel :
+  ?condensed:bool ->
   ?db:Db.t ->
   out_channel ->
   Scheduler.Gc.state ->
   unit
 
 val gc_state_to_file :
+  ?condensed:bool ->
   ?db:Db.t ->
   string ->
   Scheduler.Gc.state ->

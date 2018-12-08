@@ -53,7 +53,7 @@ end
 
 let dump_gc_state sched fn =
   let open Bistro_engine in
-  Option.iter (Scheduler.gc_state sched) ~f:(Bistro_utils.Dot_output.gc_state_to_file fn)
+  Option.iter (Scheduler.gc_state sched) ~f:(Bistro_utils.Dot_output.gc_state_to_file ~condensed:false fn)
 
 let _ =
   let open Bistro_engine in

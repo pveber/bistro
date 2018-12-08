@@ -135,7 +135,7 @@ module Gc : sig
     deps : (Workflow.any * Workflow.any) list ;
     protected : Workflow.any list ;
   }
-val state : t -> state
+  val state : t -> state
 end
 =
 struct

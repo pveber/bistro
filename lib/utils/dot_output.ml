@@ -48,8 +48,17 @@ module G = struct
     of_workflow_aux S.empty empty (W.Any u)
     |> snd
 
-  let of_gc_state gc_state =
-    List.fold gc_state.Scheduler.Gc.deps ~init:empty ~f:(fun acc (u, v) ->
+  let of_gc_state ?(condensed = false) { Scheduler.Gc.deps ; _ } =
+    let backbone =
+      if condensed then empty
+      else
+        List.fold deps ~init:(S.empty, empty) ~f:(fun (seen, acc) (u, v) ->
+            let seen, acc = of_workflow_aux seen acc u in
+            of_workflow_aux seen acc v
+          )
+        |> snd
+    in
+    List.fold deps ~init:backbone ~f:(fun acc (u, v) ->
         let e = E.create u GC_link v in
         add_edge_e acc e
       )
@@ -151,9 +160,9 @@ let workflow_to_channel ?db oc w =
 let workflow_to_file ?db fn w =
   Out_channel.with_file fn ~f:(fun oc -> workflow_to_channel ?db oc w)
 
-let gc_state_to_channel ?db oc gcs =
-  let dep_graph = G.of_gc_state gcs in
+let gc_state_to_channel ?condensed ?db oc gcs =
+  let dep_graph = G.of_gc_state ?condensed gcs in
   dot_output ~needed:S.empty ?db oc dep_graph
 
-let gc_state_to_file ?db fn w =
-  Out_channel.with_file fn ~f:(fun oc -> gc_state_to_channel ?db oc w)
+let gc_state_to_file ?condensed ?db fn w =
+  Out_channel.with_file fn ~f:(fun oc -> gc_state_to_channel ?condensed ?db oc w)
