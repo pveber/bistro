@@ -122,14 +122,20 @@ end
 module Gc : sig
   type t
   val create : Db.t -> (Logger.event -> unit) -> t
-  val register : t -> _ W.t -> unit Lwt.t
+  val register : t -> ?target:_ W.t -> _ W.t -> unit Lwt.t
   val tag_as_built : t -> _ W.t -> unit
   val stop : t -> unit Lwt.t
-  val fold_deps :
-    t ->
-    init:'a ->
-    f:('a -> Workflow.any -> Workflow.any -> 'a) ->
-    'a
+  (* val fold_deps :
+   *   t ->
+   *   init:'a ->
+   *   f:('a -> Workflow.any -> Workflow.any -> 'a) ->
+   *   'a *)
+
+  type state = {
+    deps : (Workflow.any * Workflow.any) list ;
+    protected : Workflow.any list ;
+  }
+val state : t -> state
 end
 =
 struct
@@ -160,9 +166,6 @@ struct
       in
       replace t u n ;
       n
-
-    let _dump t =
-      iter (fun k s -> printf "%s %d\n%!" (W.Any.id k) (S.cardinal s)) t
   end
 
 
@@ -269,34 +272,44 @@ struct
   and register_any : type u. t -> ?target:u W.t -> W.any -> unit Lwt.t = fun gc ?target (Workflow.Any w) ->
     register gc ?target w
 
-  let register gc w =
-    register gc w >|= fun () ->
-    gc.log (GC_registration {
-        deps =
-          T.to_seq gc.depends_on
-          |> Seq.flat_map (fun (u, s) -> Seq.map (fun v -> u, v) (S.to_seq s)) ;
-        protected =
-          S.to_seq gc.protected ;
-      })
+  let register gc ?target w =
+    printf "debug %d\n%!" (T.length gc.depends_on) ;
+    print_endline (W.id w) ;
+    register gc ?target w
 
-  let fold_deps gc ~init ~f =
-    T.fold
-      (fun u deps acc -> S.fold (fun v acc -> f acc u v) deps acc)
-      gc.depends_on
-      init
+  (* let fold_deps gc ~init ~f =
+   *   T.fold
+   *     (fun u deps acc -> S.fold (fun v acc -> f acc u v) deps acc)
+   *     gc.depends_on
+   *     init *)
+
+  type state = {
+    deps : (Workflow.any * Workflow.any) list ;
+    protected : Workflow.any list ;
+  }
+
+  let state gc = {
+    deps =
+      T.to_seq gc.depends_on
+      |> Seq.flat_map (fun (u, s) -> Seq.map (fun v -> u, v) (S.to_seq s))
+      |> Caml.List.of_seq ;
+    protected =
+      S.elements gc.protected ;
+  }
+
 end
 
 module Maybe_gc : sig
   type t = Gc.t option
-  val register : t -> _ W.t -> unit Lwt.t
+  val register : t -> ?target:_ W.t -> _ W.t -> unit Lwt.t
   val tag_as_built : t -> _ W.t -> unit
   val stop : t -> unit Lwt.t
 end
 =
 struct
   type t = Gc.t option
-  let register o w = match o with
-    | Some gc -> Gc.register gc w
+  let register o ?target w = match o with
+    | Some gc -> Gc.register gc ?target w
     | None -> Lwt.return ()
 
   let tag_as_built o w = match o with
@@ -309,7 +322,8 @@ struct
 end
 
 
-type t = {
+type 'a t = {
+  target : 'a W.t ;
   allocator : Allocator.t ;
   db : Db.t ;
   logger : Logger.t ;
@@ -319,11 +333,13 @@ type t = {
 }
 
 let create
-    ?(loggers = [])
     ?(np = 1) ?mem:(`GB mem = `GB 1)
-    ?(use_docker = true) ~collect db =
+    ?(use_docker = true)
+    ?(loggers = [])
+    ?(collect = false) db target =
   let logger = Logger.tee loggers in
   {
+    target = Bistro.Private.reveal target ;
     allocator = Allocator.create ~np ~mem:(mem * 1024) ;
     db ;
     use_docker ;
@@ -335,6 +351,8 @@ let create
         Some (Gc.create db gc_log)
       else None ;
   }
+
+let gc_state sched = Option.map ~f:Gc.state sched.gc
 
 let log ?(time = Unix.gettimeofday ()) sched event =
   sched.logger#event sched.db time event
@@ -460,16 +478,19 @@ let rec blocking_evaluator
     | W.Input { path ; _ } -> fun () -> W.FS_path path
     | W.Value { id ; _ } ->
       fun () -> (load_value (Db.cache db id))
-    | W.Path p ->
-      fun () -> (load_value (Db.cache db p.id))
-    | W.Spawn _ -> assert false
+    | W.Path p -> fun () -> W.Cache_id p.id
+    | W.Spawn s ->
+      let elts = blocking_evaluator db s.elts in
+      fun () ->
+        let elts = elts () in
+        List.init (List.length elts) ~f:(fun i -> blocking_evaluator db (s.f (list_nth s.elts i)) ())
     | W.Shell s -> fun () -> W.Cache_id s.id
     | W.List l ->
       let l = List.map l.elts ~f:(blocking_evaluator db) in
       fun () -> List.map l ~f:(fun f -> f())
 
 let rec shallow_eval
-  : type s. t -> s W.t -> s Lwt.t
+  : type s. _ t -> s W.t -> s Lwt.t
   = fun sched w ->
     match w with
     | W.Pure { value ; _ } -> Lwt.return value
@@ -598,25 +619,25 @@ let schedule_cached_workflow sched ~id w ~deps ~perform =
   |> Eval_thread.ignore
 
 let rec build
-  : type u. t -> u W.t -> unit thread
-  = fun sched w ->
+  : type u v. _ t -> ?target:v W.t -> u W.t -> unit thread
+  = fun sched ?target w ->
     let open Eval_thread.Infix in
     match w with
     | W.Pure _ -> Eval_thread.return ()
     | W.App { x ; f ; _ } ->
-      Eval_thread.both (build sched x) (build sched f)
+      Eval_thread.both (build sched ?target x) (build sched ?target f)
       >>| ignore
     | W.Both { fst ; snd ; _ } ->
-      Eval_thread.both (build sched fst) (build sched snd)
+      Eval_thread.both (build sched ?target fst) (build sched ?target snd)
       >>| ignore
-    | W.Eval_path { workflow ; _ } -> build sched workflow
+    | W.Eval_path { workflow ; _ } -> build sched ?target workflow
     | W.Spawn { elts ; f ; _ } ->
-      build sched elts >>= fun () ->
+      build sched ?target elts >>= fun () ->
       shallow_eval sched elts >> fun elts_value ->
       let n = List.length elts_value in
       let targets = List.init n ~f:(fun i -> f (list_nth elts i)) in
-      Lwt_list.iter_p (Maybe_gc.register sched.gc) targets >> fun () ->
-      Eval_thread.join ~f:(build sched) targets
+      Lwt_list.iter_p (Maybe_gc.register ?target sched.gc) targets >> fun () ->
+      Eval_thread.join ~f:(build ?target sched) targets
     | W.Input { id ; path ; _ } ->
       register_build sched ~id ~build_trace:(fun () ->
           build_trace sched w (fun _ -> perform_input sched ~id ~path)
@@ -624,7 +645,7 @@ let rec build
       |> Eval_thread.ignore
 
     | W.Select { id ; dir ; sel ; _ } ->
-      build sched dir >>= fun () ->
+      build sched ?target dir >>= fun () ->
       shallow_eval sched dir >> fun dir ->
       register_build sched ~id ~build_trace:(fun () ->
           build_trace sched w (fun _ -> perform_select sched ~id ~dir ~sel)
@@ -633,7 +654,7 @@ let rec build
 
     | W.Value { task = workflow ; id ; _ } ->
       schedule_cached_workflow sched ~id w
-        ~deps:(fun () -> build sched workflow)
+        ~deps:(fun () -> build sched ~target:w workflow)
         ~perform:(fun _ ->
           let evaluator = blocking_evaluator sched.db workflow in
           worker (fun () ->
@@ -648,7 +669,7 @@ let rec build
 
     | W.Path { id ; task = workflow ; _ } ->
       schedule_cached_workflow sched ~id w
-        ~deps:(fun () -> build sched workflow)
+        ~deps:(fun () -> build sched ~target:w workflow)
         ~perform:(fun _ ->
           let evaluator = blocking_evaluator sched.db workflow in
           (* let env = *) (* FIXME: use this *)
@@ -666,47 +687,49 @@ let rec build
 
     | W.Shell { id ; task ; descr ; _ } ->
       schedule_cached_workflow sched ~id w
-        ~deps:(fun () -> build_command_deps sched task)
+        ~deps:(fun () -> build_command_deps sched ~target:w task)
         ~perform:(fun resource ->
             shallow_eval_command sched task >> fun cmd ->
             perform_shell sched resource ~id ~descr cmd >>= fun r ->
             Eval_thread.return r)
 
     | List l ->
-      Eval_thread.join l.elts ~f:(build sched)
+      Eval_thread.join l.elts ~f:(build ?target sched)
 
 and build_command_deps
-  : t -> W.path W.t Command.t -> unit Eval_thread.t
-  = fun sched cmd ->
+  : type u. _ t -> ?target:u W.t -> W.path W.t Command.t -> unit Eval_thread.t
+  = fun sched ?target cmd ->
     match cmd with
-    | Simple_command cmd -> build_template_deps sched cmd
+    | Simple_command cmd -> build_template_deps sched ?target cmd
     | And_list xs
     | Or_list xs
     | Pipe_list xs ->
-      Eval_thread.join ~f:(build_command_deps sched) xs
-    | Docker (_, cmd) -> build_command_deps sched cmd
+      Eval_thread.join ~f:(build_command_deps sched ?target) xs
+    | Docker (_, cmd) -> build_command_deps sched ?target cmd
 
 and build_template_deps
-  : t -> W.path W.t Template.t -> unit Eval_thread.t
-  = fun sched toks ->
-    Eval_thread.join ~f:(build_template_token_deps sched) toks
+  : type u. _ t -> ?target:u W.t -> W.path W.t Template.t -> unit Eval_thread.t
+  = fun sched ?target toks ->
+    Eval_thread.join ~f:(build_template_token_deps sched ?target) toks
 
 and build_template_token_deps
-  : t -> W.path W.t Template.token -> unit Eval_thread.t
-  = fun sched tok ->
+  : type u. _ t -> ?target:u W.t -> W.path W.t Template.token -> unit Eval_thread.t
+  = fun sched ?target tok ->
     match tok with
-    | D w -> build sched w
-    | F f -> build_template_deps sched f
+    | D w -> build sched ?target w
+    | F f -> build_template_deps sched ?target f
     | DEST | TMP | NP | MEM | S _ -> Eval_thread.return ()
 
-let eval ?np ?mem ?use_docker ?loggers ?(collect = false) db w =
-  let w = Bistro.Private.reveal w in
-  let sched = create ?np ?mem ?use_docker ?loggers ~collect db in
-  Lwt.async (fun () -> Maybe_gc.register sched.gc w) ;
-  build sched w
+let run sched =
+  Maybe_gc.register sched.gc sched.target >>= fun () ->
+  build sched sched.target
   >>= (fun r -> Maybe_gc.stop sched.gc >|= fun () -> r)
-  |> Fn.flip Lwt_result.bind Lwt.(fun () -> shallow_eval sched w >|= Result.return)
+  |> Fn.flip Lwt_result.bind Lwt.(fun () -> shallow_eval sched sched.target >|= Result.return)
   |> Lwt_result.map_err Traces.elements
+
+let eval ?np ?mem ?use_docker ?loggers ?collect db w =
+  let sched = create ?np ?mem ?use_docker ?loggers ?collect db w in
+  run sched
 
 let error_report db traces =
   let buf = Buffer.create 1024 in

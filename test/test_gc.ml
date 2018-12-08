@@ -27,15 +27,15 @@ let%pworkflow [@descr "text_file_of_char_list"]
 
 let pipeline =
   start "foo"
-  (* |> append "bar"
-   * |> append "baz"
+  |> append "bar"
+  (* |> append "baz"
    * |> append "gee" *)
   |> explode
   |> Workflow.spawn ~f:uppercase
   |> text_file_of_char_list
 
 let logger = object
-  method event db _ : Bistro_engine.Logger.event -> unit = function
+  method event _ _ : Bistro_engine.Logger.event -> unit = function
     | Workflow_started (w, _) ->
       printf "started %s\n%!" (Bistro_internals.Workflow.id w)
     | Workflow_ended { outcome ; _ } -> (
@@ -47,14 +47,17 @@ let logger = object
       )
     | Workflow_collected w ->
       printf "collected %s\n%!" (Bistro_internals.Workflow.id w)
-    | GC_registration gc_state ->
-      Bistro_utils.Dot_output.to_file ~db ~gc_state "workflow.dot" pipeline ;
     | _ -> ()
   method stop = Lwt.return ()
 end
 
+let dump_gc_state sched fn =
+  let open Bistro_engine in
+  Option.iter (Scheduler.gc_state sched) ~f:(Bistro_utils.Dot_output.gc_state_to_file fn)
+
 let _ =
   let open Bistro_engine in
   let db = Db.init_exn "_bistro" in
-  Scheduler.eval_exn ~loggers:[logger] ~collect:true db pipeline
-  |> Lwt_main.run
+  let sched = Scheduler.create ~np:4 ~loggers:[logger] ~collect:true db pipeline in
+  ignore (Scheduler.run sched |> Lwt_main.run) ;
+  dump_gc_state sched "gc_final.dot" ;

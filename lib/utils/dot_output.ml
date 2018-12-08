@@ -48,12 +48,11 @@ module G = struct
     of_workflow_aux S.empty empty (W.Any u)
     |> snd
 
-  let add_gc_state g gc_state =
-    Seq.fold_left
-      (fun acc (u, v) ->
-         let e = E.create u GC_link v in
-         add_edge_e acc e)
-      g gc_state.Logger.deps
+  let of_gc_state gc_state =
+    List.fold gc_state.Scheduler.Gc.deps ~init:empty ~f:(fun acc (u, v) ->
+        let e = E.create u GC_link v in
+        add_edge_e acc e
+      )
 
 end
 
@@ -145,13 +144,16 @@ let dot_output ?db oc g ~needed =
  *
  * let create path = new logger path *)
 
-let to_channel ?db ?gc_state oc w =
+let workflow_to_channel ?db oc w =
   let dep_graph = G.of_workflow (Bistro.Private.reveal w) in
-  let g = match gc_state with
-    | None -> dep_graph
-    | Some gc_state -> G.add_gc_state dep_graph gc_state
-  in
-  dot_output ~needed:S.empty ?db  oc g
+  dot_output ~needed:S.empty ?db oc dep_graph
 
-let to_file ?db ?gc_state fn w =
-  Out_channel.with_file fn ~f:(fun oc -> to_channel ?db ?gc_state oc w)
+let workflow_to_file ?db fn w =
+  Out_channel.with_file fn ~f:(fun oc -> workflow_to_channel ?db oc w)
+
+let gc_state_to_channel ?db oc gcs =
+  let dep_graph = G.of_gc_state gcs in
+  dot_output ~needed:S.empty ?db oc dep_graph
+
+let gc_state_to_file ?db fn w =
+  Out_channel.with_file fn ~f:(fun oc -> gc_state_to_channel ?db oc w)

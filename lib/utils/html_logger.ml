@@ -53,7 +53,6 @@ let translate_event db _ = function
   | Workflow_skipped (_, `Missing_dep) -> None
   | Workflow_started (_, _) -> None
   | Workflow_collected _ -> None
-  | GC_registration _ -> None
 
 let update model db time evt =
   {
