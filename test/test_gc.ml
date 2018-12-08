@@ -2,7 +2,7 @@ open Core
 open Bistro
 
 let append x y : text_file path workflow =
-  Workflow.shell Shell_dsl.[
+  Workflow.shell ~descr:(sprintf "append(%s)" x) Shell_dsl.[
     cmd "cat" ~stdout:dest [ dep y ] ;
     cmd "echo" [ string x ; string ">>" ; dest ] ;
   ]
@@ -49,5 +49,6 @@ let pipeline =
 let _ =
   let open Bistro_engine in
   let db = Db.init_exn "_bistro" in
+  Bistro_utils.Dot_output.to_file "workflow.dot" pipeline ;
   Scheduler.eval_exn ~loggers:[logger] ~collect:true db pipeline
   |> Lwt_main.run

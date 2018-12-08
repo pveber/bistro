@@ -81,6 +81,19 @@ module Any = struct
     String.equal (id x) (id y)
 
   let hash x = Hashtbl.hash (id x)
+
+  let deps (Any w) = match w with
+    | Pure _ -> []
+    | App app -> [ Any app.f ; Any app.x ]
+    | Both p -> [ Any p.fst ; Any p.snd ]
+    | List l -> List.map any l.elts
+    | Eval_path { workflow ; _ } -> [ Any workflow ]
+    | Spawn s -> s.deps
+    | Input _ -> []
+    | Select sel -> [ any sel.dir ]
+    | Value v -> v.deps
+    | Path p -> p.deps
+    | Shell s -> s.deps
 end
 
 let input ?version path =
@@ -140,24 +153,11 @@ module Set = Set.Make(Any)
 module Table = Hashtbl.Make(Any)
 module Map = Map.Make(Any)
 
-let deps (Any w) = match w with
-  | Pure _ -> []
-  | App app -> [ Any app.f ; Any app.x ]
-  | Both p -> [ Any p.fst ; Any p.snd ]
-  | List l -> List.map any l.elts
-  | Eval_path { workflow ; _ } -> [ Any workflow ]
-  | Spawn s -> s.deps
-  | Input _ -> []
-  | Select sel -> [ any sel.dir ]
-  | Value v -> v.deps
-  | Path p -> p.deps
-  | Shell s -> s.deps
-
 let rec independent_workflows_aux cache w ~from:u =
   if Any.equal w u then Map.add w (true, Set.empty) cache
   else if Map.mem w cache then cache
   else (
-    let deps = deps w in
+    let deps = Any.deps w in
     let f acc w = independent_workflows_aux acc w ~from:u in
     let cache = List.fold_left f cache deps in
     let children = List.map (fun k -> Map.find k cache) deps in

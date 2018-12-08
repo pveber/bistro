@@ -1,5 +1,5 @@
 (library
   (name bistro_utils)
   (public_name bistro.utils)
-  (libraries bistro.engine tyxml)
+  (libraries bistro.engine ocamlgraph tyxml)
   (preprocess (pps ppx_bistro)))
