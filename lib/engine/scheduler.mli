@@ -26,3 +26,14 @@ val error_report :
   Db.t ->
   Execution_trace.t list ->
   string
+
+module Gc : sig
+  open Bistro_internals
+
+  type t
+  val fold_deps :
+    t ->
+    init:'a ->
+    f:('a -> Workflow.any -> Workflow.any -> 'a) ->
+    'a
+end

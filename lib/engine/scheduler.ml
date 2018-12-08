@@ -125,6 +125,11 @@ module Gc : sig
   val register : t -> _ W.t -> unit Lwt.t
   val tag_as_built : t -> _ W.t -> unit
   val stop : t -> unit Lwt.t
+  val fold_deps :
+    t ->
+    init:'a ->
+    f:('a -> Workflow.any -> Workflow.any -> 'a) ->
+    'a
 end
 =
 struct
@@ -264,7 +269,21 @@ struct
   and register_any : type u. t -> ?target:u W.t -> W.any -> unit Lwt.t = fun gc ?target (Workflow.Any w) ->
     register gc ?target w
 
-  let register gc w = register gc w
+  let register gc w =
+    register gc w >|= fun () ->
+    gc.log (GC_registration {
+        deps =
+          T.to_seq gc.depends_on
+          |> Seq.flat_map (fun (u, s) -> Seq.map (fun v -> u, v) (S.to_seq s)) ;
+        protected =
+          S.to_seq gc.protected ;
+      })
+
+  let fold_deps gc ~init ~f =
+    T.fold
+      (fun u deps acc -> S.fold (fun v acc -> f acc u v) deps acc)
+      gc.depends_on
+      init
 end
 
 module Maybe_gc : sig
@@ -441,7 +460,8 @@ let rec blocking_evaluator
     | W.Input { path ; _ } -> fun () -> W.FS_path path
     | W.Value { id ; _ } ->
       fun () -> (load_value (Db.cache db id))
-    | W.Path _ -> assert false
+    | W.Path p ->
+      fun () -> (load_value (Db.cache db p.id))
     | W.Spawn _ -> assert false
     | W.Shell s -> fun () -> W.Cache_id s.id
     | W.List l ->

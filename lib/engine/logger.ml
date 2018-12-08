@@ -2,6 +2,11 @@ open Bistro_internals
 
 type time = float
 
+type gc_state = {
+  deps : (Workflow.any * Workflow.any) Seq.t ;
+  protected : Workflow.any Seq.t ;
+}
+
 type event =
   | Workflow_ready : _ Workflow.t -> event
   | Workflow_started : _ Workflow.t * Allocator.resource -> event
@@ -12,6 +17,7 @@ type event =
     } -> event
   | Workflow_skipped : _ Workflow.t * [ `Done_already | `Missing_dep ] -> event
   | Workflow_allocation_error : _ Workflow.t * string -> event
+  | GC_registration : gc_state -> event
   | Workflow_collected : _ Workflow.t -> event
 
 class type t = object
@@ -31,4 +37,3 @@ let tee loggers = object
   method stop =
     Lwt.join (List.map (fun l -> l#stop) loggers)
 end
-

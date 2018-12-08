@@ -17,10 +17,17 @@ module V = struct
   let t_of_sexp _ = assert false
 end
 
+module E = struct
+  type t = Dependency | GC_link
+  let default = Dependency
+  let compare = compare
+end
+
 module S = Set.Make(V)
 
 module G = struct
-  include Graph.Persistent.Digraph.ConcreteBidirectional(V)
+  open E
+  include Graph.Persistent.Digraph.ConcreteLabeled(V)(E)
   (* let successors   g u = fold_succ (fun h t -> h :: t) g u [] *)
 
   let rec of_workflow_aux seen acc u =
@@ -40,6 +47,14 @@ module G = struct
   let of_workflow u =
     of_workflow_aux S.empty empty (W.Any u)
     |> snd
+
+  let add_gc_state g gc_state =
+    Seq.fold_left
+      (fun acc (u, v) ->
+         let e = E.create u GC_link v in
+         add_edge_e acc e)
+      g gc_state.Logger.deps
+
 end
 
 
@@ -54,6 +69,18 @@ let dot_output ?db oc g ~needed =
     | None -> Fn.const false
     | Some db -> Db.is_in_cache db
   in
+  let step_attributes ~descr u =
+    let already_done = already_done u in
+    let color = black in
+    let shape = `Shape (shape u) in
+    let id = W.Any.id u in
+    [ `Label (sprintf "%s.%s" descr (String.prefix id 6)) ;
+      shape ;
+      `Peripheries (if already_done then 2 else 1) ;
+      `Color color ;
+      `Fontcolor color ;
+    ]
+  in
   let vertex_attributes u =
     let needed = S.mem needed u in
     let color = if needed then black else light_gray in
@@ -66,21 +93,21 @@ let dot_output ?db oc g ~needed =
     | Select s ->
       let label = Path.to_string s.sel in
       [ `Label label ; `Fontcolor color ; `Color color ; shape ]
-    | Shell { descr ; _ } ->
-      let already_done  = already_done u in
-      (* let precious = String.Set.mem precious id in
-       * let label_suffix = if precious then "*" else "" in *)
-      [ `Label (descr (* ^ label_suffix *)) ;
-        shape ;
-        `Peripheries (if already_done then 2 else 1) ;
-        `Color color ;
-        `Fontcolor color ;
-      ]
-    | _ -> []
+    | Shell { descr ; _ } -> step_attributes ~descr u
+    | Value { descr ; _ } -> step_attributes ~descr u
+    | Path { descr ; _ } -> step_attributes ~descr u
+    | Pure _ -> [ `Label "pure" ; `Shape `Plaintext ]
+    | App _ -> [ `Label "app" ; `Shape `Plaintext ]
+    | Spawn _ -> [ `Label "spawn" ; `Shape `Ellipse ]
+    | Both _ -> [ `Label "both" ; `Shape `Plaintext ]
+    | List _ -> [ `Label "list" ; `Shape `Plaintext ]
+    | Eval_path _ -> [ `Label "path" ; `Shape `Plaintext ]
   in
-  let edge_attributes (u, v) =
-    let style = match u, v with
-      | W.Any W.Select _, _ -> [ `Style `Dotted ]
+  let edge_attributes e =
+    let u = G.E.src e and v = G.E.dst e in
+    let style = match u, v, G.E.label e with
+      | _, _, GC_link -> [ `Style `Dotted ]
+      | W.Any W.Select _, _, Dependency -> [ `Style `Dashed ]
       | _ -> []
     in
     let color =
@@ -110,16 +137,21 @@ let dot_output ?db oc g ~needed =
  *         let already_done = S.of_list already_done in
  *         dot_output dag ~needed ~already_done path ~precious:config.Task.precious
  *       | _ -> ()
- * 
+ *
  *     method stop = ()
- * 
+ *
  *     method wait4shutdown = Lwt.return ()
  *   end
- * 
+ *
  * let create path = new logger path *)
 
-let to_channel ?db oc w =
-  dot_output ~needed:S.empty ?db oc (G.of_workflow (Bistro.Private.reveal w))
+let to_channel ?db ?gc_state oc w =
+  let dep_graph = G.of_workflow (Bistro.Private.reveal w) in
+  let g = match gc_state with
+    | None -> dep_graph
+    | Some gc_state -> G.add_gc_state dep_graph gc_state
+  in
+  dot_output ~needed:S.empty ?db  oc g
 
-let to_file fn w =
-  Out_channel.with_file fn ~f:(fun oc -> to_channel oc w)
+let to_file ?db ?gc_state fn w =
+  Out_channel.with_file fn ~f:(fun oc -> to_channel ?db ?gc_state oc w)
