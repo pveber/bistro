@@ -275,8 +275,6 @@ struct
     register gc ?target w
 
   let register gc ?target w =
-    printf "debug %d\n%!" (T.length gc.depends_on) ;
-    print_endline (W.id w) ;
     register gc ?target w
 
   (* let fold_deps gc ~init ~f =
