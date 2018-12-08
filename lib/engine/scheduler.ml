@@ -257,6 +257,8 @@ struct
       | Eval_path x -> register gc ?target x.workflow
       | Spawn x ->
         Lwt_list.iter_p (register_any gc ?target) x.deps
+      | List_nth l ->
+        register gc ?target l.elts
       | Input _ -> Lwt.return ()
       | Select x -> register gc ?target x.dir
       | Value v ->
@@ -397,9 +399,6 @@ let load_value fn =
 let save_value ~data fn =
   Out_channel.with_file fn ~f:(fun oc -> Marshal.to_channel oc data [])
 
-let list_nth xs i =
-  W.(pure ~id:"List.nth" List.nth_exn $ xs $ int i)
-
 let step_outcome ~exit_code ~dest_exists=
   match exit_code, dest_exists with
     0, true -> `Succeeded
@@ -483,11 +482,16 @@ let rec blocking_evaluator
       let elts = blocking_evaluator db s.elts in
       fun () ->
         let elts = elts () in
-        List.init (List.length elts) ~f:(fun i -> blocking_evaluator db (s.f (list_nth s.elts i)) ())
+        List.init (List.length elts) ~f:(fun i -> blocking_evaluator db (s.f (W.list_nth s.elts i)) ())
     | W.Shell s -> fun () -> W.Cache_id s.id
     | W.List l ->
       let l = List.map l.elts ~f:(blocking_evaluator db) in
       fun () -> List.map l ~f:(fun f -> f())
+    | W.List_nth l ->
+      let elts = blocking_evaluator db l.elts in
+      fun () ->
+        let elts = elts () in
+        List.nth_exn elts l.index
 
 let rec shallow_eval
   : type s. _ t -> s W.t -> s Lwt.t
@@ -511,12 +515,15 @@ let rec shallow_eval
       Lwt.return (load_value (Db.cache sched.db id)) (* FIXME: blocking call *)
     | W.Spawn s -> (* FIXME: much room for improvement *)
       shallow_eval sched s.elts >>= fun elts ->
-      let targets = List.init (List.length elts) ~f:(fun i -> s.f (list_nth s.elts i)) in
+      let targets = List.init (List.length elts) ~f:(fun i -> s.f (W.list_nth s.elts i)) in
       Lwt_list.map_p (shallow_eval sched) targets
     | W.Path s -> Lwt.return (W.Cache_id s.id)
     | W.Shell s -> Lwt.return (W.Cache_id s.id)
     | W.List l ->
       Lwt_list.map_p (shallow_eval sched) l.elts
+    | W.List_nth l ->
+      shallow_eval sched l.elts >>= fun elts ->
+      Lwt.return (List.nth_exn elts l.index)
 
 and shallow_eval_command sched =
   let list xs = Lwt_list.map_p (shallow_eval_command sched) xs in
@@ -572,6 +579,7 @@ let requirement
       | Input _ -> 0, 0
       | Select _ -> 0, 0
       | List _ -> 0, 0
+      | List_nth _ -> 0, 0
       | Value x -> x.np, x.mem
       | Path x -> x.np, x.mem
       | Shell x -> x.np, x.mem
@@ -631,11 +639,12 @@ let rec build
       Eval_thread.both (build sched ?target fst) (build sched ?target snd)
       >>| ignore
     | W.Eval_path { workflow ; _ } -> build sched ?target workflow
+    | List_nth l -> build sched ?target l.elts
     | W.Spawn { elts ; f ; _ } ->
       build sched ?target elts >>= fun () ->
       shallow_eval sched elts >> fun elts_value ->
       let n = List.length elts_value in
-      let targets = List.init n ~f:(fun i -> f (list_nth elts i)) in
+      let targets = List.init n ~f:(fun i -> f (W.list_nth elts i)) in
       Lwt_list.iter_p (Maybe_gc.register ?target sched.gc) targets >> fun () ->
       Eval_thread.join ~f:(build ?target sched) targets
     | W.Input { id ; path ; _ } ->

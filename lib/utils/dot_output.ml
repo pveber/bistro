@@ -110,6 +110,7 @@ let dot_output ?db oc g ~needed =
     | Both _ -> [ `Label "both" ; `Shape `Plaintext ]
     | List _ -> [ `Label "list" ; `Shape `Plaintext ]
     | Eval_path _ -> [ `Label "path" ; `Shape `Plaintext ]
+    | List_nth l -> [ `Label (sprintf "list_nth %d" l.index); `Shape `Plaintext ] 
   in
   let edge_attributes e =
     let u = G.E.src e and v = G.E.dst e in

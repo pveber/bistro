@@ -26,6 +26,11 @@ type _ t =
       f : 'a t -> 'b t ;
       deps : any list ;
     } -> 'b list t
+  | List_nth : {
+      id : string ;
+      elts : 'a list t ;
+      index : int ;
+    } -> 'a t
 
   | Input : { id : string ; path : string ; version : int option } -> path t
   | Select : {
@@ -66,6 +71,7 @@ let id : type s. s t -> string = function
   | Eval_path { id ; _ } -> id
   | Shell { id ; _ } -> id
   | List { id ; _ } -> id
+  | List_nth { id ; _ } -> id
 
 let any x = Any x
 
@@ -89,6 +95,7 @@ module Any = struct
     | List l -> List.map any l.elts
     | Eval_path { workflow ; _ } -> [ Any workflow ]
     | Spawn s -> s.deps
+    | List_nth l -> [ Any l.elts ]
     | Input _ -> []
     | Select sel -> [ any sel.dir ]
     | Value v -> v.deps
@@ -183,57 +190,6 @@ let spawn elts ~f =
   let deps = any elts :: independent_workflows (any f_u) ~from:(any u) in
   Spawn { id ; elts ; f ; deps }
 
-module Pretty = struct
-  type 'a workflow = 'a t
-  type t =
-    | Pure of { id : string }
-    | App of {
-        id : string ;
-        f : t ;
-        x : t ;
-      }
-    | Both of {
-        id : string ;
-        fst : t ;
-        snd : t ;
-      }
-    | List of {
-        id : string ;
-        elts : t list ;
-      }
-    | Eval_path of { id : string ; workflow : t }
-    | Spawn of {
-        id : string ;
-        elts : t ;
-        deps : t list ;
-      }
-    | Input of { id : string ; path : string ; version : int option }
-    | Select of {
-        id : string ;
-        dir : t ;
-        sel : string list ;
-      }
-    | Value of (t, t) step
-    | Path of (t, t) step
-    | Shell of (t Command.t, t) step
-
-  let rec of_workflow : type u. u workflow -> t = function
-    | Pure { id ; _ } -> Pure { id }
-    | App { id ; f ; x } -> App { id ; f = of_workflow f ; x = of_workflow x }
-    | Both { id ; fst ; snd } -> Both { id ; fst = of_workflow fst ; snd = of_workflow snd }
-    | List { id ; elts } -> List { id ; elts = List.map of_workflow elts }
-    | Eval_path { id ; workflow } -> Eval_path { id ; workflow = of_workflow workflow }
-    | Spawn { id ; elts ; deps ; _ } -> Spawn { id ; elts = of_workflow elts ; deps = of_deps deps }
-    | Input { id ; path ; version } -> Input { id ; path ; version }
-    | Select { id ; dir ; sel } -> Select { id ; dir = of_workflow dir ; sel }
-    | Value s -> Value { s with task = of_workflow s.task ;
-                                deps = of_deps s.deps }
-    | Path s -> Path { s with task = of_workflow s.task ;
-                               deps = of_deps s.deps }
-    | Shell s -> Shell { s with task = of_command s.task ;
-                                deps = of_deps s.deps }
-
-  and of_deps d = List.map (fun (Any w) -> of_workflow w) d
-
-  and of_command cmd = Command.map cmd ~f:of_workflow
-end
+let list_nth w i =
+  let id = digest (`List_nth, id w, i) in
+  List_nth { id ; elts = w ; index = i }
