@@ -10,6 +10,16 @@ let append x y : text_file path workflow =
 let%pworkflow start x : text_file path workflow =
   Out_channel.write_all [%dest] ~data:[%param x]
 
+let%workflow explode x =
+  In_channel.read_all [%path x]
+  |> String.to_list
+
+let%workflow uppercase x =
+  Char.uppercase [%eval x]
+
+let%pworkflow text_file_of_char_list x : text_file path workflow =
+  Out_channel.write_all [%dest] ~data:(String.of_char_list [%eval x])
+
 let logger = object
   method event _ _ : Bistro_engine.Logger.event -> unit = function
     | Workflow_started (w, _) ->
@@ -29,9 +39,12 @@ end
 
 let pipeline =
   start "foo"
-  |> append "bar"
-  |> append "baz"
-  |> append "gee"
+  (* |> append "bar"
+   * |> append "baz"
+   * |> append "gee" *)
+  |> explode
+  |> Workflow.spawn ~f:uppercase
+  |> text_file_of_char_list
 
 let _ =
   let open Bistro_engine in
