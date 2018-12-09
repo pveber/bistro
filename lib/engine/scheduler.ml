@@ -245,34 +245,36 @@ struct
       T.incr_count gc.counts v
 
   let rec register : type u v. t -> ?target:u W.t -> v W.t -> unit Lwt.t = fun gc ?target w ->
-    if T.mem gc.depends_on (Workflow.Any w) then Lwt.return ()
-    else match w with
-      | Pure _ -> Lwt.return ()
-      | App app ->
-        lwt_both (register gc ?target app.f) (register gc ?target app.x)
-        >|= ignore
-      | Both both ->
-        lwt_both (register gc ?target both.fst) (register gc ?target both.snd)
-        >|= ignore
-      | List l ->
-        List.map ~f:(register ?target gc) l.elts
-        |> Lwt.join
-      | Eval_path x -> register gc ?target x.workflow
-      | Spawn x ->
-        Lwt_list.iter_p (register_any gc ?target) x.deps
-      | List_nth l ->
-        register gc ?target l.elts
-      | Input _ -> Lwt.return ()
-      | Select x -> register gc ?target x.dir
-      | Value v ->
-        uses gc target w ;
-        register gc ~target:w v.task
-      | Path p ->
-        uses gc target w ;
-        register gc ~target:w p.task
-      | Shell s ->
-        uses gc target w ;
-        Lwt_list.iter_p (register_any gc ?target) s.deps
+    match w with
+    | Pure _ -> Lwt.return ()
+    | App app ->
+      lwt_both (register gc ?target app.f) (register gc ?target app.x)
+      >|= ignore
+    | Both both ->
+      lwt_both (register gc ?target both.fst) (register gc ?target both.snd)
+      >|= ignore
+    | List l ->
+      List.map ~f:(register ?target gc) l.elts
+      |> Lwt.join
+    | Eval_path x -> register gc ?target x.workflow
+    | Spawn x ->
+      Lwt_list.iter_p (register_any gc ?target) x.deps
+    | List_nth l ->
+      register gc ?target l.elts
+    | Input _ -> Lwt.return ()
+    | Select x -> register gc ?target x.dir
+    | Value v ->
+      uses gc target w ;
+      if T.mem gc.depends_on (Workflow.Any w) then Lwt.return ()
+      else register gc ~target:w v.task
+    | Path p ->
+      uses gc target w ;
+      if T.mem gc.depends_on (Workflow.Any w) then Lwt.return ()
+      else register gc ~target:w p.task
+    | Shell s ->
+      uses gc target w ;
+      if T.mem gc.depends_on (Workflow.Any w) then Lwt.return ()
+      else Lwt_list.iter_p (register_any gc ~target:w) s.deps
 
   and register_any : type u. t -> ?target:u W.t -> W.any -> unit Lwt.t = fun gc ?target (Workflow.Any w) ->
     register gc ?target w
