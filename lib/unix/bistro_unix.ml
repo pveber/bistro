@@ -11,7 +11,7 @@ module Cmd = struct
       option (opt "--user" string) user ;
       option (opt "--password" string) password ;
       option (opt "-O" ident) dest ;
-      string url ;
+      string_dep url ;
     ]
 end
 

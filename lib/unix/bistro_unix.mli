@@ -6,7 +6,7 @@ module Cmd : sig
     ?user:string ->
     ?password:string ->
     ?dest:Shell_dsl.template ->
-    string -> Shell_dsl.command
+    string workflow -> Shell_dsl.command
 end
 
 val wget :
@@ -14,7 +14,7 @@ val wget :
   ?no_check_certificate:bool ->
   ?user:string ->
   ?password:string ->
-  string -> #file pworkflow
+  string workflow -> #file pworkflow
 val gunzip : 'a gz pworkflow -> 'a pworkflow
 val bunzip2 : 'a bz2 pworkflow -> 'a pworkflow
 val unzip : 'a zip pworkflow -> 'a pworkflow

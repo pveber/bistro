@@ -205,7 +205,7 @@ module Bedtools = struct
     ]
 
   let bamtobed ?bed12 ?split ?splitD ?ed ?tag ?cigar bam =
-    Workflow.shell ~descr:"bedtools.bamtobed" ~mem:(3 * 1024) ~np:8 [
+    Workflow.shell ~descr:"bedtools.bamtobed" ~mem:(Workflow.int  (3 * 1024)) ~np:8 [
       cmd "bedtools bamtobed" ~stdout:dest ~env [
         option (flag string "-bed12") bed12 ;
         option (flag string "-split") split ;
@@ -324,7 +324,7 @@ module Bowtie2 = struct
 
   (* memory bound correspond to storing a human index in memory, following bowtie manual *)
   let bowtie2_build ?large_index ?noauto ?packed ?bmax ?bmaxdivn ?dcv ?nodc ?noref ?justref ?offrate ?ftabchars ?seed ?cutoff fa =
-    Workflow.shell ~descr:"bowtie2_build" ~np:8 ~mem:(3 * 1024) [
+    Workflow.shell ~descr:"bowtie2_build" ~np:8 ~mem:(Workflow.int (3 * 1024)) [
       mkdir_p dest ;
       cmd "bowtie2-build" ~env [
         option (flag string "--large-index") large_index ;
@@ -388,7 +388,7 @@ module Bowtie2 = struct
           opt "-2" (list dep ~sep:",") fqs2
         ]
     in
-    Workflow.shell ~descr:"bowtie2" ~mem:(3 * 1024) ~np:8 [
+    Workflow.shell ~descr:"bowtie2" ~mem:(Workflow.int (3 * 1024)) ~np:8 [
       cmd "bowtie2" ~env [
         option (opt "--skip" int) skip ;
         option (opt "--qupto" int) qupto ;
@@ -434,7 +434,7 @@ module Bowtie = struct
 
   (* memory bound correspond to storing a human index in memory, following bowtie manual *)
   let bowtie_build ?packed ?color fa =
-    Workflow.shell ~descr:"bowtie_build" ~mem:(3 * 1024) [
+    Workflow.shell ~descr:"bowtie_build" ~mem:(Workflow.int (3 * 1024)) [
       mkdir_p dest ;
       cmd "bowtie-build" ~env [
         option (flag string "-a -p") packed ;
@@ -459,7 +459,7 @@ module Bowtie = struct
           opt "-2" (list dep ~sep:",") fqs2
         ]
     in
-    Workflow.shell ~descr:"bowtie" ~mem:(3 * 1024) ~np:8 [
+    Workflow.shell ~descr:"bowtie" ~mem:(Workflow.int (3 * 1024)) ~np:8 [
       cmd "bowtie" ~env [
         string "-S" ;
         option (opt "-n" int) n ;
@@ -1190,7 +1190,7 @@ module Ensembl = struct
         (String.capitalize_ascii (string_of_species species))
         (lab_label_of_genome (ucsc_reference_genome ~release ~species)) release
     in
-    let gff = Bistro_unix.(gunzip (wget url)) in
+    let gff = Bistro_unix.(gunzip (wget (Workflow.string url))) in
     match chr_name with
     | `ensembl -> gff
     | `ucsc -> ucsc_chr_names_gtf gff
@@ -1207,7 +1207,7 @@ module Ensembl = struct
       | `ensembl -> ident
       | `ucsc -> ucsc_chr_names_gtf
     in
-    f @@ Bistro_unix.(gunzip (wget url))
+    f @@ Bistro_unix.(gunzip (wget (Workflow.string url)))
 
   let cdna ~release ~species =
     let url = sprintf "ftp://ftp.ensembl.org/pub/release-%d/fasta/%s/cdna/%s.%s.cdna.all.fa.gz"
@@ -1215,7 +1215,7 @@ module Ensembl = struct
         (String.capitalize_ascii (string_of_species species))
         (lab_label_of_genome (ucsc_reference_genome ~release ~species))
     in
-    Bistro_unix.wget url
+    Bistro_unix.wget (Workflow.string url)
 end
 
 module FastQC = struct
@@ -1288,7 +1288,7 @@ module Fastq_screen = struct
 
   let fastq_screen ?bowtie2_opts ?filter ?illumina ?nohits ?pass ?subset
       ?tag ?(threads = 1) ?top ?(lightweight = true) fq genomes =
-    Workflow.shell ~descr:"fastq_screen" ~np:threads ~mem:(3 * 1024) [
+    Workflow.shell ~descr:"fastq_screen" ~np:threads ~mem:(Workflow.int (3 * 1024)) [
       mkdir_p dest ;
       cmd "fastq_screen" ~env [
         string "--aligner bowtie2" ;
@@ -1542,7 +1542,7 @@ module Macs = struct
       ?slocal ?llocal ?on_auto ?nomodel ?shiftsize ?keep_dup
       ?to_large ?wig ?bdg ?single_profile ?space ?call_subpeaks
       ?diag ?fe_min ?fe_max ?fe_step format treatment =
-    Workflow.shell ~descr:"macs" ~mem:(3 * 1024) ~np:8  [
+    Workflow.shell ~descr:"macs" ~mem:(Workflow.int (3 * 1024)) ~np:8  [
       mkdir_p dest ;
       cmd "macs14" ~env [
         option (opt "--control" (list ~sep:"," dep)) control ;
@@ -1657,7 +1657,7 @@ module Prokka = struct
       ?centre ?genus ?species ?strain ?plasmid ?kingdom ?gcode ?gram
       ?usegenus ?proteins ?hmms ?metagenome ?rawproduct ?fast ?(threads = 1)
       ?mincontiglen ?evalue ?rfam ?norrna ?notrna ?rnammer fa =
-    Workflow.shell ~descr:"prokka" ~np:threads ~mem:(3 * 1024) [
+    Workflow.shell ~descr:"prokka" ~np:threads ~mem:(Workflow.int (3 * 1024)) [
       mkdir_p dest ;
       cmd "prokka" ~env [
         string "--force" ;
@@ -1727,7 +1727,7 @@ module Spades = struct
       | None -> None, []
       | Some files -> renamings files
     in
-    Workflow.shell ~np:threads ~mem:(memory * 1024) ~descr:"spades" [
+    Workflow.shell ~np:threads ~mem:(Workflow.int (memory * 1024)) ~descr:"spades" [
       mkdir_p tmp ;
       mkdir_p dest ;
       docker env (
@@ -1754,18 +1754,21 @@ module Sra = struct
   let input x = Workflow.input x
 
   let fetch_srr id =
-    if (String.length id > 6) then (
-      let prefix = String.sub id 0 6 in
-      let url =
-        sprintf
-          "ftp://ftp-trace.ncbi.nlm.nih.gov/sra/sra-instant/reads/ByRun/sra/SRR/%s/%s/%s.sra"
-          prefix id id
+      let url = [%workflow
+        let id = [%eval id] in
+        if (String.length id > 6) then
+          let prefix = String.sub id 0 6 in
+          sprintf
+            "ftp://ftp-trace.ncbi.nlm.nih.gov/sra/sra-instant/reads/ByRun/sra/SRR/%s/%s/%s.sra"
+            prefix id id
+        else
+          let msg = sprintf "Bistro_bioinfo.Sra.fetch_srr: id %s is invalid (should be longer than 6 characters long)" id in
+          failwith msg
+      ]
       in
-      Workflow.shell ~descr:(sprintf "sra.fetch_srr(%s)" id) [ Bistro_unix.Cmd.wget ~dest url ]
-    )
-    else
-      let msg = sprintf "Bistro_bioinfo.Sra.fetch_srr: id %s is invalid (should be longer than 6 characters long)" id in
-      failwith msg
+      Workflow.shell ~descr:"sra.fetch_srr" [
+        Bistro_unix.Cmd.wget ~dest url
+      ]
 end
 
 module Sra_toolkit = struct
@@ -1875,7 +1878,7 @@ module Srst2 = struct
       ?truncation_score_tolerance ?other ?max_unaligned_overlap ?mapq
       ?baseq ?samtools_args ?report_new_consensus
       ?report_all_consensus ?(threads = 1) fq =
-    Workflow.shell ~descr:"srst2" ~np:threads ~mem:(3 * 1024) [
+    Workflow.shell ~descr:"srst2" ~np:threads ~mem:(Workflow.int (3 * 1024)) [
       mkdir_p dest ;
       run_gen_cmd "srst2" ?mlst_db ?mlst_delimiter ?mlst_definitions
         ?mlst_max_mismatch ?gene_db ?no_gene_details ?gene_max_mismatch
@@ -1895,7 +1898,7 @@ module Srst2 = struct
       ?truncation_score_tolerance ?other ?max_unaligned_overlap ?mapq
       ?baseq ?samtools_args ?report_new_consensus
       ?report_all_consensus ?(threads = 1) fq =
-    Workflow.shell ~descr:"srst2" ~np:threads ~mem:(3 * 1024) [
+    Workflow.shell ~descr:"srst2" ~np:threads ~mem:(Workflow.int (3 * 1024)) [
       mkdir_p dest ;
       run_gen_cmd "srst2" ?mlst_db ?mlst_delimiter ?mlst_definitions
         ?mlst_max_mismatch ?gene_db ?no_gene_details ?gene_max_mismatch
@@ -1928,7 +1931,7 @@ module Tophat = struct
           list dep ~sep:"," fqs2
         ]
     in
-    Workflow.shell ~np:8 ~mem:(4 * 1024) ~descr:"tophat" [
+    Workflow.shell ~np:8 ~mem:(Workflow.int (4 * 1024)) ~descr:"tophat" [
       cmd ~env "tophat" [
         string "--bowtie1" ;
         opt "--num-threads" ident np ;
@@ -1949,7 +1952,7 @@ module Tophat = struct
           list dep ~sep:"," fqs2
         ]
     in
-    Workflow.shell ~np:8 ~mem:(4 * 1024) ~descr:"tophat2" [
+    Workflow.shell ~np:8 ~mem:(Workflow.int (4 * 1024)) ~descr:"tophat2" [
       cmd ~env "tophat2" [
         opt "--num-threads" ident np ;
         opt "--output-dir" ident dest ;
@@ -2041,17 +2044,18 @@ module Ucsc_gb = struct
     in
     let descr = sprintf "ucsc_gb.chromosome_sequence(%s,%s)" org chr in
     Workflow.shell ~descr [
-      Bistro_unix.Cmd.wget ~dest:(tmp // "seq.fa.gz") url ;
+      Bistro_unix.Cmd.wget ~dest:(tmp // "seq.fa.gz") (Workflow.string url) ;
       cmd "gunzip" [ tmp // "seq.fa.gz" ] ;
       cmd "mv" [ tmp // "seq.fa.gz" ; dest ] ;
     ]
 
   let chromosome_sequences org =
     let org = string_of_genome org in
+    let url = sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/chromosomes/*" org in
     Workflow.shell ~descr:(sprintf "ucsc_gb.chromosome_sequences(%s)" org) [
       mkdir_p dest ;
       cd dest ;
-      Bistro_unix.Cmd.wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/chromosomes/*" org) ;
+      Bistro_unix.Cmd.wget (Workflow.string url) ;
       cmd "gunzip" [ string "*.gz" ]
     ]
 
@@ -2070,10 +2074,11 @@ module Ucsc_gb = struct
      to create first a directory and then to select the unique file in it...*)
   let genome_2bit_sequence_dir org =
     let org = string_of_genome org in
+    let url = sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/bigZips/%s.2bit" org org in
     Workflow.shell ~descr:(sprintf "ucsc_gb.2bit_sequence(%s)" org) [
       mkdir dest ;
       cd dest ;
-      Bistro_unix.Cmd.wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/bigZips/%s.2bit" org org) ;
+      Bistro_unix.Cmd.wget (Workflow.string url) ;
     ]
 
   let genome_2bit_sequence org =
@@ -2081,7 +2086,7 @@ module Ucsc_gb = struct
 
   (* (\* let wg_encode_crg_mappability n org = *\) *)
   (* (\*   let url = sp "ftp://hgdownload.cse.ucsc.edu/gbdb/%s/bbi/wgEncodeCrgMapabilityAlign%dmer.bigWig" (string_of_genome org) n in *\) *)
-  (* (\*   Guizmin_unix.wget url *\) *)
+  (* (\*   Guizmin_unix.wget (Workflow.string url) *\) *)
 
   (* (\* let wg_encode_crg_mappability_36 org = wg_encode_crg_mappability 36 org *\) *)
   (* (\* let wg_encode_crg_mappability_40 org = wg_encode_crg_mappability 40 org *\) *)
@@ -2250,7 +2255,7 @@ module Ucsc_gb = struct
           "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/liftOver/%sTo%s.over.chain.gz"
           org_from org_from (String.capitalize_ascii org_to)
       in
-      Bistro_unix.(gunzip (wget url))
+      Bistro_unix.(gunzip (wget (Workflow.string url)))
 
     let bed ~org_from ~org_to bed =
       let chain_file = chain_file ~org_from ~org_to in

@@ -555,7 +555,8 @@ and shallow_eval_template sched toks =
 and shallow_eval_token sched =
   let open Template in
   function
-  | D w -> shallow_eval sched w >|= fun p -> D p
+  | D (Workflow.Path_token w) -> shallow_eval sched w >|= fun p -> D (Execution_env.Path p)
+  | D (Workflow.String_token w) -> shallow_eval sched w >|= fun p -> D (Execution_env.String p)
   | F f -> shallow_eval_template sched f >|= fun t -> F t
   | DEST | TMP | NP | MEM | S _ as tok -> Lwt.return tok
 
@@ -574,29 +575,44 @@ let register_build sched ~id ~build_trace =
   else
     Lwt_result.return trace
 
-let requirement
-  : type s. s Workflow.t -> Allocator.request
-  = fun w ->
-    let np, mem = match w with
-      | Pure _ -> 0, 0
-      | App _  -> 0, 0
-      | Spawn _ -> 0, 0
-      | Both _ -> 0, 0
-      | Eval_path _ -> 0, 0
-      | Input _ -> 0, 0
-      | Select _ -> 0, 0
-      | List _ -> 0, 0
-      | List_nth _ -> 0, 0
-      | Value x -> x.np, x.mem
-      | Path x -> x.np, x.mem
-      | Shell x -> x.np, x.mem
-    in
-    Allocator.Request { np ; mem }
+let np_requirement
+  : type s. s Workflow.t -> int
+  = function
+    | Pure _ -> 0
+    | App _  -> 0
+    | Spawn _ -> 0
+    | Both _ -> 0
+    | Eval_path _ -> 0
+    | Input _ -> 0
+    | Select _ -> 0
+    | List _ -> 0
+    | List_nth _ -> 0
+    | Value x -> x.np
+    | Path x -> x.np
+    | Shell x -> x.np
+
+let mem_requirement
+  : type u v. u t -> v Workflow.t -> int Lwt.t
+  = fun sched -> function
+    | Pure _ -> Lwt.return 0
+    | App _  -> Lwt.return 0
+    | Spawn _ -> Lwt.return 0
+    | Both _ -> Lwt.return 0
+    | Eval_path _ -> Lwt.return 0
+    | Input _ -> Lwt.return 0
+    | Select _ -> Lwt.return 0
+    | List _ -> Lwt.return 0
+    | List_nth _ -> Lwt.return 0
+    | Value x -> shallow_eval sched x.mem
+    | Path x -> shallow_eval sched x.mem
+    | Shell x -> shallow_eval sched x.mem
 
 let build_trace sched w perform =
   let ready = Unix.gettimeofday () in
   log ~time:ready sched (Logger.Workflow_ready w) ;
-  Allocator.request sched.allocator (requirement w) >>= function
+  mem_requirement sched w >>= fun mem ->
+  let requirement = Allocator.Request { np = np_requirement w ; mem } in
+  Allocator.request sched.allocator requirement >>= function
   | Ok resource ->
     let open Eval_thread.Infix in
     let start = Unix.gettimeofday () in

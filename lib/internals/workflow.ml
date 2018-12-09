@@ -47,12 +47,14 @@ and ('a, 'b) step = {
   descr : string ;
   task : 'a ;
   np : int ; (** Required number of processors *)
-  mem : int ; (** Required memory in MB *)
+  mem : int t ; (** Required memory in MB *)
   version : int option ; (** Version number of the wrapper *)
   deps : 'b list ;
 }
 
-and shell_command = path t Command.t
+and shell_command = token Command.t
+
+and token = Path_token of path t | String_token of string t
 
 and any = Any : _ t -> any
 
@@ -117,14 +119,6 @@ let select dir sel =
   let id = digest ("select", id dir, sel) in
   Select { id ; dir ; sel }
 
-let cached_value ?(descr = "") ?(np = 1) ?(mem = 0) ?version workflow =
-  let id = digest (`Value, id workflow, version) in
-  Value { id ; descr ; task = workflow ; np ; mem ; version ; deps = [ any workflow ] }
-
-let cached_path ?(descr = "") ?(np = 1) ?(mem = 0) ?version workflow =
-  let id = digest (`Value, id workflow, version) in
-  Path { id ; descr ; task = workflow ; np ; mem ; version ; deps = [ any workflow ] }
-
 let pure ~id value = Pure { id ; value }
 let pure_data value = pure ~id:(digest value) value
 let int = pure_data
@@ -137,19 +131,38 @@ let both fst snd =
   let id = digest (`Both, id fst, id snd) in
   Both { id ; fst ; snd }
 
+let cached_value ?(descr = "") ?(np = 1) ?(mem = int 100) ?version workflow =
+  let id = digest (`Value, id workflow, version) in
+  Value { id ; descr ; task = workflow ; np ; mem ; version ; deps = [ any mem ; any workflow ] }
+
+let cached_path ?(descr = "") ?(np = 1) ?(mem = int 100) ?version workflow =
+  let id = digest (`Value, id workflow, version) in
+  Path { id ; descr ; task = workflow ; np ; mem ; version ; deps = [ any mem ; any workflow ] }
+
 let eval_path w = Eval_path { id = digest (`Eval_path, id w) ; workflow = w }
 
-let digestible_cmd = Command.map ~f:id
+let digestible_cmd = Command.map ~f:(function
+    | Path_token w -> id w
+    | String_token w -> id w
+  )
 
 let shell
     ?(descr = "")
-    ?(mem = 100)
+    ?(mem = int 100)
     ?(np = 1)
     ?version
     cmds =
   let cmd = Command.And_list cmds in
   let id = digest ("shell", version, digestible_cmd cmd) in
-  let deps = Command.deps cmd |> List.map any in
+  let deps =
+    any mem :: (
+      Command.deps cmd
+      |> List.map (function
+          | Path_token w -> any w
+          | String_token s -> any s
+        )
+    )
+  in
   Shell { descr ; task = cmd ; np ; mem ; version ; id ; deps }
 
 let list elts =

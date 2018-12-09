@@ -83,7 +83,7 @@ class type ['a] tar = object
 end
 
 module Template_dsl = struct
-  type template = Workflow.path Workflow.t Template.t
+  type template = Workflow.token Template.t
 
   let dest = [ Template.DEST ]
   let tmp = [ Template.TMP ]
@@ -93,7 +93,9 @@ module Template_dsl = struct
   let string s = [ Template.S s ]
   let int i = string (Int.to_string i)
   let float f = string (Float.to_string f)
-  let dep w = [ Template.D w ]
+  let dep w = [ Template.D (Workflow.Path_token w) ]
+  let string_dep w = [ Template.D (Workflow.String_token w) ]
+  let int_dep w = [ Template.D Workflow.(String_token (app (pure ~id:"__string_of_int__" Int.to_string) w)) ]
 
   let quote ?using:(c = '"') e =
     let quote_symbol = Template.S (Char.to_string c) in
