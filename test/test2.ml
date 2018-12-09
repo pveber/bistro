@@ -9,7 +9,7 @@ let cut_deps x = [%workflow
   |> List.filter ~f:(( <> ) [""])
 ]
 
-let%pworkflow dump_lines x =
+let%pworkflow [@descr "dump_lines"] dump_lines x =
   Out_channel.write_lines [%dest] [%eval x]
 
 let pipeline w =
@@ -43,10 +43,15 @@ let logger = object
   method stop = Lwt.return ()
 end
 
-let () =
-  Repo.build ~np:4 ~collect:true ~outdir:"res" repo ~loggers:[
-    (* Console_logger.create () ; *)
-    logger ;
-    Html_logger.create "report.html" ;
-  ]
-  |> Lwt_main.run
+let dump_gc_state sched fn =
+  let open Bistro_engine in
+  Option.iter (Scheduler.gc_state sched) ~f:(Bistro_utils.Dot_output.gc_state_to_file ~condensed:false fn)
+
+let _ =
+  let open Bistro_engine in
+  let db = Db.init_exn "_bistro" in
+  let pipeline = Repo.to_workflow repo ~outdir:"res" in
+  Dot_output.workflow_to_file "workflow.dot" pipeline ;
+  let sched = Scheduler.create ~np:4 ~loggers:[logger] ~collect:true db pipeline in
+  ignore (Scheduler.run sched |> Lwt_main.run) ;
+  dump_gc_state sched "gc_final.dot" ;

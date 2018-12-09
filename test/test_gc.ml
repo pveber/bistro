@@ -60,4 +60,4 @@ let _ =
   let db = Db.init_exn "_bistro" in
   let sched = Scheduler.create ~np:4 ~loggers:[logger] ~collect:true db pipeline in
   ignore (Scheduler.run sched |> Lwt_main.run) ;
-  dump_gc_state sched "gc_final.dot" ;
+  dump_gc_state sched "gc_final.dot"
