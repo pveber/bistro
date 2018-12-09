@@ -1,30 +1,37 @@
-open Core_kernel
+open Core
 open Bistro
-open Bistro_nlp
-open Bistro_utils
 
-let cut_deps x = [%workflow
-  let lines = In_channel.read_lines [%path x] in
-  List.group lines ~break:(fun _ l -> l = "")
-  |> List.filter ~f:(( <> ) [""])
-]
+let append x y : text_file path workflow =
+  Workflow.shell ~descr:(sprintf "append(%s)" x) Shell_dsl.[
+    cmd "cat" ~stdout:dest [ dep y ] ;
+    cmd "echo" [ string x ; string ">>" ; dest ] ;
+  ]
 
-let%pworkflow [@descr "dump_lines"] dump_lines x =
-  Out_channel.write_lines [%dest] [%eval x]
+let%pworkflow [@descr "start"]
+    start x : text_file path workflow =
+  Out_channel.write_all [%dest] ~data:[%param x]
 
-let pipeline w =
-  wikipedia_summary w
-  |> Stanford_parser.lexparser
-  |> cut_deps
-  |> Workflow.spawn ~f:(fun deps ->
-      dump_lines deps
-      |> Stanford_parser.dependensee
-    )
-  |> Repo.(items [ w ] ~prefix:"sentence" ~ext:"png")
+let%workflow [@descr "explode"]
+    explode x =
+  In_channel.read_all [%path x]
+  |> String.to_list
 
-let repo =
-  [ "Protein" ; "Cell_(biology)" ]
-  |> List.map ~f:pipeline
+let%workflow
+  [@descr "uppercase"]
+    uppercase x =
+  Char.uppercase [%eval x]
+
+let%pworkflow [@descr "text_file_of_char_list"]
+    text_file_of_char_list x : text_file path workflow =
+  Out_channel.write_all [%dest] ~data:(String.of_char_list [%eval x])
+
+let pipeline =
+  start "foo"
+  |> append "bar"
+  |> append "gee"
+  |> explode
+  |> Workflow.spawn ~f:uppercase
+  |> text_file_of_char_list
 
 let logger = object
   method event _ _ : Bistro_engine.Logger.event -> unit = function
@@ -50,8 +57,6 @@ let dump_gc_state sched db fn =
 let _ =
   let open Bistro_engine in
   let db = Db.init_exn "_bistro" in
-  let pipeline = Repo.to_workflow repo ~outdir:"res" in
-  Dot_output.workflow_to_file ~db "workflow.dot" pipeline ;
   let sched = Scheduler.create ~np:4 ~loggers:[logger] ~collect:true db pipeline in
   ignore (Scheduler.run sched |> Lwt_main.run) ;
-  dump_gc_state sched db "gc_final.dot" ;
+  dump_gc_state sched db "gc_final.dot"

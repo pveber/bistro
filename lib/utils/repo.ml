@@ -124,10 +124,10 @@ let to_workflow ~outdir items =
     |> remove_redundancies
     |> generate outdir]
 
-let build ?np ?mem ?loggers ?keep_all:_ ?use_docker ?(bistro_dir = "_bistro") ~outdir repo =
+let build ?np ?mem ?loggers ?keep_all:_ ?use_docker ?(bistro_dir = "_bistro") ?collect ~outdir repo =
   let db = Db.init_exn bistro_dir in
   let expr = to_workflow ~outdir repo in
-  Scheduler.eval ?np ?mem ?loggers ?use_docker db expr >|=
+  Scheduler.eval ?np ?mem ?loggers ?use_docker ?collect db expr >|=
   function
   | Ok () -> ()
   | Error errors ->

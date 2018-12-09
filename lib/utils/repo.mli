@@ -29,6 +29,7 @@ val build  :
   ?keep_all:bool ->
   ?use_docker:bool ->
   ?bistro_dir:string ->
+  ?collect:bool ->
   outdir:string -> t -> unit Lwt.t
 
 val to_workflow :

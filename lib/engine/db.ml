@@ -126,3 +126,21 @@ let rec path : t -> Bistro_internals.Workflow.path -> string = fun db p ->
   | Cache_id id -> cache db id
   | Cd (dir, sel) ->
     Filename.concat (path db dir) (Path.to_string sel)
+
+let rec workflow_path db (Bistro_internals.Workflow.Any w) =
+  let open Bistro_internals.Workflow in
+  match w with
+  | Input { path ; _ } -> Some (FS_path path)
+  | Select { dir ; sel ; _ } ->
+    workflow_path db (Any dir)
+    |> Option.map ~f:(fun d -> Cd (d, sel))
+  | Shell { id ; _ } -> Some (Cache_id id)
+  | Value { id ; _ } -> Some (Cache_id id)
+  | Path { id ; _ } -> Some (Cache_id id)
+  | _ -> None
+
+let is_in_cache db u =
+  workflow_path db u
+  |> Option.value_map ~default:false ~f:(fun u ->
+      Sys.file_exists (path db u) = `Yes
+    )

@@ -25,6 +25,11 @@ module B = struct
     pexp_construct (Located.lident s) args
   let enil () = econstr "[]" []
   let econs hd tl = econstr "::" [hd; tl]
+  let enone () = econstr "None" []
+  let esome x = econstr "Some" [ x ]
+  let eopt x = match x with
+    | None -> enone ()
+    | Some x -> esome x
   let elist l = List.fold_right ~f:econs l ~init:(enil ())
   let pvar v = ppat_var (Located.mk v)
 end
@@ -118,11 +123,15 @@ let rec replace_body new_body = function
     { expr with pexp_desc = Pexp_fun (lab, e1, p, replace_body new_body e2) }
   | _ -> new_body
 
-let str_item_rewriter ~loc ~path:_ var expr =
+let str_item_rewriter ~loc ~path:_ descr version var expr =
   let body, body_type = extract_body expr in
   let rewritten_body, deps = new payload_rewriter#expression body [] in
   let applicative_body = build_applicative ~loc deps [%expr fun () -> [%e rewritten_body]] in
-  let workflow_body = [%expr Bistro.Workflow.cached_value [%e applicative_body]] in
+  let workflow_body = [%expr
+    Bistro.Workflow.cached_value
+      ?descr:[%e B.eopt descr]
+      ?version:[%e B.eopt version]
+      [%e applicative_body]] in
   let workflow_body_with_type = match body_type with
     | None -> workflow_body
     | Some ty -> [%expr ([%e workflow_body] : [%t ty])]
@@ -130,11 +139,15 @@ let str_item_rewriter ~loc ~path:_ var expr =
   [%stri let [%p B.pvar var] = [%e replace_body workflow_body_with_type expr]]
 
 
-let pstr_item_rewriter ~loc ~path:_ var expr =
+let pstr_item_rewriter ~loc ~path:_ descr version var expr =
   let body, body_type = extract_body expr in
   let rewritten_body, deps = new payload_rewriter#expression body [] in
   let applicative_body = build_applicative ~loc deps [%expr fun __dest__ -> [%e rewritten_body]] in
-  let workflow_body = [%expr Bistro.Workflow.cached_path [%e applicative_body]] in
+  let workflow_body = [%expr
+    Bistro.Workflow.cached_path
+      ?descr:[%e B.eopt descr]
+      ?version:[%e B.eopt version]
+      [%e applicative_body]] in
   let workflow_body_with_type = match body_type with
     | None -> workflow_body
     | Some ty -> [%expr ([%e workflow_body] : [%t ty])]
@@ -145,6 +158,30 @@ let expression_ext =
   let open Extension in
   declare "workflow" Context.expression Ast_pattern.(single_expr_payload __) expression_rewriter
 
+let _np_attr =
+  Attribute.declare "bistro.np"
+    Attribute.Context.value_binding
+    Ast_pattern.(single_expr_payload (__))
+    (fun x -> x)
+
+let _mem_attr =
+  Attribute.declare "bistro.mem"
+    Attribute.Context.value_binding
+    Ast_pattern.(single_expr_payload (__))
+    (fun x -> x)
+
+let descr_attr =
+  Attribute.declare "bistro.descr"
+    Attribute.Context.value_binding
+    Ast_pattern.(single_expr_payload (__))
+    (fun x -> x)
+
+let version_attr =
+  Attribute.declare "bistro.version"
+    Attribute.Context.value_binding
+    Ast_pattern.(single_expr_payload (__))
+    (fun x -> x)
+
 let str_item_ext label rewriter =
   let open Extension in
   let pattern =
@@ -153,8 +190,8 @@ let str_item_ext label rewriter =
       value_binding ~expr:__ ~pat:(ppat_var __)
       (* |> Attribute.pattern np_attr *)
       (* |> Attribute.pattern mem_attr *)
-      (* |> Attribute.pattern version_attr *)
-      (* |> Attribute.pattern descr_attr *)
+      |> Attribute.pattern version_attr
+      |> Attribute.pattern descr_attr
     in
     pstr ((pstr_value nonrecursive ((vb ^:: nil))) ^:: nil)
   in

@@ -43,3 +43,8 @@ val path :
   t ->
   Bistro_internals.Workflow.path ->
   string
+
+val is_in_cache :
+  t ->
+  Bistro_internals.Workflow.any ->
+  bool
