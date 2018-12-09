@@ -692,9 +692,9 @@ let rec build
           | Error msg -> Ok (Task_result.Other { id ; outcome = `Failed ; msg = None ; summary = msg })
         )
 
-    | W.Shell { id ; task ; descr ; _ } ->
+    | W.Shell { id ; task ; descr ; deps ; _ } ->
       schedule_cached_workflow sched ~id w
-        ~deps:(fun () -> build_command_deps sched ~target:w task)
+        ~deps:(fun () -> Eval_thread.join deps ~f:(fun (W.Any x) -> build sched ~target:w x))
         ~perform:(fun resource ->
             shallow_eval_command sched task >> fun cmd ->
             perform_shell sched resource ~id ~descr cmd >>= fun r ->
@@ -702,30 +702,6 @@ let rec build
 
     | List l ->
       Eval_thread.join l.elts ~f:(build ?target sched)
-
-and build_command_deps
-  : type u. _ t -> ?target:u W.t -> W.path W.t Command.t -> unit Eval_thread.t
-  = fun sched ?target cmd ->
-    match cmd with
-    | Simple_command cmd -> build_template_deps sched ?target cmd
-    | And_list xs
-    | Or_list xs
-    | Pipe_list xs ->
-      Eval_thread.join ~f:(build_command_deps sched ?target) xs
-    | Docker (_, cmd) -> build_command_deps sched ?target cmd
-
-and build_template_deps
-  : type u. _ t -> ?target:u W.t -> W.path W.t Template.t -> unit Eval_thread.t
-  = fun sched ?target toks ->
-    Eval_thread.join ~f:(build_template_token_deps sched ?target) toks
-
-and build_template_token_deps
-  : type u. _ t -> ?target:u W.t -> W.path W.t Template.token -> unit Eval_thread.t
-  = fun sched ?target tok ->
-    match tok with
-    | D w -> build sched ?target w
-    | F f -> build_template_deps sched ?target f
-    | DEST | TMP | NP | MEM | S _ -> Eval_thread.return ()
 
 let run sched =
   Maybe_gc.register sched.gc sched.target >>= fun () ->
