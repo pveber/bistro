@@ -265,19 +265,23 @@ struct
     | Select x -> register gc ?target x.dir
     | Value v ->
       uses gc target w ;
-      if T.mem gc.depends_on (Workflow.Any w) then Lwt.return ()
+      if stop_register gc w then Lwt.return ()
       else register gc ~target:w v.task
     | Path p ->
       uses gc target w ;
-      if T.mem gc.depends_on (Workflow.Any w) then Lwt.return ()
+      if stop_register gc w then Lwt.return ()
       else register gc ~target:w p.task
     | Shell s ->
       uses gc target w ;
-      if T.mem gc.depends_on (Workflow.Any w) then Lwt.return ()
+      if stop_register gc w then Lwt.return ()
       else Lwt_list.iter_p (register_any gc ~target:w) s.deps
 
   and register_any : type u. t -> ?target:u W.t -> W.any -> unit Lwt.t = fun gc ?target (Workflow.Any w) ->
     register gc ?target w
+
+  and stop_register : type u. t -> u W.t -> bool = fun gc w ->
+    let u = Workflow.Any w in
+    T.mem gc.depends_on u || Db.is_in_cache gc.db u
 
   let register gc ?target w =
     register gc ?target w
