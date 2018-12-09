@@ -38,6 +38,12 @@ module Template_dsl : sig
   (** [dep w] is interpreted as the path where to find the result of
       workflow [w] *)
 
+  val string_dep : string workflow -> template
+  (** [string_dep w] is interpreted as the result of workflow [w] *)
+
+  val int_dep : int workflow -> template
+  (** [int_dep w] is interpreted as result of workflow [w] *)
+
   val quote : ?using:char -> template -> template
   (** [quote ~using:c t] surrounds template [t] with character [c] *)
 
