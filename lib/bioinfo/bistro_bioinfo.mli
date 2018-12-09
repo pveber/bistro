@@ -101,7 +101,7 @@ end
 
 module Sra : sig
   val input : string -> sra pworkflow
-  val fetch_srr : string -> sra pworkflow
+  val fetch_srr : string workflow -> sra pworkflow
 end
 
 (** {3 Genome databases} *)

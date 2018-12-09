@@ -1190,7 +1190,7 @@ module Ensembl = struct
         (String.capitalize_ascii (string_of_species species))
         (lab_label_of_genome (ucsc_reference_genome ~release ~species)) release
     in
-    let gff = Bistro_unix.(gunzip (wget url)) in
+    let gff = Bistro_unix.(gunzip (wget (Workflow.string url))) in
     match chr_name with
     | `ensembl -> gff
     | `ucsc -> ucsc_chr_names_gtf gff
@@ -1207,7 +1207,7 @@ module Ensembl = struct
       | `ensembl -> ident
       | `ucsc -> ucsc_chr_names_gtf
     in
-    f @@ Bistro_unix.(gunzip (wget url))
+    f @@ Bistro_unix.(gunzip (wget (Workflow.string url)))
 
   let cdna ~release ~species =
     let url = sprintf "ftp://ftp.ensembl.org/pub/release-%d/fasta/%s/cdna/%s.%s.cdna.all.fa.gz"
@@ -1215,7 +1215,7 @@ module Ensembl = struct
         (String.capitalize_ascii (string_of_species species))
         (lab_label_of_genome (ucsc_reference_genome ~release ~species))
     in
-    Bistro_unix.wget url
+    Bistro_unix.wget (Workflow.string url)
 end
 
 module FastQC = struct
@@ -1754,18 +1754,21 @@ module Sra = struct
   let input x = Workflow.input x
 
   let fetch_srr id =
-    if (String.length id > 6) then (
-      let prefix = String.sub id 0 6 in
-      let url =
-        sprintf
-          "ftp://ftp-trace.ncbi.nlm.nih.gov/sra/sra-instant/reads/ByRun/sra/SRR/%s/%s/%s.sra"
-          prefix id id
+      let url = [%workflow
+        let id = [%eval id] in
+        if (String.length id > 6) then
+          let prefix = String.sub id 0 6 in
+          sprintf
+            "ftp://ftp-trace.ncbi.nlm.nih.gov/sra/sra-instant/reads/ByRun/sra/SRR/%s/%s/%s.sra"
+            prefix id id
+        else
+          let msg = sprintf "Bistro_bioinfo.Sra.fetch_srr: id %s is invalid (should be longer than 6 characters long)" id in
+          failwith msg
+      ]
       in
-      Workflow.shell ~descr:(sprintf "sra.fetch_srr(%s)" id) [ Bistro_unix.Cmd.wget ~dest url ]
-    )
-    else
-      let msg = sprintf "Bistro_bioinfo.Sra.fetch_srr: id %s is invalid (should be longer than 6 characters long)" id in
-      failwith msg
+      Workflow.shell ~descr:"sra.fetch_srr" [
+        Bistro_unix.Cmd.wget ~dest url
+      ]
 end
 
 module Sra_toolkit = struct
@@ -2041,17 +2044,18 @@ module Ucsc_gb = struct
     in
     let descr = sprintf "ucsc_gb.chromosome_sequence(%s,%s)" org chr in
     Workflow.shell ~descr [
-      Bistro_unix.Cmd.wget ~dest:(tmp // "seq.fa.gz") url ;
+      Bistro_unix.Cmd.wget ~dest:(tmp // "seq.fa.gz") (Workflow.string url) ;
       cmd "gunzip" [ tmp // "seq.fa.gz" ] ;
       cmd "mv" [ tmp // "seq.fa.gz" ; dest ] ;
     ]
 
   let chromosome_sequences org =
     let org = string_of_genome org in
+    let url = sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/chromosomes/*" org in
     Workflow.shell ~descr:(sprintf "ucsc_gb.chromosome_sequences(%s)" org) [
       mkdir_p dest ;
       cd dest ;
-      Bistro_unix.Cmd.wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/chromosomes/*" org) ;
+      Bistro_unix.Cmd.wget (Workflow.string url) ;
       cmd "gunzip" [ string "*.gz" ]
     ]
 
@@ -2070,10 +2074,11 @@ module Ucsc_gb = struct
      to create first a directory and then to select the unique file in it...*)
   let genome_2bit_sequence_dir org =
     let org = string_of_genome org in
+    let url = sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/bigZips/%s.2bit" org org in
     Workflow.shell ~descr:(sprintf "ucsc_gb.2bit_sequence(%s)" org) [
       mkdir dest ;
       cd dest ;
-      Bistro_unix.Cmd.wget (sprintf "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/bigZips/%s.2bit" org org) ;
+      Bistro_unix.Cmd.wget (Workflow.string url) ;
     ]
 
   let genome_2bit_sequence org =
@@ -2081,7 +2086,7 @@ module Ucsc_gb = struct
 
   (* (\* let wg_encode_crg_mappability n org = *\) *)
   (* (\*   let url = sp "ftp://hgdownload.cse.ucsc.edu/gbdb/%s/bbi/wgEncodeCrgMapabilityAlign%dmer.bigWig" (string_of_genome org) n in *\) *)
-  (* (\*   Guizmin_unix.wget url *\) *)
+  (* (\*   Guizmin_unix.wget (Workflow.string url) *\) *)
 
   (* (\* let wg_encode_crg_mappability_36 org = wg_encode_crg_mappability 36 org *\) *)
   (* (\* let wg_encode_crg_mappability_40 org = wg_encode_crg_mappability 40 org *\) *)
@@ -2250,7 +2255,7 @@ module Ucsc_gb = struct
           "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/liftOver/%sTo%s.over.chain.gz"
           org_from org_from (String.capitalize_ascii org_to)
       in
-      Bistro_unix.(gunzip (wget url))
+      Bistro_unix.(gunzip (wget (Workflow.string url)))
 
     let bed ~org_from ~org_to bed =
       let chain_file = chain_file ~org_from ~org_to in
