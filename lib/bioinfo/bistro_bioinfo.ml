@@ -1617,14 +1617,36 @@ module Meme_suite = struct
     method contents : [`meme_chip_output]
   end
 
-  let meme_chip ?meme_nmotifs ?meme_minw ?meme_maxw ?np fa =
-    Workflow.shell ~descr:"meme-chip" ?np [
+  let meme_chip ?meme_nmotifs ?meme_minw ?meme_maxw ?np:threads fa =
+    Workflow.shell ~descr:"meme-chip" ?np:threads [
       cmd "meme-chip" ~env [
         option (opt "-meme-nmotifs" int) meme_nmotifs ;
         option (opt "-meme-minw" int) meme_minw ;
         option (opt "-meme-maxw" int) meme_maxw ;
-        (*opt "-meme-p" ident Bistro.EDSL.np ;*)
+        opt "-meme-p" ident np ;
         opt "--oc" ident dest ;
+        dep fa ;
+      ]
+    ]
+
+  let string_of_alphabet = function
+    | `dna -> "dna"
+    | `rna -> "rna"
+    | `protein -> "protein"
+
+  let meme_alphabet_opt x =
+    string ("-" ^ string_of_alphabet x)
+
+  let meme ?nmotifs ?minw ?maxw ?revcomp ?maxsize ?alphabet fa =
+    Workflow.shell ~descr:"meme" [
+      cmd "meme" ~env [
+        option (opt "-nmotifs" int) nmotifs ;
+        option (opt "-minw" int) minw ;
+        option (opt "-maxw" int) maxw ;
+        option meme_alphabet_opt alphabet ;
+        option (flag string "-revcomp") revcomp ;
+        option (opt "-maxsize" int) maxsize ;
+        opt "-oc" ident dest ;
         dep fa ;
       ]
     ]

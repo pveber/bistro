@@ -1001,6 +1001,16 @@ module Meme_suite : sig
     method contents : [`meme_chip_output]
   end
 
+  val meme :
+    ?nmotifs:int ->
+    ?minw:int ->
+    ?maxw:int ->
+    ?revcomp:bool ->
+    ?maxsize:int ->
+    ?alphabet:[`dna | `rna | `protein] ->
+    fasta pworkflow ->
+    directory pworkflow
+
   val meme_chip :
     ?meme_nmotifs:int ->
     ?meme_minw:int ->
