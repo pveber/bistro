@@ -275,6 +275,8 @@ struct
       uses gc target w ;
       if stop_register gc w then Lwt.return ()
       else Lwt_list.iter_p (register_any gc ~target:w) s.deps
+    | Glob g ->
+      register gc ?target g.dir
 
   and register_any : type u. t -> ?target:u W.t -> W.any -> unit Lwt.t = fun gc ?target (Workflow.Any w) ->
     register gc ?target w
@@ -499,6 +501,13 @@ let rec blocking_evaluator
       fun () ->
         let elts = elts () in
         List.nth_exn elts l.index
+    | W.Glob g ->
+      let dir = blocking_evaluator db g.dir in
+      fun () ->
+        let dir_path = dir () in
+        Sys.readdir (Db.path db dir_path)
+        |> Array.to_list
+        |> List.map ~f:(fun fn -> W.Cd (dir_path, [fn]))
 
 let rec shallow_eval
   : type s. _ t -> s W.t -> s Lwt.t
@@ -531,6 +540,11 @@ let rec shallow_eval
     | W.List_nth l ->
       shallow_eval sched l.elts >>= fun elts ->
       Lwt.return (List.nth_exn elts l.index)
+    | W.Glob g ->
+      shallow_eval sched g.dir >>= fun p ->
+      Db.path sched.db p |>
+      Misc.files_in_dir >|= fun files ->
+      List.map files ~f:(fun fn -> W.Cd (p, [fn]))
 
 and shallow_eval_command sched =
   let list xs = Lwt_list.map_p (shallow_eval_command sched) xs in
@@ -587,6 +601,7 @@ let np_requirement
     | Select _ -> 0
     | List _ -> 0
     | List_nth _ -> 0
+    | Glob _ -> 0
     | Value x -> x.np
     | Path x -> x.np
     | Shell x -> x.np
@@ -603,6 +618,7 @@ let mem_requirement
     | Select _ -> Lwt.return 0
     | List _ -> Lwt.return 0
     | List_nth _ -> Lwt.return 0
+    | Glob _ -> Lwt.return 0
     | Value x -> shallow_eval sched x.mem
     | Path x -> shallow_eval sched x.mem
     | Shell x -> shallow_eval sched x.mem
@@ -663,6 +679,7 @@ let rec build
       >>| ignore
     | W.Eval_path { workflow ; _ } -> build sched ?target workflow
     | List_nth l -> build sched ?target l.elts
+    | Glob g -> build sched ?target g.dir
     | W.Spawn { elts ; f ; _ } ->
       build sched ?target elts >>= fun () ->
       shallow_eval sched elts >> fun elts_value ->

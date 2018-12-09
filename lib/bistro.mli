@@ -192,6 +192,11 @@ module Workflow : sig
     'a list workflow ->
     f:('a workflow -> 'b workflow) ->
     'b list workflow
+
+  val glob :
+    ?pattern:string ->
+    #directory pworkflow ->
+    'a path list workflow
 end  
 
 module Private : sig

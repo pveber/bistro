@@ -41,6 +41,11 @@ type _ t =
   | Value : ((unit -> 'a) t, any) step -> 'a t
   | Path : ((string -> unit) t, any) step -> path t
   | Shell : (shell_command, any) step -> path t
+  | Glob : {
+      id : string ;
+      pattern : string option ;
+      dir : path t ;
+    } -> path list t
 
 and ('a, 'b) step = {
   id : string ;
@@ -74,6 +79,7 @@ let id : type s. s t -> string = function
   | Shell { id ; _ } -> id
   | List { id ; _ } -> id
   | List_nth { id ; _ } -> id
+  | Glob { id ; _ } -> id
 
 let any x = Any x
 
@@ -103,6 +109,7 @@ module Any = struct
     | Value v -> v.deps
     | Path p -> p.deps
     | Shell s -> s.deps
+    | Glob g -> [ Any g.dir ]
 end
 
 let input ?version path =
@@ -206,3 +213,7 @@ let spawn elts ~f =
 let list_nth w i =
   let id = digest (`List_nth, id w, i) in
   List_nth { id ; elts = w ; index = i }
+
+let glob ?pattern dir =
+  let id = digest (`Glob, id dir, pattern) in
+  Glob { id ; dir ; pattern }
