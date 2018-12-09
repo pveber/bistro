@@ -22,11 +22,19 @@ val add_prefix : string list -> t -> t
 
 val shift : string -> t -> t
 
-val build  :
+val build_main  :
   ?np:int ->
   ?mem:[`GB of int] ->
   ?loggers:Logger.t list ->
-  ?keep_all:bool ->
+  ?use_docker:bool ->
+  ?bistro_dir:string ->
+  ?collect:bool ->
+  outdir:string -> t -> unit
+
+val build :
+  ?np:int ->
+  ?mem:[`GB of int] ->
+  ?loggers:Logger.t list ->
   ?use_docker:bool ->
   ?bistro_dir:string ->
   ?collect:bool ->

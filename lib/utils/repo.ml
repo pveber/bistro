@@ -124,7 +124,7 @@ let to_workflow ~outdir items =
     |> remove_redundancies
     |> generate outdir]
 
-let build ?np ?mem ?loggers ?keep_all:_ ?use_docker ?(bistro_dir = "_bistro") ?collect ~outdir repo =
+let build ?np ?mem ?loggers ?use_docker ?(bistro_dir = "_bistro") ?collect ~outdir repo =
   let db = Db.init_exn bistro_dir in
   let expr = to_workflow ~outdir repo in
   Scheduler.eval ?np ?mem ?loggers ?use_docker ?collect db expr >|=
@@ -133,6 +133,10 @@ let build ?np ?mem ?loggers ?keep_all:_ ?use_docker ?(bistro_dir = "_bistro") ?c
   | Error errors ->
     prerr_endline (Scheduler.error_report db errors) ;
     failwith "Some workflow failed!"
+
+let build_main ?np ?mem ?loggers ?use_docker ?bistro_dir ?collect ~outdir repo =
+  build ?np ?mem ?loggers ?use_docker ?bistro_dir ?collect ~outdir repo
+  |> Lwt_main.run
 
 let add_prefix prefix items =
   List.map items ~f:(function
