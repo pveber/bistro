@@ -193,7 +193,10 @@ struct
     let n = T.decr_count gc.counts dep_w in
     if n = 0 then (
       gc.log (Logger.Workflow_collected w) ;
-      Misc.remove_if_exists (Db.cache gc.db (W.id w))
+      if not (S.mem dep_w gc.protected) then
+        Misc.remove_if_exists (Db.cache gc.db (W.id w))
+      else
+        Lwt.return ()
     )
     else Lwt.return ()
 
