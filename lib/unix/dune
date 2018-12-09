@@ -1,0 +1,4 @@
+(library
+ (name bistro_unix)
+ (public_name bistro.unix)
+ (libraries bistro))
