@@ -10,7 +10,20 @@ end
 type 'a workflow = 'a Workflow.t
 type 'a pworkflow = 'a path workflow
 
-module Workflow = Workflow
+module Workflow = struct
+  include Workflow
+
+  let zip x y =
+    pure ~id:"__List.zip__" List.zip_exn $ x $ y
+
+  let fst x = pure ~id:"__fst__" fst $ x
+  let snd x = pure ~id:"__snd__" snd $ x
+
+  let spawn2 x y ~f =
+    zip x y
+    |> spawn ~f:(fun p -> f (fst p) (snd p))
+end
+
 
 module Private = struct
   let reveal x = x

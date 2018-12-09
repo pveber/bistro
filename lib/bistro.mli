@@ -193,11 +193,17 @@ module Workflow : sig
     f:('a workflow -> 'b workflow) ->
     'b list workflow
 
+  val spawn2 :
+    'a list workflow ->
+    'b list workflow ->
+    f:('a workflow -> 'b workflow -> 'c workflow) ->
+    'c list workflow
+
   val glob :
     ?pattern:string ->
     #directory pworkflow ->
     'a path list workflow
-end  
+end
 
 module Private : sig
   val reveal : 'a workflow -> 'a Bistro_internals.Workflow.t
