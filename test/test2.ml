@@ -26,23 +26,6 @@ let repo =
   [ "Protein" ; "Cell_(biology)" ]
   |> List.map ~f:pipeline
 
-let logger = object
-  method event _ _ : Bistro_engine.Logger.event -> unit = function
-    | Workflow_started (w, _) ->
-      printf "started %s\n%!" (Bistro_internals.Workflow.id w)
-    | Workflow_ended { outcome ; _ } -> (
-        match outcome with
-        | Input { id ; _ }
-        | Select { id ; _ }
-        | Shell { id ; _ }
-        | Other { id ; _ } -> printf "ended %s\n%!" id
-      )
-    | Workflow_collected w ->
-      printf "collected %s\n%!" (Bistro_internals.Workflow.id w)
-    | _ -> ()
-  method stop = Lwt.return ()
-end
-
 let dump_gc_state sched db fn =
   let open Bistro_engine in
   Option.iter (Scheduler.gc_state sched) ~f:(Bistro_utils.Dot_output.gc_state_to_file ~db ~condensed:false fn)
@@ -52,6 +35,6 @@ let _ =
   let db = Db.init_exn "_bistro" in
   let pipeline = Repo.to_workflow repo ~outdir:"res" in
   Dot_output.workflow_to_file ~db "workflow.dot" pipeline ;
-  let sched = Scheduler.create ~np:4 ~loggers:[logger] ~collect:true db pipeline in
+  let sched = Scheduler.create ~np:4 ~loggers:[Bistro_utils.Console_logger.create ()] ~collect:true db pipeline in
   ignore (Scheduler.run sched |> Lwt_main.run) ;
   dump_gc_state sched db "gc_final.dot" ;

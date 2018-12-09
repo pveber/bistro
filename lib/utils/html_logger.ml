@@ -196,9 +196,9 @@ module Render = struct
             p [ k "missing_output" ]
         ]
         ~body:(shell_result_details ~id:id ~cmd ~cache ~stderr ~stdout ~file_dumps)
-    | Other res ->
+    | Plugin res ->
       collapsible_panel
-        ~title:[ k res.summary ]
+        ~title:[ k res.descr ]
         ~header:[
           match res.outcome with
           | `Succeeded -> k""
@@ -259,16 +259,16 @@ module Render = struct
 
     | Input { pass = false ; _ }
     | Select { pass = false ; _ }
-    | Other { outcome = `Failed ; _ }
+    | Plugin { outcome = `Failed ; _ }
     | Shell { outcome = `Failed ; _ } ->
       event_label_text `RED "FAILED"
 
-    | Other { outcome = `Missing_output ; _ }
+    | Plugin { outcome = `Missing_output ; _ }
     | Shell { outcome = `Missing_output ; _ } ->
       event_label_text `RED "MISSING OUTPUT"
 
     | Shell { outcome = `Succeeded ; _ }
-    | Other { outcome = `Succeeded ; _ } ->
+    | Plugin { outcome = `Succeeded ; _ } ->
       event_label_text `GREEN "DONE"
 
 

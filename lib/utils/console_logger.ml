@@ -24,7 +24,13 @@ let error_short_descr =
       | `Missing_output ->
         "missing output"
     )
-  | Other r -> r.summary
+  | Plugin { outcome ; _ } -> (
+      match outcome with
+      | `Succeeded -> assert false
+      | `Failed -> "failed"
+      | `Missing_output ->
+        "missing output"
+    )
 
 let output_event t = function
   | Logger.Workflow_started (Shell { id ; descr ; _ }, _) ->
@@ -40,9 +46,20 @@ let output_event t = function
     in
     msg t "ended %s.%s (%s)" descr id outcome_msg
 
+  | Workflow_ended { outcome = (Task_result.Plugin { id ; descr ; _ } as outcome) ; _ } ->
+    let id = String.prefix id 6 in
+    let outcome_msg =
+      if Task_result.succeeded outcome then
+        "success"
+      else sprintf "error: %s" (error_short_descr outcome)
+    in
+    msg t "ended %s.%s (%s)" descr id outcome_msg
+
   | Logger.Workflow_allocation_error (Shell s, err) ->
     msg t "allocation error for %s.%s (%s)" s.descr s.id err
 
+  | Workflow_collected w ->
+    msg t "collected %s" (Bistro_internals.Workflow.id w)
   | _ -> ()
 
 let rec loop stop queue new_event =

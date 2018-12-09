@@ -668,7 +668,7 @@ let rec build
         )
       |> Eval_thread.ignore
 
-    | W.Value { task = workflow ; id ; _ } ->
+    | W.Value { task = workflow ; id ; descr ; _ } ->
       schedule_cached_workflow sched ~id w
         ~deps:(fun () -> build sched ~target:w workflow)
         ~perform:(fun _ ->
@@ -679,11 +679,11 @@ let rec build
             ) () >|=
           function
           | Ok () ->
-            Ok (Task_result.Other { id ; outcome = `Succeeded ; msg = None ; summary = "" })
-          | Error msg -> Ok (Task_result.Other { id ; outcome = `Failed ; msg = None ; summary = msg })
+            Ok (Task_result.Plugin { id ; outcome = `Succeeded ; msg = None ; descr })
+          | Error msg -> Ok (Task_result.Plugin { id ; outcome = `Failed ; msg = Some msg ; descr })
         )
 
-    | W.Path { id ; task = workflow ; _ } ->
+    | W.Path { id ; task = workflow ; descr ; _ } ->
       schedule_cached_workflow sched ~id w
         ~deps:(fun () -> build sched ~target:w workflow)
         ~perform:(fun _ ->
@@ -697,8 +697,8 @@ let rec build
           worker (Fn.flip evaluator (Db.cache sched.db id)) () >|=
           function
           | Ok () ->
-            Ok (Task_result.Other { id ; outcome = `Succeeded ; msg = None ; summary = "" })
-          | Error msg -> Ok (Task_result.Other { id ; outcome = `Failed ; msg = None ; summary = msg })
+            Ok (Task_result.Plugin { id ; outcome = `Succeeded ; msg = None ; descr })
+          | Error msg -> Ok (Task_result.Plugin { id ; outcome = `Failed ; msg = Some msg ; descr })
         )
 
     | W.Shell { id ; task ; descr ; deps ; _ } ->

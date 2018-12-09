@@ -14,10 +14,10 @@ type t =
       stdout : string ;
       stderr : string ;
     }
-  | Other of {
+  | Plugin of {
       id : string ;
+      descr : string ;
       outcome : [`Succeeded | `Missing_output | `Failed] ;
-      summary : string ;
       msg : string option ;
     }
 
@@ -25,12 +25,12 @@ let id = function
   | Input { id ;  _ }
   | Select { id ;  _}
   | Shell { id ; _ }
-  | Other { id ; _ } -> id
+  | Plugin { id ; _ } -> id
 
 let succeeded = function
   | Input { pass ; _ }
   | Select { pass ; _ } -> pass
-  | Other { outcome ; _ }
+  | Plugin { outcome ; _ }
   | Shell { outcome ; _ } -> (
       match outcome with
       | `Succeeded -> true
@@ -50,11 +50,18 @@ let error_short_descr = function
         let msg = "Task_outcome.error_short_descr: not an error result" in
         raise (Invalid_argument msg)
     )
-  | Other o -> o.summary
+  | Plugin o -> (
+      match o.outcome with
+      | `Missing_output -> "Missing output"
+      | `Failed -> "Failed"
+      | `Succeeded ->
+        let msg = "Task_outcome.error_short_descr: not an error result" in
+        raise (Invalid_argument msg)
+    )
 
 let error_long_descr x db buf id = match x with
   | Input _ | Select _ -> ()
-  | Other o -> Option.iter o.msg ~f:(Buffer.add_string buf)
+  | Plugin o -> Option.iter o.msg ~f:(Buffer.add_string buf)
   | Shell x ->
     (
       bprintf buf "+------------------------------------------------------------------------------+\n" ;
