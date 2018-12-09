@@ -2,6 +2,10 @@ type 'a workflow
 type 'a path
 type 'a pworkflow = 'a path workflow
 
+class type file = object
+  method file_type : [`regular]
+end
+
 class type directory = object
   method file_kind : [`directory]
 end
@@ -138,7 +142,7 @@ module Workflow : sig
   val cached_value :
     ?descr:string ->
     ?np:int ->
-    ?mem:int ->
+    ?mem:int workflow ->
     ?version:int ->
     (unit -> 'a) workflow ->
     'a workflow
@@ -150,7 +154,7 @@ module Workflow : sig
   val cached_path :
     ?descr:string ->
     ?np:int ->
-    ?mem:int ->
+    ?mem:int workflow ->
     ?version:int ->
     (string -> unit) workflow ->
     'a path workflow
@@ -162,7 +166,7 @@ module Workflow : sig
 
   val shell :
     ?descr:string ->
-    ?mem:int ->
+    ?mem:int workflow ->
     ?np:int ->
     ?version:int ->
     Shell_dsl.command list -> 'a path workflow
@@ -188,18 +192,13 @@ module Workflow : sig
     'a list workflow ->
     f:('a workflow -> 'b workflow) ->
     'b list workflow
-end
-
+end  
 
 module Private : sig
   val reveal : 'a workflow -> 'a Bistro_internals.Workflow.t
 end
 
 (** {5 File formats} *)
-
-class type file = object
-  method file_type : [`regular]
-end
 
 class type text_file = object
   inherit file
@@ -261,3 +260,7 @@ class type ['a] tar = object
   method format : [`tar]
   method content_format : 'a
 end
+
+(* val file_size : file path workflow -> int workflow
+ * val nb_lines : text_file path workflow -> int workflow
+ * val linear_size : float -> file path workflow -> int workflow *)
