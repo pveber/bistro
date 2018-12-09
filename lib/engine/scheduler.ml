@@ -482,7 +482,9 @@ let rec blocking_evaluator
     | W.Eval_path x ->
       let f = blocking_evaluator db x.workflow in
       fun () -> Db.path db (f ())
-    | W.Select _ -> assert false
+    | W.Select s ->
+      let dir = blocking_evaluator db s.dir in
+      fun () -> W.cd (dir ()) s.sel
     | W.Input { path ; _ } -> fun () -> W.FS_path path
     | W.Value { id ; _ } ->
       fun () -> (load_value (Db.cache db id))
@@ -525,7 +527,7 @@ let rec shallow_eval
       shallow_eval sched w.workflow >|= Db.path sched.db
     | W.Select s ->
       shallow_eval sched s.dir >>= fun dir ->
-      Lwt.return (W.Cd (dir, s.sel))
+      Lwt.return (W.cd dir s.sel)
     | W.Input { path ; _ } -> Lwt.return (W.FS_path path)
     | W.Value { id ; _ } ->
       Lwt.return (load_value (Db.cache sched.db id)) (* FIXME: blocking call *)
