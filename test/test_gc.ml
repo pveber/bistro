@@ -7,22 +7,17 @@ let append x y : text_file path workflow =
     cmd "echo" [ string x ; string ">>" ; dest ] ;
   ]
 
-let%pworkflow [@descr "start"]
-    start x : text_file path workflow =
+let%pworkflow start x : text_file path workflow =
   Out_channel.write_all [%dest] ~data:[%param x]
 
-let%workflow [@descr "explode"]
-    explode x =
+let%workflow explode x =
   In_channel.read_all [%path x]
   |> String.to_list
 
-let%workflow
-  [@descr "uppercase"]
-    uppercase x =
+let%workflow uppercase x =
   Char.uppercase [%eval x]
 
-let%pworkflow [@descr "text_file_of_char_list"]
-    text_file_of_char_list x : text_file path workflow =
+let%pworkflow text_file_of_char_list x : text_file path workflow =
   Out_channel.write_all [%dest] ~data:(String.of_char_list [%eval x])
 
 let pipeline =

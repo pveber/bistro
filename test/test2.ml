@@ -9,7 +9,7 @@ let cut_deps x = [%workflow
   |> List.filter ~f:(( <> ) [""])
 ]
 
-let%pworkflow [@descr "dump_lines"] dump_lines x =
+let%pworkflow dump_lines x =
   Out_channel.write_lines [%dest] [%eval x]
 
 let pipeline w =

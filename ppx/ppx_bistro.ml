@@ -1,4 +1,5 @@
 open Base
+module L = Location
 open Ppxlib
 
 let digest x =
@@ -123,13 +124,23 @@ let rec replace_body new_body = function
     { expr with pexp_desc = Pexp_fun (lab, e1, p, replace_body new_body e2) }
   | _ -> new_body
 
+let default_descr var =
+  Printf.sprintf
+    "%s.%s"
+    (Caml.Filename.(chop_extension (basename !L.input_name)))
+    var
+    
 let str_item_rewriter ~loc ~path:_ descr version var expr =
+  let descr = match descr with
+    | Some d -> d
+    | None -> B.estring (default_descr var)
+  in
   let body, body_type = extract_body expr in
   let rewritten_body, deps = new payload_rewriter#expression body [] in
   let applicative_body = build_applicative ~loc deps [%expr fun () -> [%e rewritten_body]] in
   let workflow_body = [%expr
     Bistro.Workflow.cached_value
-      ?descr:[%e B.eopt descr]
+      ~descr:[%e descr]
       ?version:[%e B.eopt version]
       [%e applicative_body]] in
   let workflow_body_with_type = match body_type with
@@ -140,12 +151,16 @@ let str_item_rewriter ~loc ~path:_ descr version var expr =
 
 
 let pstr_item_rewriter ~loc ~path:_ descr version var expr =
+  let descr = match descr with
+    | Some d -> d
+    | None -> B.estring (default_descr var)
+  in
   let body, body_type = extract_body expr in
   let rewritten_body, deps = new payload_rewriter#expression body [] in
   let applicative_body = build_applicative ~loc deps [%expr fun __dest__ -> [%e rewritten_body]] in
   let workflow_body = [%expr
     Bistro.Workflow.cached_path
-      ?descr:[%e B.eopt descr]
+      ~descr:[%e descr]
       ?version:[%e B.eopt version]
       [%e applicative_body]] in
   let workflow_body_with_type = match body_type with
