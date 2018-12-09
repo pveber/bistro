@@ -2,13 +2,6 @@ open Core
 open Bistro_internals
 open Bistro_engine
 
-(* module T = struct
- *   include Task
- *   let sexp_of_t _ = assert false
- *   let t_of_sexp _ = assert false
- *   let hash t = String.hash (Task.id t)
- * end *)
-
 module W = Workflow
 
 module V = struct

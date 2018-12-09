@@ -43,15 +43,15 @@ let logger = object
   method stop = Lwt.return ()
 end
 
-let dump_gc_state sched fn =
+let dump_gc_state sched db fn =
   let open Bistro_engine in
-  Option.iter (Scheduler.gc_state sched) ~f:(Bistro_utils.Dot_output.gc_state_to_file ~condensed:false fn)
+  Option.iter (Scheduler.gc_state sched) ~f:(Bistro_utils.Dot_output.gc_state_to_file ~db ~condensed:false fn)
 
 let _ =
   let open Bistro_engine in
   let db = Db.init_exn "_bistro" in
   let pipeline = Repo.to_workflow repo ~outdir:"res" in
-  Dot_output.workflow_to_file "workflow.dot" pipeline ;
+  Dot_output.workflow_to_file ~db "workflow.dot" pipeline ;
   let sched = Scheduler.create ~np:4 ~loggers:[logger] ~collect:true db pipeline in
   ignore (Scheduler.run sched |> Lwt_main.run) ;
-  dump_gc_state sched "gc_final.dot" ;
+  dump_gc_state sched db "gc_final.dot" ;

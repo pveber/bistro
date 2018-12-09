@@ -28,8 +28,7 @@ let%pworkflow [@descr "text_file_of_char_list"]
 let pipeline =
   start "foo"
   |> append "bar"
-  (* |> append "baz"
-   * |> append "gee" *)
+  |> append "gee"
   |> explode
   |> Workflow.spawn ~f:uppercase
   |> text_file_of_char_list
@@ -51,13 +50,13 @@ let logger = object
   method stop = Lwt.return ()
 end
 
-let dump_gc_state sched fn =
+let dump_gc_state sched db fn =
   let open Bistro_engine in
-  Option.iter (Scheduler.gc_state sched) ~f:(Bistro_utils.Dot_output.gc_state_to_file ~condensed:false fn)
+  Option.iter (Scheduler.gc_state sched) ~f:(Bistro_utils.Dot_output.gc_state_to_file ~db ~condensed:false fn)
 
 let _ =
   let open Bistro_engine in
   let db = Db.init_exn "_bistro" in
   let sched = Scheduler.create ~np:4 ~loggers:[logger] ~collect:true db pipeline in
   ignore (Scheduler.run sched |> Lwt_main.run) ;
-  dump_gc_state sched "gc_final.dot"
+  dump_gc_state sched db "gc_final.dot"
