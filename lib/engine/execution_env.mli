@@ -1,5 +1,8 @@
 open Bistro_internals
 
+type insert =
+  | Path of Workflow.path
+  | String of string
 
 type t = {
   db : Db.t ;
@@ -10,7 +13,7 @@ type t = {
   stdout : string ;
   stderr : string ;
   dep : Workflow.path -> string ;
-  file_dump : Workflow.path Template.t -> string ;
+  file_dump : insert Template.t -> string ;
   np : int ;
   mem : int ;
   uid : int ;

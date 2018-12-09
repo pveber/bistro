@@ -52,7 +52,9 @@ and ('a, 'b) step = {
   deps : 'b list ;
 }
 
-and shell_command = path t Command.t
+and shell_command = token Command.t
+
+and token = Path_token of path t | String_token of string t
 
 and any = Any : _ t -> any
 
@@ -139,7 +141,10 @@ let both fst snd =
 
 let eval_path w = Eval_path { id = digest (`Eval_path, id w) ; workflow = w }
 
-let digestible_cmd = Command.map ~f:id
+let digestible_cmd = Command.map ~f:(function
+    | Path_token w -> id w
+    | String_token w -> id w
+  )
 
 let shell
     ?(descr = "")
@@ -149,7 +154,13 @@ let shell
     cmds =
   let cmd = Command.And_list cmds in
   let id = digest ("shell", version, digestible_cmd cmd) in
-  let deps = Command.deps cmd |> List.map any in
+  let deps =
+    Command.deps cmd
+    |> List.map (function
+        | Path_token w -> any w
+        | String_token s -> any s
+      )
+  in
   Shell { descr ; task = cmd ; np ; mem ; version ; id ; deps }
 
 let list elts =

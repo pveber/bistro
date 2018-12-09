@@ -9,7 +9,7 @@ type t
 
 val make :
   Execution_env.t ->
-  Workflow.path Command.t ->
+  Execution_env.insert Command.t ->
   t
 
 val text : t -> string

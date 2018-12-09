@@ -83,7 +83,7 @@ class type ['a] tar = object
 end
 
 module Template_dsl = struct
-  type template = Workflow.path Workflow.t Template.t
+  type template = Workflow.token Template.t
 
   let dest = [ Template.DEST ]
   let tmp = [ Template.TMP ]

@@ -555,7 +555,8 @@ and shallow_eval_template sched toks =
 and shallow_eval_token sched =
   let open Template in
   function
-  | D w -> shallow_eval sched w >|= fun p -> D p
+  | D (Workflow.Path_token w) -> shallow_eval sched w >|= fun p -> D (Execution_env.Path p)
+  | D (Workflow.String_token w) -> shallow_eval sched w >|= fun p -> D (Execution_env.String p)
   | F f -> shallow_eval_template sched f >|= fun t -> F t
   | DEST | TMP | NP | MEM | S _ as tok -> Lwt.return tok
 

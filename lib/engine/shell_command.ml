@@ -8,7 +8,7 @@ type file_dump = File_dump of {
 
 
 type symbolic_file_dump = Symbolic_file_dump of {
-    contents : Workflow.path Template.t ;
+    contents : Execution_env.insert Template.t ;
     in_docker : bool ;
   }
 
@@ -59,7 +59,8 @@ let string_of_token (env : Execution_env.t) =
   let open Template in
   function
   | S s -> s
-  | D w -> env.dep w
+  | D (Execution_env.Path p) -> env.dep p
+  | D (String s) -> s
   | F toks -> env.file_dump toks
   | DEST -> env.dest
   | TMP -> env.tmp
@@ -109,6 +110,13 @@ let dest_mount env dck_env =
     ~container_paths:Filename.[ dirname dck_env.dest ]
 
 
+let command_path_deps cmd =
+  Command.deps cmd
+  |> List.filter_map ~f:(function
+      | Execution_env.Path p -> Some p
+      | String _ -> None
+    )
+
 let rec string_of_command env =
   let open Command in
   function
@@ -121,7 +129,7 @@ let rec string_of_command env =
       let dck_env = Execution_env.dockerize env in
       sprintf
         "docker run --log-driver=none --rm %s %s %s %s -i %s bash -c '%s'"
-        (deps_mount ~env (Command.deps cmd))
+        (deps_mount ~env (command_path_deps cmd))
         (file_dumps_mount env dck_env (file_dumps_of_command true cmd))
         (tmp_mount env dck_env)
         (dest_mount env dck_env)
