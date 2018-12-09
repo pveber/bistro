@@ -507,7 +507,7 @@ let rec blocking_evaluator
         let dir_path = dir () in
         Sys.readdir (Db.path db dir_path)
         |> Array.to_list
-        |> List.map ~f:(fun fn -> W.Cd (dir_path, [fn]))
+        |> List.map ~f:(fun fn -> W.cd dir_path [fn])
 
 let rec shallow_eval
   : type s. _ t -> s W.t -> s Lwt.t
@@ -544,7 +544,7 @@ let rec shallow_eval
       shallow_eval sched g.dir >>= fun p ->
       Db.path sched.db p |>
       Misc.files_in_dir >|= fun files ->
-      List.map files ~f:(fun fn -> W.Cd (p, [fn]))
+      List.map files ~f:(fun fn -> W.cd p [fn])
 
 and shallow_eval_command sched =
   let list xs = Lwt_list.map_p (shallow_eval_command sched) xs in

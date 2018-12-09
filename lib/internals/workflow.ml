@@ -3,6 +3,10 @@ type path =
   | Cache_id of string
   | Cd of path * string list
 
+let cd dir sel = match dir with
+  | Cd (indir, insel) -> Cd (indir, insel @ sel)
+  | FS_path _ | Cache_id _ -> Cd (dir, sel)
+
 type _ t =
   | Pure : { id : string ; value : 'a } -> 'a t
   | App : {
