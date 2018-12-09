@@ -2094,7 +2094,7 @@ module Ucsc_gb = struct
   (* (\* let wg_encode_crg_mappability_75 org = wg_encode_crg_mappability 75 org *\) *)
   (* (\* let wg_encode_crg_mappability_100 org = wg_encode_crg_mappability 100 org *\) *)
 
-  let twoBitToFa bed twobits =
+  let twoBitToFa twobits bed =
     Workflow.shell ~descr:"ucsc_gb.twoBitToFa" [
       cmd ~env "twoBitToFa" [
         opt' "-bed" dep bed ;

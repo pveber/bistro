@@ -157,7 +157,7 @@ module Ucsc_gb : sig
   val chromosome_sequences : [< genome] -> chromosome_sequences pworkflow
   val genome_sequence : [< genome] -> fasta pworkflow
   val genome_2bit_sequence : [< genome] -> twobit pworkflow
-  val twoBitToFa : #bed4 pworkflow -> twobit pworkflow -> fasta pworkflow
+  val twoBitToFa : twobit pworkflow -> #bed4 pworkflow -> fasta pworkflow
 
 
   (** {5 Chromosome size and clipping} *)
