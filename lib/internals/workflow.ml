@@ -113,7 +113,7 @@ let select dir sel =
   let dir, sel =
     match dir with
     | Select { dir ; sel = root ; _ } -> dir, root @ sel
-    | Input _ | Path _ -> dir, sel
+    | Input _ | Path _ | Shell _ -> dir, sel
     | _ -> assert false
   in
   let id = digest ("select", id dir, sel) in
