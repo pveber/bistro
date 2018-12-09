@@ -1,6 +1,6 @@
 type 'a workflow
-
 type 'a path
+type 'a pworkflow = 'a path workflow
 
 class type directory = object
   method file_kind : [`directory]

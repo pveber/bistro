@@ -8,6 +8,7 @@ class type directory = object
 end
 
 type 'a workflow = 'a Workflow.t
+type 'a pworkflow = 'a path workflow
 
 module Workflow = Workflow
 
