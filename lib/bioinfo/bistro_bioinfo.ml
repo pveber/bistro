@@ -1617,13 +1617,13 @@ module Meme_suite = struct
     method contents : [`meme_chip_output]
   end
 
-  let meme_chip ?meme_nmotifs ?meme_minw ?meme_maxw ?np:threads fa =
-    Workflow.shell ~descr:"meme-chip" ?np:threads [
+  let meme_chip ?meme_nmotifs ?meme_minw ?meme_maxw (* ?np:threads *) fa =
+    Workflow.shell ~descr:"meme-chip" (* ?np:threads *) [
       cmd "meme-chip" ~env [
         option (opt "-meme-nmotifs" int) meme_nmotifs ;
         option (opt "-meme-minw" int) meme_minw ;
         option (opt "-meme-maxw" int) meme_maxw ;
-        opt "-meme-p" ident np ;
+        (* opt "-meme-p" ident np ; *)(* this is disabled due to mpirun refusing to run as root under docker *)
         opt "--oc" ident dest ;
         dep fa ;
       ]
@@ -1637,8 +1637,8 @@ module Meme_suite = struct
   let meme_alphabet_opt x =
     string ("-" ^ string_of_alphabet x)
 
-  let meme ?nmotifs ?minw ?maxw ?revcomp ?maxsize ?alphabet fa =
-    Workflow.shell ~descr:"meme" [
+  let meme ?nmotifs ?minw ?maxw ?revcomp ?maxsize ?alphabet (* ?threads *) fa =
+    Workflow.shell ~descr:"meme" (* ?np:threads *) [
       cmd "meme" ~env [
         option (opt "-nmotifs" int) nmotifs ;
         option (opt "-minw" int) minw ;
@@ -1646,6 +1646,7 @@ module Meme_suite = struct
         option meme_alphabet_opt alphabet ;
         option (flag string "-revcomp") revcomp ;
         option (opt "-maxsize" int) maxsize ;
+        (* opt "-p" ident np ; *) (* this is disabled due to mpirun refusing to run as root under docker *)
         opt "-oc" ident dest ;
         dep fa ;
       ]

@@ -1008,6 +1008,7 @@ module Meme_suite : sig
     ?revcomp:bool ->
     ?maxsize:int ->
     ?alphabet:[`dna | `rna | `protein] ->
+    (* ?threads:int -> *)
     fasta pworkflow ->
     directory pworkflow
 
@@ -1015,7 +1016,7 @@ module Meme_suite : sig
     ?meme_nmotifs:int ->
     ?meme_minw:int ->
     ?meme_maxw:int ->
-    ?np:int ->
+    (* ?np:int -> *)
     fasta pworkflow ->
     meme_chip_output pworkflow
 
