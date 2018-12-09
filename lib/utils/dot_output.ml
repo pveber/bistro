@@ -77,12 +77,12 @@ let dot_output ?db oc g ~needed =
     | None -> Fn.const false
     | Some db -> Db.is_in_cache db
   in
+  let label descr u = `Label (sprintf "%s.%s" descr (String.prefix (W.Any.id u) 6)) in
   let step_attributes ~descr u =
     let already_done = already_done u in
     let color = black in
     let shape = `Shape (shape u) in
-    let id = W.Any.id u in
-    [ `Label (sprintf "%s.%s" descr (String.prefix id 6)) ;
+    [ label descr u ;
       shape ;
       `Peripheries (if already_done then 2 else 1) ;
       `Color color ;
@@ -104,13 +104,13 @@ let dot_output ?db oc g ~needed =
     | Shell { descr ; _ } -> step_attributes ~descr u
     | Value { descr ; _ } -> step_attributes ~descr u
     | Path { descr ; _ } -> step_attributes ~descr u
-    | Pure _ -> [ `Label "pure" ; `Shape `Plaintext ]
-    | App _ -> [ `Label "app" ; `Shape `Plaintext ]
-    | Spawn _ -> [ `Label "spawn" ; `Shape `Ellipse ]
-    | Both _ -> [ `Label "both" ; `Shape `Plaintext ]
-    | List _ -> [ `Label "list" ; `Shape `Plaintext ]
-    | Eval_path _ -> [ `Label "path" ; `Shape `Plaintext ]
-    | List_nth l -> [ `Label (sprintf "list_nth %d" l.index); `Shape `Plaintext ] 
+    | Pure _ -> [ label "pure" u ; `Shape `Plaintext ]
+    | App _ -> [ label "app" u ; `Shape `Plaintext ]
+    | Spawn _ -> [ label "spawn" u ; `Shape `Ellipse ]
+    | Both _ -> [ label "both" u ; `Shape `Plaintext ]
+    | List _ -> [ label "list" u ; `Shape `Plaintext ]
+    | Eval_path _ -> [ label "path" u ; `Shape `Plaintext ]
+    | List_nth l -> [ label (sprintf "list_nth_%d" l.index) u ; `Shape `Plaintext ] 
   in
   let edge_attributes e =
     let u = G.E.src e and v = G.E.dst e in
