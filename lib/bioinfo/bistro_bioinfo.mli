@@ -636,6 +636,29 @@ module Sra_toolkit : sig
 
 end
 
+(** http://subread.sourceforge.net/ *)
+module Subread : sig
+  class type count_table = object
+    inherit tsv
+    method header : [`none]
+    method f1 : string
+    method f2 : int
+  end
+
+  val featureCounts :
+    ?feature_type:string ->
+    ?attribute_type:string ->
+    ?strandness:[`Unstranded | `Stranded | `Reversely_stranded] ->
+    ?q:int ->
+    ?nthreads:int ->
+    gff pworkflow ->
+    < format : [< `bam | `sam] ; .. > pworkflow -> (*FIXME: handle paired-hand, just add other file next to the other*)
+    [`featureCounts] dworkflow
+
+  val featureCounts_tsv : [`featureCounts] dworkflow -> count_table pworkflow
+  val featureCounts_summary : [`featureCounts] dworkflow -> text_file pworkflow
+end
+
 (** {3 NGS quality} *)
 
 module ChIPQC : sig
