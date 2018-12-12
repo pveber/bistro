@@ -3,12 +3,14 @@ type 'a path
 type 'a pworkflow = 'a path workflow
 
 class type file = object
-  method file_type : [`regular]
+  method file_kind : [`regular]
 end
 
 class type directory = object
   method file_kind : [`directory]
 end
+
+type 'a dworkflow = < directory ; contents : 'a > path workflow
 
 module Template_dsl : sig
   type template

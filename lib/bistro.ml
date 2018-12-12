@@ -9,6 +9,7 @@ end
 
 type 'a workflow = 'a Workflow.t
 type 'a pworkflow = 'a path workflow
+type 'a dworkflow = < directory ; contents : 'a > path workflow
 
 module Workflow = struct
   include Workflow
@@ -31,7 +32,7 @@ end
 
 
 class type file = object
-  method file_type : [`regular]
+  method file_kind : [`regular]
 end
 
 class type text_file = object
