@@ -1,10 +1,8 @@
 open Printf
+open Base
+open Base.Poly
 open Bistro
 open Bistro.Shell_dsl
-
-module List = ListLabels
-
-let ident x = x
 
 class type bam = object
   inherit binary_file
@@ -241,7 +239,7 @@ module Samtools = struct
   let sam_of_bam bam =
     Workflow.shell ~descr:"samtools.sam_of_bam" [
       samtools "view" [
-        opt "-o" ident dest ;
+        opt "-o" Fn.id dest ;
         dep bam ;
       ]
     ]
@@ -250,7 +248,7 @@ module Samtools = struct
     Workflow.shell ~descr:"samtools.bam_of_sam" [
       samtools "view" [
         string "-S -b" ;
-        opt "-o" ident dest ;
+        opt "-o" Fn.id dest ;
         dep sam ;
       ]
     ]
@@ -265,7 +263,7 @@ module Samtools = struct
       ] ;
       samtools "sort" [
         dest // "temp.bam" ;
-        opt "-o" ident (dest // "reads.bam") ;
+        opt "-o" Fn.id (dest // "reads.bam") ;
       ] ;
       samtools "index" [ dest // "reads.bam" ] ;
       rm_rf (dest // "temp.bam") ;
@@ -276,7 +274,7 @@ module Samtools = struct
       samtools "sort" [
         option (fun o -> flag string "-n" (o = `name)) order ;
         dep bam ;
-        opt "-o" ident dest ;
+        opt "-o" Fn.id dest ;
       ] ;
     ]
 
@@ -285,7 +283,7 @@ module Samtools = struct
       mkdir_p dest ;
       samtools "sort" [
         dep bam ;
-        opt "-o" ident (dest // "reads.bam") ;
+        opt "-o" Fn.id (dest // "reads.bam") ;
       ] ;
       samtools "index" [ dest // "reads.bam" ] ;
     ]
@@ -314,7 +312,7 @@ module Samtools = struct
         (* option (flag string "-B") _B ; *)
         (* option (opt "-s" float) s ; *)
         dep file ;
-        opt "-o" ident dest ;
+        opt "-o" Fn.id dest ;
       ]
     ]
 end
@@ -344,7 +342,7 @@ module Bowtie2 = struct
         option (opt "--dcv" int) dcv ;
         option (opt "--offrate" int) offrate ;
         option (opt "--ftabchars" int) ftabchars ;
-        opt "--threads" ident np ;
+        opt "--threads" Fn.id np ;
         option (opt "--seed" int) seed ;
         option (opt "--cutoff" int) cutoff ;
         opt "-f" dep fa ;
@@ -418,12 +416,12 @@ module Bowtie2 = struct
         option (flag string "--no-contain") no_contain ;
         option (flag string "--no-overlap") no_overlap ;
         option (flag string "--no-unal") no_unal ;
-        opt "--threads" ident np ;
+        opt "--threads" Fn.id np ;
         option (opt "--seed" int) seed ;
         option (opt "-q" (qual_option % string)) fastq_format ;
         opt "-x" (fun index -> seq [dep index ; string "/index"]) index ;
         args ;
-        opt "-S" ident dest ;
+        opt "-S" Fn.id dest ;
       ]
     ]
 end
@@ -474,7 +472,7 @@ module Bowtie = struct
         option (opt "-m" int) m ;
         option (opt "-v" int) v ;
         option (opt "-q" (qual_option % string)) fastq_format ;
-        opt "-p" ident np ;
+        opt "-p" Fn.id np ;
         option (opt "--maxins" int) maxins ;
         seq [dep index ; string "/index"] ;
         args ;
@@ -625,9 +623,9 @@ module Deeptools = struct
         ?minfragmentlength ?maxfragmentlength [
         option (opt "--filterRNAstrand" filterRNAstrand_expr) filterrnastrand ;
         option (opt "--binSize" int) binsize ;
-        opt "--numberOfProcessors" ident np ;
-        opt "--bam" ident (dep (Samtools.indexed_bam_to_bam indexed_bam)) ;
-        opt "--outFileName" ident dest ;
+        opt "--numberOfProcessors" Fn.id np ;
+        opt "--bam" Fn.id (dep (Samtools.indexed_bam_to_bam indexed_bam)) ;
+        opt "--outFileName" Fn.id dest ;
         opt "--outFileFormat" file_format_expr outfileformat ;
       ]
     ]
@@ -652,10 +650,10 @@ module Deeptools = struct
         option (opt "--pseudocount" int) pseudocount ;
         option (opt "--binSize" int) binsize ;
         option (opt "--region" string) region ;
-        opt "--numberOfProcessors" ident np ;
-        opt "--bamfile1" ident (dep (Samtools.indexed_bam_to_bam indexed_bam1)) ;
-        opt "--bamfile2" ident (dep (Samtools.indexed_bam_to_bam indexed_bam2)) ;
-        opt "--outFileName" ident dest ;
+        opt "--numberOfProcessors" Fn.id np ;
+        opt "--bamfile1" Fn.id (dep (Samtools.indexed_bam_to_bam indexed_bam1)) ;
+        opt "--bamfile2" Fn.id (dep (Samtools.indexed_bam_to_bam indexed_bam2)) ;
+        opt "--outFileName" Fn.id dest ;
         opt "--outFileFormat" file_format_expr outfileformat ;
       ]
     ]
@@ -672,10 +670,10 @@ module Deeptools = struct
         option (opt "--binSize" int) binsize ;
         option (opt "--region" string) region ;
         option (opt "--blackListFileName" dep) blacklist ;
-        opt "--numberOfProcessors" ident np ;
+        opt "--numberOfProcessors" Fn.id np ;
         opt "--bigwig1" dep bigwig1 ;
         opt "--bigwig2" dep bigwig2 ;
-        opt "--outFileName" ident dest ;
+        opt "--outFileName" Fn.id dest ;
         opt "--outFileFormat" file_format_expr outfileformat ;
       ]
     ]
@@ -714,9 +712,9 @@ module Deeptools = struct
         ?maxfragmentlength [
         option (opt "--binSize" int) binsize ;
         option (opt "--distanceBetweenBins" int) distancebetweenbins ;
-        opt "--numberOfProcessors" ident np ;
+        opt "--numberOfProcessors" Fn.id np ;
         opt "--bamfiles" (list (fun bam -> dep (Samtools.indexed_bam_to_bam bam)) ~sep:" ") indexed_bams ;
-        opt "--outFileName" ident dest ;
+        opt "--outFileName" Fn.id dest ;
       ]
     ]
 
@@ -736,13 +734,13 @@ module Deeptools = struct
         option (flag string "--transcriptID") transcriptid ;
         option (flag string "--exonID") exonid ;
         option (flag string "--transcript_id_designator") transcriptiddesignator ;
-        opt "--numberOfProcessors" ident np ;
+        opt "--numberOfProcessors" Fn.id np ;
         string "--BED" ;
         (dep bed) ;
         opt "--bamfiles"
           (list (fun bam -> dep (Samtools.indexed_bam_to_bam bam)) ~sep:" ")
           indexed_bams ;
-        opt "--outFileName" ident dest ;
+        opt "--outFileName" Fn.id dest ;
       ]
     ]
 
@@ -839,7 +837,7 @@ module Deeptools = struct
         option (opt "--maxThreshold" float) maxThreshold ;
         option (opt "--blackListFileName" dep) blackList ;
         option (opt "--sc" float) scale ;
-        opt "--outFileName" ident dest ;
+        opt "--outFileName" Fn.id dest ;
         opt "--regionsFileName" dep_list regions ;
         opt "--scoreFileName" dep_list scores ;
       ]
@@ -887,7 +885,7 @@ module Deeptools = struct
         option (opt "--legendLocation" legend_location_enum) legendLocation ;
         option (flag string "--perGroup") perGroup ;
         opt "--matrixFile" dep matrix ;
-        opt "--outFileName" ident tmp_file ;
+        opt "--outFileName" Fn.id tmp_file ;
       ] ;
       mv tmp_file dest ;
     ]
@@ -916,7 +914,7 @@ module Deeptools = struct
         opt "--corData" dep corData ;
         opt "--corMethod" corMethod_enum corMethod ;
         opt "--whatToPlot" whatToPlot_enum whatToPlot ;
-        opt "--plotFile" ident dest ;
+        opt "--plotFile" Fn.id dest ;
         opt "--plotFileFormat" string (ext_of_format output_format) ;
         option (flag string "--skipZeros") skipZeros ;
         option (opt "--labels" (list ~sep:" " string)) labels ;
@@ -1102,7 +1100,7 @@ main <- function(outdir, factor_names, sample_files, conditions) {
     let rec aux seen = function
       | [] -> []
       | h :: t ->
-        if List.mem h ~set:seen then
+        if List.mem seen h ~equal:( = ) then
           aux seen t
         else
           h :: aux (h :: seen) t
@@ -1120,12 +1118,12 @@ main <- function(outdir, factor_names, sample_files, conditions) {
     List.fold_right
       conditions
       ~init:(List.map factor_names ~f:(fun _ -> []))
-      ~f:(fun cond accu -> List.map2 cond accu ~f:(fun c cs -> c :: cs))
+      ~f:(fun cond accu -> List.map2_exn cond accu ~f:(fun c cs -> c :: cs))
     |> List.map ~f:unique
 
   let comparisons factor_names conditions =
     let factor_levels = factor_levels factor_names conditions in
-    List.map2 factor_names factor_levels ~f:(fun name levels ->
+    List.map2_exn factor_names factor_levels ~f:(fun name levels ->
         fold_2sets levels ~init:[] ~f:(fun accu l1 l2 ->
             (name, l1, l2) :: accu
           )
@@ -1193,7 +1191,7 @@ module Ensembl = struct
     let url =
       sprintf "ftp://ftp.ensembl.org/pub/release-%d/gff3/%s/%s.%s.%d.gff3.gz"
         release (string_of_species species)
-        (String.capitalize_ascii (string_of_species species))
+        (String.capitalize (string_of_species species))
         (lab_label_of_genome (ucsc_reference_genome ~release ~species)) release
     in
     let gff = Bistro_unix.(gunzip (wget url)) in
@@ -1206,11 +1204,11 @@ module Ensembl = struct
     let url =
       sprintf "ftp://ftp.ensembl.org/pub/release-%d/gtf/%s/%s.%s.%d.gtf.gz"
         release (string_of_species species)
-        (String.capitalize_ascii (string_of_species species))
+        (String.capitalize (string_of_species species))
         (lab_label_of_genome (ucsc_reference_genome ~release ~species)) release
     in
     let f = match chr_name with
-      | `ensembl -> ident
+      | `ensembl -> Fn.id
       | `ucsc -> ucsc_chr_names_gtf
     in
     f @@ Bistro_unix.(gunzip (wget url))
@@ -1218,7 +1216,7 @@ module Ensembl = struct
   let cdna ~release ~species =
     let url = sprintf "ftp://ftp.ensembl.org/pub/release-%d/fasta/%s/cdna/%s.%s.cdna.all.fa.gz"
         release (string_of_species species)
-        (String.capitalize_ascii (string_of_species species))
+        (String.capitalize (string_of_species species))
         (lab_label_of_genome (ucsc_reference_genome ~release ~species))
     in
     Bistro_unix.wget url
@@ -1277,8 +1275,8 @@ module Fastq_screen = struct
       filter_expr res t
 
   let top_expr = function
-    | `top1 x -> string (string_of_int x)
-    | `top2 (x, y) -> string (string_of_int x ^ "," ^ string_of_int y)
+    | `top1 x -> string (Int.to_string x)
+    | `top2 (x, y) -> string (Int.to_string x ^ "," ^ Int.to_string y)
 
   let configuration genomes =
     let database_lines = List.map genomes ~f:(fun (name, fa) ->
@@ -1305,11 +1303,11 @@ module Fastq_screen = struct
         option (opt "--pass" int) pass ;
         option (opt "--subset" int) subset ;
         option (flag string "--tag") tag ;
-        opt "--threads" ident np ;
+        opt "--threads" Fn.id np ;
         option (opt "--top" top_expr) top ;
         dep fq ;
         string "--conf" ; file_dump (configuration genomes) ;
-        opt "--outdir" ident dest ;
+        opt "--outdir" Fn.id dest ;
       ] ;
       if lightweight then rm_rf ( dest // "*.fastq" )
       else cmd "" [] ;
@@ -1373,7 +1371,7 @@ module Macs2 = struct
     Workflow.shell ~descr:"macs2.pileup" [
       macs2 "pileup" [
         opt "-i" dep bam ;
-        opt "-o" ident dest ;
+        opt "-o" Fn.id dest ;
         option (flag string "-B") both_direction ;
         option (opt "--extsize" int) extsize ;
       ]
@@ -1429,7 +1427,7 @@ module Macs2 = struct
     Workflow.shell ~descr:"macs2.callpeak" [
       macs2 "callpeak" [
         option (flag string "--broad") broad ;
-        opt "--outdir" ident dest ;
+        opt "--outdir" Fn.id dest ;
         opt "--name" string name ;
         opt "--format" (fun x -> x |> opt_of_format |> string) format ;
         option (opt "--pvalue" float) pvalue ;
@@ -1578,7 +1576,7 @@ module Macs = struct
         option (opt "--fe-max" int) fe_max ;
         option (opt "--fe-step" int) fe_step ;
         opt "--treatment" (list ~sep:"," dep) treatment ;
-        ident dest ;
+        Fn.id dest ;
       ]
     ]
 
@@ -1629,8 +1627,8 @@ module Meme_suite = struct
         option (opt "-meme-nmotifs" int) meme_nmotifs ;
         option (opt "-meme-minw" int) meme_minw ;
         option (opt "-meme-maxw" int) meme_maxw ;
-        (* opt "-meme-p" ident np ; *)(* this is disabled due to mpirun refusing to run as root under docker *)
-        opt "--oc" ident dest ;
+        (* opt "-meme-p" Fn.id np ; *)(* this is disabled due to mpirun refusing to run as root under docker *)
+        opt "--oc" Fn.id dest ;
         dep fa ;
       ]
     ]
@@ -1652,8 +1650,8 @@ module Meme_suite = struct
         option meme_alphabet_opt alphabet ;
         option (flag string "-revcomp") revcomp ;
         option (opt "-maxsize" int) maxsize ;
-        (* opt "-p" ident np ; *) (* this is disabled due to mpirun refusing to run as root under docker *)
-        opt "-oc" ident dest ;
+        (* opt "-p" Fn.id np ; *) (* this is disabled due to mpirun refusing to run as root under docker *)
+        opt "-oc" Fn.id dest ;
         dep fa ;
       ]
     ]
@@ -1668,7 +1666,7 @@ module Meme_suite = struct
         option (opt "--motif-pseudo" float) motif_pseudo ;
         option (flag string "--qv-thresh") qv_thresh ;
         option (opt "--thresh" float) thresh ;
-        opt "--oc" ident dest ;
+        opt "--oc" Fn.id dest ;
         dep meme_motifs ;
         dep fa;
       ]
@@ -1710,14 +1708,14 @@ module Prokka = struct
         option (flag string "--metagenome") metagenome ;
         option (flag string "--rawproduct") rawproduct ;
         option (flag string "--fast") fast ;
-        opt "--cpus" ident np ;
+        opt "--cpus" Fn.id np ;
         option (opt "--mincontiglen" int) mincontiglen ;
         option (opt "--evalue" float) evalue ;
         option (flag string "--rfam") rfam ;
         option (flag string "--norrna") norrna ;
         option (flag string "--notrna") notrna ;
         option (flag string "--rnammer") rnammer ;
-        opt "--outdir" ident dest ;
+        opt "--outdir" Fn.id dest ;
         dep fa ;
       ] ;
     ]
@@ -1730,7 +1728,7 @@ module Spades = struct
     let f side i x =
       let id = sprintf "pe%d-%d" (i + 1) side in
       let new_name = seq ~sep:"/" [ tmp ; string (id ^ ".fq") ] in
-      let opt = opt (sprintf "--pe%d-%d" (i + 1) side) ident new_name in
+      let opt = opt (sprintf "--pe%d-%d" (i + 1) side) Fn.id new_name in
       let cmd = cmd "ln" [ string "-s" ; dep x ; new_name ] in
       opt, cmd
     in
@@ -1765,10 +1763,10 @@ module Spades = struct
             cmd "spades.py" ~env [
               option (flag string "--sc") single_cell ;
               option (flag string "--iontorrent") iontorrent ;
-              opt "--threads" ident np ;
-              opt "--memory" ident (seq [ string "$((" ; mem ; string " / 1024))" ]) ;
-              option ident pe_args ;
-              opt "-o" ident dest ;
+              opt "--threads" Fn.id np ;
+              opt "--memory" Fn.id (seq [ string "$((" ; mem ; string " / 1024))" ]) ;
+              option Fn.id pe_args ;
+              opt "-o" Fn.id dest ;
             ]
           ]
         )
@@ -1786,7 +1784,7 @@ module Sra = struct
       let url = [%workflow
         let id = [%eval id] in
         if (String.length id > 6) then
-          let prefix = String.sub id 0 6 in
+          let prefix = String.prefix id 6 in
           sprintf
             "ftp://ftp-trace.ncbi.nlm.nih.gov/sra/sra-instant/reads/ByRun/sra/SRR/%s/%s/%s.sra"
             prefix id id
@@ -1825,7 +1823,7 @@ module Sra_toolkit = struct
       Workflow.shell ~descr:"sratoolkit.fastq_dump" [
         mkdir_p dest ;
         cmd ~env "fastq-dump" [
-          opt "-O" ident dest ;
+          opt "-O" Fn.id dest ;
           string "--split-files" ;
           dep sra
         ] ;
@@ -1843,7 +1841,7 @@ module Sra_toolkit = struct
       Workflow.shell ~descr:"sratoolkit.fastq_dump" [
         mkdir_p dest ;
         cmd ~env "fastq-dump" [
-          opt "-O" ident dest ;
+          opt "-O" Fn.id dest ;
           string "--split-files" ;
           string "--gzip" ;
           sra ;
@@ -1916,9 +1914,9 @@ module Srst2 = struct
         ?truncation_score_tolerance ?other ?max_unaligned_overlap ?mapq
         ?baseq ?samtools_args ?report_new_consensus
         ?report_all_consensus [
-        opt "--threads" ident np ;
+        opt "--threads" Fn.id np ;
         opt "--input_se" (list ~sep:" " dep) fq ;
-        opt "--output" ident dest ;
+        opt "--output" Fn.id dest ;
       ] ;
     ]
 
@@ -1936,9 +1934,9 @@ module Srst2 = struct
         ?truncation_score_tolerance ?other ?max_unaligned_overlap ?mapq
         ?baseq ?samtools_args ?report_new_consensus
         ?report_all_consensus [
-        opt "--threads" ident np ;
+        opt "--threads" Fn.id np ;
         opt "--input_pe" (list ~sep:" " dep) fq ;
-        opt "--output" ident dest ;
+        opt "--output" Fn.id dest ;
       ] ;
     ]
 end
@@ -1964,9 +1962,9 @@ module Tophat = struct
     Workflow.shell ~np:8 ~mem:(Workflow.int (4 * 1024)) ~descr:"tophat" [
       cmd ~env "tophat" [
         string "--bowtie1" ;
-        opt "--num-threads" ident np ;
+        opt "--num-threads" Fn.id np ;
         option (flag string "--color") color ;
-        opt "--output-dir" ident dest ;
+        opt "--output-dir" Fn.id dest ;
         seq [ dep index ; string "/index" ] ;
         args
       ]
@@ -1984,8 +1982,8 @@ module Tophat = struct
     in
     Workflow.shell ~np:8 ~mem:(Workflow.int (4 * 1024)) ~descr:"tophat2" [
       cmd ~env "tophat2" [
-        opt "--num-threads" ident np ;
-        opt "--output-dir" ident dest ;
+        opt "--num-threads" Fn.id np ;
+        opt "--output-dir" Fn.id dest ;
         seq [ dep index ; string "/index" ] ;
         args
       ]
@@ -2283,7 +2281,7 @@ module Ucsc_gb = struct
       let url =
         sprintf
           "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/liftOver/%sTo%s.over.chain.gz"
-          org_from org_from (String.capitalize_ascii org_to)
+          org_from org_from (String.capitalize org_to)
       in
       Bistro_unix.(gunzip (wget url))
 
