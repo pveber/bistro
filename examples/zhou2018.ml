@@ -16,14 +16,14 @@ module Dataset = struct
 
   let alignments d =
     Workflow.string "https://ndownloader.figshare.com/files/9473962"
-    |> Bistro_unix.wget 
+    |> Bistro_unix.wget
     |> Bistro_unix.tar_xfj
     |> Fn.flip Workflow.select ["single-gene_alignments" ; to_string d ]
     |> Workflow.glob ~pattern:"*"
 
   let best_trees d =
     Workflow.string "https://ndownloader.figshare.com/files/9473953"
-    |> Bistro_unix.wget 
+    |> Bistro_unix.wget
     |> Bistro_unix.tar_xfj
     |> Fn.flip Workflow.select ["single-gene_trees" ; to_string d ; "Best_observed"]
     |> Workflow.glob ~pattern:"*"
@@ -157,6 +157,7 @@ let%pworkflow concat results =
 
 let repo = Repo.[
     item ["concatenated_comps_fasttree"] (concat (comparisons `SongD1 `Fasttree)) ;
+    items ["comps_fasttree"] ~prefix:"tree" (comparisons `SongD1 `Fasttree) ;
   ]
 
-let () = Repo.build_main ~loggers:[Console_logger.create ()] ~np:8 ~mem:(`GB 4) ~outdir:"res" repo
+let () = Repo.build_main ~loggers:[Console_logger.create ()] ~np:4 ~mem:(`GB 4) ~outdir:"res" repo

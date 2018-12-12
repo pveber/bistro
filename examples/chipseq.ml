@@ -2,7 +2,6 @@
    Paper: https://www.ncbi.nlm.nih.gov/pubmed/21700227
    Datasets: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE29506
 *)
-open Bistro
 open Bistro_bioinfo
 open Bistro_utils
 
@@ -13,7 +12,7 @@ let genome = Ucsc_gb.genome_sequence `sacCer2
 let bowtie_index = Bowtie.bowtie_build genome
 
 let mapped_reads srrid =
-  let sra = Sra.fetch_srr (Workflow.string srrid) in
+  let sra = Sra.fetch_srr srrid in
   let fastq = Sra_toolkit.fastq_dump sra in
   Bowtie.bowtie ~v:1 bowtie_index (`single_end [ fastq ])
 
