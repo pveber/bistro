@@ -39,10 +39,24 @@ class type fasta = object
   method format : [`fasta]
 end
 
-class type ['a] fastq = object
+class type fastq = object
   inherit text_file
   method format : [`fastq]
-  method phred_encoding : 'a
+end
+
+class type sanger_fastq = object
+  inherit fastq
+  method phred_encoding : [`sanger]
+end
+
+class type solexa_fastq = object
+  inherit fastq
+  method phred_encoding : [`solexa]
+end
+
+class type phred64_fastq = object
+  inherit fastq
+  method phred_encoding : [`phred64]
 end
 
 class type gff = object
@@ -106,17 +120,9 @@ end
 module Fastq = struct
 
   type _ format =
-    | Sanger  : [`sanger] format
-    | Solexa  : [`solexa] format
-    | Phred64 : [`phred64] format
-
-  let to_sanger :
-    type s. s format -> s fastq pworkflow -> [`sanger] fastq pworkflow
-    = fun format fq ->
-      match format with
-      | Sanger -> fq
-      | Solexa -> failwith "not implemented"
-      | Phred64 -> failwith "not implemented"
+    | Sanger  : sanger_fastq format
+    | Solexa  : solexa_fastq format
+    | Phred64 : phred64_fastq format
 
   let concat = function
     | [] -> raise (Invalid_argument "fastq concat: empty list")

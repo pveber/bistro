@@ -33,10 +33,24 @@ class type fasta = object
   method format : [`fasta]
 end
 
-class type ['a] fastq = object
+class type fastq = object
   inherit text_file
   method format : [`fastq]
-  method phred_encoding : 'a
+end
+
+class type sanger_fastq = object
+  inherit fastq
+  method phred_encoding : [`sanger]
+end
+
+class type solexa_fastq = object
+  inherit fastq
+  method phred_encoding : [`solexa]
+end
+
+class type phred64_fastq = object
+  inherit fastq
+  method phred_encoding : [`phred64]
 end
 
 class type gff = object
@@ -89,14 +103,13 @@ end
 
 module Fastq : sig
   type _ format =
-    | Sanger  : [`sanger] format
-    | Solexa  : [`solexa] format
-    | Phred64 : [`phred64] format
+    | Sanger  : sanger_fastq format
+    | Solexa  : solexa_fastq format
+    | Phred64 : phred64_fastq format
+  (* val to_sanger : 'a format -> < fastq ; phred_encoding : 'a ; .. > pworkflow -> sanger_fastq pworkflow *)
 
-  val to_sanger : 'a format -> 'a fastq pworkflow -> [`sanger] fastq pworkflow
-
-  val concat : 'a fastq pworkflow list -> 'a fastq pworkflow
-  val head : int -> 'a fastq pworkflow -> 'a fastq pworkflow
+  val concat : (#fastq as 'a) pworkflow list -> 'a pworkflow
+  val head : int -> (#fastq as 'a) pworkflow -> 'a pworkflow
 end
 
 module Sra : sig
@@ -150,7 +163,7 @@ module Ucsc_gb : sig
     inherit directory
     method contents : [`ucsc_chromosome_sequences]
   end
-  
+
   val chromosome_sequence :
     [< genome] ->
     string ->
@@ -203,7 +216,7 @@ module Ucsc_gb : sig
       inherit directory
       method format : [`ucsc_lift_over of 'a]
     end
-    
+
     val chain_file :
       org_from:[< genome] ->
       org_to:[< genome] ->
@@ -607,17 +620,17 @@ end
 module Sra_toolkit : sig
   val env : Shell_dsl.docker_image
 
-  val fastq_dump : sra pworkflow -> [`sanger] fastq pworkflow
+  val fastq_dump : sra pworkflow -> sanger_fastq pworkflow
 
   val fastq_dump_gz :
     [`id of string | `file of sra pworkflow] ->
-    [`sanger] fastq gz pworkflow
+    sanger_fastq gz pworkflow
 
-  val fastq_dump_pe : sra pworkflow -> [`sanger] fastq pworkflow * [`sanger] fastq pworkflow
+  val fastq_dump_pe : sra pworkflow -> sanger_fastq pworkflow * sanger_fastq pworkflow
 
   val fastq_dump_pe_gz :
     [`id of string | `file of sra pworkflow] ->
-    [`sanger] fastq gz pworkflow * [`sanger] fastq gz pworkflow
+    sanger_fastq gz pworkflow * sanger_fastq gz pworkflow
 
   val fastq_dump_to_fasta : sra pworkflow -> fasta pworkflow
 
@@ -651,7 +664,7 @@ module FastQC : sig
     method contents : [`fastQC_report]
   end
 
-  val run : 'a fastq pworkflow -> report pworkflow
+  val run : #fastq pworkflow -> report pworkflow
   val html_report : report pworkflow -> html pworkflow
   val per_base_quality : report pworkflow -> png pworkflow
   val per_base_sequence_content : report pworkflow -> png pworkflow
@@ -674,7 +687,7 @@ module Fastq_screen : sig
     ?threads:int ->
     ?top: [ `top1 of int | `top2 of int * int ] ->
     ?lightweight:bool ->
-    'a fastq pworkflow ->
+    #fastq pworkflow ->
     (string * fasta pworkflow) list ->
     output pworkflow
 
@@ -702,8 +715,8 @@ module Bowtie : sig
     ?n:int -> ?v:int ->
     ?maxins:int ->
     index pworkflow ->
-    [ `single_end of 'a fastq pworkflow list
-    | `paired_end of 'a fastq pworkflow list * 'a fastq pworkflow list ] ->
+    [ `single_end of 'a pworkflow list
+    | `paired_end of 'a pworkflow list * 'a pworkflow list ] ->
     sam pworkflow
 end
 
@@ -757,8 +770,8 @@ module Bowtie2 : sig
     ?seed:int ->
     ?fastq_format:'a Fastq.format ->
     index pworkflow ->
-    [ `single_end of 'a fastq pworkflow list
-    | `paired_end of 'a fastq pworkflow list * 'a fastq pworkflow list ] ->
+    [ `single_end of 'a pworkflow list
+    | `paired_end of 'a pworkflow list * 'a pworkflow list ] ->
     sam pworkflow
 end
 
@@ -768,18 +781,18 @@ module Tophat : sig
     inherit directory
     method contents : [`tophat]
   end
-  
+
   val tophat1 :
     ?color:bool ->
     Bowtie.index pworkflow ->
-    [ `single_end of 'a fastq pworkflow list
-    | `paired_end of 'a fastq pworkflow list * 'a fastq pworkflow list ] ->
+    [ `single_end of #fastq pworkflow list
+    | `paired_end of (#fastq as 'a) pworkflow list * 'a pworkflow list ] ->
     output pworkflow
 
   val tophat2 :
     Bowtie2.index pworkflow ->
-    [ `single_end of 'a fastq pworkflow list
-    | `paired_end of 'a fastq pworkflow list * 'a fastq pworkflow list ] ->
+    [ `single_end of #fastq pworkflow list
+    | `paired_end of (#fastq as 'a) pworkflow list * 'a pworkflow list ] ->
     output pworkflow
 
   val accepted_hits : output pworkflow -> bam pworkflow
@@ -1077,7 +1090,7 @@ module Spades : sig
   val spades :
     ?single_cell:bool ->
     ?iontorrent:bool ->
-    ?pe:[`sanger] fastq pworkflow list * [`sanger] fastq pworkflow list ->
+    ?pe:sanger_fastq pworkflow list * sanger_fastq pworkflow list ->
     ?threads:int ->
     ?memory:int ->
     unit ->
@@ -1138,7 +1151,7 @@ module Srst2 : sig
     ?report_new_consensus:bool ->
     ?report_all_consensus:bool ->
     ?threads:int ->
-    'a fastq pworkflow list ->
+    #fastq pworkflow list ->
     directory pworkflow
 
 
@@ -1164,6 +1177,6 @@ module Srst2 : sig
     ?report_new_consensus:bool ->
     ?report_all_consensus:bool ->
     ?threads:int ->
-    'a fastq pworkflow list ->
+    #fastq pworkflow list ->
     directory pworkflow
 end
