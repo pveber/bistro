@@ -63,6 +63,6 @@ let differential_analysis =
 let () =
   let open Bistro_utils.Repo in
   [
-    item ["deseq2"] differential_analysis ;
+    item ["deseq2"] differential_analysis#directory ;
   ]
   |> build_main ~np:4 ~mem:(`GB 4) ~outdir:"res"
