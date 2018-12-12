@@ -1190,7 +1190,7 @@ module Ensembl = struct
         (String.capitalize_ascii (string_of_species species))
         (lab_label_of_genome (ucsc_reference_genome ~release ~species)) release
     in
-    let gff = Bistro_unix.(gunzip (wget (Workflow.string url))) in
+    let gff = Bistro_unix.(gunzip (wget url)) in
     match chr_name with
     | `ensembl -> gff
     | `ucsc -> ucsc_chr_names_gtf gff
@@ -1207,7 +1207,7 @@ module Ensembl = struct
       | `ensembl -> ident
       | `ucsc -> ucsc_chr_names_gtf
     in
-    f @@ Bistro_unix.(gunzip (wget (Workflow.string url)))
+    f @@ Bistro_unix.(gunzip (wget url))
 
   let cdna ~release ~species =
     let url = sprintf "ftp://ftp.ensembl.org/pub/release-%d/fasta/%s/cdna/%s.%s.cdna.all.fa.gz"
@@ -1215,7 +1215,7 @@ module Ensembl = struct
         (String.capitalize_ascii (string_of_species species))
         (lab_label_of_genome (ucsc_reference_genome ~release ~species))
     in
-    Bistro_unix.wget (Workflow.string url)
+    Bistro_unix.wget url
 end
 
 module FastQC = struct
@@ -1776,7 +1776,7 @@ end
 module Sra = struct
   let input x = Workflow.input x
 
-  let fetch_srr id =
+  let fetch_srr_dyn id =
       let url = [%workflow
         let id = [%eval id] in
         if (String.length id > 6) then
@@ -1792,6 +1792,7 @@ module Sra = struct
       Workflow.shell ~descr:"sra.fetch_srr" [
         Bistro_unix.Cmd.wget ~dest url
       ]
+  let fetch_srr id = fetch_srr_dyn (Workflow.string id)
 end
 
 module Sra_toolkit = struct
@@ -2278,7 +2279,7 @@ module Ucsc_gb = struct
           "ftp://hgdownload.cse.ucsc.edu/goldenPath/%s/liftOver/%sTo%s.over.chain.gz"
           org_from org_from (String.capitalize_ascii org_to)
       in
-      Bistro_unix.(gunzip (wget (Workflow.string url)))
+      Bistro_unix.(gunzip (wget url))
 
     let bed ~org_from ~org_to bed =
       let chain_file = chain_file ~org_from ~org_to in

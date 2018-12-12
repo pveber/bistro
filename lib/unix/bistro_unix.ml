@@ -15,11 +15,14 @@ module Cmd = struct
     ]
 end
 
-let wget ?descr_url ?no_check_certificate ?user ?password url =
+let wget_dyn ?descr_url ?no_check_certificate ?user ?password url =
   let info = match descr_url with None -> "" | Some i -> sprintf "(%s)" i in
   Workflow.shell ~descr:("unix.wget" ^ info) [
     Cmd.wget ?no_check_certificate ?user ?password ~dest url
   ]
+
+let wget ?descr_url ?no_check_certificate ?user ?password url =
+  wget_dyn ?descr_url ?no_check_certificate ?user ?password (Workflow.string url)
 
 let unzip zip =
   Workflow.shell ~descr:"unix.unzip" [

@@ -14,7 +14,15 @@ val wget :
   ?no_check_certificate:bool ->
   ?user:string ->
   ?password:string ->
+  string -> #file pworkflow
+
+val wget_dyn :
+  ?descr_url:string ->
+  ?no_check_certificate:bool ->
+  ?user:string ->
+  ?password:string ->
   string workflow -> #file pworkflow
+
 val gunzip : 'a gz pworkflow -> 'a pworkflow
 val bunzip2 : 'a bz2 pworkflow -> 'a pworkflow
 val unzip : 'a zip pworkflow -> 'a pworkflow
