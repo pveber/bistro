@@ -11,7 +11,7 @@ end
 
 class type bed3 = object
   inherit tsv
-  method header : [`none]
+  method header : [`no]
   method f1 : string
   method f2 : int
   method f3 : int
@@ -59,7 +59,7 @@ end
 
 class type gff = object
   inherit tsv
-  method header : [`none]
+  method header : [`no]
   method f1 : string
   method f2 : string
   method f3 : string
@@ -1322,7 +1322,7 @@ module Htseq = struct
 
   class type count_tsv = object
     inherit tsv
-    method header : [`none]
+    method header : [`no]
     method f1 : string
     method f2 : int
   end
@@ -2028,7 +2028,7 @@ module Ucsc_gb = struct
 
   class type chrom_sizes = object
     inherit tsv
-    method header : [`none]
+    method header : [`no]
     method f1 : string
     method f2 : int
   end
