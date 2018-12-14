@@ -2346,7 +2346,7 @@ module Subread = struct
   let featureCounts_htseq_tsv o =
     Workflow.shell ~descr:"featureCounts_htseq_tsv" [
       pipe [
-        cmd "sed" [ quote ~using:'\'' (string "1d") ; dep (featureCounts_tsv o) ] ;
+        cmd "sed" [ quote ~using:'\'' (string "1,2d") ; dep (featureCounts_tsv o) ] ;
         cmd "awk" ~stdout:dest [ quote ~using:'\'' (string "{print $1,$7}") ]
       ]
     ]
