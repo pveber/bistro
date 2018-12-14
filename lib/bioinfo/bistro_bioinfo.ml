@@ -955,14 +955,14 @@ library(RColorBrewer)
 loadCounts <- function(sample_files) {
     loadFile <- function(fn) {
         d <- read.table(fn,header=F,sep='\t')
-        d[1:(dim(d)[1] - 5),2]
+        d[!grepl("^__",d[,1]), 2] #remove HTSEQ sum counts
     }
     sapply(sample_files,loadFile)
 }
 
 loadIds <- function(sample_files) {
     d <- read.table(sample_files[1],header=F,sep='\t')
-    d[1:(dim(d)[1] - 5),1]
+    d[!grepl("^__",d[,1]), 1]
 }
 
 differentialAnalysis <- function(counts, description) {
@@ -2347,7 +2347,10 @@ module Subread = struct
     Workflow.shell ~descr:"featureCounts_htseq_tsv" [
       pipe [
         cmd "sed" [ quote ~using:'\'' (string "1,2d") ; dep (featureCounts_tsv o) ] ;
-        cmd "awk" ~stdout:dest [ quote ~using:'\'' (string "{print $1,$7}") ]
+        cmd "awk" ~stdout:dest [
+          quote ~using:'\'' (string "{print $1,$7}") ;
+          string "OFS='\t'" ;
+        ]
       ]
     ]
   let featureCounts_summary o = Workflow.select o ["counts.tsv.summary"]
