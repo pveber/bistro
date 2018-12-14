@@ -1,9 +1,8 @@
-(** 
+(**
    Paper: https://www.ncbi.nlm.nih.gov/pubmed/21700227
    Datasets: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE29506
 *)
 open Core
-open Bistro
 open Bistro_bioinfo
 open Bistro_utils
 
@@ -15,7 +14,7 @@ type chIP_sample = [ `ChIP_Pho4_noPi ]
 
 type factor = [ `Pho4 ]
 [@@deriving show, enumerate]
-          
+
 let factor = function
   | `ChIP_Pho4_noPi -> `Pho4
 
@@ -87,5 +86,5 @@ let () =
   Repo.build_main
     ~np ~mem:(`GB 4)
     ~outdir:"res"
-    ~loggers:[ Console_logger.create () ] 
+    ~loggers:[ Console_logger.create () ]
     repo

@@ -15,15 +15,13 @@ module Dataset = struct
     | `SongD1 -> "SongD1"
 
   let alignments d =
-    Workflow.string "https://ndownloader.figshare.com/files/9473962"
-    |> Bistro_unix.wget
+    Bistro_unix.wget "https://ndownloader.figshare.com/files/9473962"
     |> Bistro_unix.tar_xfj
     |> Fn.flip Workflow.select ["single-gene_alignments" ; to_string d ]
     |> Workflow.glob ~pattern:"*"
 
   let best_trees d =
-    Workflow.string "https://ndownloader.figshare.com/files/9473953"
-    |> Bistro_unix.wget
+    Bistro_unix.wget "https://ndownloader.figshare.com/files/9473953"
     |> Bistro_unix.tar_xfj
     |> Fn.flip Workflow.select ["single-gene_trees" ; to_string d ; "Best_observed"]
     |> Workflow.glob ~pattern:"*"
