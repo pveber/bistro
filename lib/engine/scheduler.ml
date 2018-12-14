@@ -263,14 +263,14 @@ struct
       register gc ?target l.elts
     | Input _ -> Lwt.return ()
     | Select x -> register gc ?target x.dir
-    | Value v ->
+    | Plugin { task = Value_plugin v ; _ } ->
       uses gc target w ;
       if stop_register gc w then Lwt.return ()
-      else register gc ~target:w v.task
-    | Path p ->
+      else register gc ~target:w v
+    | Plugin { task = Path_plugin p ; _ } ->
       uses gc target w ;
       if stop_register gc w then Lwt.return ()
-      else register gc ~target:w p.task
+      else register gc ~target:w p
     | Shell s ->
       uses gc target w ;
       if stop_register gc w then Lwt.return ()
@@ -486,9 +486,9 @@ let rec blocking_evaluator
       let dir = blocking_evaluator db s.dir in
       fun () -> W.cd (dir ()) s.sel
     | W.Input { path ; _ } -> fun () -> W.FS_path path
-    | W.Value { id ; _ } ->
+    | W.Plugin { id ; task = Value_plugin _ ; _ } ->
       fun () -> (load_value (Db.cache db id))
-    | W.Path p -> fun () -> W.Cache_id p.id
+    | W.Plugin { id ; task = Path_plugin _ ; _ } -> fun () -> W.Cache_id id
     | W.Spawn s ->
       let elts = blocking_evaluator db s.elts in
       fun () ->
@@ -529,13 +529,13 @@ let rec shallow_eval
       shallow_eval sched s.dir >>= fun dir ->
       Lwt.return (W.cd dir s.sel)
     | W.Input { path ; _ } -> Lwt.return (W.FS_path path)
-    | W.Value { id ; _ } ->
+    | W.Plugin { id ; task = Value_plugin _ ; _ } ->
       Lwt.return (load_value (Db.cache sched.db id)) (* FIXME: blocking call *)
     | W.Spawn s -> (* FIXME: much room for improvement *)
       shallow_eval sched s.elts >>= fun elts ->
       let targets = List.init (List.length elts) ~f:(fun i -> s.f (W.list_nth s.elts i)) in
       Lwt_list.map_p (shallow_eval sched) targets
-    | W.Path s -> Lwt.return (W.Cache_id s.id)
+    | W.Plugin { id ; task = Path_plugin _ ; _ } -> Lwt.return (W.Cache_id id)
     | W.Shell s -> Lwt.return (W.Cache_id s.id)
     | W.List l ->
       Lwt_list.map_p (shallow_eval sched) l.elts
@@ -604,8 +604,7 @@ let np_requirement
     | List _ -> 0
     | List_nth _ -> 0
     | Glob _ -> 0
-    | Value x -> x.np
-    | Path x -> x.np
+    | Plugin x -> x.np
     | Shell x -> x.np
 
 let mem_requirement
@@ -621,8 +620,7 @@ let mem_requirement
     | List _ -> Lwt.return 0
     | List_nth _ -> Lwt.return 0
     | Glob _ -> Lwt.return 0
-    | Value x -> shallow_eval sched x.mem
-    | Path x -> shallow_eval sched x.mem
+    | Plugin x -> shallow_eval sched x.mem
     | Shell x -> shallow_eval sched x.mem
 
 let build_trace sched w perform =
@@ -703,7 +701,7 @@ let rec build
         )
       |> Eval_thread.ignore
 
-    | W.Value { task = workflow ; id ; descr ; _ } ->
+    | W.Plugin { task = Value_plugin workflow ; id ; descr ; _ } ->
       schedule_cached_workflow sched ~id w
         ~deps:(fun () -> build sched ~target:w workflow)
         ~perform:(fun _ ->
@@ -718,7 +716,7 @@ let rec build
           | Error msg -> Ok (Task_result.Plugin { id ; outcome = `Failed ; msg = Some msg ; descr })
         )
 
-    | W.Path { id ; task = workflow ; descr ; _ } ->
+    | W.Plugin { id ; task = Path_plugin workflow ; descr ; _ } ->
       schedule_cached_workflow sched ~id w
         ~deps:(fun () -> build sched ~target:w workflow)
         ~perform:(fun _ ->

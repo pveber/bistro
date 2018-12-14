@@ -95,8 +95,7 @@ let dot_output ?db oc g ~needed =
       let label = Path.to_string s.sel in
       [ `Label label ; `Fontcolor color ; `Color color ; shape ]
     | Shell { descr ; _ } -> step_attributes ~descr u
-    | Value { descr ; _ } -> step_attributes ~descr u
-    | Path { descr ; _ } -> step_attributes ~descr u
+    | Plugin { descr ; _ } -> step_attributes ~descr u
     | Pure _ -> [ label "pure" u ; `Shape `Plaintext ]
     | App _ -> [ label "app" u ; `Shape `Plaintext ]
     | Spawn _ -> [ label "spawn" u ; `Shape `Ellipse ]
