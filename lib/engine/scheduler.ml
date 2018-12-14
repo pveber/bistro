@@ -343,6 +343,8 @@ end
 
 type t = {
   start : unit Synchro.t ;
+  _end_ : unit Synchro.t ;
+  mutable closed : bool ;
   allocator : Allocator.t ;
   db : Db.t ;
   logger : Logger.t ;
@@ -359,6 +361,8 @@ let create
   let logger = Logger.tee loggers in
   {
     start = Synchro.create () ;
+    _end_ = Synchro.create () ;
+    closed = false ;
     allocator = Allocator.create ~np ~mem:(mem * 1024) ;
     db ;
     use_docker ;
@@ -756,6 +760,7 @@ let rec build
 let start sched = Synchro.signal sched.start ()
 
 let eval sched target =
+  if sched.closed then failwith "Scheduler is closed" ;
   let target = Bistro.Private.reveal target in
   Synchro.wait sched.start >>= fun () ->
   Maybe_gc.register sched.gc target >>= fun () ->
@@ -775,3 +780,7 @@ let eval_exn sched w =
   eval sched w >|= function
   | Ok r -> r
   | Error errors -> failwith (error_report sched.db errors)
+
+let stop sched =
+  Maybe_gc.stop sched.gc >>= fun () ->
+  sched.logger#stop

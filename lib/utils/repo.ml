@@ -140,7 +140,8 @@ let build ?np ?mem ?loggers ?use_docker ?(bistro_dir = "_bistro") ?collect ~outd
   let sched = Scheduler.create ?np ?mem ?loggers ?use_docker ?collect db in
   let results = Lwt_list.map_p (Scheduler.eval sched) expressions in
   Scheduler.start sched ;
-  Lwt.map partition_results results >|= fun (res, errors) ->
+  Lwt.map partition_results results >>= fun (res, errors) ->
+  Scheduler.stop sched >|= fun () ->
   generate outdir (List.concat res) ;
   if errors <> [] then (
     let errors =

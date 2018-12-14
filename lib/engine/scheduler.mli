@@ -41,3 +41,5 @@ val error_report :
   Db.t ->
   Execution_trace.t list ->
   string
+
+val stop : t -> unit Lwt.t
