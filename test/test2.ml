@@ -35,6 +35,8 @@ let _ =
   let db = Db.init_exn "_bistro" in
   let pipeline = Repo.to_workflow repo ~outdir:"res" in
   Dot_output.workflow_to_file ~db "workflow.dot" pipeline ;
-  let sched = Scheduler.create ~np:4 ~loggers:[Bistro_utils.Console_logger.create ()] ~collect:true db pipeline in
-  ignore (Scheduler.run sched |> Lwt_main.run) ;
-  dump_gc_state sched db "gc_final.dot" ;
+  let sched = Scheduler.create ~np:4 ~loggers:[Bistro_utils.Console_logger.create ()] ~collect:true db in
+  let thread = Scheduler.eval_exn sched pipeline in
+  Scheduler.start sched ;
+  Lwt_main.run thread ;
+  dump_gc_state sched db "gc_final.dot"

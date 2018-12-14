@@ -35,13 +35,11 @@ let error_short_descr =
 let output_step_event t ~id ~descr =
   let id = String.prefix id 6 in
   msg t "started %s.%s" descr id
-  
+
 let output_event t = function
   | Logger.Workflow_started (Shell { id ; descr ; _ }, _) ->
     output_step_event t ~id ~descr
-  | Logger.Workflow_started (Value { id ; descr ; _ }, _) ->
-    output_step_event t ~id ~descr
-  | Logger.Workflow_started (Path { id ; descr ; _ }, _) ->
+  | Logger.Workflow_started (Plugin { id ; descr ; _ }, _) ->
     output_step_event t ~id ~descr
 
   | Workflow_ended { outcome = (Task_result.Shell { id ; descr ; _ } as outcome) ; _ } ->

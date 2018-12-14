@@ -35,6 +35,8 @@ let dump_gc_state sched db fn =
 let _ =
   let open Bistro_engine in
   let db = Db.init_exn "_bistro" in
-  let sched = Scheduler.create ~np:4 ~loggers:[Bistro_utils.Console_logger.create ()] ~collect:true db pipeline in
-  ignore (Scheduler.run sched |> Lwt_main.run) ;
+  let sched = Scheduler.create ~np:4 ~loggers:[Bistro_utils.Console_logger.create ()] ~collect:true db in
+  let thread = Scheduler.eval_exn sched pipeline in
+  Scheduler.start sched ;
+  ignore (Lwt_main.run thread) ;
   dump_gc_state sched db "gc_final.dot"

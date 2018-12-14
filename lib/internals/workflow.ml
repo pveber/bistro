@@ -42,8 +42,7 @@ type _ t =
       dir : path t ;
       sel : string list ;
     } -> path t
-  | Value : ((unit -> 'a) t, any) step -> 'a t
-  | Path : ((string -> unit) t, any) step -> path t
+  | Plugin : ('a plugin, any) step -> 'a t
   | Shell : (shell_command, any) step -> path t
   | Glob : {
       id : string ;
@@ -61,6 +60,10 @@ and ('a, 'b) step = {
   deps : 'b list ;
 }
 
+and 'a plugin =
+  | Value_plugin : (unit -> 'a) t -> 'a plugin
+  | Path_plugin : (string -> unit) t -> path plugin
+
 and shell_command = token Command.t
 
 and token = Path_token of path t | String_token of string t
@@ -73,8 +76,7 @@ let digest x =
 let id : type s. s t -> string = function
   | Input { id ; _ } -> id
   | Select { id ; _ } -> id
-  | Value { id ; _ } -> id
-  | Path { id ; _ } -> id
+  | Plugin { id ; _ } -> id
   | Pure { id ; _ } -> id
   | App { id ; _ } -> id
   | Spawn { id ; _ } -> id
@@ -110,8 +112,7 @@ module Any = struct
     | List_nth l -> [ Any l.elts ]
     | Input _ -> []
     | Select sel -> [ any sel.dir ]
-    | Value v -> v.deps
-    | Path p -> p.deps
+    | Plugin v -> v.deps
     | Shell s -> s.deps
     | Glob g -> [ Any g.dir ]
 end
@@ -124,7 +125,7 @@ let select dir sel =
   let dir, sel =
     match dir with
     | Select { dir ; sel = root ; _ } -> dir, root @ sel
-    | Input _ | Path _ | Shell _ -> dir, sel
+    | Input _ | Plugin _ | Shell _ -> dir, sel
     | _ -> assert false
   in
   let id = digest ("select", id dir, sel) in
@@ -144,11 +145,11 @@ let both fst snd =
 
 let cached_value ?(descr = "") ?(np = 1) ?(mem = int 100) ?version workflow =
   let id = digest (`Value, id workflow, version) in
-  Value { id ; descr ; task = workflow ; np ; mem ; version ; deps = [ any mem ; any workflow ] }
+  Plugin { id ; descr ; task = Value_plugin workflow ; np ; mem ; version ; deps = [ any mem ; any workflow ] }
 
 let cached_path ?(descr = "") ?(np = 1) ?(mem = int 100) ?version workflow =
   let id = digest (`Value, id workflow, version) in
-  Path { id ; descr ; task = workflow ; np ; mem ; version ; deps = [ any mem ; any workflow ] }
+  Plugin { id ; descr ; task = Path_plugin workflow ; np ; mem ; version ; deps = [ any mem ; any workflow ] }
 
 let eval_path w = Eval_path { id = digest (`Eval_path, id w) ; workflow = w }
 

@@ -27,3 +27,5 @@ val error_report :
 val all_ok : t list -> bool
 
 val gather_failures : t list -> t list
+
+module Set : Set.S with type elt = t

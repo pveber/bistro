@@ -135,8 +135,8 @@ let rec workflow_path db (Bistro_internals.Workflow.Any w) =
     workflow_path db (Any dir)
     |> Option.map ~f:(fun d -> Cd (d, sel))
   | Shell { id ; _ } -> Some (Cache_id id)
-  | Value { id ; _ } -> Some (Cache_id id)
-  | Path { id ; _ } -> Some (Cache_id id)
+  | Plugin { id ; task = Path_plugin _ ; _ } -> Some (Cache_id id)
+  | Plugin { id ; task = Value_plugin _ ; _ } -> Some (Cache_id id)
   | _ -> None
 
 let is_in_cache db u =

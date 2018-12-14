@@ -80,6 +80,7 @@ let link dst p_u =
   ignore (Sys.command cmd)
 
 let generate outdir items =
+  let items = remove_redundancies items in
   List.iter items ~f:(fun item ->
       let repo_path = Filename.concat outdir item.repo_path in
       let file_path = Filename.concat outdir item.file_path in
@@ -90,32 +91,33 @@ let generate outdir items =
       link file_path cache_path
     )
 
+let item_to_workflow = function
+  | Item (path, w) ->
+    [%workflow [ normalized_repo_item ~repo_path:path ~id:(W.id (Private.reveal w)) ~cache_path:[%path w] ]]
+  | Item_list l ->
+    [%workflow
+      let id = W.id (Private.reveal l.elts) in
+      let elts = [%eval Workflow.spawn l.elts ~f:Workflow.eval_path] in
+      let n = List.length elts in
+      let m = Float.(n |> of_int |> log10 |> to_int) in
+      let ext = match l.ext with
+        | None -> ""
+        | Some s -> "." ^ s
+      in
+      let format =
+        Scanf.format_from_string
+          (sprintf {|%%s_%%0%dd%%s|} m)
+          "%s%d%s" in
+      let list_elt_path i =
+        l.path @ [ sprintf format l.prefix i ext ]
+      in
+      List.mapi elts ~f:(fun i path_w ->
+          normalized_repo_item ~repo_path:(list_elt_path i) ~id:(Misc.digest (id, i)) ~cache_path:path_w
+        )]
+
 let to_workflow ~outdir items =
   let normalized_items =
-    List.map items ~f:(function
-        | Item (path, w) ->
-          [%workflow [ normalized_repo_item ~repo_path:path ~id:(W.id (Private.reveal w)) ~cache_path:[%path w] ]]
-        | Item_list l ->
-          [%workflow
-            let id = W.id (Private.reveal l.elts) in
-            let elts = [%eval Workflow.spawn l.elts ~f:Workflow.eval_path] in
-            let n = List.length elts in
-            let m = Float.(n |> of_int |> log10 |> to_int) in
-            let ext = match l.ext with
-              | None -> ""
-              | Some s -> "." ^ s
-            in
-            let format =
-              Scanf.format_from_string
-                (sprintf {|%%s_%%0%dd%%s|} m)
-                "%s%d%s" in
-            let list_elt_path i =
-              l.path @ [ sprintf format l.prefix i ext ]
-            in
-            List.mapi elts ~f:(fun i path_w ->
-                normalized_repo_item ~repo_path:(list_elt_path i) ~id:(Misc.digest (id, i)) ~cache_path:path_w
-              )]
-      )
+    List.map items ~f:item_to_workflow
     |> Workflow.list
   in
   [%workflow
@@ -124,15 +126,31 @@ let to_workflow ~outdir items =
     |> remove_redundancies
     |> generate outdir]
 
+let partition_results xs =
+  let rec inner ok err = function
+    | [] -> ok, err
+    | Ok x :: t -> inner (x :: ok) err t
+    | Error e :: t -> inner ok (e :: err) t
+  in
+  inner [] [] xs
+
 let build ?np ?mem ?loggers ?use_docker ?(bistro_dir = "_bistro") ?collect ~outdir repo =
   let db = Db.init_exn bistro_dir in
-  let expr = to_workflow ~outdir repo in
-  Scheduler.eval ?np ?mem ?loggers ?use_docker ?collect db expr >|=
-  function
-  | Ok () -> ()
-  | Error errors ->
+  let expressions = List.map repo ~f:(item_to_workflow) in
+  let sched = Scheduler.create ?np ?mem ?loggers ?use_docker ?collect db in
+  let results = Lwt_list.map_p (Scheduler.eval sched) expressions in
+  Scheduler.start sched ;
+  Lwt.map partition_results results >>= fun (res, errors) ->
+  Scheduler.stop sched >|= fun () ->
+  generate outdir (List.concat res) ;
+  if errors <> [] then (
+    let errors =
+      List.concat errors
+      |> Execution_trace.gather_failures
+    in
     prerr_endline (Scheduler.error_report db errors) ;
     failwith "Some workflow failed!"
+  )
 
 let build_main ?np ?mem ?loggers ?use_docker ?bistro_dir ?collect ~outdir repo =
   build ?np ?mem ?loggers ?use_docker ?bistro_dir ?collect ~outdir repo
