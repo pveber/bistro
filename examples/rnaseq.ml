@@ -48,7 +48,7 @@ let annotation : gff pworkflow =
 let counts x =
   Subread.featureCounts
     ~feature_type:"gene"
-    ~attribute_type:"ID"
+    ~attribute_type:"gene_id"
     ~strandness:`Unstranded
     ~q:5
     annotation
