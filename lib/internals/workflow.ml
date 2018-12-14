@@ -63,8 +63,6 @@ and ('a, 'b) step = {
 and 'a plugin =
   | Value_plugin : (unit -> 'a) t -> 'a plugin
   | Path_plugin : (string -> unit) t -> path plugin
-  (* | Effect_plugin of (unit -> unit) t *)
-
 
 and shell_command = token Command.t
 

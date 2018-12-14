@@ -12,7 +12,7 @@ module Gc : sig
   }
 end
 
-type 'a t
+type t
 
 val create :
   ?np:int ->
@@ -21,32 +21,19 @@ val create :
   ?loggers:Logger.t list ->
   ?collect:bool ->
   Db.t ->
-  'a Bistro.workflow ->
-  'a t
+  t
 
-val run :
-  'a t ->
-  ('a, Execution_trace.t list) Lwt_result.t
+val gc_state : t -> Gc.state option
 
-val gc_state : _ t -> Gc.state option
+val start : t -> unit
 
 val eval :
-  ?np:int ->
-  ?mem:[`GB of int] ->
-  ?use_docker:bool ->
-  ?loggers:Logger.t list ->
-  ?collect:bool ->
-  Db.t ->
+  t ->
   'a Bistro.workflow ->
   ('a, Execution_trace.t list) Lwt_result.t
 
 val eval_exn :
-  ?np:int ->
-  ?mem:[`GB of int] ->
-  ?use_docker:bool ->
-  ?loggers:Logger.t list ->
-  ?collect:bool ->
-  Db.t ->
+  t ->
   'a Bistro.workflow ->
   'a Lwt.t
 

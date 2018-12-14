@@ -74,3 +74,5 @@ let error_report trace db buf =
   | (Done_already _ | Canceled _) -> ()
 
 let all_ok xs = not (List.exists ~f:is_errored xs)
+
+module Set = S
