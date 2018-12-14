@@ -2309,9 +2309,14 @@ module Subread = struct
 
   class type count_table = object
     inherit tsv
-    method header : [`none]
+    method header : [`no]
     method f1 : string
-    method f2 : int
+    method f2 : string
+    method f3 : int
+    method f4 : int
+    method f5 : [`Plus | `Minus]
+    method f6 : int
+    method f7 : int
   end
 
   let strandness_token = function
@@ -2338,5 +2343,12 @@ module Subread = struct
     ]
 
   let featureCounts_tsv o = Workflow.select o ["counts.tsv"]
+  let featureCounts_htseq_tsv o =
+    Workflow.shell ~descr:"featureCounts_htseq_tsv" [
+      pipe [
+        cmd "sed" [ quote ~using:'\'' (string "1d") ; dep (featureCounts_tsv o) ] ;
+        cmd "awk" ~stdout:dest [ quote ~using:'\'' (string "{print $1,$7}") ]
+      ]
+    ]
   let featureCounts_summary o = Workflow.select o ["counts.tsv.summary"]
 end

@@ -53,7 +53,7 @@ let counts x =
     ~q:5
     annotation
     (mapped_reads x)
-  |> Subread.featureCounts_tsv
+  |> Subread.featureCounts_htseq_tsv
 
 let differential_analysis =
   DESeq2.main_effects
@@ -65,4 +65,4 @@ let () =
   [
     item ["deseq2"] differential_analysis#directory ;
   ]
-  |> build_main ~np:4 ~mem:(`GB 4) ~outdir:"res"
+  |> build_main ~np:4 ~mem:(`GB 4) ~outdir:"res" ~loggers:[Bistro_utils.Console_logger.create ()]
