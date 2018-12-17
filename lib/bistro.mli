@@ -218,6 +218,11 @@ class type text_file = object
   method encoding : [`text]
 end
 
+class type ['a] sexp_value = object
+  inherit file
+  method ty : 'a
+end
+
 class type binary_file = object
   inherit file
   method encoding : [`binary]
