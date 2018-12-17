@@ -75,7 +75,7 @@ module Template_dsl : sig
 end
 
 module Shell_dsl : sig
-  type template
+  type template = Template_dsl.template
   type command
   type docker_image
 
