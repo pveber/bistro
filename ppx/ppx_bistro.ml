@@ -65,14 +65,14 @@ class payload_rewriter = object
         | _ -> failwith "expected empty payload"
 
       )
-    | { pexp_desc = Pexp_extension ({txt = ext ; _}, payload) ; _ } -> (
+    | { pexp_desc = Pexp_extension ({txt = ("eval" | "path" | "param" as ext) ; loc ; _}, payload) ; _ } -> (
         match payload with
         | PStr [ { pstr_desc = Pstr_eval (e, _) ; _ } ] ->
           let id = new_id () in
           let acc' = (id, e, insert_type_of_ext ext) :: acc in
           let expr' = B.elident id in
           expr', acc'
-        | _ -> failwith "expected an expression"
+        | _ -> failwith (Location.raise_errorf ~loc "expected an expression")
       )
     | _ -> super#expression expr acc
 
@@ -129,7 +129,7 @@ let default_descr var =
     "%s.%s"
     (Caml.Filename.(chop_extension (basename !L.input_name)))
     var
-    
+
 let str_item_rewriter ~loc ~path:_ descr version var expr =
   let descr = match descr with
     | Some d -> d
