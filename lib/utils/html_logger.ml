@@ -72,7 +72,7 @@ module Render = struct
       incr c ;
       sprintf "id%08d" !c
 
-  let k = pcdata
+  let k = txt
 
   let collapsible_panel ~title ~header ~body =
     let elt_id = new_elt_id () in
@@ -303,11 +303,11 @@ module Render = struct
     ]
 
   let head =
-    head (title (pcdata "Bistro report")) [
+    head (title (txt "Bistro report")) [
       link ~rel:[`Stylesheet] ~href:"http://netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap.min.css" () ;
       link ~rel:[`Stylesheet] ~href:"http://netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap-theme.min.css" () ;
-      script ~a:[a_src "https://code.jquery.com/jquery.js"] (pcdata "") ;
-      script ~a:[a_src "http://netdna.bootstrapcdn.com/bootstrap/3.0.2/js/bootstrap.min.js"] (pcdata "") ;
+      script ~a:[a_src "https://code.jquery.com/jquery.js"] (txt "") ;
+      script ~a:[a_src "http://netdna.bootstrapcdn.com/bootstrap/3.0.2/js/bootstrap.min.js"] (txt "") ;
     ]
 
   let model m =
