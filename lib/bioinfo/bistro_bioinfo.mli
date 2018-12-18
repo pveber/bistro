@@ -612,7 +612,7 @@ module Samtools : sig
      * ?_F:int ->
      * ?_B:bool ->
      * ?s:float -> *)
-    < kind : [`file] ;
+    < file_kind : [`regular] ;
       format : [< `bam | `sam] ; .. > pworkflow ->
     'o pworkflow
 end
