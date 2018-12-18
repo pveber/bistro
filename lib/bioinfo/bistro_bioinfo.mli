@@ -1034,7 +1034,7 @@ module Macs2 : sig
     method f9 : float
   end
 
-  val broad_peaks : output pworkflow -> broad_peaks pworkflow
+  val broad_peaks : broad_output pworkflow -> broad_peaks pworkflow
 end
 
 
