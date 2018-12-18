@@ -23,6 +23,8 @@ module Workflow = struct
   let spawn2 x y ~f =
     zip x y
     |> spawn ~f:(fun p -> f (fst p) (snd p))
+
+  let eval_paths xs = list (List.map xs ~f:eval_path)
 end
 
 

@@ -187,6 +187,9 @@ module Workflow : sig
 
   val eval_path : 'a path workflow -> string workflow
 
+  val eval_paths :
+    'a path workflow list -> string list workflow
+
   val list :
     'a workflow list -> 'a list workflow
 
