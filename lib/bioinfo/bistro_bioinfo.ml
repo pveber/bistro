@@ -2305,7 +2305,7 @@ end
 
 module Subread = struct
 
-  let env = docker_image ~account:"pveber" ~name:"subread" ~tag:"1.6.0" ()
+  let env = docker_image ~account:"pveber" ~name:"subread" ~tag:"1.6.3" ()
 
   class type count_table = object
     inherit tsv
