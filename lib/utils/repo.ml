@@ -134,10 +134,10 @@ let partition_results xs =
   in
   inner [] [] xs
 
-let build ?np ?mem ?loggers ?use_docker ?(bistro_dir = "_bistro") ?collect ~outdir repo =
+let build ?np ?mem ?loggers ?allowed_containers ?(bistro_dir = "_bistro") ?collect ~outdir repo =
   let db = Db.init_exn bistro_dir in
   let expressions = List.map repo ~f:(item_to_workflow) in
-  let sched = Scheduler.create ?np ?mem ?loggers ?use_docker ?collect db in
+  let sched = Scheduler.create ?np ?mem ?loggers ?allowed_containers ?collect db in
   let results = Lwt_list.map_p (Scheduler.eval sched) expressions in
   Scheduler.start sched ;
   Lwt.map partition_results results >>= fun (res, errors) ->
@@ -152,8 +152,8 @@ let build ?np ?mem ?loggers ?use_docker ?(bistro_dir = "_bistro") ?collect ~outd
     failwith "Some workflow failed!"
   )
 
-let build_main ?np ?mem ?loggers ?use_docker ?bistro_dir ?collect ~outdir repo =
-  build ?np ?mem ?loggers ?use_docker ?bistro_dir ?collect ~outdir repo
+let build_main ?np ?mem ?loggers ?allowed_containers ?bistro_dir ?collect ~outdir repo =
+  build ?np ?mem ?loggers ?allowed_containers ?bistro_dir ?collect ~outdir repo
   |> Lwt_main.run
 
 let add_prefix prefix items =

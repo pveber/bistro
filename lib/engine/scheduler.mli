@@ -17,7 +17,7 @@ type t
 val create :
   ?np:int ->
   ?mem:[`GB of int] ->
-  ?use_docker:bool ->
+  ?allowed_containers:[`Docker | `Singularity] list ->
   ?loggers:Logger.t list ->
   ?collect:bool ->
   Db.t ->

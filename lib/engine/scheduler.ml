@@ -348,14 +348,14 @@ type t = {
   allocator : Allocator.t ;
   db : Db.t ;
   logger : Logger.t ;
-  use_docker : bool ;
+  allowed_containers : [`Docker | `Singularity] list ;
   traces : Execution_trace.t thread Table.t ;
   gc : Gc.t option ;
 }
 
 let create
     ?(np = 1) ?mem:(`GB mem = `GB 1)
-    ?(use_docker = true)
+    ?(allowed_containers = [`Docker])
     ?(loggers = [])
     ?(collect = false) db =
   let logger = Logger.tee loggers in
@@ -365,7 +365,7 @@ let create
     closed = false ;
     allocator = Allocator.create ~np ~mem:(mem * 1024) ;
     db ;
-    use_docker ;
+    allowed_containers ;
     traces = String.Table.create () ;
     logger ;
     gc =
@@ -451,7 +451,7 @@ let perform_select sched ~id ~dir ~sel =
 let perform_shell sched (Allocator.Resource { np ; mem }) ~id ~descr cmd =
   let env =
     Execution_env.make
-      ~use_docker:sched.use_docker
+      ~allowed_containers:sched.allowed_containers
       ~db:sched.db
       ~np ~mem ~id
   in

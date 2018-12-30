@@ -8,14 +8,15 @@ type file_dump = File_dump of {
 
 type symbolic_file_dump = Symbolic_file_dump of {
     contents : Execution_env.insert Template.t ;
-    in_docker : bool ;
+    in_docker_container : bool ;
   }
 
 type t = Command of {
     text : string ;
     file_dumps : file_dump list ;
     env : Execution_env.t ;
-    uses_docker : bool ;
+    uses_docker : bool ; (* only used to chown results when done through docker *)
+    images_for_singularity : Command.container_image list ;
   }
 
 let text (Command cmd) = cmd.text
@@ -26,7 +27,7 @@ let rec file_dumps_of_tokens in_docker toks =
   |> List.concat
   |> List.dedup_and_sort ~compare:Caml.compare
 
-and file_dumps_of_token in_docker =
+and file_dumps_of_token in_docker_container =
   let open Template in
   function
   | NP
@@ -38,8 +39,8 @@ and file_dumps_of_token in_docker =
   | F contents ->
     Symbolic_file_dump {
       contents = contents ;
-      in_docker = in_docker
-    } :: file_dumps_of_tokens in_docker contents
+      in_docker_container ;
+    } :: file_dumps_of_tokens in_docker_container contents
     |> List.dedup_and_sort ~compare:Caml.compare
 
 let rec file_dumps_of_command in_docker =
@@ -122,6 +123,29 @@ let find_docker_image env =
       | Singularity_image _ -> None
     )
 
+let find_singularity_image env =
+  List.find_map env ~f:Command.(function
+      | Docker_image _ -> None
+      | Singularity_image i -> Some i
+    )
+
+let rec choose_execution_environment images allowed_containers =
+  match allowed_containers with
+  | [] -> `Plain
+  | `Docker :: others -> ( (* docker only accepts docker images *)
+      match find_docker_image images with
+      | Some i -> `Docker_container i
+      | None -> choose_execution_environment images others
+    )
+  | `Singularity :: others -> (
+      match find_singularity_image images with
+      | Some i -> `Singularity_container (Command.Singularity_image i)
+      | None ->
+        match find_docker_image images with
+        | Some i -> `Singularity_container (Docker_image i)
+        | None -> choose_execution_environment images others
+    )
+
 let rec string_of_command env =
   let open Command in
   function
@@ -130,8 +154,10 @@ let rec string_of_command env =
   | Or_list xs -> par (string_of_command_aux env " || " xs)
   | Pipe_list xs -> par (string_of_command_aux env " | " xs)
   | Within_container (img, cmd) ->
-    match find_docker_image img, env.using_docker with
-    | Some image, true ->
+    match choose_execution_environment img env.allowed_containers with
+    | `Plain ->
+      string_of_command env cmd
+    | `Docker_container image ->
       let dck_env = Execution_env.dockerize env in
       sprintf
         "docker run --log-driver=none --rm %s %s %s %s -i %s bash -c '%s'"
@@ -141,17 +167,41 @@ let rec string_of_command env =
         (dest_mount env dck_env)
         (Docker.image_url image)
         (string_of_command dck_env cmd)
-    | None, _
-    | _, false ->
-      string_of_command env cmd
+    | `Singularity_container _ -> assert false
 
 and string_of_command_aux env sep xs =
   List.map xs ~f:(string_of_command env)
   |> String.concat ~sep
 
-let compile_file_dump env (Symbolic_file_dump { contents ; in_docker }) =
+let rec images_for_singularity env = function
+  | Command.Simple_command _ -> []
+  | And_list xs
+  | Or_list xs
+  | Pipe_list xs -> images_for_singularity_aux env xs
+  | Within_container (img, _) ->
+    match choose_execution_environment img env.Execution_env.allowed_containers with
+    | `Plain
+    | `Docker_container _ -> []
+    | `Singularity_container img -> [ img ]
+and images_for_singularity_aux env xs =
+  List.concat_map xs ~f:(images_for_singularity env)
+
+let rec command_uses_docker env = function
+  | Command.Simple_command _ -> false
+  | And_list xs
+  | Or_list xs
+  | Pipe_list xs -> command_uses_docker_aux env xs
+  | Within_container (img, _) ->
+    match choose_execution_environment img env.Execution_env.allowed_containers with
+    | `Plain -> false
+    | `Docker_container _ -> true
+    | `Singularity_container _ -> false
+and command_uses_docker_aux env xs =
+  List.exists xs ~f:(command_uses_docker env)
+
+let compile_file_dump env (Symbolic_file_dump { contents ; in_docker_container }) =
   let exec_env =
-    if in_docker && env.Execution_env.using_docker
+    if in_docker_container && Execution_env.allows_docker env
     then Execution_env.dockerize env
     else env
   in
@@ -166,7 +216,8 @@ let make env cmd =
       file_dumps_of_command false cmd
       |> List.map ~f:(compile_file_dump env) ;
     env ;
-    uses_docker = Command.uses_container cmd ;
+    uses_docker = command_uses_docker env cmd ;
+    images_for_singularity = images_for_singularity env cmd ;
   }
 
 let write_file_dumps xs =
@@ -198,7 +249,7 @@ let run (Command cmd) =
   in
   let dest_exists = Sys.file_exists cmd.env.dest = `Yes in
   (
-    if cmd.env.using_docker && cmd.uses_docker then (
+    if Execution_env.allows_docker cmd.env && cmd.uses_docker then (
       Misc.docker_chown ~path:cmd.env.tmp_dir ~uid:cmd.env.uid >>= fun () ->
       if dest_exists then Misc.docker_chown ~path:cmd.env.dest ~uid:cmd.env.uid
       else Lwt.return ()
@@ -206,3 +257,5 @@ let run (Command cmd) =
     else Lwt.return ()
   ) >>= fun () ->
   Lwt.return (exit_code, dest_exists)
+
+let images_for_singularity (Command c) = c.images_for_singularity
