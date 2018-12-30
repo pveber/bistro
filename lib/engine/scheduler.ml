@@ -573,9 +573,9 @@ and shallow_eval_command sched =
     list xs >|= fun xs -> Or_list xs
   | Pipe_list xs ->
     list xs >|= fun xs -> Pipe_list xs
-  | Docker (env, cmd) ->
+  | Within_container (env, cmd) ->
     shallow_eval_command sched cmd >|= fun cmd ->
-    Docker (env, cmd)
+    Within_container (env, cmd)
 
 and shallow_eval_template sched toks =
     Lwt_list.map_p (shallow_eval_token sched) toks

@@ -147,11 +147,11 @@ module Shell_dsl = struct
   include Template_dsl
 
   type command = Workflow.shell_command
-  type docker_image = Command.docker_image
+  type container_image = Command.container_image
 
-  let docker image cmd = Command.Docker (image, cmd)
+  let within_container images cmd = Command.Within_container (images, cmd)
 
-  let gen_cmd prog_expr ?env ?stdin ?stdout ?stderr args =
+  let gen_cmd prog_expr ?img ?stdin ?stdout ?stderr args =
     let stdout_expr =
       match stdout with
       | None -> []
@@ -174,9 +174,9 @@ module Shell_dsl = struct
       |> List.concat
     in
     let cmd = Command.Simple_command tokens in
-    match env with
+    match img with
     | None -> cmd
-    | Some image -> docker image cmd
+    | Some image -> within_container image cmd
 
   let cmd p = gen_cmd [ S p ]
 

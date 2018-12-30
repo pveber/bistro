@@ -6,7 +6,6 @@ type file_dump = File_dump of {
     path : string ;
   }
 
-
 type symbolic_file_dump = Symbolic_file_dump of {
     contents : Execution_env.insert Template.t ;
     in_docker : bool ;
@@ -53,7 +52,7 @@ let rec file_dumps_of_command in_docker =
     List.map xs ~f:(file_dumps_of_command in_docker)
     |> List.concat
     |> List.dedup_and_sort ~compare:Caml.compare
-  | Docker (_, cmd) -> file_dumps_of_command true cmd
+  | Within_container (_, cmd) -> file_dumps_of_command true cmd
 
 let string_of_token (env : Execution_env.t) =
   let open Template in
@@ -117,6 +116,12 @@ let command_path_deps cmd =
       | String _ -> None
     )
 
+let find_docker_image env =
+  List.find_map env ~f:Command.(function
+      | Docker_image i -> Some i
+      | Singularity_image _ -> None
+    )
+
 let rec string_of_command env =
   let open Command in
   function
@@ -124,8 +129,9 @@ let rec string_of_command env =
   | And_list xs -> par (string_of_command_aux env " && " xs)
   | Or_list xs -> par (string_of_command_aux env " || " xs)
   | Pipe_list xs -> par (string_of_command_aux env " | " xs)
-  | Docker (image, cmd) ->
-    if env.using_docker then
+  | Within_container (img, cmd) ->
+    match find_docker_image img, env.using_docker with
+    | Some image, true ->
       let dck_env = Execution_env.dockerize env in
       sprintf
         "docker run --log-driver=none --rm %s %s %s %s -i %s bash -c '%s'"
@@ -135,7 +141,8 @@ let rec string_of_command env =
         (dest_mount env dck_env)
         (Docker.image_url image)
         (string_of_command dck_env cmd)
-    else
+    | None, _
+    | _, false ->
       string_of_command env cmd
 
 and string_of_command_aux env sep xs =
@@ -159,7 +166,7 @@ let make env cmd =
       file_dumps_of_command false cmd
       |> List.map ~f:(compile_file_dump env) ;
     env ;
-    uses_docker = Command.uses_docker cmd ;
+    uses_docker = Command.uses_container cmd ;
   }
 
 let write_file_dumps xs =

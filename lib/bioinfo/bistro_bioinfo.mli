@@ -252,7 +252,7 @@ end
 (** {3 NGS utilities} *)
 
 module Bedtools : sig
-  val env : Shell_dsl.docker_image
+  val img : Shell_dsl.container_image list
 
   type 'a input
 
@@ -618,7 +618,7 @@ module Samtools : sig
 end
 
 module Sra_toolkit : sig
-  val env : Shell_dsl.docker_image
+  val img : Shell_dsl.container_image list
 
   val fastq_dump : sra pworkflow -> sanger_fastq pworkflow
 
@@ -832,7 +832,7 @@ end
 
 module DESeq2 : sig
 
-  val env : Shell_dsl.docker_image
+  val img : Shell_dsl.container_image list
 
   class type table = object
     inherit tsv
