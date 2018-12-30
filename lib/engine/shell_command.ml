@@ -167,7 +167,12 @@ let rec string_of_command env =
         (dest_mount env dck_env)
         (Docker.image_url image)
         (string_of_command dck_env cmd)
-    | `Singularity_container _ -> assert false
+    | `Singularity_container img ->
+      let env = Execution_env.singularize env in
+      sprintf
+        "singularity exec %s bash -c '%s'"
+        (Db.singularity_image env.Execution_env.db img)
+        (string_of_command env cmd)
 
 and string_of_command_aux env sep xs =
   List.map xs ~f:(string_of_command env)
@@ -257,5 +262,3 @@ let run (Command cmd) =
     else Lwt.return ()
   ) >>= fun () ->
   Lwt.return (exit_code, dest_exists)
-
-let images_for_singularity (Command c) = c.images_for_singularity

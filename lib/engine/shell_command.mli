@@ -14,5 +14,4 @@ val make :
 
 val text : t -> string
 val file_dumps : t -> file_dump list
-val images_for_singularity : t -> Command.container_image list
 val run : t -> (int * bool) Lwt.t

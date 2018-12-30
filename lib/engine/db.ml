@@ -24,6 +24,7 @@ let build_dir base = base / "build"
 let tmp_dir base = base / "tmp"
 let stderr_dir base = base / "stderr"
 let stdout_dir base = base / "stdout"
+let singularity_image_dir base = base / "singularity_image"
 
 let get_obj f db id =
   Filename.concat (f db) id
@@ -144,3 +145,16 @@ let is_in_cache db u =
   |> Option.value_map ~default:false ~f:(fun u ->
       Sys.file_exists (path db u) = `Yes
     )
+
+let container_image_identifier img =
+  let f account name tag =
+    sprintf "%s_%s%s_%s.sif" account name
+      (Option.value_map tag ~default:"" ~f:(( ^ ) "_"))
+      (Bistro_internals.Workflow.digest img)
+  in
+  match (img : Bistro_internals.Command.container_image) with
+  | Docker_image i -> f i.account i.name i.tag
+  | Singularity_image i -> f i.account i.name i.tag
+
+let singularity_image db img =
+  Filename.concat (singularity_image_dir db) (container_image_identifier img)

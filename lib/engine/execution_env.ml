@@ -111,3 +111,7 @@ let dockerize env = {
 }
 
 let allows_docker env = List.mem ~equal:Poly.equal env.allowed_containers `Docker
+
+let singularize env = {
+  env with allowed_containers = [] ;
+}

@@ -37,3 +37,4 @@ val container_mount : Db.t -> Workflow.path -> container_mount
 val dockerize : t -> t
 val docker_cache_dir : string
 val allows_docker : t -> bool
+val singularize : t -> t

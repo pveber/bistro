@@ -26,12 +26,14 @@ val cache_dir : t -> string
 val stdout_dir : t -> string
 val stderr_dir : t -> string
 val build_dir : t -> string
+val singularity_image_dir : t -> string
 
 val tmp : t -> id -> string
 val cache : t -> id -> string
 val stdout : t -> id -> string
 val stderr : t -> id -> string
 val build : t -> id -> string
+val singularity_image : t -> Bistro_internals.Command.container_image -> string
 
 val fold_cache :
   t ->
