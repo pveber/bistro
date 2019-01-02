@@ -2,6 +2,8 @@
 
 interaction with GC
 
+ressource allocation for singularity pull
+
 *)
 open Core
 open Lwt.Infix
@@ -693,19 +695,24 @@ let schedule_container_image_fetch sched img =
   let id = Db.container_image_identifier img in
   let ready = Unix.gettimeofday () in
   register_build sched ~id ~build_trace:(fun () ->
-      let start = Unix.gettimeofday () in
-      (* log ~time:start sched (Logger.Workflow_started (w, resource)) ; *)
-      printf "== started ==> %s\n%!" id ;
       let dest = Db.singularity_image sched.db img in
-      if Sys.file_exists dest = `Yes then Eval_thread.return (Execution_trace.Done_already { id })
+      if Sys.file_exists dest = `Yes then
+        Eval_thread.return (Execution_trace.Done_already { id })
       else (
-        Singularity.fetch_image img dest >>= fun outcome ->
-        let _end_ = Unix.gettimeofday () in
-        printf "== ended ==> %s\n%!" id ;
-        Eval_thread.return @@ Execution_trace.Run {
-          ready ; start ; _end_ ;
-          outcome = Task_result.Container_image_fetch { id ; outcome } ;
-        }
+        let req = Allocator.Request { np = 1 ; mem = 0 } in
+        Allocator.request sched.allocator req >>= function
+        | Ok resource ->
+          let start = Unix.gettimeofday () in
+          (* log ~time:start sched (Logger.Workflow_started (w, resource)) ; *)
+          Singularity.fetch_image img dest >>= fun outcome ->
+          let _end_ = Unix.gettimeofday () in
+          Allocator.release sched.allocator resource ;
+          Eval_thread.return @@ Execution_trace.Run {
+            ready ; start ; _end_ ;
+            outcome = Task_result.Container_image_fetch { id ; outcome } ;
+          }
+        | Error _ ->
+          assert false (* should never happen, we're asking so little here! *)
       )
     )
   |> Eval_thread.ignore
