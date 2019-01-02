@@ -23,6 +23,8 @@ let error_short_descr =
         sprintf "ended with exit code %d" exit_code
       | `Missing_output ->
         "missing output"
+      | `Missing_container_image _ ->
+        "failed to fetch container image"
     )
   | Plugin { outcome ; _ } -> (
       match outcome with

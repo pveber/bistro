@@ -1,4 +1,5 @@
 open Core
+open Lwt.Infix
 open Bistro_internals
 
 type file_dump = File_dump of {
@@ -231,6 +232,18 @@ let write_file_dumps xs =
   in
   Lwt_list.iter_p f xs
 
+let fetch_singularity_images db imgs =
+  let f img =
+    if Sys.file_exists (Db.singularity_image db img) = `Yes then Lwt_result.return ()
+    else Singularity.fetch_image db img
+  in
+  Lwt_list.map_p f imgs >|= Result.all_unit
+
+let ( >>=? ) x f =
+  x >>= function
+  | Ok x -> f x >|= Result.return
+  | Error _ as e -> Lwt.return e
+
 let run (Command cmd) =
   let open Lwt in
   let script_file = Filename.temp_file "guizmin" ".sh" in
@@ -242,6 +255,7 @@ let run (Command cmd) =
             (fun oc -> write oc cmd.text)) >>= fun () ->
   Misc.redirection cmd.env.stdout >>= fun stdout ->
   Misc.redirection cmd.env.stderr >>= fun stderr ->
+  fetch_singularity_images cmd.env.db cmd.images_for_singularity >>=? fun () ->
   Lwt_process.exec ~stdout ~stderr ("", [| "sh" ; script_file |])
   >>= fun status ->
   Lwt_unix.unlink script_file >>= fun () ->

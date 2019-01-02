@@ -14,4 +14,4 @@ val make :
 
 val text : t -> string
 val file_dumps : t -> file_dump list
-val run : t -> (int * bool) Lwt.t
+val run : t -> (int * bool, [> `Singularity_failed_pull of int * string]) Lwt_result.t

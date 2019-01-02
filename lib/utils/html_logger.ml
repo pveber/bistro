@@ -73,6 +73,7 @@ module Render = struct
       sprintf "id%08d" !c
 
   let k = txt
+  let kf fmt = Printf.ksprintf txt fmt
 
   let collapsible_panel ~title ~header ~body =
     let elt_id = new_elt_id () in
@@ -191,9 +192,11 @@ module Render = struct
           match outcome with
           | `Succeeded -> k""
           | `Failed ->
-            p [ k (sprintf "Command failed with code %d" exit_code) ]
+            p [ kf "Command failed with code %d" exit_code ]
           | `Missing_output ->
-            p [ k "missing_output" ]
+            p [ k "Missing output" ]
+          | `Missing_container_image url ->
+            p [ kf "Failed to fetch container image %s" url ]
         ]
         ~body:(shell_result_details ~id:id ~cmd ~cache ~stderr ~stdout ~file_dumps)
     | Plugin res ->
@@ -271,6 +274,8 @@ module Render = struct
     | Plugin { outcome = `Succeeded ; _ } ->
       event_label_text `GREEN "DONE"
 
+    | Shell { outcome = `Missing_container_image _ ; _ } ->
+      event_label_text `RED "MISSING CONTAINER IMAGE"
 
   let event time evt =
     let table_line label details =

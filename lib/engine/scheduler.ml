@@ -456,27 +456,41 @@ let perform_shell sched (Allocator.Resource { np ; mem }) ~id ~descr cmd =
       ~np ~mem ~id
   in
   let cmd = Shell_command.make env cmd in
-  Shell_command.run cmd >>= fun (exit_code, dest_exists) ->
-  let cache_dest = Db.cache sched.db id in
-  let outcome = step_outcome ~exit_code ~dest_exists in
-  Misc.(
-    if outcome = `Succeeded then
-      mv env.dest cache_dest >>= fun () ->
-      remove_if_exists env.tmp_dir
-    else
-      Lwt.return ()
-  ) >>= fun () ->
-  Eval_thread.return (Task_result.Shell {
-      outcome ;
-      id ;
-      descr ;
-      exit_code ;
-      cmd = Shell_command.text cmd ;
-      file_dumps = Shell_command.file_dumps cmd ;
-      cache = if outcome = `Succeeded then Some cache_dest else None ;
-      stdout = env.stdout ;
-      stderr = env.stderr ;
-    })
+  Shell_command.run cmd >>= function
+  | Ok (exit_code, dest_exists) ->
+    let cache_dest = Db.cache sched.db id in
+    let outcome = step_outcome ~exit_code ~dest_exists in
+    Misc.(
+      if outcome = `Succeeded then
+        mv env.dest cache_dest >>= fun () ->
+        remove_if_exists env.tmp_dir
+      else
+        Lwt.return ()
+    ) >>= fun () ->
+    Eval_thread.return (Task_result.Shell {
+        outcome ;
+        id ;
+        descr ;
+        exit_code ;
+        cmd = Shell_command.text cmd ;
+        file_dumps = Shell_command.file_dumps cmd ;
+        cache = if outcome = `Succeeded then Some cache_dest else None ;
+        stdout = env.stdout ;
+        stderr = env.stderr ;
+      })
+  | Error (`Singularity_failed_pull (exit_code, url)) ->
+    Eval_thread.return (Task_result.Shell {
+        outcome = `Missing_container_image url ;
+        id ;
+        descr ;
+        exit_code ;
+        cmd = Shell_command.text cmd ;
+        file_dumps = Shell_command.file_dumps cmd ;
+        cache = None ;
+        stdout = env.stdout ;
+        stderr = env.stderr ;
+      })
+
 
 let rec blocking_evaluator
   : type s. Db.t -> s W.t -> (unit -> s)

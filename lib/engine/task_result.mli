@@ -4,7 +4,10 @@ type t =
   | Shell of {
       id : string ;
       descr : string ;
-      outcome : [`Succeeded | `Missing_output | `Failed] ;
+      outcome : [ `Succeeded
+                | `Missing_output
+                | `Failed
+                | `Missing_container_image of string ] ;
       exit_code : int ;
       cmd : string ;
       file_dumps : Shell_command.file_dump list ;
