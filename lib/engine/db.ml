@@ -41,6 +41,7 @@ let create_db path =
   Unix.mkdir_p (cache_dir path) ;
   Unix.mkdir_p (stderr_dir path) ;
   Unix.mkdir_p (stdout_dir path) ;
+  Unix.mkdir_p (singularity_image_dir path) ;
   Ok ()
 
 let dir_is_empty path =
@@ -71,6 +72,7 @@ let dirs_of_db_exist path =
     tmp_dir path ;
     stderr_dir path ;
     stdout_dir path ;
+    singularity_image_dir path ;
   ]
   in
   let checks = List.map dir_paths ~f:(check_path `Dir) in
