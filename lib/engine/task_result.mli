@@ -4,10 +4,7 @@ type t =
   | Shell of {
       id : string ;
       descr : string ;
-      outcome : [ `Succeeded
-                | `Missing_output
-                | `Failed
-                | `Missing_container_image of string ] ;
+      outcome : [ `Succeeded | `Missing_output | `Failed ] ;
       exit_code : int ;
       cmd : string ;
       file_dumps : Shell_command.file_dump list ;
@@ -20,6 +17,10 @@ type t =
       descr : string ;
       outcome : [`Succeeded | `Missing_output | `Failed] ;
       msg : string option ;
+    }
+  | Container_image_fetch of {
+      id : string ;
+      outcome : (unit, [ `Singularity_failed_pull of int * string ]) result
     }
 
 val id : t -> string

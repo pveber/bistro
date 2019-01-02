@@ -195,8 +195,6 @@ module Render = struct
             p [ kf "Command failed with code %d" exit_code ]
           | `Missing_output ->
             p [ k "Missing output" ]
-          | `Missing_container_image url ->
-            p [ kf "Failed to fetch container image %s" url ]
         ]
         ~body:(shell_result_details ~id:id ~cmd ~cache ~stderr ~stdout ~file_dumps)
     | Plugin res ->
@@ -211,6 +209,11 @@ module Render = struct
             p [ k "missing_output" ]
         ]
         ~body:[]
+    | Container_image_fetch f ->
+      match f.outcome with
+      | Ok () -> [ k"" ]
+      | Error (`Singularity_failed_pull (_, url)) ->
+        [ p [kf "Failed to fetch container image at %s" url] ]
 
   let workflow_start ~descr ~id =
     collapsible_panel
@@ -271,10 +274,11 @@ module Render = struct
       event_label_text `RED "MISSING OUTPUT"
 
     | Shell { outcome = `Succeeded ; _ }
-    | Plugin { outcome = `Succeeded ; _ } ->
+    | Plugin { outcome = `Succeeded ; _ }
+    | Container_image_fetch { outcome = Ok () ; _ } ->
       event_label_text `GREEN "DONE"
 
-    | Shell { outcome = `Missing_container_image _ ; _ } ->
+    | Container_image_fetch { outcome = Error _ ; _ } ->
       event_label_text `RED "MISSING CONTAINER IMAGE"
 
   let event time evt =

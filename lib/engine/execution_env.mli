@@ -38,3 +38,15 @@ val dockerize : t -> t
 val docker_cache_dir : string
 val allows_docker : t -> bool
 val singularize : t -> t
+
+val choose_container :
+  [`Docker | `Singularity] list ->
+  Command.container_image list ->
+  [ `Plain
+  | `Docker_container of Command.Docker_image.t
+  | `Singularity_container of Command.container_image ]
+
+val images_for_singularity :
+  [`Docker | `Singularity] list ->
+  _ Command.t ->
+  Command.container_image list

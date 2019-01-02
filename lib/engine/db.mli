@@ -35,6 +35,8 @@ val stderr : t -> id -> string
 val build : t -> id -> string
 val singularity_image : t -> Bistro_internals.Command.container_image -> string
 
+val container_image_identifier : Bistro_internals.Command.container_image -> string
+
 val fold_cache :
   t ->
   init:'a ->

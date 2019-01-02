@@ -1,5 +1,4 @@
 open Core
-open Lwt.Infix
 open Bistro_internals
 
 type file_dump = File_dump of {
@@ -17,7 +16,6 @@ type t = Command of {
     file_dumps : file_dump list ;
     env : Execution_env.t ;
     uses_docker : bool ; (* only used to chown results when done through docker *)
-    images_for_singularity : Command.container_image list ;
   }
 
 let text (Command cmd) = cmd.text
@@ -118,35 +116,6 @@ let command_path_deps cmd =
       | String _ -> None
     )
 
-let find_docker_image env =
-  List.find_map env ~f:Command.(function
-      | Docker_image i -> Some i
-      | Singularity_image _ -> None
-    )
-
-let find_singularity_image env =
-  List.find_map env ~f:Command.(function
-      | Docker_image _ -> None
-      | Singularity_image i -> Some i
-    )
-
-let rec choose_execution_environment images allowed_containers =
-  match allowed_containers with
-  | [] -> `Plain
-  | `Docker :: others -> ( (* docker only accepts docker images *)
-      match find_docker_image images with
-      | Some i -> `Docker_container i
-      | None -> choose_execution_environment images others
-    )
-  | `Singularity :: others -> (
-      match find_singularity_image images with
-      | Some i -> `Singularity_container (Command.Singularity_image i)
-      | None ->
-        match find_docker_image images with
-        | Some i -> `Singularity_container (Docker_image i)
-        | None -> choose_execution_environment images others
-    )
-
 let rec string_of_command env =
   let open Command in
   function
@@ -155,7 +124,7 @@ let rec string_of_command env =
   | Or_list xs -> par (string_of_command_aux env " || " xs)
   | Pipe_list xs -> par (string_of_command_aux env " | " xs)
   | Within_container (img, cmd) ->
-    match choose_execution_environment img env.allowed_containers with
+    match Execution_env.choose_container env.Execution_env.allowed_containers img with
     | `Plain ->
       string_of_command env cmd
     | `Docker_container image ->
@@ -179,26 +148,13 @@ and string_of_command_aux env sep xs =
   List.map xs ~f:(string_of_command env)
   |> String.concat ~sep
 
-let rec images_for_singularity env = function
-  | Command.Simple_command _ -> []
-  | And_list xs
-  | Or_list xs
-  | Pipe_list xs -> images_for_singularity_aux env xs
-  | Within_container (img, _) ->
-    match choose_execution_environment img env.Execution_env.allowed_containers with
-    | `Plain
-    | `Docker_container _ -> []
-    | `Singularity_container img -> [ img ]
-and images_for_singularity_aux env xs =
-  List.concat_map xs ~f:(images_for_singularity env)
-
 let rec command_uses_docker env = function
   | Command.Simple_command _ -> false
   | And_list xs
   | Or_list xs
   | Pipe_list xs -> command_uses_docker_aux env xs
   | Within_container (img, _) ->
-    match choose_execution_environment img env.Execution_env.allowed_containers with
+    match Execution_env.choose_container env.Execution_env.allowed_containers img with
     | `Plain -> false
     | `Docker_container _ -> true
     | `Singularity_container _ -> false
@@ -223,7 +179,6 @@ let make env cmd =
       |> List.map ~f:(compile_file_dump env) ;
     env ;
     uses_docker = command_uses_docker env cmd ;
-    images_for_singularity = images_for_singularity env cmd ;
   }
 
 let write_file_dumps xs =
@@ -231,18 +186,6 @@ let write_file_dumps xs =
     Lwt_io.(with_file ~mode:output path (fun oc -> write oc text))
   in
   Lwt_list.iter_p f xs
-
-let fetch_singularity_images db imgs =
-  let f img =
-    if Sys.file_exists (Db.singularity_image db img) = `Yes then Lwt_result.return ()
-    else Singularity.fetch_image db img
-  in
-  Lwt_list.map_p f imgs >|= Result.all_unit
-
-let ( >>=? ) x f =
-  x >>= function
-  | Ok x -> f x >|= Result.return
-  | Error _ as e -> Lwt.return e
 
 let run (Command cmd) =
   let open Lwt in
@@ -255,7 +198,6 @@ let run (Command cmd) =
             (fun oc -> write oc cmd.text)) >>= fun () ->
   Misc.redirection cmd.env.stdout >>= fun stdout ->
   Misc.redirection cmd.env.stderr >>= fun stderr ->
-  fetch_singularity_images cmd.env.db cmd.images_for_singularity >>=? fun () ->
   Lwt_process.exec ~stdout ~stderr ("", [| "sh" ; script_file |])
   >>= fun status ->
   Lwt_unix.unlink script_file >>= fun () ->

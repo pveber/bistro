@@ -1,3 +1,8 @@
+(**
+
+interaction with GC
+
+*)
 open Core
 open Lwt.Infix
 open Bistro_internals
@@ -20,6 +25,7 @@ module Eval_thread : sig
   (*   'a list -> *)
   (*   f:('a -> 'b t) -> *)
   (*   'b list t *)
+  val join2 : unit t -> unit t -> unit t
   val join :
     'a list ->
     f:('a -> unit t) ->
@@ -69,6 +75,12 @@ struct
       )
     in
     Lwt.return res
+
+  let join2 x y =
+    let open Infix in
+    x >>= fun () ->
+    y >>= fun () ->
+    return ()
 
   let join xs ~f =
     let open Lwt_result in
@@ -456,41 +468,27 @@ let perform_shell sched (Allocator.Resource { np ; mem }) ~id ~descr cmd =
       ~np ~mem ~id
   in
   let cmd = Shell_command.make env cmd in
-  Shell_command.run cmd >>= function
-  | Ok (exit_code, dest_exists) ->
-    let cache_dest = Db.cache sched.db id in
-    let outcome = step_outcome ~exit_code ~dest_exists in
-    Misc.(
-      if outcome = `Succeeded then
-        mv env.dest cache_dest >>= fun () ->
-        remove_if_exists env.tmp_dir
-      else
-        Lwt.return ()
-    ) >>= fun () ->
-    Eval_thread.return (Task_result.Shell {
-        outcome ;
-        id ;
-        descr ;
-        exit_code ;
-        cmd = Shell_command.text cmd ;
-        file_dumps = Shell_command.file_dumps cmd ;
-        cache = if outcome = `Succeeded then Some cache_dest else None ;
-        stdout = env.stdout ;
-        stderr = env.stderr ;
-      })
-  | Error (`Singularity_failed_pull (exit_code, url)) ->
-    Eval_thread.return (Task_result.Shell {
-        outcome = `Missing_container_image url ;
-        id ;
-        descr ;
-        exit_code ;
-        cmd = Shell_command.text cmd ;
-        file_dumps = Shell_command.file_dumps cmd ;
-        cache = None ;
-        stdout = env.stdout ;
-        stderr = env.stderr ;
-      })
-
+  Shell_command.run cmd >>= fun (exit_code, dest_exists) ->
+  let cache_dest = Db.cache sched.db id in
+  let outcome = step_outcome ~exit_code ~dest_exists in
+  Misc.(
+    if outcome = `Succeeded then
+      mv env.dest cache_dest >>= fun () ->
+      remove_if_exists env.tmp_dir
+    else
+      Lwt.return ()
+  ) >>= fun () ->
+  Eval_thread.return (Task_result.Shell {
+      outcome ;
+      id ;
+      descr ;
+      exit_code ;
+      cmd = Shell_command.text cmd ;
+      file_dumps = Shell_command.file_dumps cmd ;
+      cache = if outcome = `Succeeded then Some cache_dest else None ;
+      stdout = env.stdout ;
+      stderr = env.stderr ;
+    })
 
 let rec blocking_evaluator
   : type s. Db.t -> s W.t -> (unit -> s)
@@ -691,6 +689,32 @@ let schedule_cached_workflow sched ~id w ~deps ~perform =
   >>| signal_trace_to_gc sched w
   |> Eval_thread.ignore
 
+let schedule_container_image_fetch sched img =
+  let id = Db.container_image_identifier img in
+  let ready = Unix.gettimeofday () in
+  register_build sched ~id ~build_trace:(fun () ->
+      let start = Unix.gettimeofday () in
+      (* log ~time:start sched (Logger.Workflow_started (w, resource)) ; *)
+      printf "== started ==> %s\n%!" id ;
+      let dest = Db.singularity_image sched.db img in
+      if Sys.file_exists dest = `Yes then Eval_thread.return (Execution_trace.Done_already { id })
+      else (
+        Singularity.fetch_image img dest >>= fun outcome ->
+        let _end_ = Unix.gettimeofday () in
+        printf "== ended ==> %s\n%!" id ;
+        Eval_thread.return @@ Execution_trace.Run {
+          ready ; start ; _end_ ;
+          outcome = Task_result.Container_image_fetch { id ; outcome } ;
+        }
+      )
+    )
+  |> Eval_thread.ignore
+
+let schedule_shell_container_image_fetch sched cmd =
+  Eval_thread.join
+    (Execution_env.images_for_singularity sched.allowed_containers cmd)
+    ~f:(schedule_container_image_fetch sched)
+
 let rec build
   : type u v. t -> ?target:v W.t -> u W.t -> unit thread
   = fun sched ?target w ->
@@ -762,7 +786,10 @@ let rec build
 
     | W.Shell { id ; task ; descr ; deps ; _ } ->
       schedule_cached_workflow sched ~id w
-        ~deps:(fun () -> Eval_thread.join deps ~f:(fun (W.Any x) -> build sched ~target:w x))
+        ~deps:Eval_thread.(fun () ->
+            join2
+              (schedule_shell_container_image_fetch sched task)
+              (join deps ~f:(fun (W.Any x) -> build sched ~target:w x)))
         ~perform:(fun resource ->
             shallow_eval_command sched task >> fun cmd ->
             perform_shell sched resource ~id ~descr cmd >>= fun r ->

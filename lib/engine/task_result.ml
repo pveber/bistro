@@ -6,10 +6,7 @@ type t =
   | Shell of {
       id : string ;
       descr : string ;
-      outcome : [`Succeeded |
-                 `Missing_output |
-                 `Failed |
-                 `Missing_container_image of string] ;
+      outcome : [`Succeeded | `Missing_output | `Failed ] ;
       exit_code : int ;
       cmd : string ;
       file_dumps : Shell_command.file_dump list ;
@@ -23,32 +20,37 @@ type t =
       outcome : [`Succeeded | `Missing_output | `Failed] ;
       msg : string option ;
     }
+  | Container_image_fetch of {
+      id : string ;
+      outcome : (unit, [ `Singularity_failed_pull of int * string ]) result
+    }
 
 let id = function
   | Input { id ;  _ }
   | Select { id ;  _}
   | Shell { id ; _ }
-  | Plugin { id ; _ } -> id
+  | Plugin { id ; _ }
+  | Container_image_fetch { id ; _ } -> id
 
 let succeeded_of_outcome = function
   | `Succeeded -> true
-  | `Missing_container_image _
   | `Failed | `Missing_output -> false
 
 let succeeded = function
   | Input { pass ; _ }
   | Select { pass ; _ } -> pass
-  | Plugin { outcome ; _ } -> succeeded_of_outcome outcome
+  | Container_image_fetch f -> f.outcome = Ok ()
+  | Plugin { outcome ; _ }
   | Shell { outcome ; _ } -> succeeded_of_outcome outcome
 
 let error_short_descr = function
   | Input { path ; _ } -> sprintf "Input %s doesn't exist" path
   | Select { dir_path ; sel ; _ } ->
     sprintf "Path %s doesn't exist in %s" (Path.to_string sel) dir_path
+  | Container_image_fetch _ -> sprintf "Container image could not be fetched"
   | Shell x -> (
       match x.outcome with
       | `Missing_output -> "Missing output"
-      | `Missing_container_image _ -> sprintf "Container image could not be fetched"
       | `Failed ->
         sprintf "Ended with exit code %d" x.exit_code
       | `Succeeded ->
@@ -68,33 +70,34 @@ let error_long_descr x db buf id = match x with
   | Input _ | Select _ -> ()
   | Plugin o -> Option.iter o.msg ~f:(Buffer.add_string buf)
   | Shell x ->
+    (
+      bprintf buf "+------------------------------------------------------------------------------+\n" ;
+      bprintf buf "| Submitted script                                                             |\n" ;
+      bprintf buf "+------------------------------------------------------------------------------+\n" ;
+      bprintf buf "%s\n" x.cmd
+    ) ;
+    List.iter x.file_dumps ~f:(fun (Shell_command.File_dump { path ; text }) ->
+        bprintf buf "+------------------------------------------------------------------------------+\n" ;
+        bprintf buf "|> Dumped file: %s\n" path ;
+        bprintf buf "+------------------------------------------------------------------------------+\n" ;
+        bprintf buf "%s\n" text ;
+      ) ;
+    bprintf buf "#\n" ;
+    bprintf buf "+------------------------------------------------------------------------------+\n" ;
+    bprintf buf "| STDOUT                                                                       |\n" ;
+    bprintf buf "+------------------------------------------------------------------------------+\n" ;
+    bprintf buf "%s\n" (In_channel.read_all (Db.stdout db id)) ;
+    bprintf buf "+------------------------------------------------------------------------------+\n" ;
+    bprintf buf "| STDERR                                                                       |\n" ;
+    bprintf buf "+------------------------------------------------------------------------------+\n" ;
+    bprintf buf "%s\n" (In_channel.read_all (Db.stderr db id))
+  | Container_image_fetch x ->
     match x.outcome with
-    | `Missing_container_image url ->
+    | Ok () -> assert false
+    | Error (`Singularity_failed_pull (_, url)) ->
       (
         bprintf buf "+------------------------------------------------------------------------------+\n" ;
         bprintf buf "| Image URL                                                                    |\n" ;
         bprintf buf "+------------------------------------------------------------------------------+\n" ;
         bprintf buf "%s\n" url
-      ) ;
-    | `Missing_output | `Failed | `Succeeded ->
-      (
-        bprintf buf "+------------------------------------------------------------------------------+\n" ;
-        bprintf buf "| Submitted script                                                             |\n" ;
-        bprintf buf "+------------------------------------------------------------------------------+\n" ;
-        bprintf buf "%s\n" x.cmd
-      ) ;
-      List.iter x.file_dumps ~f:(fun (Shell_command.File_dump { path ; text }) ->
-          bprintf buf "+------------------------------------------------------------------------------+\n" ;
-          bprintf buf "|> Dumped file: %s\n" path ;
-          bprintf buf "+------------------------------------------------------------------------------+\n" ;
-          bprintf buf "%s\n" text ;
-        ) ;
-      bprintf buf "#\n" ;
-      bprintf buf "+------------------------------------------------------------------------------+\n" ;
-      bprintf buf "| STDOUT                                                                       |\n" ;
-      bprintf buf "+------------------------------------------------------------------------------+\n" ;
-      bprintf buf "%s\n" (In_channel.read_all (Db.stdout db id)) ;
-      bprintf buf "+------------------------------------------------------------------------------+\n" ;
-      bprintf buf "| STDERR                                                                       |\n" ;
-      bprintf buf "+------------------------------------------------------------------------------+\n" ;
-      bprintf buf "%s\n" (In_channel.read_all (Db.stderr db id))
+      )

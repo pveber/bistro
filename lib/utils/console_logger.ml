@@ -23,8 +23,6 @@ let error_short_descr =
         sprintf "ended with exit code %d" exit_code
       | `Missing_output ->
         "missing output"
-      | `Missing_container_image _ ->
-        "failed to fetch container image"
     )
   | Plugin { outcome ; _ } -> (
       match outcome with
@@ -33,6 +31,8 @@ let error_short_descr =
       | `Missing_output ->
         "missing output"
     )
+  | Container_image_fetch _ ->
+    "failed to fetch container image"
 
 let output_step_event t ~id ~descr =
   let id = String.prefix id 6 in
