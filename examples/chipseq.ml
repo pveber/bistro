@@ -41,6 +41,7 @@ let repo = Repo.[
 
 let () =
   Repo.build_main
+    ~collect:true
     ~allowed_containers:[`Singularity]
     ~np:4 ~mem:(`GB 4)
     ~outdir:"res"

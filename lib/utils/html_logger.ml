@@ -48,11 +48,12 @@ let translate_event db _ = function
     let path = Db.cache db (Workflow.id w) in
     Some (Workflow_done_already { w ; path })
 
-  | Workflow_ready _ -> None
-  | Workflow_allocation_error _ -> None
-  | Workflow_skipped (_, `Missing_dep) -> None
-  | Workflow_started (_, _) -> None
-  | Workflow_collected _ -> None
+  | Workflow_ready _
+  | Workflow_allocation_error _
+  | Workflow_skipped (_, `Missing_dep)
+  | Workflow_started (_, _)
+  | Workflow_collected _
+  | Singularity_image_collected _ -> None
 
 let update model db time evt =
   {
