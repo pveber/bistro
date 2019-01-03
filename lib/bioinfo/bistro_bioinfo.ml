@@ -140,10 +140,10 @@ module Fastq = struct
 end
 
 module Bedtools = struct
-  let env = docker_image ~account:"pveber" ~name:"bedtools" ~tag:"2.21.0" ()
+  let img = [ docker_image ~account:"pveber" ~name:"bedtools" ~tag:"2.21.0" () ]
 
   let bedtools ?stdout subcmd args =
-    cmd "bedtools" ?stdout ~env (string subcmd :: args)
+    cmd "bedtools" ?stdout ~img (string subcmd :: args)
 
   type 'a input = Bed | Gff
 
@@ -181,7 +181,7 @@ module Bedtools = struct
   let intersect ?ubam ?wa ?wb ?loj ?wo ?wao ?u ?c ?v ?f ?_F ?r ?e ?s ?_S
       ?split ?sorted ?g ?header ?filenames ?sortout _ file files =
     Workflow.shell ~descr:"bedtools.intersect" [
-      cmd "bedtools intersect" ~env ~stdout:dest [
+      cmd "bedtools intersect" ~img ~stdout:dest [
         option (flag string "-ubam") ubam ;
         option (flag string "-wa") wa ;
         option (flag string "-wb") wb ;
@@ -210,7 +210,7 @@ module Bedtools = struct
 
   let bamtobed ?bed12 ?split ?splitD ?ed ?tag ?cigar bam =
     Workflow.shell ~descr:"bedtools.bamtobed" ~mem:(Workflow.int  (3 * 1024)) ~np:8 [
-      cmd "bedtools bamtobed" ~stdout:dest ~env [
+      cmd "bedtools bamtobed" ~stdout:dest ~img [
         option (flag string "-bed12") bed12 ;
         option (flag string "-split") split ;
         option (flag string "-splitD") splitD ;
@@ -231,10 +231,10 @@ module Samtools = struct
   let sam = Sam
 
 
-  let env = docker_image ~account:"pveber" ~name:"samtools" ~tag:"1.3.1" ()
+  let img = [ docker_image ~account:"pveber" ~name:"samtools" ~tag:"1.3.1" () ]
 
   let samtools subcmd args =
-    cmd "samtools" ~env (string subcmd :: args)
+    cmd "samtools" ~img (string subcmd :: args)
 
   let sam_of_bam bam =
     Workflow.shell ~descr:"samtools.sam_of_bam" [
@@ -297,7 +297,7 @@ module Samtools = struct
 
   let view ~output (* ?_1 ?u *) ?h ?_H (* ?c ?_L *) ?q (* ?m ?f ?_F ?_B ?s *) file =
     Workflow.shell ~descr:"samtools.view" [
-      cmd "samtools view" ~env [
+      cmd "samtools view" ~img [
         output_format_expr output ;
         (* option (flag string "-1") _1 ; *)
         (* option (flag string "-u") u ; *)
@@ -324,13 +324,13 @@ module Bowtie2 = struct
     inherit directory
   end
 
-  let env = docker_image ~account:"pveber" ~name:"bowtie2" ~tag:"2.3.3" ()
+  let img = [ docker_image ~account:"pveber" ~name:"bowtie2" ~tag:"2.3.3" () ]
 
   (* memory bound correspond to storing a human index in memory, following bowtie manual *)
   let bowtie2_build ?large_index ?noauto ?packed ?bmax ?bmaxdivn ?dcv ?nodc ?noref ?justref ?offrate ?ftabchars ?seed ?cutoff fa =
     Workflow.shell ~descr:"bowtie2_build" ~np:8 ~mem:(Workflow.int (3 * 1024)) [
       mkdir_p dest ;
-      cmd "bowtie2-build" ~env [
+      cmd "bowtie2-build" ~img [
         option (flag string "--large-index") large_index ;
         option (flag string "--no-auto") noauto ;
         option (flag string "--packed") packed ;
@@ -393,7 +393,7 @@ module Bowtie2 = struct
         ]
     in
     Workflow.shell ~descr:"bowtie2" ~mem:(Workflow.int (3 * 1024)) ~np:8 [
-      cmd "bowtie2" ~env [
+      cmd "bowtie2" ~img [
         option (opt "--skip" int) skip ;
         option (opt "--qupto" int) qupto ;
         option (opt "--trim5" int) trim5 ;
@@ -434,13 +434,13 @@ module Bowtie = struct
     inherit directory
   end
 
-  let env = docker_image ~account:"pveber" ~name:"bowtie" ~tag:"1.1.2" ()
+  let img = [ docker_image ~account:"pveber" ~name:"bowtie" ~tag:"1.1.2" () ]
 
   (* memory bound correspond to storing a human index in memory, following bowtie manual *)
   let bowtie_build ?packed ?color fa =
     Workflow.shell ~descr:"bowtie_build" ~mem:(Workflow.int (3 * 1024)) [
       mkdir_p dest ;
-      cmd "bowtie-build" ~env [
+      cmd "bowtie-build" ~img [
         option (flag string "-a -p") packed ;
         option (flag string "--color") color ;
         opt "-f" dep fa ;
@@ -464,7 +464,7 @@ module Bowtie = struct
         ]
     in
     Workflow.shell ~descr:"bowtie" ~mem:(Workflow.int (3 * 1024)) ~np:8 [
-      cmd "bowtie" ~env [
+      cmd "bowtie" ~img [
         string "-S" ;
         option (opt "-n" int) n ;
         option (opt "-l" int) l ;
@@ -497,7 +497,7 @@ module ChIPQC = struct
     method contents : [`ChIPQC]
   end
 
-  let env = docker_image ~account:"pveber" ~name:"bioconductor" ~tag:"3.3" ()
+  let img = [ docker_image ~account:"pveber" ~name:"bioconductor" ~tag:"3.3" () ]
 
   let sample_sheet samples =
     let header = string "SampleID,Tissue,Factor,Replicate,bamReads,Peaks" in
@@ -524,14 +524,14 @@ module ChIPQC = struct
 
   let run samples =
     Workflow.shell ~descr:"ChIPQC" [
-      cmd "Rscript" ~env [ file_dump (rscript (sample_sheet samples)) ] ;
+      cmd "Rscript" ~img [ file_dump (rscript (sample_sheet samples)) ] ;
     ]
 
 end
 
 module Deeptools = struct
 
-  let env = docker_image ~account:"pveber" ~name:"deeptools" ~tag:"3.1.3" ()
+  let img = [ docker_image ~account:"pveber" ~name:"deeptools" ~tag:"3.1.3" () ]
 
   type 'a signal_format = [ `bigWig | `bedGraph ]
   type 'a img_format = [ `png | `pdf | ` svg ]
@@ -589,7 +589,7 @@ module Deeptools = struct
       ?smoothlength ?extendreads ?ignoreduplicates ?minmappingquality
       ?samflaginclude ?samflagexclude ?minfragmentlength ?maxfragmentlength
       cmd_name other_args =
-    cmd cmd_name ~env (
+    cmd cmd_name ~img (
       List.append [
         option (opt "--outFileFormat" file_format_expr) outfileformat ;
         option (opt "--scaleFactor" float) scalefactor ;
@@ -663,7 +663,7 @@ module Deeptools = struct
       ?region ?blacklist ?(threads = 1)
       outfileformat bigwig1 bigwig2 =
     Workflow.shell ~descr:"bigwigcompare" ~np:threads [
-      cmd "bigwigCompare" ~env [
+      cmd "bigwigCompare" ~img [
         option (opt "--scaleFactor" float) scalefactor ;
         option (opt "--ratio" ratio_expr) ratio ;
         option (opt "--pseudocount" int) pseudocount ;
@@ -682,7 +682,7 @@ module Deeptools = struct
   let multibamsum_gen_cmd ?outrawcounts ?extendreads ?ignoreduplicates
       ?minmappingquality ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
       ?maxfragmentlength ?blacklist ?region cmd_name other_args =
-    cmd cmd_name ~env (
+    cmd cmd_name ~img (
       List.append [
         option (opt "--region" string) region ;
         option (flag string "--outRawCounts") outrawcounts ;
@@ -820,7 +820,7 @@ module Deeptools = struct
       ?minThreshold ?maxThreshold ?blackList ?scale
       ?(numberOfProcessors = 1) ~regions ~scores () =
     Workflow.shell ~descr:"deeptools.computeMatrix_reference_point" ~np:numberOfProcessors [
-      cmd "computeMatrix" ~env [
+      cmd "computeMatrix" ~img [
         string "reference-point" ;
         option (opt "--referencePoint" reference_point_enum) referencePoint ;
         option (opt "--upstream" int) upstream ;
@@ -853,7 +853,7 @@ module Deeptools = struct
       output_format matrix =
     let tmp_file = tmp // ("file." ^ ext_of_format output_format) in
     Workflow.shell ~descr:"deeptools.plotHeatmap" [
-      cmd "plotHeatmap" ~env [
+      cmd "plotHeatmap" ~img [
         option (opt "--dpi" int) dpi ;
         option (opt "--kmeans" int) kmeans ;
         option (opt "--hclust" int) hclust ;
@@ -910,7 +910,7 @@ module Deeptools = struct
       ~corMethod ~whatToPlot output_format corData
     =
     Workflow.shell ~descr:"deeptools.plotCorrelation" [
-      cmd "plotCorrelation" ~env [
+      cmd "plotCorrelation" ~img [
         opt "--corData" dep corData ;
         opt "--corMethod" corMethod_enum corMethod ;
         opt "--whatToPlot" whatToPlot_enum whatToPlot ;
@@ -944,7 +944,7 @@ module DESeq2 = struct
       directory : directory pworkflow ;
     >
 
-  let env = docker_image ~account:"pveber" ~name:"bioconductor" ~tag:"3.3" ()
+  let img = [ docker_image ~account:"pveber" ~name:"bioconductor" ~tag:"3.3" () ]
 
   let wrapper_script = {|
 library(DESeq2)
@@ -1089,7 +1089,7 @@ main <- function(outdir, factor_names, sample_files, conditions) {
 
   let wrapper factors samples =
     Workflow.shell ~descr:"deseq2.wrapper" [
-      cmd "Rscript" ~env [ file_dump (script factors samples) ] ;
+      cmd "Rscript" ~img [ file_dump (script factors samples) ] ;
     ]
 
 (*
@@ -1223,7 +1223,7 @@ module Ensembl = struct
 end
 
 module FastQC = struct
-  let env = docker_image ~account:"pveber" ~name:"fastqc" ~tag:"0.11.5" ()
+  let img = [ docker_image ~account:"pveber" ~name:"fastqc" ~tag:"0.11.5" () ]
 
   class type report = object
     inherit directory
@@ -1232,7 +1232,7 @@ module FastQC = struct
 
   let run fq = Workflow.shell ~descr:"fastQC" [
       mkdir_p dest ;
-      cmd "fastqc" ~env [
+      cmd "fastqc" ~img [
         seq ~sep:"" [ string "--outdir=" ; dest ] ;
         dep fq ;
       ] ;
@@ -1258,7 +1258,7 @@ module Fastq_screen = struct
     method contents : [`fastq_screen]
   end
 
-  let env = docker_image ~account:"pveber" ~name:"fastq-screen" ~tag:"0.11.1" ()
+  let img = [ docker_image ~account:"pveber" ~name:"fastq-screen" ~tag:"0.11.1" () ]
 
   let rec filter_expr res = function
       [] -> string res
@@ -1294,7 +1294,7 @@ module Fastq_screen = struct
       ?tag ?(threads = 1) ?top ?(lightweight = true) fq genomes =
     Workflow.shell ~descr:"fastq_screen" ~np:threads ~mem:(Workflow.int (3 * 1024)) [
       mkdir_p dest ;
-      cmd "fastq_screen" ~env [
+      cmd "fastq_screen" ~img [
         string "--aligner bowtie2" ;
         option (opt "--bowtie2" string) bowtie2_opts ;
         option (opt "--filter" (filter_expr "")) filter ;
@@ -1318,7 +1318,7 @@ module Fastq_screen = struct
 end
 
 module Htseq = struct
-  let env = docker_image ~account:"pveber" ~name:"htseq" ~tag:"0.6.1" ()
+  let img = [ docker_image ~account:"pveber" ~name:"htseq" ~tag:"0.6.1" () ]
 
   class type count_tsv = object
     inherit tsv
@@ -1347,7 +1347,7 @@ module Htseq = struct
       | `bam bam -> "bam", dep bam
     in
     Workflow.shell ~descr:"htseq-count" [
-      cmd "htseq-count" ~env ~stdout:dest [
+      cmd "htseq-count" ~img ~stdout:dest [
         opt "-f" string format ;
         option (opt "-m" (string_of_mode % string)) mode ;
         option (opt "-r" (string_of_order % string)) order ;
@@ -1362,10 +1362,10 @@ module Htseq = struct
 end
 
 module Macs2 = struct
-  let env = docker_image ~account:"pveber" ~name:"macs2" ~tag:"2.1.1" ()
+  let img = [ docker_image ~account:"pveber" ~name:"macs2" ~tag:"2.1.1" () ]
 
   let macs2 subcmd opts =
-    cmd "macs2" ~env (string subcmd :: opts)
+    cmd "macs2" ~img (string subcmd :: opts)
 
   let pileup ?extsize ?both_direction bam =
     Workflow.shell ~descr:"macs2.pileup" [
@@ -1505,7 +1505,7 @@ end
 
 module Macs = struct
 
-  let env = docker_image ~account:"pveber" ~name:"macs" ~tag:"1.4.2" ()
+  let img = [ docker_image ~account:"pveber" ~name:"macs" ~tag:"1.4.2" () ]
 
 
   type _ format =
@@ -1548,7 +1548,7 @@ module Macs = struct
       ?diag ?fe_min ?fe_max ?fe_step format treatment =
     Workflow.shell ~descr:"macs" ~mem:(Workflow.int (3 * 1024)) ~np:8  [
       mkdir_p dest ;
-      cmd "macs14" ~env [
+      cmd "macs14" ~img [
         option (opt "--control" (list ~sep:"," dep)) control ;
         opt "--name" seq [ dest ; string "/" ; string name ] ;
         opt "--format" (fun x -> x |> opt_of_format |> string) format ;
@@ -1614,7 +1614,7 @@ end
 
 module Meme_suite = struct
 
-  let env = docker_image ~account:"pveber" ~name:"meme" ~tag:"4.11.2" ()
+  let img = [ docker_image ~account:"pveber" ~name:"meme" ~tag:"4.11.2" () ]
 
   class type meme_chip_output = object
     inherit directory
@@ -1623,7 +1623,7 @@ module Meme_suite = struct
 
   let meme_chip ?meme_nmotifs ?meme_minw ?meme_maxw (* ?np:threads *) fa =
     Workflow.shell ~descr:"meme-chip" (* ?np:threads *) [
-      cmd "meme-chip" ~env [
+      cmd "meme-chip" ~img [
         option (opt "-meme-nmotifs" int) meme_nmotifs ;
         option (opt "-meme-minw" int) meme_minw ;
         option (opt "-meme-maxw" int) meme_maxw ;
@@ -1643,7 +1643,7 @@ module Meme_suite = struct
 
   let meme ?nmotifs ?minw ?maxw ?revcomp ?maxsize ?alphabet (* ?threads *) fa =
     Workflow.shell ~descr:"meme" (* ?np:threads *) [
-      cmd "meme" ~env [
+      cmd "meme" ~img [
         option (opt "-nmotifs" int) nmotifs ;
         option (opt "-minw" int) minw ;
         option (opt "-maxw" int) maxw ;
@@ -1658,7 +1658,7 @@ module Meme_suite = struct
 
   let fimo ?alpha ?bgfile ?max_stored_scores ?motif ?motif_pseudo ?qv_thresh ?thresh meme_motifs fa =
     Workflow.shell ~descr:"fimo" [
-      cmd "fimo" ~env [
+      cmd "fimo" ~img [
         option (opt "--aplha" float) alpha;
         option (opt "--bgfile" string) bgfile ;
         option (opt "--max-stored-scores" int) max_stored_scores ;
@@ -1674,7 +1674,7 @@ module Meme_suite = struct
 end
 
 module Prokka = struct
-  let env = docker_image ~account:"pveber" ~name:"prokka" ~tag:"1.12" ()
+  let img = [ docker_image ~account:"pveber" ~name:"prokka" ~tag:"1.12" () ]
 
   let gram_expr = function
     | `Plus -> string "+"
@@ -1686,7 +1686,7 @@ module Prokka = struct
       ?mincontiglen ?evalue ?rfam ?norrna ?notrna ?rnammer fa =
     Workflow.shell ~descr:"prokka" ~np:threads ~mem:(Workflow.int (3 * 1024)) [
       mkdir_p dest ;
-      cmd "prokka" ~env [
+      cmd "prokka" ~img [
         string "--force" ;
         option (opt "--prefix" string) prefix ;
         option (flag string "--addgenes") addgenes ;
@@ -1722,7 +1722,7 @@ module Prokka = struct
 end
 
 module Spades = struct
-  let env = docker_image ~account:"pveber" ~name:"spades" ~tag:"3.9.1" ()
+  let img = [ docker_image ~account:"pveber" ~name:"spades" ~tag:"3.9.1" () ]
 
   let renamings (ones, twos) =
     let f side i x =
@@ -1757,10 +1757,10 @@ module Spades = struct
     Workflow.shell ~np:threads ~mem:(Workflow.int (memory * 1024)) ~descr:"spades" [
       mkdir_p tmp ;
       mkdir_p dest ;
-      docker env (
+      within_container img (
         and_list (
           ln_commands @ [
-            cmd "spades.py" ~env [
+            cmd "spades.py" ~img [
               option (flag string "--sc") single_cell ;
               option (flag string "--iontorrent") iontorrent ;
               opt "--threads" Fn.id np ;
@@ -1801,11 +1801,11 @@ end
 
 module Sra_toolkit = struct
 
-  let env = docker_image ~account:"pveber" ~name:"sra-toolkit" ~tag:"2.8.0" ()
+  let img = [ docker_image ~account:"pveber" ~name:"sra-toolkit" ~tag:"2.8.0" () ]
 
   let fastq_dump sra =
     Workflow.shell ~descr:"sratoolkit.fastq_dump" [
-      cmd ~env "fastq-dump" [ string "-Z" ; dep sra ] ~stdout:dest
+      cmd ~img "fastq-dump" [ string "-Z" ; dep sra ] ~stdout:dest
     ]
 
   let sra_of_input = function
@@ -1815,14 +1815,14 @@ module Sra_toolkit = struct
   let fastq_dump_gz input =
     let sra = sra_of_input input in
     Workflow.shell ~descr:"sratoolkit.fastq_dump" [
-      cmd ~env "fastq-dump" [ string "--gzip" ; string "-Z" ; sra ] ~stdout:dest
+      cmd ~img "fastq-dump" [ string "--gzip" ; string "-Z" ; sra ] ~stdout:dest
     ]
 
   let fastq_dump_pe sra =
     let dir =
       Workflow.shell ~descr:"sratoolkit.fastq_dump" [
         mkdir_p dest ;
-        cmd ~env "fastq-dump" [
+        cmd ~img "fastq-dump" [
           opt "-O" Fn.id dest ;
           string "--split-files" ;
           dep sra
@@ -1840,7 +1840,7 @@ module Sra_toolkit = struct
     let dir =
       Workflow.shell ~descr:"sratoolkit.fastq_dump" [
         mkdir_p dest ;
-        cmd ~env "fastq-dump" [
+        cmd ~img "fastq-dump" [
           opt "-O" Fn.id dest ;
           string "--split-files" ;
           string "--gzip" ;
@@ -1855,7 +1855,7 @@ module Sra_toolkit = struct
 
   let fastq_dump_to_fasta sra =
     Workflow.shell ~descr:"sratoolkit.fastq_dump" [
-      cmd ~env "fastq-dump" [
+      cmd ~img "fastq-dump" [
         string "-Z" ;
         string "--fasta" ;
         dep sra
@@ -1865,7 +1865,7 @@ end
 
 module Srst2 = struct
 
-  let env = docker_image ~account:"pveber" ~name:"srst2" ~tag:"0.2.0" ()
+  let img = [ docker_image ~account:"pveber" ~name:"srst2" ~tag:"0.2.0" () ]
 
 
   let run_gen_cmd ?mlst_db ?mlst_delimiter ?mlst_definitions
@@ -1874,7 +1874,7 @@ module Srst2 = struct
       ?truncation_score_tolerance ?other ?max_unaligned_overlap ?mapq
       ?baseq ?samtools_args ?report_new_consensus
       ?report_all_consensus cmd_name other_args =
-    cmd cmd_name ~env (
+    cmd cmd_name ~img (
       List.append [
         option (opt "--mlst_db" dep) mlst_db ;
         option (opt "--mlst_delimiter" string) mlst_delimiter ;
@@ -1942,7 +1942,7 @@ module Srst2 = struct
 end
 
 module Tophat = struct
-  let env = docker_image ~account:"pveber" ~name:"tophat" ~tag:"2.1.1" ()
+  let img = [ docker_image ~account:"pveber" ~name:"tophat" ~tag:"2.1.1" () ]
 
   class type output = object
     inherit directory
@@ -1960,7 +1960,7 @@ module Tophat = struct
         ]
     in
     Workflow.shell ~np:8 ~mem:(Workflow.int (4 * 1024)) ~descr:"tophat" [
-      cmd ~env "tophat" [
+      cmd ~img "tophat" [
         string "--bowtie1" ;
         opt "--num-threads" Fn.id np ;
         option (flag string "--color") color ;
@@ -1981,7 +1981,7 @@ module Tophat = struct
         ]
     in
     Workflow.shell ~np:8 ~mem:(Workflow.int (4 * 1024)) ~descr:"tophat2" [
-      cmd ~env "tophat2" [
+      cmd ~img "tophat2" [
         opt "--num-threads" Fn.id np ;
         opt "--output-dir" Fn.id dest ;
         seq [ dep index ; string "/index" ] ;
@@ -2058,7 +2058,7 @@ module Ucsc_gb = struct
     method contents : [`ucsc_chromosome_sequences]
   end
   
-  let env = docker_image ~account:"pveber" ~name:"ucsc-kent" ~tag:"330" ()
+  let img = [ docker_image ~account:"pveber" ~name:"ucsc-kent" ~tag:"330" () ]
 
 
   (** {5 Dealing with genome sequences} *)
@@ -2124,7 +2124,7 @@ module Ucsc_gb = struct
 
   let twoBitToFa twobits bed =
     Workflow.shell ~descr:"ucsc_gb.twoBitToFa" [
-      cmd ~env "twoBitToFa" [
+      cmd ~img "twoBitToFa" [
         opt' "-bed" dep bed ;
         dep twobits ;
         dest
@@ -2164,14 +2164,14 @@ module Ucsc_gb = struct
 
   let fetchChromSizes org =
     Workflow.shell ~descr:"ucsc_gb.fetchChromSizes" [
-      cmd "fetchChromSizes" ~env ~stdout:dest [
+      cmd "fetchChromSizes" ~img ~stdout:dest [
         string (string_of_genome org) ;
       ]
     ]
 
   let bedClip org bed =
     Workflow.shell ~descr:"ucsc_gb.bedClip" [
-      cmd "bedClip -verbose=2" ~env [
+      cmd "bedClip -verbose=2" ~img [
         dep bed ;
         dep org ;
         dest ;
@@ -2211,7 +2211,7 @@ module Ucsc_gb = struct
         string "-k2,2n" ;
         dep bg ;
       ] ;
-      cmd "bedGraphToBigWig" ~env [
+      cmd "bedGraphToBigWig" ~img [
         tmp ;
         dep (fetchChromSizes org) ;
         dest ;
@@ -2227,7 +2227,7 @@ module Ucsc_gb = struct
         dep bed ;
       ] in
     let bedToBigBed =
-      cmd "bedToBigBed" ~env [
+      cmd "bedToBigBed" ~img [
         tmp ;
         dep (fetchChromSizes org) ;
         dest ;
@@ -2289,7 +2289,7 @@ module Ucsc_gb = struct
       let chain_file = chain_file ~org_from ~org_to in
       Workflow.shell ~descr:"ucsc.liftOver" [
         mkdir_p dest ;
-        cmd "liftOver" ~env [
+        cmd "liftOver" ~img [
           dep bed ;
           dep chain_file ;
           dest // "mapped.bed" ;
@@ -2305,7 +2305,7 @@ end
 
 module Subread = struct
 
-  let env = docker_image ~account:"pveber" ~name:"subread" ~tag:"1.6.3" ()
+  let img = [ docker_image ~account:"pveber" ~name:"subread" ~tag:"1.6.3" () ]
 
   class type count_table = object
     inherit tsv
@@ -2330,7 +2330,7 @@ module Subread = struct
       gff mapped_reads =
     Workflow.shell ~descr:"featureCounts" ~np:(Option.value ~default:1 nthreads) [
       mkdir_p dest ;
-      cmd "featureCounts" ~env [
+      cmd "featureCounts" ~img [
         option (opt "-t" string) feature_type ;
         option (opt "-g" string) attribute_type ;
         option (opt "-s" strandness_token) strandness ;

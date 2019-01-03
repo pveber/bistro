@@ -6,17 +6,16 @@ type file_dump = File_dump of {
     path : string ;
   }
 
-
 type symbolic_file_dump = Symbolic_file_dump of {
     contents : Execution_env.insert Template.t ;
-    in_docker : bool ;
+    in_docker_container : bool ;
   }
 
 type t = Command of {
     text : string ;
     file_dumps : file_dump list ;
     env : Execution_env.t ;
-    uses_docker : bool ;
+    uses_docker : bool ; (* only used to chown results when done through docker *)
   }
 
 let text (Command cmd) = cmd.text
@@ -27,7 +26,7 @@ let rec file_dumps_of_tokens in_docker toks =
   |> List.concat
   |> List.dedup_and_sort ~compare:Caml.compare
 
-and file_dumps_of_token in_docker =
+and file_dumps_of_token in_docker_container =
   let open Template in
   function
   | NP
@@ -39,8 +38,8 @@ and file_dumps_of_token in_docker =
   | F contents ->
     Symbolic_file_dump {
       contents = contents ;
-      in_docker = in_docker
-    } :: file_dumps_of_tokens in_docker contents
+      in_docker_container ;
+    } :: file_dumps_of_tokens in_docker_container contents
     |> List.dedup_and_sort ~compare:Caml.compare
 
 let rec file_dumps_of_command in_docker =
@@ -53,7 +52,7 @@ let rec file_dumps_of_command in_docker =
     List.map xs ~f:(file_dumps_of_command in_docker)
     |> List.concat
     |> List.dedup_and_sort ~compare:Caml.compare
-  | Docker (_, cmd) -> file_dumps_of_command true cmd
+  | Within_container (_, cmd) -> file_dumps_of_command true cmd
 
 let string_of_token (env : Execution_env.t) =
   let open Template in
@@ -124,8 +123,11 @@ let rec string_of_command env =
   | And_list xs -> par (string_of_command_aux env " && " xs)
   | Or_list xs -> par (string_of_command_aux env " || " xs)
   | Pipe_list xs -> par (string_of_command_aux env " | " xs)
-  | Docker (image, cmd) ->
-    if env.using_docker then
+  | Within_container (img, cmd) ->
+    match Execution_env.choose_container env.Execution_env.allowed_containers img with
+    | `Plain ->
+      string_of_command env cmd
+    | `Docker_container image ->
       let dck_env = Execution_env.dockerize env in
       sprintf
         "docker run --log-driver=none --rm %s %s %s %s -i %s bash -c '%s'"
@@ -135,16 +137,33 @@ let rec string_of_command env =
         (dest_mount env dck_env)
         (Docker.image_url image)
         (string_of_command dck_env cmd)
-    else
-      string_of_command env cmd
+    | `Singularity_container img ->
+      let env = Execution_env.singularize env in
+      sprintf
+        "singularity exec %s bash -c '%s'"
+        (Db.singularity_image env.Execution_env.db img)
+        (string_of_command env cmd)
 
 and string_of_command_aux env sep xs =
   List.map xs ~f:(string_of_command env)
   |> String.concat ~sep
 
-let compile_file_dump env (Symbolic_file_dump { contents ; in_docker }) =
+let rec command_uses_docker env = function
+  | Command.Simple_command _ -> false
+  | And_list xs
+  | Or_list xs
+  | Pipe_list xs -> command_uses_docker_aux env xs
+  | Within_container (img, _) ->
+    match Execution_env.choose_container env.Execution_env.allowed_containers img with
+    | `Plain -> false
+    | `Docker_container _ -> true
+    | `Singularity_container _ -> false
+and command_uses_docker_aux env xs =
+  List.exists xs ~f:(command_uses_docker env)
+
+let compile_file_dump env (Symbolic_file_dump { contents ; in_docker_container }) =
   let exec_env =
-    if in_docker && env.Execution_env.using_docker
+    if in_docker_container && Execution_env.allows_docker env
     then Execution_env.dockerize env
     else env
   in
@@ -159,7 +178,7 @@ let make env cmd =
       file_dumps_of_command false cmd
       |> List.map ~f:(compile_file_dump env) ;
     env ;
-    uses_docker = Command.uses_docker cmd ;
+    uses_docker = command_uses_docker env cmd ;
   }
 
 let write_file_dumps xs =
@@ -191,7 +210,7 @@ let run (Command cmd) =
   in
   let dest_exists = Sys.file_exists cmd.env.dest = `Yes in
   (
-    if cmd.env.using_docker && cmd.uses_docker then (
+    if Execution_env.allows_docker cmd.env && cmd.uses_docker then (
       Misc.docker_chown ~path:cmd.env.tmp_dir ~uid:cmd.env.uid >>= fun () ->
       if dest_exists then Misc.docker_chown ~path:cmd.env.dest ~uid:cmd.env.uid
       else Lwt.return ()

@@ -26,7 +26,7 @@ val build_main  :
   ?np:int ->
   ?mem:[`GB of int] ->
   ?loggers:Logger.t list ->
-  ?use_docker:bool ->
+  ?allowed_containers:[`Docker | `Singularity] list ->
   ?bistro_dir:string ->
   ?collect:bool ->
   outdir:string -> t -> unit
@@ -35,7 +35,7 @@ val build :
   ?np:int ->
   ?mem:[`GB of int] ->
   ?loggers:Logger.t list ->
-  ?use_docker:bool ->
+  ?allowed_containers:[`Docker | `Singularity] list ->
   ?bistro_dir:string ->
   ?collect:bool ->
   outdir:string -> t -> unit Lwt.t

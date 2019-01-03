@@ -20,6 +20,7 @@ module Eval_thread : sig
   (*   'a list -> *)
   (*   f:('a -> 'b t) -> *)
   (*   'b list t *)
+  val join2 : unit t -> unit t -> unit t
   val join :
     'a list ->
     f:('a -> unit t) ->
@@ -70,6 +71,11 @@ struct
     in
     Lwt.return res
 
+  let join2 x y =
+    let open Infix in
+    both x y >>= fun ((), ()) ->
+    return ()
+
   let join xs ~f =
     let open Lwt_result in
     list_map xs ~f >|= ignore
@@ -118,7 +124,8 @@ module Gc : sig
   type t
   val create : Db.t -> (Logger.event -> unit) -> t
   val register : t -> ?target:_ W.t -> _ W.t -> unit Lwt.t
-  val tag_as_built : t -> _ W.t -> unit
+  val tag_workflow_as_built : t -> _ W.t -> unit
+  val uses_singularity_image : t -> _ W.t -> Command.container_image -> unit
   val stop : t -> unit Lwt.t
   (* val fold_deps :
    *   t ->
@@ -134,9 +141,34 @@ module Gc : sig
 end
 =
 struct
-  module S = W.Set
+  module Elt = struct
+    type t =
+      | Workflow : W.any -> t
+      | Singularity_image : Command.container_image -> t
+
+    let workflow w = Workflow (W.Any w)
+    let singularity_image x = Singularity_image x
+
+    let id = function
+      | Workflow w -> W.Any.id w
+      | Singularity_image i -> Db.container_image_identifier i
+
+    let compare x y =
+    String.compare (id x) (id y)
+
+    let equal x y =
+      String.equal (id x) (id y)
+
+    let hash x = Hashtbl.hash (id x)
+
+    let path db = function
+      | Workflow w -> Db.cache db (W.Any.id w)
+      | Singularity_image i -> Db.singularity_image db i
+  end
+
+  module S = Caml.Set.Make(Elt)
   module T = struct
-    include W.Table
+    include Caml.Hashtbl.Make(Elt)
     let update t ~key ~default ~f =
       let data = match find t key with
         | d -> d
@@ -165,7 +197,7 @@ struct
 
 
   type msg =
-    | Built : _ W.t -> msg
+    | Built : Elt.t -> msg
     | Stop : msg
 
   type t = {
@@ -184,12 +216,17 @@ struct
     Lwt_queue.push x.inbox Stop ;
     x._end_
 
-  let update_counts_and_collect gc (Workflow.Any w as dep_w) =
-    let n = T.decr_count gc.counts dep_w in
+  let update_counts_and_collect gc x =
+    let n = T.decr_count gc.counts x in
     if n = 0 then (
-      gc.log (Logger.Workflow_collected w) ;
-      if not (S.mem dep_w gc.protected) then
-        Misc.remove_if_exists (Db.cache gc.db (W.id w))
+      if not (S.mem x gc.protected) then (
+        gc.log (
+          match x with
+          | Workflow (W.Any w) -> Logger.Workflow_collected w
+          | Singularity_image i -> Logger.Singularity_image_collected i
+        ) ;
+        Misc.remove_if_exists (Elt.path gc.db x)
+      )
       else
         Lwt.return ()
     )
@@ -197,8 +234,8 @@ struct
 
   let rec main gc =
     Lwt_queue.pop gc.inbox >>= function
-    | Built w ->
-      T.adj_find gc.depends_on (Workflow.Any w)
+    | Built x ->
+      T.adj_find gc.depends_on x
       |> S.elements
       |> List.map ~f:(update_counts_and_collect gc)
       |> Lwt.join >>= fun () ->
@@ -226,18 +263,25 @@ struct
     Lwt.async (fun () -> main gc) ;
     gc
 
-  let tag_as_built gc w =
-    Lwt_queue.push gc.inbox (Built w)
+  let tag_workflow_as_built gc w =
+    Lwt_queue.push gc.inbox (Built (Elt.workflow w))
 
   let uses gc u v =
     match u with
     | None ->
-      gc.protected <- S.add (Workflow.Any v) gc.protected
+      gc.protected <- S.add (Elt.workflow v) gc.protected
     | Some u ->
-      let u = Workflow.Any u and v = Workflow.Any v in
+      let u = Elt.workflow u and v = Elt.workflow v in
       T.adj_add gc.depends_on u v ;
       T.adj_add gc.is_used_by v u ;
       T.incr_count gc.counts v
+
+  let uses_singularity_image gc u v =
+    let u = Elt.workflow u and v = Elt.singularity_image v in
+    T.adj_add gc.depends_on u v ;
+    T.adj_add gc.is_used_by v u ;
+    T.incr_count gc.counts v ;
+    (let n = T.find gc.counts v in printf "%s: %d -> %d\n%!" (Elt.id v) (n - 1) n)
 
   let rec register : type u v. t -> ?target:u W.t -> v W.t -> unit Lwt.t = fun gc ?target w ->
     match w with
@@ -277,8 +321,8 @@ struct
     register gc ?target w
 
   and stop_register : type u. t -> u W.t -> bool = fun gc w ->
-    let u = Workflow.Any w in
-    T.mem gc.depends_on u || Db.is_in_cache gc.db u
+    let u = Elt.workflow w in
+    T.mem gc.depends_on u || Db.is_in_cache gc.db (W.Any w)
 
   let register gc ?target w =
     register gc ?target w
@@ -297,10 +341,21 @@ struct
   let state gc = {
     deps =
       T.to_seq gc.depends_on
-      |> Seq.flat_map (fun (u, s) -> Seq.map (fun v -> u, v) (S.to_seq s))
+      |> Seq.flat_map (fun (u, s) ->
+          match u with
+          | Elt.Workflow w_u ->
+            Seq.filter_map
+              (function
+                | Elt.Workflow w_v -> Some (w_u, w_v)
+                | Singularity_image _ -> None)
+              (S.to_seq s)
+          | Singularity_image _ -> Seq.empty
+        )
       |> Caml.List.of_seq ;
     protected =
-      S.elements gc.protected ;
+      S.to_seq gc.protected
+      |> Seq.filter_map (function Elt.Workflow w -> Some w | Singularity_image _ -> None)
+      |> Caml.List.of_seq ;
   }
 
 end
@@ -308,7 +363,8 @@ end
 module Maybe_gc : sig
   type t = Gc.t option
   val register : t -> ?target:_ W.t -> _ W.t -> unit Lwt.t
-  val tag_as_built : t -> _ W.t -> unit
+  val uses_singularity_image : t -> _ W.t -> Command.container_image -> unit
+  val tag_workflow_as_built : t -> _ W.t -> unit
   val stop : t -> unit Lwt.t
 end
 =
@@ -318,8 +374,12 @@ struct
     | Some gc -> Gc.register gc ?target w
     | None -> Lwt.return ()
 
-  let tag_as_built o w = match o with
-    | Some gc -> Gc.tag_as_built gc w
+  let uses_singularity_image o w s = match o with
+    | Some gc -> Gc.uses_singularity_image gc w s
+    | None -> ()
+
+  let tag_workflow_as_built o w = match o with
+    | Some gc -> Gc.tag_workflow_as_built gc w
     | None -> ()
 
   let stop = function
@@ -348,14 +408,14 @@ type t = {
   allocator : Allocator.t ;
   db : Db.t ;
   logger : Logger.t ;
-  use_docker : bool ;
+  allowed_containers : [`Docker | `Singularity] list ;
   traces : Execution_trace.t thread Table.t ;
   gc : Gc.t option ;
 }
 
 let create
     ?(np = 1) ?mem:(`GB mem = `GB 1)
-    ?(use_docker = true)
+    ?(allowed_containers = [`Docker])
     ?(loggers = [])
     ?(collect = false) db =
   let logger = Logger.tee loggers in
@@ -365,7 +425,7 @@ let create
     closed = false ;
     allocator = Allocator.create ~np ~mem:(mem * 1024) ;
     db ;
-    use_docker ;
+    allowed_containers ;
     traces = String.Table.create () ;
     logger ;
     gc =
@@ -451,7 +511,7 @@ let perform_select sched ~id ~dir ~sel =
 let perform_shell sched (Allocator.Resource { np ; mem }) ~id ~descr cmd =
   let env =
     Execution_env.make
-      ~use_docker:sched.use_docker
+      ~allowed_containers:sched.allowed_containers
       ~db:sched.db
       ~np ~mem ~id
   in
@@ -573,9 +633,9 @@ and shallow_eval_command sched =
     list xs >|= fun xs -> Or_list xs
   | Pipe_list xs ->
     list xs >|= fun xs -> Pipe_list xs
-  | Docker (env, cmd) ->
+  | Within_container (env, cmd) ->
     shallow_eval_command sched cmd >|= fun cmd ->
-    Docker (env, cmd)
+    Within_container (env, cmd)
 
 and shallow_eval_template sched toks =
     Lwt_list.map_p (shallow_eval_token sched) toks
@@ -663,7 +723,7 @@ let cached_build sched ~id ~f =
 
 let signal_trace_to_gc sched w t =
   if not (Execution_trace.is_errored t) then (
-    Maybe_gc.tag_as_built sched.gc w
+    Maybe_gc.tag_workflow_as_built sched.gc w
   )
 
 let schedule_cached_workflow sched ~id w ~deps ~perform =
@@ -671,11 +731,47 @@ let schedule_cached_workflow sched ~id w ~deps ~perform =
   register_build sched ~id ~build_trace:(fun () ->
       cached_build sched ~id ~f:(fun () ->
           deps () >>= fun () ->
-          build_trace sched w perform
+          build_trace sched w perform >|= fun trace_or_error ->
+          (
+            match trace_or_error with
+            | Ok trace -> signal_trace_to_gc sched w trace
+            | Error _ -> ()
+          ) ;
+          trace_or_error
         )
     )
-  >>| signal_trace_to_gc sched w
   |> Eval_thread.ignore
+
+let schedule_container_image_fetch sched img =
+  let id = Db.container_image_identifier img in
+  let ready = Unix.gettimeofday () in
+  register_build sched ~id ~build_trace:(fun () ->
+      let dest = Db.singularity_image sched.db img in
+      if Sys.file_exists dest = `Yes then
+        Eval_thread.return (Execution_trace.Done_already { id })
+      else (
+        let req = Allocator.Request { np = 1 ; mem = 0 } in
+        Allocator.request sched.allocator req >>= function
+        | Ok resource ->
+          let start = Unix.gettimeofday () in
+          (* log ~time:start sched (Logger.Workflow_started (w, resource)) ; *)
+          Singularity.fetch_image img dest >>= fun outcome ->
+          let _end_ = Unix.gettimeofday () in
+          Allocator.release sched.allocator resource ;
+          Eval_thread.return @@ Execution_trace.Run {
+            ready ; start ; _end_ ;
+            outcome = Task_result.Container_image_fetch { id ; outcome } ;
+          }
+        | Error _ ->
+          assert false (* should never happen, we're asking so little here! *)
+      )
+    )
+  |> Eval_thread.ignore
+
+let schedule_shell_container_image_fetch sched w cmd =
+  let images = Execution_env.images_for_singularity sched.allowed_containers cmd in
+  List.iter images ~f:(Maybe_gc.uses_singularity_image sched.gc w) ;
+  Eval_thread.join images ~f:(schedule_container_image_fetch sched)
 
 let rec build
   : type u v. t -> ?target:v W.t -> u W.t -> unit thread
@@ -748,7 +844,10 @@ let rec build
 
     | W.Shell { id ; task ; descr ; deps ; _ } ->
       schedule_cached_workflow sched ~id w
-        ~deps:(fun () -> Eval_thread.join deps ~f:(fun (W.Any x) -> build sched ~target:w x))
+        ~deps:Eval_thread.(fun () ->
+            join2
+              (schedule_shell_container_image_fetch sched w task)
+              (join deps ~f:(fun (W.Any x) -> build sched ~target:w x)))
         ~perform:(fun resource ->
             shallow_eval_command sched task >> fun cmd ->
             perform_shell sched resource ~id ~descr cmd >>= fun r ->

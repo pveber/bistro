@@ -77,13 +77,13 @@ end
 module Shell_dsl : sig
   type template = Template_dsl.template
   type command
-  type docker_image
+  type container_image
 
   include module type of Template_dsl with type template := template
 
   val cmd :
     string ->
-    ?env:docker_image ->
+    ?img:container_image list ->
     ?stdin:template -> ?stdout:template -> ?stderr:template ->
     template list -> command
   (** Command-line constructor, e.g. [cmd "echo" ~stdout:dest [ string
@@ -125,7 +125,7 @@ module Shell_dsl : sig
   val rm_rf : template -> command
   val mv : template -> template -> command
 
-  val docker : docker_image -> command -> command
+  val within_container : container_image list -> command -> command
   (** [docker cmd] transforms [cmd] so that it can be executed in a
       Docker container. *)
 
@@ -134,7 +134,7 @@ module Shell_dsl : sig
     ?registry:string ->
     account:string ->
     name:string ->
-    unit -> docker_image
+    unit -> container_image
   (** Construct a description of a publicly available docker image *)
 
   val ( % ) : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c

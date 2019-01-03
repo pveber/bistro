@@ -6,7 +6,7 @@ type insert =
 
 type t = {
   db : Db.t ;
-  using_docker : bool ;
+  allowed_containers : [`Docker | `Singularity] list ;
   tmp_dir : string ; (* host all execution *)
   dest : string ;    (* expected path for the target *)
   tmp : string ;     (* temp dir for the process *)
@@ -21,7 +21,7 @@ type t = {
 
 val make :
   db:Db.t ->
-  use_docker:bool ->
+  allowed_containers:[`Docker | `Singularity] list ->
   np:int ->
   mem:int ->
   id:string ->
@@ -36,3 +36,17 @@ type container_mount = {
 val container_mount : Db.t -> Workflow.path -> container_mount
 val dockerize : t -> t
 val docker_cache_dir : string
+val allows_docker : t -> bool
+val singularize : t -> t
+
+val choose_container :
+  [`Docker | `Singularity] list ->
+  Command.container_image list ->
+  [ `Plain
+  | `Docker_container of Command.Docker_image.t
+  | `Singularity_container of Command.container_image ]
+
+val images_for_singularity :
+  [`Docker | `Singularity] list ->
+  _ Command.t ->
+  Command.container_image list

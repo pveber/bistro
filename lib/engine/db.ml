@@ -24,6 +24,7 @@ let build_dir base = base / "build"
 let tmp_dir base = base / "tmp"
 let stderr_dir base = base / "stderr"
 let stdout_dir base = base / "stdout"
+let singularity_image_dir base = base / "singularity_image"
 
 let get_obj f db id =
   Filename.concat (f db) id
@@ -40,6 +41,7 @@ let create_db path =
   Unix.mkdir_p (cache_dir path) ;
   Unix.mkdir_p (stderr_dir path) ;
   Unix.mkdir_p (stdout_dir path) ;
+  Unix.mkdir_p (singularity_image_dir path) ;
   Ok ()
 
 let dir_is_empty path =
@@ -70,6 +72,7 @@ let dirs_of_db_exist path =
     tmp_dir path ;
     stderr_dir path ;
     stdout_dir path ;
+    singularity_image_dir path ;
   ]
   in
   let checks = List.map dir_paths ~f:(check_path `Dir) in
@@ -144,3 +147,16 @@ let is_in_cache db u =
   |> Option.value_map ~default:false ~f:(fun u ->
       Sys.file_exists (path db u) = `Yes
     )
+
+let container_image_identifier img =
+  let f account name tag =
+    sprintf "%s_%s%s_%s.sif" account name
+      (Option.value_map tag ~default:"" ~f:(( ^ ) "_"))
+      (Bistro_internals.Workflow.digest img)
+  in
+  match (img : Bistro_internals.Command.container_image) with
+  | Docker_image i -> f i.account i.name i.tag
+  | Singularity_image i -> f i.account i.name i.tag
+
+let singularity_image db img =
+  Filename.concat (singularity_image_dir db) (container_image_identifier img)

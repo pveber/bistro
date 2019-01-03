@@ -7,7 +7,7 @@ type insert =
 
 type t = {
   db : Db.t ;
-  using_docker : bool ;
+  allowed_containers : [`Docker | `Singularity] list ;
   tmp_dir : string ; (* host all execution *)
   dest : string ;    (* expected path for the target *)
   tmp : string ;     (* temp dir for the process *)
@@ -21,7 +21,7 @@ type t = {
 }
 
 
-let make ~db  ~use_docker ~np ~mem ~id =
+let make ~db  ~allowed_containers ~np ~mem ~id =
   let tmp_dir = Db.tmp db id in
   let file_dump toks =
     Filename.concat tmp_dir (Misc.digest toks)
@@ -29,7 +29,7 @@ let make ~db  ~use_docker ~np ~mem ~id =
   {
     db ;
     tmp_dir ;
-    using_docker = use_docker ;
+    allowed_containers ;
     tmp = Filename.concat tmp_dir "tmp" ;
     dest = Filename.concat tmp_dir "dest" ;
     stdout = Db.stdout db id ;
@@ -98,7 +98,7 @@ let container_mount
 let dockerize env = {
   db = env.db ;
   tmp_dir = "/bistro" ;
-  using_docker = false ;
+  allowed_containers = [] ;
   dest = "/bistro/dest" ;
   tmp = "/bistro/tmp" ;
   file_dump = (fun toks -> Filename.concat docker_cache_dir (Misc.digest toks)) ;
@@ -109,3 +109,51 @@ let dockerize env = {
   stderr = env.stderr ;
   uid = env.uid ;
 }
+
+let allows_docker env = List.mem ~equal:Poly.equal env.allowed_containers `Docker
+
+let singularize env = {
+  env with allowed_containers = [] ;
+}
+
+let find_docker_image env =
+  List.find_map env ~f:Command.(function
+      | Docker_image i -> Some i
+      | Singularity_image _ -> None
+    )
+
+let find_singularity_image env =
+  List.find_map env ~f:Command.(function
+      | Docker_image _ -> None
+      | Singularity_image i -> Some i
+    )
+
+let rec choose_container allowed_containers images =
+  match allowed_containers with
+  | [] -> `Plain
+  | `Docker :: others -> ( (* docker only accepts docker images *)
+      match find_docker_image images with
+      | Some i -> `Docker_container i
+      | None -> choose_container others images
+    )
+  | `Singularity :: others -> (
+      match find_singularity_image images with
+      | Some i -> `Singularity_container (Command.Singularity_image i)
+      | None ->
+        match find_docker_image images with
+        | Some i -> `Singularity_container (Docker_image i)
+        | None -> choose_container others images
+    )
+
+let rec images_for_singularity allowed_containers = function
+  | Command.Simple_command _ -> []
+  | And_list xs
+  | Or_list xs
+  | Pipe_list xs -> images_for_singularity_aux allowed_containers xs
+  | Within_container (img, _) ->
+    match choose_container allowed_containers img with
+    | `Plain
+    | `Docker_container _ -> []
+    | `Singularity_container img -> [ img ]
+and images_for_singularity_aux allowed_containers xs =
+  List.concat_map xs ~f:(images_for_singularity allowed_containers)

@@ -48,11 +48,12 @@ let translate_event db _ = function
     let path = Db.cache db (Workflow.id w) in
     Some (Workflow_done_already { w ; path })
 
-  | Workflow_ready _ -> None
-  | Workflow_allocation_error _ -> None
-  | Workflow_skipped (_, `Missing_dep) -> None
-  | Workflow_started (_, _) -> None
-  | Workflow_collected _ -> None
+  | Workflow_ready _
+  | Workflow_allocation_error _
+  | Workflow_skipped (_, `Missing_dep)
+  | Workflow_started (_, _)
+  | Workflow_collected _
+  | Singularity_image_collected _ -> None
 
 let update model db time evt =
   {
@@ -73,6 +74,7 @@ module Render = struct
       sprintf "id%08d" !c
 
   let k = txt
+  let kf fmt = Printf.ksprintf txt fmt
 
   let collapsible_panel ~title ~header ~body =
     let elt_id = new_elt_id () in
@@ -191,9 +193,9 @@ module Render = struct
           match outcome with
           | `Succeeded -> k""
           | `Failed ->
-            p [ k (sprintf "Command failed with code %d" exit_code) ]
+            p [ kf "Command failed with code %d" exit_code ]
           | `Missing_output ->
-            p [ k "missing_output" ]
+            p [ k "Missing output" ]
         ]
         ~body:(shell_result_details ~id:id ~cmd ~cache ~stderr ~stdout ~file_dumps)
     | Plugin res ->
@@ -208,6 +210,11 @@ module Render = struct
             p [ k "missing_output" ]
         ]
         ~body:[]
+    | Container_image_fetch f ->
+      match f.outcome with
+      | Ok () -> [ k"" ]
+      | Error (`Singularity_failed_pull (_, url)) ->
+        [ p [kf "Failed to fetch container image at %s" url] ]
 
   let workflow_start ~descr ~id =
     collapsible_panel
@@ -268,9 +275,12 @@ module Render = struct
       event_label_text `RED "MISSING OUTPUT"
 
     | Shell { outcome = `Succeeded ; _ }
-    | Plugin { outcome = `Succeeded ; _ } ->
+    | Plugin { outcome = `Succeeded ; _ }
+    | Container_image_fetch { outcome = Ok () ; _ } ->
       event_label_text `GREEN "DONE"
 
+    | Container_image_fetch { outcome = Error _ ; _ } ->
+      event_label_text `RED "MISSING CONTAINER IMAGE"
 
   let event time evt =
     let table_line label details =

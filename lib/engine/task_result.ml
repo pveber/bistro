@@ -6,7 +6,7 @@ type t =
   | Shell of {
       id : string ;
       descr : string ;
-      outcome : [`Succeeded | `Missing_output | `Failed] ;
+      outcome : [`Succeeded | `Missing_output | `Failed ] ;
       exit_code : int ;
       cmd : string ;
       file_dumps : Shell_command.file_dump list ;
@@ -20,27 +20,34 @@ type t =
       outcome : [`Succeeded | `Missing_output | `Failed] ;
       msg : string option ;
     }
+  | Container_image_fetch of {
+      id : string ;
+      outcome : (unit, [ `Singularity_failed_pull of int * string ]) result
+    }
 
 let id = function
   | Input { id ;  _ }
   | Select { id ;  _}
   | Shell { id ; _ }
-  | Plugin { id ; _ } -> id
+  | Plugin { id ; _ }
+  | Container_image_fetch { id ; _ } -> id
+
+let succeeded_of_outcome = function
+  | `Succeeded -> true
+  | `Failed | `Missing_output -> false
 
 let succeeded = function
   | Input { pass ; _ }
   | Select { pass ; _ } -> pass
+  | Container_image_fetch f -> f.outcome = Ok ()
   | Plugin { outcome ; _ }
-  | Shell { outcome ; _ } -> (
-      match outcome with
-      | `Succeeded -> true
-      | `Failed | `Missing_output -> false
-    )
+  | Shell { outcome ; _ } -> succeeded_of_outcome outcome
 
 let error_short_descr = function
   | Input { path ; _ } -> sprintf "Input %s doesn't exist" path
   | Select { dir_path ; sel ; _ } ->
     sprintf "Path %s doesn't exist in %s" (Path.to_string sel) dir_path
+  | Container_image_fetch _ -> sprintf "Container image could not be fetched"
   | Shell x -> (
       match x.outcome with
       | `Missing_output -> "Missing output"
@@ -84,3 +91,13 @@ let error_long_descr x db buf id = match x with
     bprintf buf "| STDERR                                                                       |\n" ;
     bprintf buf "+------------------------------------------------------------------------------+\n" ;
     bprintf buf "%s\n" (In_channel.read_all (Db.stderr db id))
+  | Container_image_fetch x ->
+    match x.outcome with
+    | Ok () -> assert false
+    | Error (`Singularity_failed_pull (_, url)) ->
+      (
+        bprintf buf "+------------------------------------------------------------------------------+\n" ;
+        bprintf buf "| Image URL                                                                    |\n" ;
+        bprintf buf "+------------------------------------------------------------------------------+\n" ;
+        bprintf buf "%s\n" url
+      )
