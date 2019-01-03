@@ -486,12 +486,12 @@ let step_outcome ~exit_code ~dest_exists=
   | 0, false -> `Missing_output
   | _ -> `Failed
 
-let perform_input sched ~path ~id =
+let perform_input ~path ~id =
   let pass = Sys.file_exists path = `Yes in
-  (
-    if pass then Misc.cp path (Db.cache sched.db id)
-    else Lwt.return ()
-  ) >>= fun () ->
+  (* (
+   *   if pass then Misc.cp path (Db.cache sched.db id)
+   *   else Lwt.return ()
+   * ) >>= fun () -> *)
   Eval_thread.return (
     Task_result.Input { id ; pass ; path }
   )
@@ -797,7 +797,7 @@ let rec build
       Eval_thread.join ~f:(build ?target sched) targets
     | W.Input { id ; path ; _ } ->
       register_build sched ~id ~build_trace:(fun () ->
-          build_trace sched w (fun _ -> perform_input sched ~id ~path)
+          build_trace sched w (fun _ -> perform_input ~id ~path)
         )
       |> Eval_thread.ignore
 
