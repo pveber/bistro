@@ -557,7 +557,7 @@ let rec blocking_evaluator
     | W.Select s ->
       let dir = blocking_evaluator db s.dir in
       fun () -> W.cd (dir ()) s.sel
-    | W.Input { path ; _ } -> fun () -> W.FS_path path
+    | W.Input { path ; _ } -> fun () -> W.FS_path (Misc.absolutize path)
     | W.Plugin { id ; task = Value_plugin _ ; _ } ->
       fun () -> (load_value (Db.cache db id))
     | W.Plugin { id ; task = Path_plugin _ ; _ } -> fun () -> W.Cache_id id
@@ -600,7 +600,7 @@ let rec shallow_eval
     | W.Select s ->
       shallow_eval sched s.dir >>= fun dir ->
       Lwt.return (W.cd dir s.sel)
-    | W.Input { path ; _ } -> Lwt.return (W.FS_path path)
+    | W.Input { path ; _ } -> Lwt.return (W.FS_path (Misc.absolutize path))
     | W.Plugin { id ; task = Value_plugin _ ; _ } ->
       Lwt.return (load_value (Db.cache sched.db id)) (* FIXME: blocking call *)
     | W.Spawn s -> (* FIXME: much room for improvement *)

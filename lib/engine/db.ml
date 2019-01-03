@@ -133,7 +133,7 @@ let rec path : t -> Bistro_internals.Workflow.path -> string = fun db p ->
 let rec workflow_path db (Bistro_internals.Workflow.Any w) =
   let open Bistro_internals.Workflow in
   match w with
-  | Input { path ; _ } -> Some (FS_path path)
+  | Input { path ; _ } -> Some (FS_path (Misc.absolutize path))
   | Select { dir ; sel ; _ } ->
     workflow_path db (Any dir)
     |> Option.map ~f:(fun d -> Cd (d, sel))
