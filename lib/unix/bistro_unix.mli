@@ -7,6 +7,8 @@ module Cmd : sig
     ?password:string ->
     ?dest:Shell_dsl.template ->
     string workflow -> Shell_dsl.command
+
+  val psgunzip : _ gz pworkflow -> Shell_dsl.template
 end
 
 val wget :

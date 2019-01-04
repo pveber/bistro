@@ -13,6 +13,10 @@ module Cmd = struct
       option (opt "-O" ident) dest ;
       string_dep url ;
     ]
+
+  (* process substitution for gunzip *)
+  let psgunzip x =
+    seq ~sep:"" [ string "<(gunzip -c " ; dep x ; string ";)" ]
 end
 
 let wget_dyn ?descr_url ?no_check_certificate ?user ?password url =
