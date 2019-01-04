@@ -25,6 +25,8 @@ type t =
 
 val id : t -> string
 
+val name : t -> string
+
 val succeeded : t -> bool
 
 val error_short_descr : t -> string

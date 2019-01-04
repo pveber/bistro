@@ -62,11 +62,10 @@ let error_report trace db buf =
   match trace with
   | Run { outcome ; _ } ->
     if not (Task_result.succeeded outcome) then
-      let tid = Task_result.id outcome in
-      let title = sprintf "Task %s failed\n" tid in
+      let title = sprintf "Task %s failed\n" (Task_result.name outcome) in
       let short_descr = Task_result.error_short_descr outcome in
       error_title buf title short_descr ;
-      Task_result.error_long_descr outcome db buf tid
+      Task_result.error_long_descr outcome db buf (Task_result.id outcome)
   | Allocation_error { id ; msg } ->
     let title = sprintf "Task %s failed\n" id in
     let short_descr = sprintf "Allocation error: %s\n" msg in

@@ -32,6 +32,14 @@ let id = function
   | Plugin { id ; _ }
   | Container_image_fetch { id ; _ } -> id
 
+let name = function
+  | Input { id ;  path ; _ } -> sprintf "input(%s, %s)" id path
+  | Select { dir_path ; sel ; _ } ->
+    sprintf "select(%s, %s)" dir_path (Path.to_string sel)
+  | Shell { id ; descr ; _ } -> sprintf "shell(%s,%s)" descr id
+  | Plugin { id ; descr ; _ } -> sprintf "plugin(%s,%s)" descr id
+  | Container_image_fetch { id ; _ } -> sprintf "container_image_fetch(%s)" id
+
 let succeeded_of_outcome = function
   | `Succeeded -> true
   | `Failed | `Missing_output -> false
