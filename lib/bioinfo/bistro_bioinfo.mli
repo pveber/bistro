@@ -869,6 +869,22 @@ module Kallisto : sig
     tsv pworkflow
 end
 
+(** {3 Genome assembly} *)
+
+module Spades : sig
+  val spades :
+    ?single_cell:bool ->
+    ?iontorrent:bool ->
+    ?pe:sanger_fastq pworkflow list * sanger_fastq pworkflow list ->
+    ?threads:int ->
+    ?memory:int ->
+    unit ->
+    [`spades] dworkflow
+
+  val contigs : [`spades] dworkflow -> fasta pworkflow
+  val scaffolds : [`spades] dworkflow -> fasta pworkflow
+end
+
 (** {3 Differential analysis} *)
 
 module DESeq2 : sig
@@ -1150,26 +1166,6 @@ module Prokka : sig
     directory pworkflow
 
 end
-
-module Spades : sig
-  class type output = object
-    inherit directory
-    method contents : [`spades]
-  end
-
-  val spades :
-    ?single_cell:bool ->
-    ?iontorrent:bool ->
-    ?pe:sanger_fastq pworkflow list * sanger_fastq pworkflow list ->
-    ?threads:int ->
-    ?memory:int ->
-    unit ->
-    output pworkflow
-
-  val contigs : output pworkflow -> fasta pworkflow
-  val scaffolds : output pworkflow -> fasta pworkflow
-end
-
 
 module Srst2 : sig
 
