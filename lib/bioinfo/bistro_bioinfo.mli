@@ -899,6 +899,17 @@ module Idba : sig
   val idba_ud_scaffolds : [`idba] dworkflow -> fasta pworkflow
 end
 
+module Cisa : sig
+  val merge :
+    ?min_length:int ->
+    (string * fasta pworkflow) list -> fasta pworkflow
+
+  val cisa :
+    genome_size:int ->
+    fasta pworkflow ->
+    fasta pworkflow
+end
+
 module Quast : sig
   val quast :
     ?reference:fasta pworkflow ->
