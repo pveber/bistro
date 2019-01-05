@@ -885,6 +885,14 @@ module Spades : sig
   val scaffolds : [`spades] dworkflow -> fasta pworkflow
 end
 
+module Quast : sig
+  val quast :
+    ?reference:fasta pworkflow ->
+    ?labels:string list ->
+    fasta pworkflow list ->
+    [`quast] dworkflow
+end
+
 (** {3 Differential analysis} *)
 
 module DESeq2 : sig

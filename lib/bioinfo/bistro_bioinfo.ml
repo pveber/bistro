@@ -2466,3 +2466,17 @@ module Spades = struct
   let contigs x = Workflow.select x ["contigs.fasta"]
   let scaffolds x = Workflow.select x ["scaffolds.fasta"]
 end
+
+module Quast = struct
+  let img = [ docker_image ~account:"pveber" ~name:"quast" ~tag:"4.3" () ]
+
+  let quast ?reference ?labels fas =
+    Workflow.shell ~descr:"quast" [
+      cmd "quast.py" ~img [
+        option (opt "-R" dep) reference ;
+        option (opt "--labels" (list ~sep:"," string)) labels ;
+        opt "--output-dir" (fun x -> seq [x ; string "/results"]) dest ;
+        list ~sep:" " dep fas ;
+      ]
+    ]
+end
