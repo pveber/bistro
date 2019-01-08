@@ -72,12 +72,11 @@ module G = struct
     | List_nth _ -> false
     | Glob _ -> false
 
-  
   let reduce_to_paths g =
     let foreach_vertex v acc =
       if is_path v then acc else (
-        let f p acc = fold_succ (fun s acc -> add_edge acc p s) g p acc in
-        fold_pred f g v (remove_vertex g v)
+        let f p acc = fold_succ (fun s acc -> add_edge acc p s) acc v acc in
+        remove_vertex (fold_pred f acc v acc) v
       )
     in
     fold_vertex foreach_vertex g g
