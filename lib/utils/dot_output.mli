@@ -3,12 +3,14 @@ open Bistro_engine
 
 val workflow_to_channel :
   ?db:Db.t ->
+  ?reduce:bool ->
   out_channel ->
   _ workflow ->
   unit
 
 val workflow_to_file :
   ?db:Db.t ->
+  ?reduce:bool ->
   string ->
   _ workflow ->
   unit

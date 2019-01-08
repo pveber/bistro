@@ -57,6 +57,30 @@ module G = struct
         add_edge_e acc e
       )
 
+  let is_path (W.Any w) =
+    match w with
+    | Plugin _ -> true
+    | Shell _ -> true
+    | Input _ -> true
+    | Select _ -> true
+    | Pure _ -> false
+    | App _ -> false
+    | Eval_path _ -> false
+    | Both _ -> false
+    | List _ -> false
+    | Spawn _ -> false
+    | List_nth _ -> false
+    | Glob _ -> false
+
+  
+  let reduce_to_paths g =
+    let foreach_vertex v acc =
+      if is_path v then acc else (
+        let f p acc = fold_succ (fun s acc -> add_edge acc p s) g p acc in
+        fold_pred f g v (remove_vertex g v)
+      )
+    in
+    fold_vertex foreach_vertex g g
 end
 
 
@@ -147,12 +171,13 @@ let dot_output ?db oc g ~needed =
  *
  * let create path = new logger path *)
 
-let workflow_to_channel ?db oc w =
+let workflow_to_channel ?db ?(reduce = false) oc w =
   let dep_graph = G.of_workflow (Bistro.Private.reveal w) in
+  let dep_graph = if reduce then G.reduce_to_paths dep_graph else dep_graph in
   dot_output ~needed:S.empty ?db oc dep_graph
 
-let workflow_to_file ?db fn w =
-  Out_channel.with_file fn ~f:(fun oc -> workflow_to_channel ?db oc w)
+let workflow_to_file ?db ?reduce fn w =
+  Out_channel.with_file fn ~f:(fun oc -> workflow_to_channel ?db ?reduce oc w)
 
 let gc_state_to_channel ?condensed ?db oc gcs =
   let dep_graph = G.of_gc_state ?condensed gcs in
