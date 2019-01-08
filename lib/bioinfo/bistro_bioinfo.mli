@@ -158,7 +158,7 @@ module Ucsc_gb : sig
   val string_of_genome : [< genome] -> string
   val genome_of_string : string -> genome option
 
-  (** {5 Dealing with genome sequences} *)
+  (** {4 Dealing with genome sequences} *)
   class type chromosome_sequences = object
     inherit directory
     method contents : [`ucsc_chromosome_sequences]
@@ -174,12 +174,12 @@ module Ucsc_gb : sig
   val twoBitToFa : twobit pworkflow -> #bed4 pworkflow -> fasta pworkflow
 
 
-  (** {5 Chromosome size and clipping} *)
+  (** {4 Chromosome size and clipping} *)
   val fetchChromSizes : [< genome] -> chrom_sizes pworkflow
   val bedClip : chrom_sizes pworkflow -> (#bed3 as 'a) pworkflow -> 'a pworkflow
 
 
-  (** {5 Conversion between annotation file formats} *)
+  (** {4 Conversion between annotation file formats} *)
   (* val wig_of_bigWig : bigWig file -> wig file *)
   (* val bigWig_of_wig : ?clip:bool -> [< genome] -> wig file -> bigWig file *)
   val bedGraphToBigWig : [< genome] -> bedGraph pworkflow -> bigWig pworkflow
@@ -188,8 +188,8 @@ module Ucsc_gb : sig
     [< genome] ->
     [ `bed3 of bed3 pworkflow | `bed5 of bed5 pworkflow ] ->
     bigBed pworkflow
-  (** {v bedToBigBed v} utility. Fails when given an empty BED file on
-      input. Note that the underlying {v bedToBigBed v} expects BED
+  (** bedToBigBed utility. Fails when given an empty BED file on
+      input. Note that the underlying bedToBigBed expects BED
       files with {i exactly} 3 or 5 columns. *)
 
   val bedToBigBed_failsafe :

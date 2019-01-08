@@ -9,7 +9,8 @@ val of_string : string -> t
 val to_string : t -> string
 
 (** [make_relative ~from:dirA dirB] constructs a relative path that
-    can be used to go from [dirA] to [dirB]. @raise
-    [Invalid_argument] if [dirA] is relative. *)
+    can be used to go from [dirA] to [dirB]. 
+
+    @raise [Invalid_argument] if [dirA] is relative. *)
 val make_relative : ?from:string -> string -> t
 

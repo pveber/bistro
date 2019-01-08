@@ -1,3 +1,28 @@
+(** A library to build scientific workflows.
+
+     This module introduces a type ['a worfklow] that describe a set
+   of inter-dependent steps that will eventually generate a value of
+   type ['a]. Steps may be either command lines to be executed, or
+   OCaml expressions to be evaluated.
+
+     To build shell-based workflows, use the {!module:Shell_dsl}
+   module, that provides a set of combinators to write shell scripts
+   easily. For instance, the following function shows how to create a
+   gzipped file using the output of another workflow: 
+   {[ 
+      let gzip (x : 'a pworkflow) : 'a gz pworkflow = 
+        Workflow.shell ~descr:"unix.gzip" [ 
+          cmd "gzip" [ string "-c" ; dep x ; string ">" dest ]
+        ] 
+   ]}
+
+     Note that a workflow is just a recipe to build some
+   result. Building the workflow won't actually generate anything. In
+   order to run the workflow, you have to run it using an execution
+   engine like the one provided by [bistro.engine].  *)
+
+(** {2 Base types} *)
+
 type 'a workflow
 type 'a path
 type 'a pworkflow = 'a path workflow
@@ -11,6 +36,9 @@ class type directory = object
 end
 
 type 'a dworkflow = < directory ; contents : 'a > path workflow
+
+
+(** {2 Building shell-based workflow} *)
 
 module Template_dsl : sig
   type template
@@ -86,13 +114,15 @@ module Shell_dsl : sig
     ?img:container_image list ->
     ?stdin:template -> ?stdout:template -> ?stderr:template ->
     template list -> command
-  (** Command-line constructor, e.g. [cmd "echo" ~stdout:dest [ string
-      "foo" ]] will generate a shell command like ["echo foo >
-      /some/path"].
-      - @param env specifies a Docker image where to run the command
-      - @param stdin adds a ["< /some/path"] token at the end of the command
-      - @param stdout adds a ["> /some/path"] token at the end of the command
-      - @param stderr adds a ["2> /some/path"] token at the end of the command *)
+  (** Command-line constructor, e.g. 
+        [cmd "echo" ~stdout:dest [ string "foo" ]] 
+      will generate a shell command like 
+        ["echo foo > /some/path"].
+
+      @param env specifies a Docker image where to run the command
+      @param stdin adds a ["< /some/path"] token at the end of the command
+      @param stdout adds a ["> /some/path"] token at the end of the command
+      @param stderr adds a ["2> /some/path"] token at the end of the command *)
 
   val opt : string -> ('a -> template) -> 'a -> template
   (** Command-line option formatting, e.g.: [opt "--output" dep dest]
@@ -117,7 +147,7 @@ module Shell_dsl : sig
   val ( // ) : template -> string -> template
   (** Similar to {!val:Filename.concat}, but with other types. *)
 
-  (** {5 Useful commands} *)
+  (** {4 Useful commands} *)
 
   val mkdir : template -> command
   val mkdir_p : template -> command
@@ -173,10 +203,10 @@ module Workflow : sig
     ?version:int ->
     Shell_dsl.command list -> 'a path workflow
   (** Workflow constructor, taking a list of commands in input. Other arguments are:
-      - @param descr description of the workflow, used for logging
-      - @param mem required memory
-      - @param np maximum number of cores (could be given less at execution)
-      - @param version version number, used to force the rebuild of a workflow *)
+      @param descr description of the workflow, used for logging
+      @param mem required memory
+      @param np maximum number of cores (could be given less at execution)
+      @param version version number, used to force the rebuild of a workflow *)
 
   val pure : id:string -> 'a -> 'a workflow
   val pure_data : 'a -> 'a workflow
@@ -214,7 +244,7 @@ module Private : sig
   val reveal : 'a workflow -> 'a Bistro_internals.Workflow.t
 end
 
-(** {5 File formats} *)
+(** {2 File formats} *)
 
 class type text_file = object
   inherit file
