@@ -55,7 +55,7 @@ and ('a, 'b) step = {
   descr : string ;
   task : 'a ;
   np : int ; (** Required number of processors *)
-  mem : int t ; (** Required memory in MB *)
+  mem : int t option ; (** Required memory in MB *)
   version : int option ; (** Version number of the wrapper *)
   deps : 'b list ;
 }
@@ -143,13 +143,21 @@ let both fst snd =
   let id = digest (`Both, id fst, id snd) in
   Both { id ; fst ; snd }
 
-let cached_value ?(descr = "") ?(np = 1) ?(mem = int 100) ?version workflow =
-  let id = digest (`Value, id workflow, version) in
-  Plugin { id ; descr ; task = Value_plugin workflow ; np ; mem ; version ; deps = [ any mem ; any workflow ] }
+let add_mem_dep mem deps = match mem with
+  | None -> deps
+  | Some mem -> any mem :: deps
 
-let cached_path ?(descr = "") ?(np = 1) ?(mem = int 100) ?version workflow =
+let cached_value ?(descr = "") ?(np = 1) ?mem ?version workflow =
   let id = digest (`Value, id workflow, version) in
-  Plugin { id ; descr ; task = Path_plugin workflow ; np ; mem ; version ; deps = [ any mem ; any workflow ] }
+  Plugin { id ; descr ; np ; mem ; version ;
+           task = Value_plugin workflow ;
+           deps = add_mem_dep mem [ any workflow ] }
+
+let cached_path ?(descr = "") ?(np = 1) ?mem ?version workflow =
+  let id = digest (`Value, id workflow, version) in
+  Plugin { id ; descr ; np ; mem ; version ;
+           task = Path_plugin workflow ;
+           deps = add_mem_dep mem [ any workflow ] }
 
 let eval_path w = Eval_path { id = digest (`Eval_path, id w) ; workflow = w }
 
@@ -160,14 +168,13 @@ let digestible_cmd = Command.map ~f:(function
 
 let shell
     ?(descr = "")
-    ?(mem = int 100)
+    ?mem
     ?(np = 1)
     ?version
     cmds =
   let cmd = Command.And_list cmds in
   let id = digest ("shell", version, digestible_cmd cmd) in
-  let deps =
-    any mem :: (
+  let deps = add_mem_dep mem (
       Command.deps cmd
       |> List.map (function
           | Path_token w -> any w

@@ -679,6 +679,10 @@ let np_requirement
     | Plugin x -> x.np
     | Shell x -> x.np
 
+let opt_mem_requirement sched = function
+  | None -> Lwt.return 100
+  | Some mem -> shallow_eval sched mem
+
 let mem_requirement
   : type u. t -> u Workflow.t -> int Lwt.t
   = fun sched -> function
@@ -692,8 +696,8 @@ let mem_requirement
     | List _ -> Lwt.return 0
     | List_nth _ -> Lwt.return 0
     | Glob _ -> Lwt.return 0
-    | Plugin x -> shallow_eval sched x.mem
-    | Shell x -> shallow_eval sched x.mem
+    | Plugin x -> opt_mem_requirement sched x.mem
+    | Shell x -> opt_mem_requirement sched x.mem
 
 let build_trace sched w perform =
   let ready = Unix.gettimeofday () in
