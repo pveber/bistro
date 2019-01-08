@@ -50,9 +50,9 @@ Getting started with the OCaml interpreter
 While OCaml programs can be compiled into executables, it is also very
 convenient to enter programs interactively using an *interpreter*
 (similar to what exists for ``python`` or ``R``). The OCaml language
-has a very nice interpreter called
-[``utop``](https://github.com/diml/utop) than can easily installed
-using ``opam``. In a shell just type:
+has a very nice interpreter called `utop
+<https://github.com/diml/utop>`__ than can easily installed using
+``opam``. In a shell just type:
 
 .. code-block:: sh
 
