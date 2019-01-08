@@ -43,3 +43,13 @@ val error_report :
   string
 
 val stop : t -> unit Lwt.t
+
+val simple_eval_exn :
+  ?np:int ->
+  ?mem:[`GB of int] ->
+  ?allowed_containers:[`Docker | `Singularity] list ->
+  ?loggers:Logger.t list ->
+  ?collect:bool ->
+  ?db_path:string ->
+  'a Bistro.workflow ->
+  'a

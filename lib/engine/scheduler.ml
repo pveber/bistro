@@ -887,3 +887,12 @@ let eval_exn sched w =
 let stop sched =
   Maybe_gc.stop sched.gc >>= fun () ->
   sched.logger#stop
+
+let simple_eval_exn
+    ?np ?mem ?allowed_containers ?loggers
+    ?collect ?(db_path = "_bistro") w =
+  let db = Db.init_exn db_path in
+  let sched = create ?np ?mem ?allowed_containers ?loggers db ?collect in
+  let thread = eval_exn sched w in
+  start sched ;
+  Lwt_main.run thread
