@@ -49,19 +49,26 @@ Getting started with the OCaml interpreter
 
 While OCaml programs can be compiled into executables, it is also very
 convenient to enter programs interactively using an *interpreter*
-(similar to what exists for python or R). The OCaml language has a
-very nice interpreter called [``utop``](https://github.com/diml/utop)
-than can easily installed using ``opam``. In a shell just type:
+(similar to what exists for ``python`` or ``R``). The OCaml language
+has a very nice interpreter called
+[``utop``](https://github.com/diml/utop) than can easily installed
+using ``opam``. In a shell just type:
 
 .. code-block:: sh
 
    opam install utop
 
-and then you can call ``utop`` on the command line. An interpreter like ``utop`` reads expressions or definitions, evaluates them and prints the result. Expressions or definitions sent to ``utop`` should be ended with ``;;`` (this is not needed in OCaml programs). For instance, let's enter a simple sentence ``let a = 1;;``. ``utop`` answers as follows:
+and then you can call ``utop`` on the command line. An interpreter
+like ``utop`` reads expressions or definitions, evaluates them and
+prints the result. Expressions or definitions sent to ``utop`` should
+be ended with ``;;`` (in most cases they can be ommited in OCaml
+programs, but it doesn't hurt to keep them in the beginning). For
+instance, let's enter a simple sentence ``let a = 1;;``. ``utop``
+answers as follows:
 
 .. code-block:: ocaml
 
-        OCaml version 4.02.3
+        OCaml version 4.07.1
 
    # let a = 1;;
    val a : int = 1
@@ -122,3 +129,38 @@ functions:
 
    # let f x = x + 1;;
    val f : int -> int = <fun>
+
+Arguments can be named, in which case they are preceded by a ``~`` at
+the function definition and function calls:
+
+.. code-block:: ocaml
+
+   # let f ~x = x + 1;;
+   val f : int -> int = <fun>
+   # f ~x:0;;
+   - : int = 1
+
+Named arguments are very handy in that they can be given in any order;
+also they are a very effective way to document your code. A variant of
+named arguments are *optional arguments*, which may not be provided to
+the function.
+
+Last, ``bistro`` API uses so-called *polymorphic variants*, which is a
+particular kind of values in OCaml. They are easy to spot because they
+are written with a leading backquote, like in:
+
+.. code-block:: ocaml
+
+  # `mm10;;
+  - : [> `mm10 ] = `mm10
+  # `GB 3;;
+  - : [> `GB of int ] = `GB 3
+
+The preceding snippet shows two basic usages of the variants: in the
+first one, they are used as a substitute to constant strings, the
+important difference being that the OCaml compiler will spot any typo
+at compile-time; the second usage is to wrap other values under a
+label that reminds of the meaning of the value. Here we define a
+memory requirement (3 GB), but instead of just representing it with an
+integer, we wrap it with the polymorphic variant to recall that this
+requirement is expressed in GB and not MB for instance.

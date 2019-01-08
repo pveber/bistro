@@ -23,14 +23,14 @@ Debian/Ubuntu just
 
 .. code:: sh
    
-   $ opam init --comp=4.05.0
+   $ opam init --comp=4.07.1
 
-Take good care to follow the instructions given by ``opam`` after this
+**Take good care** to follow the instructions given by ``opam`` after this
 command ends. Typically you will need to add this line:
 
 .. code:: sh
    
-   $ . /home/pveber/.opam/opam-init/init.sh > /dev/null 2> /dev/null || true
+   $ . ${HOME}/.opam/opam-init/init.sh > /dev/null 2> /dev/null || true
 
 to your ``.bashrc`` and execute
 
@@ -68,8 +68,8 @@ paste the following program:
 
    #require "bistro.bioinfo bistro.utils"
 
-   open Bistro.EDSL
-   open Bistro_bioinfo.Std
+   open Bistro
+   open Bistro_bioinfo
    open Bistro_utils
 
    let sample = Sra.fetch_srr "SRR217304"           (* Fetch a sample from the SRA database *)
@@ -86,7 +86,7 @@ paste the following program:
    ]
 
    (** Actually run the pipeline *)
-   let () = Repo.build ~outdir:"res" ~np:2 ~mem:(`GB 4) repo
+   let () = Repo.build_main ~outdir:"res" ~np:2 ~mem:(`GB 4) repo
 
 Running a pipeline
 ==================
@@ -96,22 +96,24 @@ be installed on the system. Maintaining installations of many tools on
 a single system is particularly time-consuming and might become
 extremely tricky (e.g. to have several versions of the same tool, or
 tools that have incompatible dependencies on very basic pieces of the
-system, like the C compiler). To avoid this problem, ``bistro`` uses
-`Docker <https://www.docker.com/>`__ to run each tool of the workflow in
-an isolated environment (a Docker container) containing a proper
-installation of the tool. In practice, you don't have to install
-anything: for each step of a workflow ``bistro`` will invoke
-``docker`` specifying which environment it needs, and ``docker`` will
-fetch it and run the command. This is a tremendous time-saver in
-practice to deploy a pipeline on a new machine.
+system, like the C compiler). To avoid this problem, ``bistro`` can
+use so-called *containers* like `Docker <https://www.docker.com/>`__
+or `Singularity <https://www.sylabs.io/>` to run each tool of the
+workflow in an isolated environment containing a proper installation
+of the tool. In practice, you don't have to install anything: for each
+step of a workflow ``bistro`` will invoke a container specifying which
+environment it needs. This is a tremendous time-saver in practice to
+deploy a pipeline on a new machine.
 
-To get there you have to install ``docker`` on your machine and add
-your user in the ``docker`` group. Follow instructions on `this page
+To get there you have to install ``docker`` or ``singularity``. Follow
+instructions on `this page
 <https://docs.docker.com/engine/installation/#supported-platforms>`__
-to do so. Summarized instructions are also available `there
-<installing-docker.html>`_. Note that ``bistro`` can be used without
-``docker``, but in that case, you must make each program used in the
-pipeline available on your system.
+for ``docker̀` and `this one
+<https://www.sylabs.io/guides/3.0/user-guide/quick_start.html#quick-installation-steps>`__
+for ``singularity``. Summarized instructions are also available `there
+<installing-docker.html>`_ for ``docker̀`. Note that ``bistro`` can be
+used without containers, but in that case, you must make each program
+used in the pipeline available on your system.
 
 Assuming ``docker`` is installed on your machine, you can simply run
 your pipeline by:

@@ -2,11 +2,11 @@
 Basics: how to write pipelines
 ==============================
 
-Now that we have a working installation of ``bistro`` and ``docker``,
-let us get back to our original goal, namely to write pipelines of
-scientific computations. In the following we'll use the ``utop``
-interpreter to run an OCaml script. If you write your code in a file
-named ``pipeline.ml``, you can run it by typing
+Now that we have a working installation of ``bistro``, let us get back
+to our original goal, namely to write pipelines of scientific
+computations. In the following we'll use the ``utop`` interpreter to
+run an OCaml script. If you write your code in a file named
+``pipeline.ml``, you can run it by typing
 
 .. code-block:: bash
 
@@ -21,7 +21,7 @@ What's in bistro
 
 ``bistro`` essentially brings three main components:
   - a data structure to represent a workflow, understood as a
-    collection of interdependent shell scripts
+    collection of interdependent steps
   - an execution engine that can run a workflow, featuring parallel
     build, resume-on-failure and logging
   - a library of pre-defined workflows to easily run applications from
