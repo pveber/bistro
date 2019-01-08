@@ -32,6 +32,7 @@ module G = struct
           ~init:(seen, acc)
           ~f:(fun (seen, acc) v -> of_workflow_aux seen acc v)
       in
+      let acc = add_vertex acc u in
       let acc = List.fold deps ~init:acc ~f:(fun acc v -> add_edge acc u v) in
       let seen = S.add seen u in
       seen, acc
@@ -83,7 +84,7 @@ let dot_output ?db oc g ~needed =
     ]
   in
   let vertex_attributes u =
-    let needed = S.mem needed u in
+    let needed = db = None || S.mem needed u in
     let color = if needed then black else light_gray in
     let shape = `Shape (shape u) in
     let W.Any w = u in
@@ -113,8 +114,7 @@ let dot_output ?db oc g ~needed =
       | _ -> []
     in
     let color =
-      if S.mem needed u
-      && not (already_done u)
+      if db = None || (S.mem needed u && not (already_done u))
       then black else light_gray in
     style @ [ `Color color ]
   in
