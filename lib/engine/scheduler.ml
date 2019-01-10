@@ -280,8 +280,7 @@ struct
     let u = Elt.workflow u and v = Elt.singularity_image v in
     T.adj_add gc.depends_on u v ;
     T.adj_add gc.is_used_by v u ;
-    T.incr_count gc.counts v ;
-    (let n = T.find gc.counts v in printf "%s: %d -> %d\n%!" (Elt.id v) (n - 1) n)
+    T.incr_count gc.counts v
 
   let rec register : type u v. t -> ?target:u W.t -> v W.t -> unit Lwt.t = fun gc ?target w ->
     match w with
