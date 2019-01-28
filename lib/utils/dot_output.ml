@@ -127,7 +127,7 @@ let dot_output ?db oc g ~needed =
     | List _ -> [ label "list" u ; `Shape `Plaintext ]
     | Glob _ -> [ label "glob" u ; `Shape `Plaintext ]
     | Eval_path _ -> [ label "path" u ; `Shape `Plaintext ]
-    | List_nth l -> [ label (sprintf "list_nth_%d" l.index) u ; `Shape `Plaintext ] 
+    | List_nth l -> [ label (sprintf "list_nth_%d" l.index) u ; `Shape `Plaintext ]
   in
   let edge_attributes e =
     let u = G.E.src e and v = G.E.dst e in
