@@ -545,6 +545,8 @@ let perform_path_plugin sched (Allocator.Resource { mem ; np }) f ~id ~descr =
       ~np ~mem ~id
   in
   let cache_dest = Db.cache sched.db id in
+  Misc.remove_if_exists env.tmp_dir >>= fun () ->
+  Unix.mkdir_p env.tmp ;
   worker (Fn.flip f env.dest) () >>= function
   | Ok () ->
     let outcome =
@@ -553,7 +555,8 @@ let perform_path_plugin sched (Allocator.Resource { mem ; np }) f ~id ~descr =
     in
     Misc.(
       if outcome = `Succeeded then
-        mv env.dest cache_dest
+        mv env.dest cache_dest >>= fun () ->
+        remove_if_exists env.tmp_dir
       else Lwt.return ()
     ) >>= fun () ->
     Lwt_result.return (Task_result.Plugin { id ; outcome ; msg = None ; descr })
