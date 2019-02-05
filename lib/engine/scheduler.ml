@@ -537,6 +537,30 @@ let perform_shell sched (Allocator.Resource { np ; mem }) ~id ~descr cmd =
       stderr = env.stderr ;
     })
 
+let perform_path_plugin sched (Allocator.Resource { mem ; np }) f ~id ~descr =
+  let env =
+    Execution_env.make
+      ~allowed_containers:[]
+      ~db:sched.db
+      ~np ~mem ~id
+  in
+  let cache_dest = Db.cache sched.db id in
+  worker (Fn.flip f env.dest) () >>= function
+  | Ok () ->
+    let outcome =
+      if Sys.file_exists env.dest = `Yes then `Succeeded
+      else `Missing_output
+    in
+    Misc.(
+      if outcome = `Succeeded then
+        mv env.dest cache_dest
+      else Lwt.return ()
+    ) >>= fun () ->
+    Lwt_result.return (Task_result.Plugin { id ; outcome ; msg = None ; descr })
+  | Error msg ->
+    Lwt_result.return (Task_result.Plugin { id ; outcome = `Failed ; msg = Some msg ; descr })
+
+
 let rec blocking_evaluator
   : type s. Db.t -> s W.t -> (unit -> s)
   = fun db w ->
@@ -830,19 +854,9 @@ let rec build
     | W.Plugin { id ; task = Path_plugin workflow ; descr ; _ } ->
       schedule_cached_workflow sched ~id w
         ~deps:(fun () -> build sched ~target:w workflow)
-        ~perform:(fun _ ->
-          let evaluator = blocking_evaluator sched.db workflow in
-          (* let env = *) (* FIXME: use this *)
-          (*   Execution_env.make *)
-          (*     ~use_docker:sched.use_docker *)
-          (*     ~db:sched.db *)
-          (*     ~np ~mem ~id *)
-          (* in *)
-          worker (Fn.flip evaluator (Db.cache sched.db id)) () >|=
-          function
-          | Ok () ->
-            Ok (Task_result.Plugin { id ; outcome = `Succeeded ; msg = None ; descr })
-          | Error msg -> Ok (Task_result.Plugin { id ; outcome = `Failed ; msg = Some msg ; descr })
+        ~perform:(fun resource ->
+            let evaluator = blocking_evaluator sched.db workflow in
+            perform_path_plugin sched resource ~id ~descr evaluator
         )
 
     | W.Shell { id ; task ; descr ; deps ; _ } ->
