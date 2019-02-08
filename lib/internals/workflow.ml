@@ -66,7 +66,14 @@ and 'a plugin =
 
 and shell_command = token Command.t
 
-and token = Path_token of path t | String_token of string t
+and token =
+  | Path_token of path t
+  | Path_list_token of {
+      elts : path list t ;
+      sep : string ;
+      quote : char option ;
+    }
+  | String_token of string t
 
 and any = Any : _ t -> any
 
@@ -163,6 +170,7 @@ let eval_path w = Eval_path { id = digest (`Eval_path, id w) ; workflow = w }
 
 let digestible_cmd = Command.map ~f:(function
     | Path_token w -> id w
+    | Path_list_token { elts ; sep ; quote } -> digest (id elts, sep, quote)
     | String_token w -> id w
   )
 
@@ -178,6 +186,7 @@ let shell
       Command.deps cmd
       |> List.map (function
           | Path_token w -> any w
+          | Path_list_token { elts ; _ } -> any elts
           | String_token s -> any s
         )
     )

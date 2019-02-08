@@ -72,6 +72,12 @@ module Template_dsl : sig
   (** [dep w] is interpreted as the path where to find the result of
       workflow [w] *)
 
+  val deps :
+    ?quote:char ->
+    sep:string ->
+    _ path list workflow ->
+    template
+
   val string_dep : string workflow -> template
   (** [string_dep w] is interpreted as the result of workflow [w] *)
 

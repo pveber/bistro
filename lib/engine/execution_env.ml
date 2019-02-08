@@ -3,6 +3,11 @@ open Bistro_internals
 
 type insert =
   | Path of Workflow.path
+  | Path_list of {
+      elts : Workflow.path list ;
+      sep : string ;
+      quote : char option ;
+    }
   | String of string
 
 type t = {

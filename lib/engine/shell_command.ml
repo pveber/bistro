@@ -59,6 +59,13 @@ let string_of_token (env : Execution_env.t) =
   function
   | S s -> s
   | D (Execution_env.Path p) -> env.dep p
+  | D (Execution_env.Path_list { elts ; quote ; sep }) ->
+    let quote =
+      Option.value_map quote ~default:Fn.id ~f:(fun c p -> sprintf "%c%s%c" c p c)
+    in
+    List.map elts ~f:env.dep
+    |> List.map ~f:quote
+    |> String.concat ~sep
   | D (String s) -> s
   | F toks -> env.file_dump toks
   | DEST -> env.dest
@@ -112,9 +119,11 @@ let dest_mount env dck_env =
 let command_path_deps cmd =
   Command.deps cmd
   |> List.filter_map ~f:(function
-      | Execution_env.Path p -> Some p
+      | Execution_env.Path p -> Some [ p ]
+      | Path_list l -> Some l.elts
       | String _ -> None
     )
+  |> List.concat
 
 let rec string_of_command env =
   let open Command in

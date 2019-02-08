@@ -115,6 +115,7 @@ module Template_dsl = struct
   let int i = string (Int.to_string i)
   let float f = string (Float.to_string f)
   let dep w = [ Template.D (Workflow.Path_token w) ]
+  let deps ?quote ~sep w = [ Template.D (Workflow.Path_list_token { elts = w ; quote ; sep }) ]
   let string_dep w = [ Template.D (Workflow.String_token w) ]
   let int_dep w = [ Template.D Workflow.(String_token (app (pure ~id:"__string_of_int__" Int.to_string) w)) ]
 
