@@ -8,12 +8,12 @@
      To build shell-based workflows, use the {!module:Shell_dsl}
    module, that provides a set of combinators to write shell scripts
    easily. For instance, the following function shows how to create a
-   gzipped file using the output of another workflow: 
-   {[ 
-      let gzip (x : 'a pworkflow) : 'a gz pworkflow = 
-        Workflow.shell ~descr:"unix.gzip" [ 
+   gzipped file using the output of another workflow:
+   {[
+      let gzip (x : 'a pworkflow) : 'a gz pworkflow =
+        Workflow.shell ~descr:"unix.gzip" [
           cmd "gzip" [ string "-c" ; dep x ; string ">" dest ]
-        ] 
+        ]
    ]}
 
      Note that a workflow is just a recipe to build some
@@ -114,9 +114,9 @@ module Shell_dsl : sig
     ?img:container_image list ->
     ?stdin:template -> ?stdout:template -> ?stderr:template ->
     template list -> command
-  (** Command-line constructor, e.g. 
-        [cmd "echo" ~stdout:dest [ string "foo" ]] 
-      will generate a shell command like 
+  (** Command-line constructor, e.g.
+        [cmd "echo" ~stdout:dest [ string "foo" ]]
+      will generate a shell command like
         ["echo foo > /some/path"].
 
       @param env specifies a Docker image where to run the command
