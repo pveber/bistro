@@ -127,7 +127,7 @@ let rec replace_body new_body = function
 let default_descr var =
   Printf.sprintf
     "%s.%s"
-    (Caml.Filename.(chop_extension (basename !L.input_name)))
+    Caml.Filename.(remove_extension (basename !L.input_name))
     var
 
 let str_item_rewriter ~loc ~path:_ descr version var expr =
