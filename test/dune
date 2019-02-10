@@ -1,4 +1,4 @@
 (executables
-  (names test test1 test2 test_gc accordion)
+  (names test test1 test2 test_gc accordion test_script)
   (libraries bistro.utils bistro.nlp core lwt.unix)
   (preprocess (pps ppx_bistro ppx_jane)))
