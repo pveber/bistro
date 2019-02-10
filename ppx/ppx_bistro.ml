@@ -169,6 +169,21 @@ let pstr_item_rewriter ~loc ~path:_ descr version var expr =
   in
   [%stri let [%p B.pvar var] = [%e replace_body workflow_body_with_type expr]]
 
+let script_rewriter ~loc ~path:_ str =
+  let fragments = Script_parser.fragments str in
+  List.map fragments ~f:(function
+      | `Text (i, j) ->
+        let e = B.estring (String.sub str ~pos:i ~len:(j - i + 1)) in
+        [%expr Bistro.Shell_dsl.string [%e e]]
+      | `Antiquot (i, j) ->
+        B.evar (String.sub str ~pos:i ~len:(j - i + 1))
+    )
+  |> B.elist
+
+let script_ext =
+  let open Extension in
+  declare "script" Context.expression Ast_pattern.(single_expr_payload (estring __)) script_rewriter
+  
 let expression_ext =
   let open Extension in
   declare "workflow" Context.expression Ast_pattern.(single_expr_payload __) expression_rewriter
@@ -214,6 +229,7 @@ let str_item_ext label rewriter =
 
 let () =
   Driver.register_transformation "bistro" ~extensions:[
+    script_ext ;
     expression_ext ;
     str_item_ext "workflow" str_item_rewriter ;
     str_item_ext "pworkflow" pstr_item_rewriter ;
