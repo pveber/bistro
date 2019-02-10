@@ -179,6 +179,7 @@ let script_rewriter ~loc ~path:_ str =
         B.evar (String.sub str ~pos:i ~len:(j - i + 1))
     )
   |> B.elist
+  |> (fun e -> [%expr Bistro.Shell_dsl.seq ~sep:"" [%e e]])
 
 let script_ext =
   let open Extension in
