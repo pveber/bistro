@@ -696,6 +696,8 @@ module ChIPQC : sig
   end
 
   val run : 'a sample list -> output pworkflow
+  (** Beware: doesn't work with only one sample (see
+     https://support.bioconductor.org/p/84754/) *)
 end
 
 
