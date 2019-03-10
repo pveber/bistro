@@ -489,7 +489,7 @@ module ChIPQC = struct
     tissue : string ;
     factor : string ;
     replicate : string ;
-    bam : bam pworkflow ;
+    bam : indexed_bam pworkflow ;
     peaks : (#bed3 as 'a) pworkflow ;
   }
 
@@ -503,7 +503,7 @@ module ChIPQC = struct
   let sample_sheet samples =
     let header = string "SampleID,Tissue,Factor,Replicate,bamReads,Peaks" in
     let line { id ; tissue ; factor ; replicate ; bam ; peaks } =
-      seq ~sep:"," [ string id ; string tissue ; string factor ; string replicate ; dep bam ; dep peaks ]
+      seq ~sep:"," [ string id ; string tissue ; string factor ; string replicate ; dep (Samtools.indexed_bam_to_bam bam) ; dep peaks ]
     in
     seq ~sep:"\n" (header :: List.map ~f:line samples)
 

@@ -669,7 +669,7 @@ module ChIPQC : sig
     tissue : string ;
     factor : string ;
     replicate : string ;
-    bam : bam pworkflow ;
+    bam : indexed_bam pworkflow ;
     peaks : (#bed3 as 'a) pworkflow ;
   }
 
