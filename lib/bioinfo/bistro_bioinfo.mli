@@ -620,7 +620,9 @@ end
 module Sra_toolkit : sig
   val img : Shell_dsl.container_image list
 
-  val fastq_dump : sra pworkflow -> sanger_fastq pworkflow
+  val fastq_dump :
+    [`id of string | `idw of string workflow | `file of sra pworkflow] ->
+    sanger_fastq pworkflow
 
   val fastq_dump_gz :
     [`id of string | `file of sra pworkflow] ->

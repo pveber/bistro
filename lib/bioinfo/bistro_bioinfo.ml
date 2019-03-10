@@ -1748,14 +1748,15 @@ module Sra_toolkit = struct
 
   let img = [ docker_image ~account:"pveber" ~name:"sra-toolkit" ~tag:"2.8.0" () ]
 
-  let fastq_dump sra =
-    Workflow.shell ~descr:"sratoolkit.fastq_dump" [
-      cmd ~img "fastq-dump" [ string "-Z" ; dep sra ] ~stdout:dest
-    ]
-
   let sra_of_input = function
     | `id id -> string id
+    | `idw w -> string_dep w
     | `file w -> dep w
+
+  let fastq_dump sra =
+    Workflow.shell ~descr:"sratoolkit.fastq_dump" [
+      cmd ~img "fastq-dump" [ string "-Z" ; sra_of_input sra ] ~stdout:dest
+    ]
 
   let fastq_dump_gz input =
     let sra = sra_of_input input in
