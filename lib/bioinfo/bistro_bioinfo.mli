@@ -1182,9 +1182,9 @@ end
 
 
 module Meme_suite : sig
-  class type meme_chip_output = object
-    inherit directory
-    method contents : [`meme_chip_output]
+  class type meme_output = object
+    inherit text_file
+    method format : [`meme_output]
   end
 
   val meme :
@@ -1204,17 +1204,24 @@ module Meme_suite : sig
     ?meme_maxw:int ->
     (* ?np:int -> *)
     fasta pworkflow ->
-    meme_chip_output pworkflow
+    [`meme_chip_output] dworkflow
 
+  (** http://meme-suite.org/doc/fimo.html?man_type=web *)
   val fimo :
     ?alpha: float ->
-    ?bgfile: string ->
+    ?bgfile:text_file pworkflow ->
     ?max_stored_scores: int ->
-    ?motif: string ->
-    ?motif_pseudo: float ->
+    ?max_strand:bool ->
+    ?motif:string ->
+    ?motif_pseudo:float ->
+    ?no_qvalue:bool ->
+    ?norc:bool ->
+    ?parse_genomic_coord:bool ->
+    ?prior_dist:text_file pworkflow ->
+    ?psp:text_file pworkflow ->
     ?qv_thresh:bool ->
     ?thresh: float ->
-    meme_chip_output pworkflow ->
+    meme_output pworkflow ->
     fasta pworkflow ->
     directory pworkflow
 end

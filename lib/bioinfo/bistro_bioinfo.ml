@@ -1617,9 +1617,9 @@ module Meme_suite = struct
 
   let img = [ docker_image ~account:"pveber" ~name:"meme" ~tag:"4.11.2" () ]
 
-  class type meme_chip_output = object
-    inherit directory
-    method contents : [`meme_chip_output]
+  class type meme_output = object
+    inherit text_file
+    method format : [`meme_output]
   end
 
   let meme_chip ?meme_nmotifs ?meme_minw ?meme_maxw (* ?np:threads *) fa =
@@ -1657,19 +1657,28 @@ module Meme_suite = struct
       ]
     ]
 
-  let fimo ?alpha ?bgfile ?max_stored_scores ?motif ?motif_pseudo ?qv_thresh ?thresh meme_motifs fa =
-    Workflow.shell ~descr:"fimo" [
+  let fimo
+      ?alpha ?bgfile ?max_stored_scores ?max_strand ?motif ?motif_pseudo
+      ?no_qvalue ?norc ?parse_genomic_coord ?prior_dist ?psp
+      ?qv_thresh ?thresh meme_motifs seqs =
+    Bistro.Workflow.shell ~descr:"meme_suite.fimo"  [
       cmd "fimo" ~img [
-        option (opt "--aplha" float) alpha;
-        option (opt "--bgfile" string) bgfile ;
+        option (opt "--alpha" float) alpha ;
+        option (opt "--bgfile" dep) bgfile ;
         option (opt "--max-stored-scores" int) max_stored_scores ;
+        option (flag string "--max-strand") max_strand ;
         option (opt "--motif" string) motif ;
         option (opt "--motif-pseudo" float) motif_pseudo ;
+        option (flag string "--no-qvalue") no_qvalue ;
+        option (flag string "--norc") norc ;
+        option (flag string "--parse-genomic-coord") parse_genomic_coord ;
+        option (opt "--prior-dist" dep) prior_dist ;
+        option (opt "--psp" dep) psp ;
         option (flag string "--qv-thresh") qv_thresh ;
         option (opt "--thresh" float) thresh ;
         opt "--oc" Fn.id dest ;
         dep meme_motifs ;
-        dep fa;
+        dep seqs ;
       ]
     ]
 end
