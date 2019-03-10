@@ -69,3 +69,8 @@ let crlf2lf f =
   Workflow.shell ~descr:"unix.crlf2lf" [
     cmd "tr" [ opt "-d" string "'\r'"] ~stdin:(dep f) ~stdout:dest
   ]
+
+let head ~n f =
+  Workflow.shell ~descr:"unix.head" [
+    cmd "head" [ opt "-n" int n ] ~stdin:(dep f) ~stdout:dest
+  ]

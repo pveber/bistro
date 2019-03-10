@@ -37,3 +37,8 @@ val tar_xfj :
   'a tar bz2 pworkflow ->
   'a pworkflow
 val crlf2lf : (#text_file as 'a) pworkflow -> 'a pworkflow
+
+val head :
+  n:int ->
+  (#text_file as 'a) pworkflow ->
+  'a pworkflow
