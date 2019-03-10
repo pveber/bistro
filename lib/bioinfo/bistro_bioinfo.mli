@@ -112,12 +112,6 @@ module Fastq : sig
   val head : int -> (#fastq as 'a) pworkflow -> 'a pworkflow
 end
 
-module Sra : sig
-  val input : string -> sra pworkflow
-  val fetch_srr : string -> sra pworkflow
-  val fetch_srr_dyn : string workflow -> sra pworkflow
-end
-
 (** {3 Genome databases} *)
 
 module Ucsc_gb : sig

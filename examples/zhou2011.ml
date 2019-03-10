@@ -28,11 +28,9 @@ let srr_id = function
   | `ChIP_Pho4_noPi -> [ "SRR217304" ; "SRR217305" ]
   | `Input_WT_NoPi -> [ "SRR217324" ]
 
-let sra x = List.map (srr_id x) ~f:(fun id ->
-    Sra.fetch_srr id
+let fastq x = List.map (srr_id x) ~f:(fun id ->
+    Sra_toolkit.fastq_dump (`id id)
   )
-
-let fastq x = List.map ~f:Sra_toolkit.fastq_dump (sra x)
 
 let bowtie_index = Bowtie.bowtie_build genome
 

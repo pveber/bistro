@@ -1722,28 +1722,6 @@ module Prokka = struct
     ]
 end
 
-module Sra = struct
-  let input x = Workflow.input x
-
-  let fetch_srr_dyn id =
-      let url = [%workflow
-        let id = [%eval id] in
-        if (String.length id > 6) then
-          let prefix = String.prefix id 6 in
-          sprintf
-            "ftp://ftp-trace.ncbi.nlm.nih.gov/sra/sra-instant/reads/ByRun/sra/SRR/%s/%s/%s.sra"
-            prefix id id
-        else
-          let msg = sprintf "Bistro_bioinfo.Sra.fetch_srr: id %s is invalid (should be longer than 6 characters long)" id in
-          failwith msg
-      ]
-      in
-      Workflow.shell ~descr:"sra.fetch_srr" [
-        Bistro_unix.Cmd.wget ~dest url
-      ]
-  let fetch_srr id = fetch_srr_dyn (Workflow.string id)
-end
-
 module Sra_toolkit = struct
 
   let img = [ docker_image ~account:"pveber" ~name:"sra-toolkit" ~tag:"2.8.0" () ]
