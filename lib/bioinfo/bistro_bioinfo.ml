@@ -498,7 +498,7 @@ module ChIPQC = struct
     method contents : [`ChIPQC]
   end
 
-  let img = [ docker_image ~account:"pveber" ~name:"bioconductor" ~tag:"3.3" () ]
+  let img = [ docker_image ~account:"pveber" ~name:"bioconductor" ~tag:"3.4" () ]
 
   let sample_sheet samples =
     let header = string "SampleID,Tissue,Factor,Replicate,bamReads,Peaks" in
