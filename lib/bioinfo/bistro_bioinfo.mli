@@ -611,7 +611,7 @@ module Samtools : sig
     'o pworkflow
 end
 
-module Picard : sig
+module Picardtools : sig
   val img : Shell_dsl.container_image list
 
   val markduplicates :
@@ -621,6 +621,10 @@ module Picard : sig
 
   val reads :
     [`picard_markduplicates] dworkflow ->
+    bam pworkflow
+
+  val sort_bam_by_name :
+    bam pworkflow ->
     bam pworkflow
 end
 

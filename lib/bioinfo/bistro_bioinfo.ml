@@ -2639,13 +2639,13 @@ module Hisat2 = struct
     ]
 end
 
-module Picard = struct
+module Picardtools = struct
   let img = [ docker_image ~account:"pveber" ~name:"picard-tools" ~tag:"2.8.1" () ]
 
+  let arg k v =
+    seq ~sep:"" [ string k ; string "=" ; v ]
+
   let markduplicates ?remove_duplicates indexed_bam =
-    let arg k v =
-      seq ~sep:"" [ string k ; string "=" ; v ]
-    in
     Workflow.shell ~descr:"picard.markduplicates" ~mem:(Workflow.int (3 * 1024)) [
       mkdir_p dest ;
       cmd "PicardCommandLine" ~img [
@@ -2660,4 +2660,14 @@ module Picard = struct
     ]
 
   let reads x = Workflow.select x ["reads.bam"]
+
+  let sort_bam_by_name bam =
+    Workflow.shell ~descr:"picard.sort_bam_by_name" ~mem:(Workflow.int (1 * 1024)) [
+      cmd "PicardCommandLine" ~img [
+        string "SortSam" ;
+        arg "INPUT" (dep bam) ;
+        arg "OUTPUT" dest ;
+        arg "SORT_ORDER" (string "queryname") ;
+      ]
+    ]
 end
