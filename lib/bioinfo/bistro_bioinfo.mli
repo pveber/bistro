@@ -524,7 +524,7 @@ module Deeptools : sig
     whatToPlot:[`heatmap | `scatterplot] ->
     'a img_format ->
     compressed_numpy_array pworkflow ->
-    directory pworkflow
+    'a pworkflow
 
   (* val plotProfile : *)
   (*   ?dpi:int -> *)
