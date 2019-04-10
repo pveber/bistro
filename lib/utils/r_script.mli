@@ -17,8 +17,11 @@ val int : int -> expr
 val float : float -> expr
 val dep : _ pworkflow -> expr
 val ints : int list -> expr
+val ints_dep : int list workflow -> expr
 val floats : float list -> expr
+val floats_dep : float list workflow -> expr
 val strings : string list -> expr
+val strings_dep : string list workflow -> expr
 val deps : _ pworkflow list -> expr
 val arg : ?l:string -> expr -> arg
 val assign : string -> expr -> expr

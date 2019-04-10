@@ -39,8 +39,28 @@ let call fn args = call_gen fn Fn.id args
 let vector f xs = call_gen "c" f xs
 
 let ints xs = vector Template_dsl.int xs
+
+let string_call_gen fn arg xs =
+  List.map xs ~f:arg
+  |> String.concat ~sep:","
+  |> Printf.sprintf "%s(%s)" fn
+
+let ints_dep w =
+  Workflow.(app (pure (string_call_gen "c" Int.to_string) ~id:"r_script.ints") w)
+  |> Template_dsl.string_dep
+
 let floats xs = vector Template_dsl.float xs
+
+let floats_dep w =
+  Workflow.(app (pure (string_call_gen "c" Float.to_string) ~id:"r_script.ints") w)
+  |> Template_dsl.string_dep
+
 let strings xs = vector string xs
+
+let strings_dep w =
+  Workflow.(app (pure (string_call_gen "c" Fn.id) ~id:"r_script.ints") w)
+  |> Template_dsl.string_dep
+
 let deps xs = vector dep xs
 
 let arg ?l e =
