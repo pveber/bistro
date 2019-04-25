@@ -550,6 +550,24 @@ module Deeptools : sig
   (*   'a output -> *)
   (*   deeptools_matrix gz pworkflow -> *)
   (*   'a pworkflow *)
+
+  val plotEnrichment :
+    ?labels:string list ->
+    ?regionLabels:string list ->
+    ?plotTitle:string ->
+    ?variableScales:bool ->
+    ?plotHeight:float ->
+    ?plotWidth:float ->
+    ?colors:string list ->
+    ?numPlotsPerRow:int ->
+    ?alpha:float ->
+    ?offset:int ->
+    ?blackList:#bed3 pworkflow ->
+    ?numberOfProcessors:int ->
+    bams:bam pworkflow list ->
+    beds:#bed3 pworkflow list ->
+    'a img_format ->
+    'a pworkflow
 end
 
 module Htseq : sig

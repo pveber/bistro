@@ -926,6 +926,32 @@ module Deeptools = struct
         option (flag string "--log1p") log1p ;
       ] ;
     ]
+
+  let plotEnrichment
+      ?labels ?regionLabels ?plotTitle ?variableScales ?plotHeight
+      ?plotWidth ?colors ?numPlotsPerRow ?alpha ?offset ?blackList
+      ?(numberOfProcessors = 1) ~bams ~beds output_format
+    =
+    Workflow.shell ~np:numberOfProcessors ~descr:"deeptools.plotEnrichment" [
+      cmd "plotEnrichment" ~img [
+        option (opt "--labels" (list ~sep:" " string)) labels ;
+        option (opt "--regionLabels" (list ~sep:" " string)) regionLabels ;
+        option (opt "--plotTitle" string) plotTitle ;
+        option (flag string "--variableScales") variableScales ;
+        option (opt "--plotHeight" float) plotHeight ;
+        option (opt "--plotWidth" float) plotWidth ;
+        option (opt "--colors" (list ~sep:" " string)) colors ;
+        option (opt "--numPlotsPerRow" int) numPlotsPerRow ;
+        option (opt "--alpha" float) alpha ;
+        option (opt "--offset" int) offset ;
+        option (opt "--blackListFileName" dep) blackList ;
+        opt "--numberOfProcessors" Fn.id np ;
+        opt "--bamfiles" (list ~sep:" " dep) bams ;
+        opt "--BED" (list ~sep:" " dep) beds ;
+        opt "--plotFile" Fn.id dest ;
+        opt "--plotFileFormat" string (ext_of_format output_format) ;
+      ]
+    ]
 end
 
 module DESeq2 = struct
