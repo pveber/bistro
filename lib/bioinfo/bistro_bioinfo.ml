@@ -934,8 +934,8 @@ module Deeptools = struct
     =
     Workflow.shell ~np:numberOfProcessors ~descr:"deeptools.plotEnrichment" [
       cmd "plotEnrichment" ~img [
-        option (opt "--labels" (list ~sep:" " string)) labels ;
-        option (opt "--regionLabels" (list ~sep:" " string)) regionLabels ;
+        option (opt "--labels" (list ~sep:" " (string % quote ~using:'\''))) labels ;
+        option (opt "--regionLabels" (list ~sep:" " (string % quote ~using:'\''))) regionLabels ;
         option (opt "--plotTitle" string) plotTitle ;
         option (flag string "--variableScales") variableScales ;
         option (opt "--plotHeight" float) plotHeight ;
