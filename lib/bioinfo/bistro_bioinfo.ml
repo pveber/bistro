@@ -209,6 +209,24 @@ module Bedtools = struct
       ]
     ]
 
+  let closest ?strand ?io ?iu ?id ?fu ?fd ?ties ?mdb ?k ?header _ query beds =
+    Workflow.shell ~descr:"bedtools.intersect" [
+      cmd "bedtools.closest" ~img ~stdout:dest [
+        option ((function `same -> "-s" | `opposite -> "-S") % string) strand ;
+        option (flag string "-io") io ;
+        option (flag string "-iu") iu ;
+        option (flag string "-id") id ;
+        option (flag string "-fu") fu ;
+        option (flag string "-fd") fd ;
+        option (opt "-t" ((function `all -> "all" | `first -> "first" | `last -> "last") % string)) ties ;
+        option (opt "-mdb" ((function `each -> "each" | `all -> "all") % string)) mdb ;
+        option (opt "-k" int) k ;
+        option (flag string "-header") header ;
+        opt "-a" dep query ;
+        opt "-b" (list dep ~sep:" ") beds ;
+      ]
+    ]
+
   let bamtobed ?bed12 ?split ?splitD ?ed ?tag ?cigar bam =
     Workflow.shell ~descr:"bedtools.bamtobed" ~mem:(Workflow.int  (3 * 1024)) ~np:8 [
       cmd "bedtools bamtobed" ~stdout:dest ~img [

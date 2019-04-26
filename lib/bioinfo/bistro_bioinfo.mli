@@ -326,6 +326,21 @@ module Bedtools : sig
     bam pworkflow ->
     #bed6 pworkflow
 
+  val closest :
+    ?strand:[`same | `opposite] ->
+    ?io:bool ->
+    ?iu:bool ->
+    ?id:bool ->
+    ?fu:bool ->
+    ?fd:bool ->
+    ?ties:[`all | `first | `last] ->
+    ?mdb:[`each | `all] ->
+    ?k:int ->
+    ?header:bool ->
+    'a input ->
+    'a pworkflow ->
+    #bed3 pworkflow list ->
+    'a pworkflow
 end
 
 
