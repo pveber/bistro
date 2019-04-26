@@ -838,6 +838,7 @@ module Deeptools = struct
         option (opt "--maxThreshold" float) maxThreshold ;
         option (opt "--blackListFileName" dep) blackList ;
         option (opt "--sc" float) scale ;
+        opt "--numberOfProcessors" Fn.id np ;
         opt "--outFileName" Fn.id dest ;
         opt "--regionsFileName" dep_list regions ;
         opt "--scoreFileName" dep_list scores ;
