@@ -541,30 +541,30 @@ module Deeptools : sig
     compressed_numpy_array pworkflow ->
     'a pworkflow
 
-  (* val plotProfile : *)
-  (*   ?dpi:int -> *)
-  (*   ?kmeans:int -> *)
-  (*   ?hclust:int -> *)
-  (*   ?averageType:[`mean | `median | `min | `max | `std | `sum] -> *)
-  (*   ?plotHeight:float -> (\** in cm *\) *)
-  (*   ?plotWidth:float -> *)
-  (*   ?plotType:[`lines | `fill | `se | `std | `overlapped_lines | `heatmap] -> *)
-  (*   ?colors:string list -> *)
-  (*   ?numPlotsPerRow:int -> *)
-  (*   ?startLabel:string -> *)
-  (*   ?endLabel:string -> *)
-  (*   ?refPointLabel:string -> *)
-  (*   ?regionsLabel:string list -> *)
-  (*   ?samplesLabel:string list -> *)
-  (*   ?plotTitle:string -> *)
-  (*   ?yAxisLabel:string -> *)
-  (*   ?yMin:int list -> *)
-  (*   ?yMax:int list -> *)
-  (*   ?legendLocation:[`best | `upper_right | `upper_left | `upper_center | `lower_left | `lower_right | `lower_center | `center | `center_left | `center_right | `none] -> *)
-  (*   ?perGroup:bool -> *)
-  (*   'a output -> *)
-  (*   deeptools_matrix gz pworkflow -> *)
-  (*   'a pworkflow *)
+  val plotProfile :
+    ?dpi:int ->
+    ?kmeans:int ->
+    ?hclust:int ->
+    ?averageType:[`mean | `median | `min | `max | `std | `sum] ->
+    ?plotHeight:float -> (** in cm *)
+    ?plotWidth:float ->
+    ?plotType:[`lines | `fill | `se | `std | `overlapped_lines | `heatmap] ->
+    ?colors:string list ->
+    ?numPlotsPerRow:int ->
+    ?startLabel:string ->
+    ?endLabel:string ->
+    ?refPointLabel:string ->
+    ?regionsLabel:string list ->
+    ?samplesLabel:string list ->
+    ?plotTitle:string ->
+    ?yAxisLabel:string ->
+    ?yMin:float list ->
+    ?yMax:float list ->
+    ?legendLocation:[`best | `upper_right | `upper_left | `upper_center | `lower_left | `lower_right | `lower_center | `center | `center_left | `center_right | `none] ->
+    ?perGroup:bool ->
+    'a img_format ->
+    deeptools_matrix gz pworkflow ->
+    'a pworkflow
 
   val plotEnrichment :
     ?labels:string list ->

@@ -810,21 +810,18 @@ module Deeptools = struct
 
 
   let legend_location_enum x=
-    (match x with
-     | `best-> "best"
-     | `upper_right-> "upper_right"
-     | `upper_left-> "upper_left"
-     | `upper_center-> "upper_center"
-     | `lower_left-> "lower_left"
-     | `lower_right-> "lower_right"
-     | `lower_center-> "lower_center"
-     | `center-> "center"
-     | `center_left-> "center_left"
-     | `center_right-> "center_right"
-     | `none -> "none"
-    )
-    |> string
-
+    string @@ match x with
+    | `best-> "best"
+    | `upper_right-> "upper_right"
+    | `upper_left-> "upper_left"
+    | `upper_center-> "upper_center"
+    | `lower_left-> "lower_left"
+    | `lower_right-> "lower_right"
+    | `lower_center-> "lower_center"
+    | `center-> "center"
+    | `center_left-> "center_left"
+    | `center_right-> "center_right"
+    | `none -> "none"
 
 
   class type deeptools_matrix = object
@@ -918,11 +915,14 @@ module Deeptools = struct
     |> string
 
   let whatToPlot_enum x =
-    (match x with
-     | `heatmap -> "heatmap"
-     | `scatterplot -> "scatterplot"
-    )
-    |> string
+    string @@ match x with
+    | `heatmap -> "heatmap"
+    | `scatterplot -> "scatterplot"
+    | `lines -> "lines"
+    | `fill -> "fill"
+    | `se -> "se"
+    | `std -> "std"
+    | `overlapped_lines -> "overlapped_lines"
 
   let plotCorrelation
       ?skipZeros ?labels ?plotTitle ?removeOutliers
@@ -944,6 +944,42 @@ module Deeptools = struct
         option (flag string "--plotNumbers") plotNumbers ;
         option (flag string "--log1p") log1p ;
       ] ;
+    ]
+
+  let plotProfile
+      ?dpi ?kmeans ?hclust ?averageType ?plotHeight
+      ?plotWidth ?plotType ?colors ?numPlotsPerRow
+      ?startLabel ?endLabel ?refPointLabel ?regionsLabel
+      ?samplesLabel ?plotTitle ?yAxisLabel ?yMin ?yMax
+      ?legendLocation ?perGroup
+      output_format matrix
+    =
+    Workflow.shell ~descr:"deeptools.plotProfile" [
+      cmd "plotProfile" ~img [
+        option (opt "--dpi" int) dpi ;
+        option (opt "--kmeans" int) kmeans ;
+        option (opt "--hclust" int) hclust ;
+        option (opt "--averageType" average_type_bins_enum) averageType ;
+        option (opt "--plotHeight" float) plotHeight ;
+        option (opt "--plotWidth" float) plotWidth ;
+        option (opt "--plotType" whatToPlot_enum) plotType ;
+        option (opt "--colors" (list ~sep:" " string)) colors ;
+        option (opt "--numPlotsPerRow" int) numPlotsPerRow ;
+        option (opt "--startLabel" (string % quote ~using:'"')) startLabel ;
+        option (opt "--endLabel" (string % quote ~using:'"')) endLabel ;
+        option (opt "--refPointLabel" (string % quote ~using:'"')) refPointLabel ;
+        option (opt "--regionsLabel" (list ~sep:" " (string % quote ~using:'"'))) regionsLabel ;
+        option (opt "--samplesLabel" (list ~sep:" " (string % quote ~using:'"'))) samplesLabel ;
+        option (opt "--plotTitle" (string % quote ~using:'"')) plotTitle ;
+        option (opt "--yAxisLabel" (string % quote ~using:'"')) yAxisLabel ;
+        option (opt "--yMin" (list ~sep:" " float)) yMin ;
+        option (opt "--yMax" (list ~sep:" " float)) yMax ;
+        option (opt "--legendLocation" legend_location_enum) legendLocation ;
+        option (flag string "--perGroup") perGroup ;
+        opt "--plotFileFormat" string (ext_of_format output_format) ;
+        opt "--outFileName" Fn.id dest ;
+        opt "--matrixFile" dep matrix ;
+      ]
     ]
 
   let plotEnrichment
