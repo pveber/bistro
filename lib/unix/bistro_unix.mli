@@ -28,6 +28,10 @@ val wget_dyn :
 val gunzip : 'a gz pworkflow -> 'a pworkflow
 val bunzip2 : 'a bz2 pworkflow -> 'a pworkflow
 val unzip : 'a zip pworkflow -> 'a pworkflow
+val tar_xf :
+  ?strip_components:int ->
+  'a tar pworkflow ->
+  'a pworkflow
 val tar_xfz :
   ?strip_components:int ->
   'a tar gz pworkflow ->

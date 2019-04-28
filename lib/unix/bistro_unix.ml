@@ -43,6 +43,17 @@ let bunzip2 bz2 =
     cmd "bunzip2" [ opt "-c" dep bz2 ] ~stdout:dest
   ]
 
+let tar_xf ?strip_components tar =
+  Workflow.shell ~descr:"unix.tar_xf" [
+    mkdir_p dest ;
+    cmd "tar" [
+      string "xf" ;
+      dep tar ;
+      opt "-C" ident dest ;
+      option (opt "--strip-components" int) strip_components ;
+    ] ;
+  ]
+
 let tar_xfz ?strip_components tgz =
   Workflow.shell ~descr:"unix.tar_xfz" [
     mkdir_p dest ;
