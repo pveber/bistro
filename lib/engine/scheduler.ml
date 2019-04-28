@@ -563,6 +563,22 @@ let perform_path_plugin sched (Allocator.Resource { mem ; np }) f ~id ~descr =
   | Error msg ->
     Lwt_result.return (Task_result.Plugin { id ; outcome = `Failed ; msg = Some msg ; descr })
 
+let perform_glob ~type_selection ~pattern root =
+  let open Rresult.R.Infix in
+  let elements = match type_selection with
+    | None -> `Any
+    | Some `File -> `Files
+    | Some `Directory -> `Dirs
+  in
+  Bos.OS.Path.fold ~elements List.cons [] [Fpath.v root] >>= fun xs ->
+  let xs = List.map ~f:Fpath.to_string xs in
+  let res = match pattern with
+    | None -> xs
+    | Some pattern ->
+      let re = Re.compile (Re.Glob.glob pattern) in
+      List.filter xs ~f:(Re.execp re)
+  in
+  Ok res
 
 let rec blocking_evaluator
   : type s. Db.t -> s W.t -> (unit -> s)
@@ -601,13 +617,14 @@ let rec blocking_evaluator
       fun () ->
         let elts = elts () in
         List.nth_exn elts l.index
-    | W.Glob g ->
-      let dir = blocking_evaluator db g.dir in
+    | W.Glob { dir ; type_selection ; pattern ; id = _ } ->
+      let dir = blocking_evaluator db dir in
       fun () ->
         let dir_path = dir () in
-        Sys.readdir (Db.path db dir_path)
-        |> Array.to_list
-        |> List.map ~f:(fun fn -> W.cd dir_path [fn])
+        match perform_glob ~type_selection ~pattern (Db.path db dir_path) with
+        | Error (`Msg s) -> failwithf "glob error: %s" s ()
+        | Ok xs ->
+          List.map xs ~f:(fun fn -> W.FS_path fn)
 
 let rec shallow_eval
   : type s. t -> s W.t -> s Lwt.t
@@ -640,11 +657,14 @@ let rec shallow_eval
     | W.List_nth l ->
       shallow_eval sched l.elts >>= fun elts ->
       Lwt.return (List.nth_exn elts l.index)
-    | W.Glob g ->
-      shallow_eval sched g.dir >>= fun p ->
-      Db.path sched.db p |>
-      Misc.files_in_dir >|= fun files ->
-      List.map files ~f:(fun fn -> W.cd p [fn])
+    | W.Glob { dir ; type_selection ; pattern ; id = _ } ->
+      shallow_eval sched dir >>= fun p ->
+      Db.path sched.db p |> fun dir_path ->
+      match perform_glob ~type_selection ~pattern dir_path with
+        | Error (`Msg s) -> Lwt.fail (Failure (sprintf "glob error: %s" s))
+        | Ok xs ->
+          Lwt.return @@
+          List.map xs ~f:(fun fn -> W.FS_path fn)
 
 and shallow_eval_command sched =
   let list xs = Lwt_list.map_p (shallow_eval_command sched) xs in

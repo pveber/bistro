@@ -242,6 +242,7 @@ module Workflow : sig
 
   val glob :
     ?pattern:string ->
+    ?type_selection:[`File | `Directory] ->
     #directory pworkflow ->
     'a path list workflow
 end

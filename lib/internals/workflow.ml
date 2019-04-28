@@ -47,6 +47,7 @@ type _ t =
   | Glob : {
       id : string ;
       pattern : string option ;
+      type_selection : [`File | `Directory] option ;
       dir : path t ;
     } -> path list t
 
@@ -235,6 +236,6 @@ let list_nth w i =
   let id = digest (`List_nth, id w, i) in
   List_nth { id ; elts = w ; index = i }
 
-let glob ?pattern dir =
-  let id = digest (`Glob, id dir, pattern) in
-  Glob { id ; dir ; pattern }
+let glob ?pattern ?type_selection dir =
+  let id = digest (`Glob, id dir, pattern, type_selection) in
+  Glob { id ; dir ; pattern ; type_selection }
