@@ -199,7 +199,7 @@ let script_rewriter ~loc:_ ~path:_ { txt = str ; loc } =
         | `Text (i, j) ->
           let i = i.Script_parser.Position.cnum in
           let j = j.Script_parser.Position.cnum in
-          let e = B.estring (String.sub str ~pos:i ~len:(j - i + 1)) in
+          let e = B.estring (String.sub str ~pos:i ~len:(j - i)) in
           [%expr Bistro.Shell_dsl.string [%e e]]
         | `Antiquotation (i, j) ->
           let cnum_i = i.Script_parser.Position.cnum in
