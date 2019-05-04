@@ -176,7 +176,8 @@ let script_rewriter ~loc ~path:_ str =
         let e = B.estring (String.sub str ~pos:i ~len:(j - i + 1)) in
         [%expr Bistro.Shell_dsl.string [%e e]]
       | `Antiquot (i, j) ->
-        B.evar (String.sub str ~pos:i ~len:(j - i + 1))
+        let txt = String.sub str ~pos:i ~len:(j - i + 1) in
+        Parser.parse_expression Lexer.token (Lexing.from_string txt)
     )
   |> B.elist
   |> (fun e -> [%expr Bistro.Shell_dsl.seq ~sep:"" [%e e]])
@@ -184,7 +185,7 @@ let script_rewriter ~loc ~path:_ str =
 let script_ext =
   let open Extension in
   declare "script" Context.expression Ast_pattern.(single_expr_payload (estring __)) script_rewriter
-  
+
 let expression_ext =
   let open Extension in
   declare "workflow" Context.expression Ast_pattern.(single_expr_payload __) expression_rewriter
