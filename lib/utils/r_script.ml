@@ -74,7 +74,10 @@ let assign var e =
   let open Template_dsl in
   seq ~sep:" " [ string var ; string "<-" ; e ]
 
-let workflow ?descr ?np ?mem ?img exprs =
+let workflow ?descr ?np ?mem ?img script =
   Workflow.shell ?descr ?np ?mem Shell_dsl.[
-    cmd "Rscript" ?img [ file_dump (make exprs) ] ;
+    cmd "Rscript" ?img [ file_dump script ] ;
   ]
+
+let workflow' ?descr ?np ?mem ?img exprs =
+  workflow ?descr ?np ?mem ?img (make exprs)

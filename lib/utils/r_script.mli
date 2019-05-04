@@ -31,5 +31,13 @@ val workflow :
   ?np:int ->
   ?mem:int workflow ->
   ?img:Shell_dsl.container_image list ->
+  template ->
+  'a pworkflow
+
+val workflow' :
+  ?descr:string ->
+  ?np:int ->
+  ?mem:int workflow ->
+  ?img:Shell_dsl.container_image list ->
   expr list ->
   'a pworkflow
