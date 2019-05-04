@@ -14,6 +14,13 @@ module Position = struct
     { cnum = p.cnum + 1 ;
       bol = p.cnum + 1 ;
       lnum = p.lnum + 1 }
+
+  let translate_lexing_position (q : Lexing.position) ~by:p =
+  {
+    q with pos_lnum = p.lnum + q.pos_lnum ;
+           pos_bol = if p.lnum = 0 then q.pos_bol - 2 else q.pos_cnum + p.bol ;
+           pos_cnum = p.cnum + q.pos_cnum
+  }
 end
 
 type token = [
