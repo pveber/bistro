@@ -6,10 +6,18 @@ module Client = struct
 end
 
 module Server = struct
+  (* module Backend = struct
+   *   type t = unit
+   * 
+   * end *)
+
+  (* module Scheduler = Scheduler.Make(Backend) *)
+
   type t = {
     sched : Scheduler.t ;
     port : int ;
   }
+
 
   let create ?np ?mem ?allowed_containers ?loggers ?collect ?(port = 6666) db =
     let sched = Scheduler.create ?np ?mem ?allowed_containers ?loggers ?collect db in

@@ -65,6 +65,29 @@ let files_in_dir dir =
     )
   >|= List.sort ~compare:String.compare
 
+let glob ~type_selection ~pattern root =
+  let open Rresult.R.Infix in
+  let elements = match type_selection with
+    | None -> `Any
+    | Some `File -> `Files
+    | Some `Directory -> `Dirs
+  in
+  Bos.OS.Path.fold ~elements List.cons [] [Fpath.v root] >>= fun xs ->
+  let xs = List.map ~f:Fpath.to_string xs in
+  let res = match pattern with
+    | None -> xs
+    | Some pattern ->
+      let re = Re.compile (Re.Glob.glob pattern) in
+      List.filter xs ~f:(Re.execp re)
+  in
+  Ok res
+
 let rec waitpid pid =
   try Lwt_unix.waitpid [] pid
   with Unix.Unix_error (Unix.EINTR, _, _) -> waitpid pid
+
+let load_value fn =
+  In_channel.with_file fn ~f:Marshal.from_channel
+
+let save_value ~data fn =
+  Out_channel.with_file fn ~f:(fun oc -> Marshal.to_channel oc data [])
