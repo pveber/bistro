@@ -64,7 +64,7 @@ module Make(Backend : Backend) : sig
     'a Lwt.t
 
   val error_report :
-    Db.t ->
+    t ->
     Execution_trace.t list ->
     string
 

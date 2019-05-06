@@ -803,7 +803,7 @@ module Make(Backend : Backend) = struct
     |> Fn.flip Lwt_result.bind Lwt.(fun () -> shallow_eval sched target >|= Result.return)
     |> Lwt_result.map_err Execution_trace.Set.elements
 
-  let error_report db traces =
+  let error_report { db ; _ } traces =
     let buf = Buffer.create 1024 in
     List.iter traces ~f:(fun trace ->
         Execution_trace.error_report trace db buf
@@ -813,7 +813,7 @@ module Make(Backend : Backend) = struct
   let eval_exn sched w =
     eval sched w >|= function
     | Ok r -> r
-    | Error errors -> failwith (error_report sched.db errors)
+    | Error errors -> failwith (error_report sched errors)
 
   let stop sched =
     Maybe_gc.stop sched.gc >>= fun () ->

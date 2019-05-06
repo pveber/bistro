@@ -148,7 +148,7 @@ let build ?np ?mem ?loggers ?allowed_containers ?(bistro_dir = "_bistro") ?colle
       List.concat errors
       |> Execution_trace.gather_failures
     in
-    prerr_endline (Scheduler.error_report db errors) ;
+    prerr_endline (Scheduler.error_report sched errors) ;
     failwith "Some workflow failed!"
   )
 
