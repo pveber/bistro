@@ -33,6 +33,10 @@ module Server : sig
     ?port:int ->
     ?db:string ->
     'a workflow ->
-    ('a, Execution_trace.t list) result
+    unit
 
+  val simple_command :
+    summary:string ->
+    'a workflow ->
+    Command.t
 end

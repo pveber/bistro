@@ -1,4 +1,5 @@
 (library
   (name bistro_multinode)
   (public_name bistro.multinode)
-  (libraries bistro.engine core))
+  (libraries bistro.engine core)
+  (preprocess (pps ppx_jane)))
