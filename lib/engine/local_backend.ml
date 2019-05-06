@@ -8,6 +8,8 @@ type t = {
   allocator : Allocator.t ;
 }
 
+type token = unit
+
 let create
     ?(np = 1) ?mem:(`GB mem = `GB 1)
     ?(loggers = [])
@@ -20,9 +22,9 @@ let create
 let log ?(time = Unix.gettimeofday ()) backend event =
   backend.logger#event backend.db time event
 
-let run_shell_command _ = Shell_command.run
+let run_shell_command _ () = Shell_command.run
 
-let eval _ f x =
+let eval _ () f x =
   let (read_from_child, write_to_parent) = Unix.pipe () in
   let (read_from_parent, write_to_child) = Unix.pipe () in
   match Unix.fork () with
@@ -64,7 +66,7 @@ let build_trace backend w requirement perform =
     let open Eval_thread.Infix in
     let start = Unix.gettimeofday () in
     log ~time:start backend (Logger.Workflow_started (w, resource)) ;
-    perform resource >>= fun outcome ->
+    perform () resource >>= fun outcome ->
     let _end_ = Unix.gettimeofday () in
     log ~time:_end_ backend (Logger.Workflow_ended { outcome ; start ; _end_ }) ;
     Allocator.release backend.allocator resource ;

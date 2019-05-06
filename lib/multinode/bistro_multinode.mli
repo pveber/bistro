@@ -10,14 +10,12 @@ module Server : sig
   type t
 
   val create :
-    ?np:int ->
-    ?mem:[`GB of int] ->
     ?allowed_containers:[`Docker | `Singularity] list ->
     ?loggers:Logger.t list ->
     ?collect:bool ->
     ?port:int ->
     Db.t ->
-    t
+    t Lwt.t
 
   val start : t -> unit
 
@@ -29,8 +27,6 @@ module Server : sig
   val stop : t -> unit Lwt.t
 
   val simple_app :
-    ?np:int ->
-    ?mem:[`GB of int] ->
     ?allowed_containers:[`Docker | `Singularity] list ->
     ?loggers:Logger.t list ->
     ?collect:bool ->
@@ -38,5 +34,5 @@ module Server : sig
     ?db:string ->
     'a workflow ->
     ('a, Execution_trace.t list) result
-    
+
 end

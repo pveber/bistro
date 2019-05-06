@@ -15,14 +15,17 @@ module type Backend = sig
   open Bistro_internals
 
   type t
+  type token
 
   val run_shell_command :
     t ->
+    token ->
     Shell_command.t ->
     (int * bool) Lwt.t
 
   val eval :
     t ->
+    token ->
     ('a -> unit) ->
     'a ->
     (unit, string) Lwt_result.t
@@ -31,7 +34,7 @@ module type Backend = sig
     t ->
     _ Workflow.t ->
     Allocator.request ->
-    (Allocator.resource -> Task_result.t Eval_thread.t) ->
+    (token -> Allocator.resource -> Task_result.t Eval_thread.t) ->
     Execution_trace.t Eval_thread.t
 end
 

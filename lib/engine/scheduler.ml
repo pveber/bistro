@@ -326,19 +326,21 @@ struct
   let wait = fst
 end
 
-
 module type Backend = sig
   open Bistro_internals
 
   type t
+  type token
 
   val run_shell_command :
     t ->
+    token ->
     Shell_command.t ->
     (int * bool) Lwt.t
 
   val eval :
     t ->
+    token ->
     ('a -> unit) ->
     'a ->
     (unit, string) Lwt_result.t
@@ -347,7 +349,7 @@ module type Backend = sig
     t ->
     _ Workflow.t ->
     Allocator.request ->
-    (Allocator.resource -> Task_result.t Eval_thread.t) ->
+    (token -> Allocator.resource -> Task_result.t Eval_thread.t) ->
     Execution_trace.t Eval_thread.t
 end
 
@@ -424,7 +426,7 @@ module Make(Backend : Backend) = struct
     | 0, false -> `Missing_output
     | _ -> `Failed
 
-  let perform_shell { backend ; allowed_containers ; db ; _ } (Allocator.Resource { np ; mem }) ~id ~descr cmd =
+  let perform_shell { backend ; allowed_containers ; db ; _ } token (Allocator.Resource { np ; mem }) ~id ~descr cmd =
     let env =
       Execution_env.make
         ~allowed_containers
@@ -432,7 +434,7 @@ module Make(Backend : Backend) = struct
         ~np ~mem ~id
     in
     let cmd = Shell_command.make env cmd in
-    Backend.run_shell_command backend cmd >>= fun (exit_code, dest_exists) ->
+    Backend.run_shell_command backend token cmd >>= fun (exit_code, dest_exists) ->
     let cache_dest = Db.cache db id in
     let outcome = step_outcome ~exit_code ~dest_exists in
     Misc.(
@@ -501,9 +503,9 @@ module Make(Backend : Backend) = struct
           | Ok xs ->
             List.map xs ~f:(fun fn -> Workflow.FS_path fn)
 
-  let perform_plugin { backend ; db ; _ } (Allocator.Resource _) ~id ~descr workflow =
+  let perform_plugin { backend ; db ; _ } token (Allocator.Resource _) ~id ~descr workflow =
     let evaluator = blocking_evaluator db workflow in
-    Backend.eval backend (fun () ->
+    Backend.eval backend token (fun () ->
         let y = evaluator () () in
         Misc.save_value ~data:y (Db.cache db id)
       ) () >|=
@@ -513,7 +515,7 @@ module Make(Backend : Backend) = struct
     | Error msg -> Ok (Task_result.Plugin { id ; outcome = `Failed ; msg = Some msg ; descr })
 
 
-  let perform_path_plugin { db ; backend ; _ } (Allocator.Resource { mem ; np }) ~id ~descr workflow =
+  let perform_path_plugin { db ; backend ; _ } token (Allocator.Resource { mem ; np }) ~id ~descr workflow =
     let evaluator = blocking_evaluator db workflow in
     let env =
       Execution_env.make
@@ -524,7 +526,7 @@ module Make(Backend : Backend) = struct
     let cache_dest = Db.cache db id in
     Misc.remove_if_exists env.tmp_dir >>= fun () ->
     Unix.mkdir_p env.tmp ;
-    Backend.eval backend (Fn.flip evaluator env.dest) () >>= function
+    Backend.eval backend token (Fn.flip evaluator env.dest) () >>= function
     | Ok () ->
       let outcome =
         if Sys.file_exists env.dest = `Yes then `Succeeded
@@ -747,7 +749,7 @@ module Make(Backend : Backend) = struct
         Eval_thread.join ~f:(build ?target sched) targets
       | W.Input { id ; path ; _ } ->
         register_build sched ~id ~build_trace:(fun () ->
-            build_trace sched w (fun _ -> perform_input ~id ~path)
+            build_trace sched w (fun _ _ -> perform_input ~id ~path)
           )
         |> Eval_thread.ignore
 
@@ -755,22 +757,24 @@ module Make(Backend : Backend) = struct
         build sched ?target dir >>= fun () ->
         shallow_eval sched dir >> fun dir ->
         register_build sched ~id ~build_trace:(fun () ->
-            build_trace sched w (fun _ -> perform_select ~db:sched.db ~id ~dir ~sel)
+            build_trace sched w (fun _ _ ->
+                perform_select ~db:sched.db ~id ~dir ~sel
+              )
           )
         |> Eval_thread.ignore
 
       | W.Plugin { task = Value_plugin workflow ; id ; descr ; _ } ->
         schedule_cached_workflow sched ~id w
           ~deps:(fun () -> build sched ~target:w workflow)
-          ~perform:(fun resource ->
-              perform_plugin sched resource ~id ~descr workflow
+          ~perform:(fun token resource ->
+              perform_plugin sched token resource ~id ~descr workflow
             )
 
       | W.Plugin { id ; task = Path_plugin workflow ; descr ; _ } ->
         schedule_cached_workflow sched ~id w
           ~deps:(fun () -> build sched ~target:w workflow)
-          ~perform:(fun resource ->
-              perform_path_plugin sched resource ~id ~descr workflow
+          ~perform:(fun token resource ->
+              perform_path_plugin sched token resource ~id ~descr workflow
             )
 
       | W.Shell { id ; task ; descr ; deps ; _ } ->
@@ -779,9 +783,9 @@ module Make(Backend : Backend) = struct
               join2
                 (schedule_shell_container_image_fetch sched w task)
                 (join deps ~f:(fun (W.Any x) -> build sched ~target:w x)))
-          ~perform:(fun resource ->
+          ~perform:(fun token resource ->
               shallow_eval_command sched task >> fun cmd ->
-              perform_shell sched resource ~id ~descr cmd >>= fun r ->
+              perform_shell sched token resource ~id ~descr cmd >>= fun r ->
               Eval_thread.return r)
 
       | List l ->
