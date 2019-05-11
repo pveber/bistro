@@ -2,16 +2,22 @@ open Core_kernel
 open Bistro_engine
 open Lwt.Infix
 
-type client_request =
-  | Offer of { np : int ; mem : int }
-  (* | Im_stopping *)
-[@@deriving sexp]
+type job =
+  | Eval of {
+      workflow_id : string ;
+      f : unit -> unit ;
+    }
 
-type server_answer =
-  | Good_boy
-  | Wait of float
-  | Stop
-[@@deriving sexp]
+type client_id = Client_id of string
+
+type _ api_request =
+  | Subscript : { np : int ; mem : int } -> client_id api_request
+  | Get_job : { client_id : string } -> job api_request
+  | Result : {
+      client_id : string ;
+      workflow_id : string ;
+      result : (unit, string) Result.t ;
+    } -> unit api_request
 
 module Client = struct
   type t = {
@@ -24,20 +30,25 @@ module Client = struct
   let with_connection { hostname ; port ; _ } ~f =
     Lwt_io.with_connection Unix.(ADDR_INET (inet_addr_of_string hostname, port)) f
 
-  let send_msg x msg : server_answer Lwt.t =
+  let send_request x (msg : 'a api_request) : 'a Lwt.t =
     with_connection x ~f:(fun (ic, oc) ->
-        Lwt_io.write_value oc (msg : client_request) >>= fun () ->
+        Lwt_io.write_value oc msg >>= fun () ->
         Lwt_io.flush oc >>= fun () ->
         Lwt_io.read_value ic
       )
 
   let main ~np ~mem ~hostname ~port () =
     let client = { np ; mem ; hostname ; port } in
-    let loop () =
-      send_msg client (Offer { np = 42 ; mem = 42 }) >|= fun x ->
-      if x = Good_boy then print_endline "I'm a good boy!"
-    in    
-    Lwt_main.run (loop ())
+    (* let alloc = Allocator.create ~np ~mem in *)
+    (* let stop_condition = Lwt_condition.create () in *)
+    send_request client (Subscript { np ; mem }) >>= fun (Client_id client_id) ->
+    let rec loop () =
+      send_request client (Get_job { client_id }) >>= fun (Eval { workflow_id ; f }) ->
+      Local_backend.eval () () f () >>= fun result ->
+      send_request client (Result { client_id ; workflow_id ; result }) >>= fun () ->
+      loop ()
+    in
+    loop ()
 
   let command =
     let open Command.Let_syntax in
@@ -47,7 +58,9 @@ module Client = struct
       and hostname = flag "--hostname" (required string) ~doc:"ADDR Bistro server address"
       and port = flag "--port" (required int) ~doc:"INT Bistro server port"
       in
-      main ~np ~mem ~hostname ~port
+      fun () ->
+        main ~np ~mem ~hostname ~port ()
+        |> Lwt_main.run
     ]
 end
 
@@ -63,42 +76,124 @@ module Server = struct
      *       waiter : (unit, string) result Lwt.u ;
      *     } *)
 
+    type worker = Worker of {
+        id : string ;
+        np : int ;
+        mem : int ;
+        alloc : Allocator.t ;
+      }
+
     type token = string
-    type t = {
-      server : Lwt_io.server ;
-      workers : string list ;
-      stop_signal : unit Lwt_condition.t ;
-      server_stop : unit Lwt.t ;
+
+    type state = {
+      workers : worker String.Table.t ;
     }
 
-    let server_handler _ (ic, oc) =
+    type t = {
+      server : Lwt_io.server ;
+      state : state ;
+      stop_signal : unit Lwt_condition.t ;
+      server_stop : unit Lwt.t ;
+      logger : Logger.t ;
+      db : Db.t ;
+    }
+
+    let new_id =
+      let c = ref 0 in
+      fun () -> incr c ; sprintf "w%d" !c
+
+    let create_state () = {
+      workers = String.Table.create () ;
+    }
+
+    let server_api : type s. state -> s api_request -> s Lwt.t = fun state msg ->
+      match msg with
+      | Subscript { np ; mem } ->
+        let id = new_id () in
+        let w = Worker { id ; np ; mem ; alloc = Allocator.create ~np ~mem } in
+        String.Table.set state.workers ~key:id ~data:w ;
+        Lwt.return (Client_id id)
+      | Get_job _ -> assert false
+      | Result _ -> assert false
+
+    let server_handler state _ (ic, oc) =
       Lwt_io.read_value ic >>= fun msg ->
-      (
-        match msg with
-        | Offer { np ; mem } -> printf "%d %d\n%!" np mem
-      ) ;
-      Lwt_io.write_value oc Good_boy >>= fun () ->
+      server_api state msg >>= fun res ->
+      Lwt_io.write_value oc res >>= fun () ->
       Lwt_io.flush oc >>= fun () ->
       Lwt_io.close ic >>= fun () ->
       Lwt_io.close oc
 
-    let create ~port =
+    let create ?(loggers = []) ~port db =
       Lwt_unix.gethostname () >>= fun hostname ->
       Lwt_unix.gethostbyname hostname >>= fun h ->
       let sockaddr = Unix.ADDR_INET (h.Unix.h_addr_list.(0), port) in
-      Lwt_io.establish_server_with_client_address sockaddr server_handler >>= fun server ->
+      let state = create_state () in
+      Lwt_io.establish_server_with_client_address sockaddr (server_handler state) >>= fun server ->
       let stop_signal = Lwt_condition.create () in
       let server_stop =
         Lwt_condition.wait stop_signal >>= fun () -> Lwt_io.shutdown_server server
       in
       Lwt.return {
-        stop_signal : unit Lwt_condition.t ;
-        server_stop : unit Lwt.t ;
+        stop_signal ;
+        server_stop ;
         server ;
-        workers = [] ;
+        state ;
+        logger = Logger.tee loggers ;
+        db ;
       }
-    
-    let build_trace _ = assert false
+
+    let log ?(time = Unix.gettimeofday ()) backend event =
+      backend.logger#event backend.db time event
+
+    let request_resource backend req =
+      let allocation_race =
+        String.Table.to_alist backend.state.workers
+        |> List.map ~f:(fun (_, (Worker { alloc ; _ } as w)) ->
+            w,
+            Allocator.request alloc req >|= fun r -> r, w
+          )
+      in
+      let rec loop xs =
+        if xs = [] then Lwt_result.fail `Resource_unavailable
+        else
+          Lwt.choose (List.map ~f:snd xs) >>= fun (r, (Worker w_first as worker_first)) ->
+          let others = List.filter xs ~f:(fun (Worker w, _) -> w.id <> w_first.id) in
+          match r with
+          | Ok resource ->
+            let cancellations =
+              List.map others ~f:(fun (Worker w, t) ->
+                  t >|= function
+                  | Ok r, _ -> Allocator.release w.alloc r
+                  | Error _, _ -> ()
+                )
+            in
+            Lwt.async (fun () -> Lwt.join cancellations) ;
+            Lwt_result.return (worker_first, resource)
+          | Error _ -> loop others
+      in
+      loop allocation_race
+
+    let build_trace backend w requirement perform =
+      let ready = Unix.gettimeofday () in
+      log ~time:ready backend (Logger.Workflow_ready w) ;
+      request_resource backend requirement >>= function
+      | Ok (Worker worker, resource) ->
+        let open Eval_thread.Infix in
+        let start = Unix.gettimeofday () in
+        log ~time:start backend (Logger.Workflow_started (w, resource)) ;
+        perform worker.id resource >>= fun outcome ->
+        let _end_ = Unix.gettimeofday () in
+        log ~time:_end_ backend (Logger.Workflow_ended { outcome ; start ; _end_ }) ;
+        Allocator.release worker.alloc resource ;
+        Eval_thread.return (
+          Execution_trace.Run { ready ; start  ; _end_ ; outcome }
+        )
+      | Error `Resource_unavailable ->
+        let msg = "Could not find enough resources" in
+        log backend (Logger.Workflow_allocation_error (w, msg)) ;
+        Eval_thread.return (Execution_trace.Allocation_error { id = Bistro_internals.Workflow.id w ; msg })
+
     let eval _ = assert false
     let run_shell_command _ = assert false
   end
@@ -108,7 +203,7 @@ module Server = struct
   type t = Scheduler.t
 
   let create ?allowed_containers ?loggers ?collect ?(port = 6666) db =
-    Backend.create ~port >|= fun backend ->
+    Backend.create ?loggers ~port db >|= fun backend ->
     Scheduler.create ?allowed_containers ?loggers ?collect backend db
 
   let start sched =
@@ -130,10 +225,10 @@ module Server = struct
        * | Ok _ -> ()
        * | Error e ->
        *   print_endline @@ Scheduler.error_report server e *)
-        
+
     in
     Lwt_main.run t
-    
+
 
   let simple_command ~summary w =
     let open Command.Let_syntax in
