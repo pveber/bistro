@@ -16,36 +16,6 @@ let lwt_both x y =
   y >>= fun y ->
   Lwt.return (x, y)
 
-module Lwt_queue : sig
-  type 'a t
-  val create : unit -> 'a t
-  val push : 'a t -> 'a -> unit
-  val pop : 'a t -> 'a Lwt.t
-end
-=
-struct
-  type 'a t = {
-    queue : 'a Queue.t ;
-    condition : unit Lwt_condition.t ;
-  }
-
-  let create () = {
-    queue = Queue.create () ;
-    condition = Lwt_condition.create () ;
-  }
-
-  let push q x =
-    Queue.enqueue q.queue x ;
-    Lwt_condition.signal q.condition ()
-
-  let rec pop q =
-    match Queue.dequeue q.queue with
-    | None ->
-      Lwt_condition.wait q.condition >>= fun () ->
-      pop q
-    | Some x -> Lwt.return x
-end
-
 module Gc : sig
   type t
   val create : Db.t -> (Logger.event -> unit) -> t
