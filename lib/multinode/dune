@@ -1,5 +1,5 @@
 (library
   (name bistro_multinode)
   (public_name bistro.multinode)
-  (libraries bistro.engine core)
+  (libraries bistro.engine bistro.utils core lwt_react)
   (preprocess (pps ppx_jane)))

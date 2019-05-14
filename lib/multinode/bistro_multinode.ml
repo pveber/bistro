@@ -120,9 +120,16 @@ module Server = struct
       workers : worker String.Table.t ;
     }
 
+    type event = [
+      | `Stop
+      | `New_worker
+    ]
+
     type t = {
       server : Lwt_io.server ;
       state : state ;
+      events : event Lwt_react.event ;
+      send_event : event -> unit ;
       stop_signal : unit Lwt_condition.t ;
       server_stop : unit Lwt.t ;
       logger : Logger.t ;
@@ -192,11 +199,14 @@ module Server = struct
       let sockaddr = Unix.ADDR_INET (h.Unix.h_addr_list.(0), port) in
       let state = create_state () in
       Lwt_io.establish_server_with_client_address sockaddr (server_handler state) >>= fun server ->
+      let events, send_event = Lwt_react.E.create () in
       let stop_signal = Lwt_condition.create () in
       let server_stop =
         Lwt_condition.wait stop_signal >>= fun () -> Lwt_io.shutdown_server server
       in
       Lwt.return {
+        events ;
+        send_event ;
         stop_signal ;
         server_stop ;
         server ;
