@@ -246,26 +246,35 @@ module Server = struct
       in
       loop allocation_race
 
+    let rec wait_for_new_worker backend =
+      Lwt_react.E.next backend.events >>= function
+      | `New_worker -> Lwt.return ()
+      | _ -> wait_for_new_worker backend
+
     let build_trace backend w requirement perform =
       let ready = Unix.gettimeofday () in
       log ~time:ready backend (Logger.Workflow_ready w) ;
-      request_resource backend requirement >>= function
-      | Ok (Worker worker, resource) ->
-        let open Eval_thread.Infix in
-        let start = Unix.gettimeofday () in
-        log ~time:start backend (Logger.Workflow_started (w, resource)) ;
-        let token = { worker_id = worker.id ; workflow_id = Bistro_internals.Workflow.id w } in
-        perform token resource >>= fun outcome ->
-        let _end_ = Unix.gettimeofday () in
-        log ~time:_end_ backend (Logger.Workflow_ended { outcome ; start ; _end_ }) ;
-        Allocator.release worker.alloc resource ;
-        Eval_thread.return (
-          Execution_trace.Run { ready ; start  ; _end_ ; outcome }
-        )
-      | Error `Resource_unavailable ->
-        let msg = "Could not find enough resources" in
-        log backend (Logger.Workflow_allocation_error (w, msg)) ;
-        Eval_thread.return (Execution_trace.Allocation_error { id = Bistro_internals.Workflow.id w ; msg })
+      let rec loop () =
+        request_resource backend requirement >>= function
+        | Ok (Worker worker, resource) ->
+          let open Eval_thread.Infix in
+          let start = Unix.gettimeofday () in
+          log ~time:start backend (Logger.Workflow_started (w, resource)) ;
+          let token = { worker_id = worker.id ; workflow_id = Bistro_internals.Workflow.id w } in
+          perform token resource >>= fun outcome ->
+          let _end_ = Unix.gettimeofday () in
+          log ~time:_end_ backend (Logger.Workflow_ended { outcome ; start ; _end_ }) ;
+          Allocator.release worker.alloc resource ;
+          Eval_thread.return (
+            Execution_trace.Run { ready ; start  ; _end_ ; outcome }
+          )
+        | Error `Resource_unavailable ->
+          let msg = "No worker with enough resource" in
+          log backend (Logger.Workflow_allocation_error (w, msg)) ;
+          wait_for_new_worker backend >>= fun () ->
+          loop ()
+      in
+      loop ()
 
     let eval backend { worker_id ; workflow_id } f x =
       let Worker worker = String.Table.find_exn backend.state.workers worker_id in
@@ -317,7 +326,9 @@ module Server = struct
     let open Command.Let_syntax in
     Command.basic ~summary [%map_open
       let port = flag "--port" (required int) ~doc:"INT Port"
+      and verbose = flag "--verbose" no_arg ~doc:" Display more info"
       in
-      fun () -> simple_app ~port w
+      let loggers = if verbose then [ Bistro_utils.Console_logger.create () ] else [] in
+      fun () -> simple_app ~port ~loggers w
     ]
 end
