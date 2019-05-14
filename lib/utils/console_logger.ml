@@ -67,6 +67,8 @@ let output_event t = function
 
   | Workflow_collected w ->
     msg t "collected %s" (Bistro_internals.Workflow.id w)
+
+  | Debug m -> msg t "%s" m
   | _ -> ()
 
 let rec loop stop queue new_event =

@@ -53,7 +53,8 @@ let translate_event db _ = function
   | Workflow_skipped (_, `Missing_dep)
   | Workflow_started (_, _)
   | Workflow_collected _
-  | Singularity_image_collected _ -> None
+  | Singularity_image_collected _
+  | Debug _ -> None
 
 let update model db time evt =
   {
