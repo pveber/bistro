@@ -162,13 +162,14 @@ module Server = struct
       workers = String.Table.create () ;
     }
 
-    let server_api : type s. state -> s api_request -> s Lwt.t = fun state msg ->
+    let server_api : type s. (Logger.event -> unit) -> state -> s api_request -> s Lwt.t = fun log state msg ->
       match msg with
 
       | Subscript { np ; mem } ->
         let id = new_id () in
         let w = create_worker ~np ~mem id in
         String.Table.set state.workers ~key:id ~data:w ;
+        log (Logger.Debug (sprintf "new worker %s" id)) ;
         Lwt.return (Client_id id)
 
       | Get_job { client_id } -> (
@@ -185,9 +186,9 @@ module Server = struct
 
       | Shell_command_result _ -> assert false
 
-    let server_handler state _ (ic, oc) =
+    let server_handler log state _ (ic, oc) =
       Lwt_io.read_value ic >>= fun msg ->
-      server_api state msg >>= fun res ->
+      server_api log state msg >>= fun res ->
       Lwt_io.write_value oc res >>= fun () ->
       Lwt_io.flush oc >>= fun () ->
       Lwt_io.close ic >>= fun () ->
@@ -198,7 +199,9 @@ module Server = struct
       Lwt_unix.gethostbyname hostname >>= fun h ->
       let sockaddr = Unix.ADDR_INET (h.Unix.h_addr_list.(0), port) in
       let state = create_state () in
-      Lwt_io.establish_server_with_client_address sockaddr (server_handler state) >>= fun server ->
+      let logger = Logger.tee loggers in
+      let log event = logger#event db (Unix.gettimeofday ()) event in
+      Lwt_io.establish_server_with_client_address sockaddr (server_handler log state) >>= fun server ->
       let events, send_event = Lwt_react.E.create () in
       let stop_signal = Lwt_condition.create () in
       let server_stop =
