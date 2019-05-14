@@ -3,20 +3,29 @@ open Bistro_engine
 open Lwt.Infix
 
 type job =
-  | Eval of {
+  | Plugin of {
       workflow_id : string ;
       f : unit -> unit ;
+    }
+  | Shell_command of {
+      workflow_id : string ;
+      cmd : Shell_command.t ;
     }
 
 type client_id = Client_id of string
 
 type _ api_request =
   | Subscript : { np : int ; mem : int } -> client_id api_request
-  | Get_job : { client_id : string } -> job api_request
-  | Result : {
+  | Get_job : { client_id : string } -> job option api_request
+  | Plugin_result : {
       client_id : string ;
       workflow_id : string ;
       result : (unit, string) Result.t ;
+    } -> unit api_request
+  | Shell_command_result : {
+      client_id : string ;
+      workflow_id : string ;
+      result : int * bool ;
     } -> unit api_request
 
 module Client = struct
@@ -40,13 +49,27 @@ module Client = struct
   let main ~np ~mem ~hostname ~port () =
     let client = { np ; mem ; hostname ; port } in
     (* let alloc = Allocator.create ~np ~mem in *)
-    (* let stop_condition = Lwt_condition.create () in *)
+    let stop_var = Lwt_mvar.create_empty () in
     send_request client (Subscript { np ; mem }) >>= fun (Client_id client_id) ->
+    let job_thread = function
+      | Plugin { workflow_id ; f } ->
+        Local_backend.eval () () f () >>= fun result ->
+        send_request client (Plugin_result { client_id ; workflow_id ; result })
+      | Shell_command { workflow_id ; cmd } ->
+        Shell_command.run cmd >>= fun result ->
+        send_request client (Shell_command_result { client_id ; workflow_id ; result })
+    in
     let rec loop () =
-      send_request client (Get_job { client_id }) >>= fun (Eval { workflow_id ; f }) ->
-      Local_backend.eval () () f () >>= fun result ->
-      send_request client (Result { client_id ; workflow_id ; result }) >>= fun () ->
-      loop ()
+      Lwt.pick [
+        (send_request client (Get_job { client_id }) >|= fun x -> `New_job x) ;
+        Lwt_mvar.take stop_var >|= fun () -> `Stop
+      ]
+      >>= function
+      | `New_job None
+      | `Stop -> Lwt.return ()
+      | `New_job (Some job) ->
+        Lwt.async (fun () -> job_thread job) ;
+        loop ()
     in
     loop ()
 
@@ -66,24 +89,32 @@ end
 
 module Server = struct
   module Backend = struct
-    (* type job =
-     *   | Shell_command of {
-     *       cmd : Shell_command.t ;
-     *       waiter : (int * bool) Lwt.u ;
-     *     }
-     *   | Eval of {
-     *       f : unit -> unit ;
-     *       waiter : (unit, string) result Lwt.u ;
-     *     } *)
+
+    type job_waiter =
+      | Waiting_shell_command of {
+          workflow_id : string ;
+          cmd : Shell_command.t ;
+          waiter : (int * bool) Lwt.u ;
+        }
+      | Waiting_plugin of {
+          workflow_id : string ;
+          f : unit -> unit ;
+          waiter : (unit, string) result Lwt.u ;
+        }
 
     type worker = Worker of {
         id : string ;
         np : int ;
         mem : int ;
         alloc : Allocator.t ;
+        pending_jobs : job_waiter Lwt_queue.t ;
+        running_jobs : job_waiter String.Table.t ;
       }
 
-    type token = string
+    type token = {
+      worker_id : string ;
+      workflow_id : string ;
+    }
 
     type state = {
       workers : worker String.Table.t ;
@@ -102,19 +133,50 @@ module Server = struct
       let c = ref 0 in
       fun () -> incr c ; sprintf "w%d" !c
 
+    let workflow_id_of_job_waiter = function
+      | Waiting_plugin wp -> wp.workflow_id
+      | Waiting_shell_command wsc -> wsc.workflow_id
+
+    let job_of_job_waiter = function
+      | Waiting_plugin { f ; workflow_id ; _ } ->
+        Plugin { f ; workflow_id }
+      | Waiting_shell_command { cmd ; workflow_id ; _ } ->
+        Shell_command { cmd ; workflow_id }
+
+    let create_worker ~np ~mem id =
+      Worker {
+        id ; np ; mem ;
+        alloc = Allocator.create ~np ~mem ;
+        pending_jobs = Lwt_queue.create () ;
+        running_jobs = String.Table.create () ;
+      }
+
     let create_state () = {
       workers = String.Table.create () ;
     }
 
     let server_api : type s. state -> s api_request -> s Lwt.t = fun state msg ->
       match msg with
+
       | Subscript { np ; mem } ->
         let id = new_id () in
-        let w = Worker { id ; np ; mem ; alloc = Allocator.create ~np ~mem } in
+        let w = create_worker ~np ~mem id in
         String.Table.set state.workers ~key:id ~data:w ;
         Lwt.return (Client_id id)
-      | Get_job _ -> assert false
-      | Result _ -> assert false
+
+      | Get_job { client_id } -> (
+          match String.Table.find state.workers client_id with
+          | None -> Lwt.return None
+          | Some (Worker worker) ->
+            Lwt_queue.pop worker.pending_jobs >>= fun wp ->
+            let workflow_id = workflow_id_of_job_waiter wp in
+            String.Table.set worker.running_jobs ~key:workflow_id ~data:wp ;
+            Lwt.return (Some (job_of_job_waiter wp))
+        )
+
+      | Plugin_result _ -> assert false
+
+      | Shell_command_result _ -> assert false
 
     let server_handler state _ (ic, oc) =
       Lwt_io.read_value ic >>= fun msg ->
@@ -182,7 +244,8 @@ module Server = struct
         let open Eval_thread.Infix in
         let start = Unix.gettimeofday () in
         log ~time:start backend (Logger.Workflow_started (w, resource)) ;
-        perform worker.id resource >>= fun outcome ->
+        let token = { worker_id = worker.id ; workflow_id = Bistro_internals.Workflow.id w } in
+        perform token resource >>= fun outcome ->
         let _end_ = Unix.gettimeofday () in
         log ~time:_end_ backend (Logger.Workflow_ended { outcome ; start ; _end_ }) ;
         Allocator.release worker.alloc resource ;
@@ -194,8 +257,20 @@ module Server = struct
         log backend (Logger.Workflow_allocation_error (w, msg)) ;
         Eval_thread.return (Execution_trace.Allocation_error { id = Bistro_internals.Workflow.id w ; msg })
 
-    let eval _ = assert false
-    let run_shell_command _ = assert false
+    let eval backend { worker_id ; workflow_id } f x =
+      let Worker worker = String.Table.find_exn backend.state.workers worker_id in
+      let f () = f x in
+      let t, u = Lwt.wait () in
+      let job_waiter = Waiting_plugin { waiter = u ; f ; workflow_id } in
+      Lwt_queue.push worker.pending_jobs job_waiter ;
+      t
+
+    let run_shell_command backend { worker_id ; workflow_id } cmd =
+      let Worker worker = String.Table.find_exn backend.state.workers worker_id in
+      let t, u = Lwt.wait () in
+      let job = Waiting_shell_command { waiter = u ; cmd ; workflow_id } in
+      Lwt_queue.push worker.pending_jobs job ;
+      t
   end
 
   module Scheduler = Scheduler.Make(Backend)
@@ -215,16 +290,14 @@ module Server = struct
   let eval sched w =
     Scheduler.eval sched w
 
-  let simple_app ?allowed_containers ?loggers ?collect ?port ?(db = "_bistro") _w =
+  let simple_app ?allowed_containers ?loggers ?collect ?port ?(db = "_bistro") w =
     let t =
       create ?allowed_containers ?loggers ?collect ?port (Db.init_exn db) >>= fun server ->
       start server ;
-      Lwt_unix.sleep 30.
-      (* FOR LATER *)
-      (* eval server w >|= function
-       * | Ok _ -> ()
-       * | Error e ->
-       *   print_endline @@ Scheduler.error_report server e *)
+      eval server w >|= function
+      | Ok _ -> ()
+      | Error e ->
+        print_endline @@ Scheduler.error_report server e
 
     in
     Lwt_main.run t
