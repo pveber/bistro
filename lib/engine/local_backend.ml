@@ -76,3 +76,5 @@ let build_trace backend w requirement perform =
   | Error (`Msg msg) ->
     log backend (Logger.Workflow_allocation_error (w, msg)) ;
     Eval_thread.return (Execution_trace.Allocation_error { id = Workflow.id w ; msg })
+
+let stop _ = Lwt.return ()

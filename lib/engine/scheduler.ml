@@ -321,6 +321,8 @@ module type Backend = sig
     Allocator.request ->
     (token -> Allocator.resource -> Task_result.t Eval_thread.t) ->
     Execution_trace.t Eval_thread.t
+
+  val stop : t -> unit Lwt.t
 end
 
 module Make(Backend : Backend) = struct
@@ -788,7 +790,8 @@ module Make(Backend : Backend) = struct
 
   let stop sched =
     Maybe_gc.stop sched.gc >>= fun () ->
-    sched.logger#stop
+    sched.logger#stop >>= fun () ->
+    Backend.stop sched.backend
 end
 
 include Make(Local_backend)

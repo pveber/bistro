@@ -36,6 +36,8 @@ module type Backend = sig
     Allocator.request ->
     (token -> Allocator.resource -> Task_result.t Eval_thread.t) ->
     Execution_trace.t Eval_thread.t
+
+  val stop : t -> unit Lwt.t
 end
 
 module Make(Backend : Backend) : sig

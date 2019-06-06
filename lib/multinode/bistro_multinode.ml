@@ -225,7 +225,9 @@ module Server = struct
       alloc = Worker_allocator.create () ;
     }
 
-    let server_api : type s. (Logger.event -> unit) -> state -> s api_request -> s Lwt.t = fun log state msg ->
+    let server_api
+      : type s. (Logger.event -> unit) -> stop_signal:unit Lwt_condition.t -> state -> s api_request -> s Lwt.t
+      = fun log ~stop_signal state msg ->
       match msg with
 
       | Subscript { np ; mem } ->
@@ -237,19 +239,18 @@ module Server = struct
         Lwt.return (Client_id id)
 
       | Get_job { client_id } -> (
-          printf "%s requests a job.\n%!" client_id ;
           match String.Table.find state.workers client_id with
-          | None ->
-            printf "%s is unknown!\n%!" client_id ;
-            Lwt.return None
+          | None -> Lwt.return None
           | Some (Worker worker) ->
-            printf "%s is known!\n%!" client_id ;
-            Lwt_queue.pop worker.pending_jobs >>= fun wp ->
-            print_endline "mlkj" ;
-            let workflow_id = workflow_id_of_job_waiter wp in
-            printf "%s is allocated to %s.\n%!" workflow_id client_id ;
-            String.Table.set worker.running_jobs ~key:workflow_id ~data:wp ;
-            Lwt.return (Some (job_of_job_waiter wp))
+            Lwt.choose [
+              (Lwt_queue.pop worker.pending_jobs >|= fun x -> `Job x) ;
+              (Lwt_condition.wait stop_signal >|= fun () -> `Stop) ;
+            ] >>= function
+            | `Job wp ->
+              let workflow_id = workflow_id_of_job_waiter wp in
+              String.Table.set worker.running_jobs ~key:workflow_id ~data:wp ;
+              Lwt.return (Some (job_of_job_waiter wp))
+            | `Stop -> Lwt.return None
         )
 
       | Plugin_result r ->
@@ -267,9 +268,9 @@ module Server = struct
           | Waiting_shell_command wp -> Lwt.wakeup wp.waiter r.result
         )
 
-    let server_handler log state _ (ic, oc) =
+    let server_handler log ~stop_signal state _ (ic, oc) =
       Lwt_io.read_value ic >>= fun msg ->
-      server_api log state msg >>= fun res ->
+      server_api log ~stop_signal state msg >>= fun res ->
       Lwt_io.write_value oc res ~flags:[Closures] >>= fun () ->
       Lwt_io.flush oc >>= fun () ->
       Lwt_io.close ic >>= fun () ->
@@ -282,9 +283,9 @@ module Server = struct
       let state = create_state () in
       let logger = Logger.tee loggers in
       let log event = logger#event db (Unix.gettimeofday ()) event in
-      Lwt_io.establish_server_with_client_address sockaddr (server_handler log state) >>= fun server ->
-      let events, send_event = Lwt_react.E.create () in
       let stop_signal = Lwt_condition.create () in
+      Lwt_io.establish_server_with_client_address sockaddr (server_handler log ~stop_signal state) >>= fun server ->
+      let events, send_event = Lwt_react.E.create () in
       let server_stop =
         Lwt_condition.wait stop_signal >>= fun () -> Lwt_io.shutdown_server server
       in
@@ -336,7 +337,6 @@ module Server = struct
       let f () = f x in
       let t, u = Lwt.wait () in
       let job_waiter = Waiting_plugin { waiter = u ; f ; workflow_id } in
-      print_endline "pushed plugin" ;
       Lwt_queue.push worker.pending_jobs job_waiter ;
       t
 
@@ -344,9 +344,12 @@ module Server = struct
       let Worker worker = String.Table.find_exn backend.state.workers worker_id in
       let t, u = Lwt.wait () in
       let job = Waiting_shell_command { waiter = u ; cmd ; workflow_id } in
-      print_endline "pushed shell command" ;
       Lwt_queue.push worker.pending_jobs job ;
       t
+
+    let stop backend =
+      Lwt_condition.broadcast backend.stop_signal () ;
+      Lwt.return ()
   end
 
   module Scheduler = Scheduler.Make(Backend)
@@ -370,11 +373,13 @@ module Server = struct
     let t =
       create ?allowed_containers ?loggers ?collect ?port (Db.init_exn db) >>= fun server ->
       start server ;
-      eval server w >|= function
-      | Ok _ -> ()
-      | Error e ->
-        print_endline @@ Scheduler.error_report server e
-
+      eval server w >|= (
+        function
+        | Ok _ -> ()
+        | Error e ->
+          print_endline @@ Scheduler.error_report server e
+      ) >>= fun () ->
+      stop server
     in
     Lwt_main.run t
 
