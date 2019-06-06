@@ -769,7 +769,8 @@ module Make(Backend : Backend) = struct
     Synchro.wait sched.start >>= fun () ->
     Maybe_gc.register sched.gc target >>= fun () ->
     build sched target
-    >>= (fun r -> Maybe_gc.stop sched.gc >|= fun () -> r)
+    >>= (fun r -> Maybe_gc.stop sched.gc >|= fun () -> r) (* FIXME: is this the right moment?
+                                                             what if eval is called several times? *)
     |> Fn.flip Lwt_result.bind Lwt.(fun () -> shallow_eval sched target >|= Result.return)
     |> Lwt_result.map_err Execution_trace.Set.elements
 
