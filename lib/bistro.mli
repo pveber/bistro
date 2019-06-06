@@ -130,6 +130,12 @@ module Shell_dsl : sig
       @param stdout adds a ["> /some/path"] token at the end of the command
       @param stderr adds a ["2> /some/path"] token at the end of the command *)
 
+  val bash :
+    ?img:container_image list ->
+    template ->
+    command
+  (** Run a bash script, best used with [%script {|...|}] *)
+
   val opt : string -> ('a -> template) -> 'a -> template
   (** Command-line option formatting, e.g.: [opt "--output" dep dest]
       will be rendered like ["--output /some/path"] *)

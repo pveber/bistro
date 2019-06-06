@@ -207,4 +207,6 @@ module Shell_dsl = struct
   let ( % ) f g x = g (f x)
 
   let docker_image = Command.docker_image
+
+  let bash ?img script = cmd "bash" ?img [ file_dump script ]
 end
