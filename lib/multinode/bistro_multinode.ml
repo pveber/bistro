@@ -131,7 +131,6 @@ module Server = struct
           String.Table.fold table ~init:() ~f:(fun ~key ~data () -> if f ~key ~data then raise (M.Found (key, data))) ;
           None
         with M.Found (k, v) -> Some (k, v)
-                                                    
 
       let allocation_pass pool =
         let remaining_waiters =
@@ -172,7 +171,7 @@ module Server = struct
             | Some (Resource r) -> Resource { np = r.np + np ; mem = r.mem + mem }
           )
     end
-    
+
     type token = {
       worker_id : string ;
       workflow_id : string ;
@@ -253,9 +252,20 @@ module Server = struct
             Lwt.return (Some (job_of_job_waiter wp))
         )
 
-      | Plugin_result _ -> assert false
-
-      | Shell_command_result _ -> assert false
+      | Plugin_result r ->
+        let Worker worker = String.Table.find_exn state.workers r.client_id in
+        Lwt.return (
+          match String.Table.find_exn worker.running_jobs r.workflow_id with
+          | Waiting_plugin wp -> Lwt.wakeup wp.waiter r.result
+          | Waiting_shell_command _ -> assert false
+        )
+      | Shell_command_result r ->
+        let Worker worker = String.Table.find_exn state.workers r.client_id in
+        Lwt.return (
+          match String.Table.find_exn worker.running_jobs r.workflow_id with
+          | Waiting_plugin _ -> assert false
+          | Waiting_shell_command wp -> Lwt.wakeup wp.waiter r.result
+        )
 
     let server_handler log state _ (ic, oc) =
       Lwt_io.read_value ic >>= fun msg ->
@@ -292,45 +302,12 @@ module Server = struct
     let log ?(time = Unix.gettimeofday ()) backend event =
       backend.logger#event backend.db time event
 
-    (* let request_resource backend req =
-     *   let allocation_race =
-     *     String.Table.to_alist backend.state.workers
-     *     |> List.map ~f:(fun (_, (Worker { alloc ; _ } as w)) ->
-     *         w,
-     *         Allocator.request alloc req >|= fun r -> r, w
-     *       )
-     *   in
-     *   let rec loop xs =
-     *     if xs = [] then Lwt_result.fail `Resource_unavailable
-     *     else
-     *       Lwt.choose (List.map ~f:snd xs) >>= fun (r, (Worker w_first as worker_first)) ->
-     *       let others = List.filter xs ~f:(fun (Worker w, _) -> w.id <> w_first.id) in
-     *       match r with
-     *       | Ok resource ->
-     *         let cancellations =
-     *           List.map others ~f:(fun (Worker w, t) ->
-     *               t >|= function
-     *               | Ok r, _ -> Allocator.release w.alloc r
-     *               | Error _, _ -> ()
-     *             )
-     *         in
-     *         Lwt.async (fun () -> Lwt.join cancellations) ;
-     *         Lwt_result.return (worker_first, resource)
-     *       | Error _ -> loop others
-     *   in
-     *   loop allocation_race *)
-
     let request_resource backend req =
       Worker_allocator.request backend.state.alloc req >|= fun (worker_id, resource) ->
       String.Table.find_exn backend.state.workers worker_id, resource
 
     let release_resource backend worker_id res =
       Worker_allocator.release backend.state.alloc worker_id res
-
-    (* let rec wait_for_new_worker backend =
-     *   Lwt_react.E.next backend.events >>= function
-     *   | `New_worker -> Lwt.return ()
-     *   | _ -> wait_for_new_worker backend *)
 
     let build_trace backend w requirement perform =
       let ready = Unix.gettimeofday () in
