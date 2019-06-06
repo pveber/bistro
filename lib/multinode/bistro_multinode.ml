@@ -47,10 +47,12 @@ module Client = struct
       )
 
   let main ~np ~mem ~hostname ~port () =
+    let mem = mem * 1024 in
     let client = { np ; mem ; hostname ; port } in
     (* let alloc = Allocator.create ~np ~mem in *)
     let stop_var = Lwt_mvar.create_empty () in
     send_request client (Subscript { np ; mem }) >>= fun (Client_id client_id) ->
+    printf "Received id: %s\n%!" client_id ;
     let job_thread = function
       | Plugin { workflow_id ; f } ->
         Local_backend.eval () () f () >>= fun result ->
@@ -68,6 +70,7 @@ module Client = struct
       | `New_job None
       | `Stop -> Lwt.return ()
       | `New_job (Some job) ->
+        print_endline "Received new job!" ;
         Lwt.async (fun () -> job_thread job) ;
         loop ()
     in
@@ -106,11 +109,70 @@ module Server = struct
         id : string ;
         np : int ;
         mem : int ;
-        alloc : Allocator.t ;
+        mutable available_resource : Allocator.resource ;
         pending_jobs : job_waiter Lwt_queue.t ;
         running_jobs : job_waiter String.Table.t ;
       }
 
+    module Worker_allocator = struct
+      type t = {
+        mutable available : Allocator.resource String.Table.t ;
+        mutable waiters : ((int * int) * (string * Allocator.resource) Lwt.u) list ;
+      }
+
+      let create () = {
+        available = String.Table.create () ;
+        waiters = [] ;
+      }
+
+      let search (type s) (table : s String.Table.t) ~f =
+        let module M = struct exception Found of string * s end in
+        try
+          String.Table.fold table ~init:() ~f:(fun ~key ~data () -> if f ~key ~data then raise (M.Found (key, data))) ;
+          None
+        with M.Found (k, v) -> Some (k, v)
+                                                    
+
+      let allocation_pass pool =
+        let remaining_waiters =
+          List.filter_map pool.waiters ~f:(fun ((np, mem), u as elt) ->
+              let allocation_attempt =
+                search pool.available ~f:(fun ~key:_ ~data:(Resource curr) ->
+                    curr.np >= np && curr.mem >= mem
+                  )
+              in
+              match allocation_attempt with
+              | None -> Some elt
+              | Some (worker_id, (Resource curr)) ->
+                String.Table.set pool.available ~key:worker_id ~data:(Resource { np = curr.np - np ; mem = curr.mem - mem }) ;
+                Lwt.wakeup u (worker_id, Resource { np ; mem }) ;
+                None
+            )
+        in
+        pool.waiters <- remaining_waiters
+
+      let request pool (Allocator.Request { np ; mem }) =
+        let t, u = Lwt.wait () in
+        let waiters =
+          ((np, mem), u) :: pool.waiters
+          |> List.sort ~compare:(fun (x, _) (y,_) -> compare y x)
+        in
+        pool.waiters <- waiters ;
+        allocation_pass pool ;
+        t
+
+      let add_worker pool (Worker { id ; np ; mem ; _ }) =
+        match String.Table.add pool.available ~key:id ~data:(Allocator.Resource { np ; mem }) with
+        | `Ok -> allocation_pass pool
+        | `Duplicate -> failwith "A worker has been added twice"
+
+      let release pool worker_id (Allocator.Resource { np ; mem }) =
+        String.Table.update pool.available worker_id ~f:(function
+            | None -> failwith "Tried to release resources of inexistent worker"
+            | Some (Resource r) -> Resource { np = r.np + np ; mem = r.mem + mem }
+          )
+    end
+    
     type token = {
       worker_id : string ;
       workflow_id : string ;
@@ -118,6 +180,7 @@ module Server = struct
 
     type state = {
       workers : worker String.Table.t ;
+      alloc : Worker_allocator.t ;
     }
 
     type event = [
@@ -153,13 +216,14 @@ module Server = struct
     let create_worker ~np ~mem id =
       Worker {
         id ; np ; mem ;
-        alloc = Allocator.create ~np ~mem ;
+        available_resource = Allocator.Resource { np ; mem } ;
         pending_jobs = Lwt_queue.create () ;
         running_jobs = String.Table.create () ;
       }
 
     let create_state () = {
       workers = String.Table.create () ;
+      alloc = Worker_allocator.create () ;
     }
 
     let server_api : type s. (Logger.event -> unit) -> state -> s api_request -> s Lwt.t = fun log state msg ->
@@ -169,15 +233,22 @@ module Server = struct
         let id = new_id () in
         let w = create_worker ~np ~mem id in
         String.Table.set state.workers ~key:id ~data:w ;
+        Worker_allocator.add_worker state.alloc w ;
         log (Logger.Debug (sprintf "new worker %s" id)) ;
         Lwt.return (Client_id id)
 
       | Get_job { client_id } -> (
+          printf "%s requests a job.\n%!" client_id ;
           match String.Table.find state.workers client_id with
-          | None -> Lwt.return None
+          | None ->
+            printf "%s is unknown!\n%!" client_id ;
+            Lwt.return None
           | Some (Worker worker) ->
+            printf "%s is known!\n%!" client_id ;
             Lwt_queue.pop worker.pending_jobs >>= fun wp ->
+            print_endline "mlkj" ;
             let workflow_id = workflow_id_of_job_waiter wp in
+            printf "%s is allocated to %s.\n%!" workflow_id client_id ;
             String.Table.set worker.running_jobs ~key:workflow_id ~data:wp ;
             Lwt.return (Some (job_of_job_waiter wp))
         )
@@ -189,7 +260,7 @@ module Server = struct
     let server_handler log state _ (ic, oc) =
       Lwt_io.read_value ic >>= fun msg ->
       server_api log state msg >>= fun res ->
-      Lwt_io.write_value oc res >>= fun () ->
+      Lwt_io.write_value oc res ~flags:[Closures] >>= fun () ->
       Lwt_io.flush oc >>= fun () ->
       Lwt_io.close ic >>= fun () ->
       Lwt_io.close oc
@@ -221,69 +292,74 @@ module Server = struct
     let log ?(time = Unix.gettimeofday ()) backend event =
       backend.logger#event backend.db time event
 
-    let request_resource backend req =
-      let allocation_race =
-        String.Table.to_alist backend.state.workers
-        |> List.map ~f:(fun (_, (Worker { alloc ; _ } as w)) ->
-            w,
-            Allocator.request alloc req >|= fun r -> r, w
-          )
-      in
-      let rec loop xs =
-        if xs = [] then Lwt_result.fail `Resource_unavailable
-        else
-          Lwt.choose (List.map ~f:snd xs) >>= fun (r, (Worker w_first as worker_first)) ->
-          let others = List.filter xs ~f:(fun (Worker w, _) -> w.id <> w_first.id) in
-          match r with
-          | Ok resource ->
-            let cancellations =
-              List.map others ~f:(fun (Worker w, t) ->
-                  t >|= function
-                  | Ok r, _ -> Allocator.release w.alloc r
-                  | Error _, _ -> ()
-                )
-            in
-            Lwt.async (fun () -> Lwt.join cancellations) ;
-            Lwt_result.return (worker_first, resource)
-          | Error _ -> loop others
-      in
-      loop allocation_race
+    (* let request_resource backend req =
+     *   let allocation_race =
+     *     String.Table.to_alist backend.state.workers
+     *     |> List.map ~f:(fun (_, (Worker { alloc ; _ } as w)) ->
+     *         w,
+     *         Allocator.request alloc req >|= fun r -> r, w
+     *       )
+     *   in
+     *   let rec loop xs =
+     *     if xs = [] then Lwt_result.fail `Resource_unavailable
+     *     else
+     *       Lwt.choose (List.map ~f:snd xs) >>= fun (r, (Worker w_first as worker_first)) ->
+     *       let others = List.filter xs ~f:(fun (Worker w, _) -> w.id <> w_first.id) in
+     *       match r with
+     *       | Ok resource ->
+     *         let cancellations =
+     *           List.map others ~f:(fun (Worker w, t) ->
+     *               t >|= function
+     *               | Ok r, _ -> Allocator.release w.alloc r
+     *               | Error _, _ -> ()
+     *             )
+     *         in
+     *         Lwt.async (fun () -> Lwt.join cancellations) ;
+     *         Lwt_result.return (worker_first, resource)
+     *       | Error _ -> loop others
+     *   in
+     *   loop allocation_race *)
 
-    let rec wait_for_new_worker backend =
-      Lwt_react.E.next backend.events >>= function
-      | `New_worker -> Lwt.return ()
-      | _ -> wait_for_new_worker backend
+    let request_resource backend req =
+      Worker_allocator.request backend.state.alloc req >|= fun (worker_id, resource) ->
+      String.Table.find_exn backend.state.workers worker_id, resource
+
+    let release_resource backend worker_id res =
+      Worker_allocator.release backend.state.alloc worker_id res
+
+    (* let rec wait_for_new_worker backend =
+     *   Lwt_react.E.next backend.events >>= function
+     *   | `New_worker -> Lwt.return ()
+     *   | _ -> wait_for_new_worker backend *)
 
     let build_trace backend w requirement perform =
       let ready = Unix.gettimeofday () in
       log ~time:ready backend (Logger.Workflow_ready w) ;
-      let rec loop () =
-        request_resource backend requirement >>= function
-        | Ok (Worker worker, resource) ->
-          let open Eval_thread.Infix in
-          let start = Unix.gettimeofday () in
-          log ~time:start backend (Logger.Workflow_started (w, resource)) ;
-          let token = { worker_id = worker.id ; workflow_id = Bistro_internals.Workflow.id w } in
-          perform token resource >>= fun outcome ->
-          let _end_ = Unix.gettimeofday () in
-          log ~time:_end_ backend (Logger.Workflow_ended { outcome ; start ; _end_ }) ;
-          Allocator.release worker.alloc resource ;
-          Eval_thread.return (
-            Execution_trace.Run { ready ; start  ; _end_ ; outcome }
-          )
-        | Error `Resource_unavailable ->
-          let msg = "No worker with enough resource" in
-          log backend (Logger.Workflow_allocation_error (w, msg)) ;
-          wait_for_new_worker backend >>= fun () ->
-          loop ()
-      in
-      loop ()
+      printf "Try to build %s\n%!" (Bistro_internals.Workflow.id w) ;
+      request_resource backend requirement >>= fun (Worker worker, resource) ->
+      let open Eval_thread.Infix in
+      let start = Unix.gettimeofday () in
+      log ~time:start backend (Logger.Workflow_started (w, resource)) ;
+      let token = { worker_id = worker.id ; workflow_id = Bistro_internals.Workflow.id w } in
+      perform token resource >>= fun outcome ->
+      let _end_ = Unix.gettimeofday () in
+      log ~time:_end_ backend (Logger.Workflow_ended { outcome ; start ; _end_ }) ;
+      release_resource backend worker.id resource ;
+      Eval_thread.return (
+        Execution_trace.Run { ready ; start  ; _end_ ; outcome }
+      )
+        (* | Error `Resource_unavailable ->
+         *   let msg = "No worker with enough resource" in
+         *   log backend (Logger.Workflow_allocation_error (w, msg)) ;
+         *   wait_for_new_worker backend >>= fun () ->
+         *   loop () *)
 
     let eval backend { worker_id ; workflow_id } f x =
       let Worker worker = String.Table.find_exn backend.state.workers worker_id in
       let f () = f x in
       let t, u = Lwt.wait () in
       let job_waiter = Waiting_plugin { waiter = u ; f ; workflow_id } in
+      print_endline "pushed plugin" ;
       Lwt_queue.push worker.pending_jobs job_waiter ;
       t
 
@@ -291,6 +367,7 @@ module Server = struct
       let Worker worker = String.Table.find_exn backend.state.workers worker_id in
       let t, u = Lwt.wait () in
       let job = Waiting_shell_command { waiter = u ; cmd ; workflow_id } in
+      print_endline "pushed shell command" ;
       Lwt_queue.push worker.pending_jobs job ;
       t
   end
