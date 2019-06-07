@@ -49,10 +49,8 @@ module Client = struct
   let main ~np ~mem ~hostname ~port () =
     let mem = mem * 1024 in
     let client = { np ; mem ; hostname ; port } in
-    (* let alloc = Allocator.create ~np ~mem in *)
     let stop_var = Lwt_mvar.create_empty () in
     send_request client (Subscript { np ; mem }) >>= fun (Client_id client_id) ->
-    printf "Received id: %s\n%!" client_id ;
     let job_thread = function
       | Plugin { workflow_id ; f } ->
         Local_backend.eval () () f () >>= fun result ->
@@ -70,7 +68,6 @@ module Client = struct
       | `New_job None
       | `Stop -> Lwt.return ()
       | `New_job (Some job) ->
-        print_endline "Received new job!" ;
         Lwt.async (fun () -> job_thread job) ;
         loop ()
     in
@@ -258,13 +255,13 @@ module Server = struct
         Lwt.return (
           match String.Table.find_exn worker.running_jobs r.workflow_id with
           | Waiting_plugin wp -> Lwt.wakeup wp.waiter r.result
-          | Waiting_shell_command _ -> assert false
+          | Waiting_shell_command _ -> assert false (* should never happen *)
         )
       | Shell_command_result r ->
         let Worker worker = String.Table.find_exn state.workers r.client_id in
         Lwt.return (
           match String.Table.find_exn worker.running_jobs r.workflow_id with
-          | Waiting_plugin _ -> assert false
+          | Waiting_plugin _ -> assert false (* should never happen *)
           | Waiting_shell_command wp -> Lwt.wakeup wp.waiter r.result
         )
 
@@ -313,7 +310,6 @@ module Server = struct
     let build_trace backend w requirement perform =
       let ready = Unix.gettimeofday () in
       log ~time:ready backend (Logger.Workflow_ready w) ;
-      printf "Try to build %s\n%!" (Bistro_internals.Workflow.id w) ;
       request_resource backend requirement >>= fun (Worker worker, resource) ->
       let open Eval_thread.Infix in
       let start = Unix.gettimeofday () in
