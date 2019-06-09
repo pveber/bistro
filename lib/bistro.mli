@@ -1,45 +1,59 @@
 (** A library to build scientific workflows.
 
-     This module introduces a type ['a worfklow] that describe a set
+    This module introduces a type ['a worfklow] that describes a set
    of inter-dependent steps that will eventually generate a value of
    type ['a]. Steps may be either command lines to be executed, or
    OCaml expressions to be evaluated.
 
-     To build shell-based workflows, use the {!module:Shell_dsl}
+    To build shell-based workflows, use the {!module:Shell_dsl}
    module, that provides a set of combinators to write shell scripts
    easily. For instance, the following function shows how to create a
    gzipped file using the output of another workflow:
-   {[
+
+    {[
       let gzip (x : 'a pworkflow) : 'a gz pworkflow =
         Workflow.shell ~descr:"unix.gzip" [
           cmd "gzip" [ string "-c" ; dep x ; string ">" dest ]
         ]
-   ]}
+    ]}
+*)
 
-     Note that a workflow is just a recipe to build some
-   result. Building the workflow won't actually generate anything. In
-   order to run the workflow, you have to run it using an execution
-   engine like the one provided by [bistro.engine].  *)
 
 (** {2 Base types} *)
 
 type 'a workflow
-type 'a path
-type 'a pworkflow = 'a path workflow
+(** Representation of a computational pipeline. Constructors are
+   provided in the {!Workflow} module. Note that a workflow is just a
+   recipe to build some result. Building the workflow won't actually
+   generate anything. In order to run the workflow, you have to run it
+   using an execution engine like the one provided by [bistro.engine].
+   *)
 
+type 'a path
+(** Abstract representation of a path in the filesystem. The type
+   parameter can be used to provide information on the format of a
+   file (this is an instance of phantom-typing). *)
+
+type 'a pworkflow = 'a path workflow
+(** Type alias for path workflows *)
+
+(** Base class for files when typing a {!path} *)
 class type file = object
   method file_kind : [`regular]
 end
 
+(** Base class for directories when typing a {!path} *)
 class type directory = object
   method file_kind : [`directory]
 end
 
 type 'a dworkflow = < directory ; contents : 'a > path workflow
+(** Type alias for workflows that produce a directory *)
 
 
 (** {2 Building shell-based workflow} *)
 
+(** Representation of scripts *)
 module Template_dsl : sig
   type template
 
@@ -108,6 +122,7 @@ module Template_dsl : sig
       path. *)
 end
 
+(** Command-line construction *)
 module Shell_dsl : sig
   type template = Template_dsl.template
   type command
@@ -182,7 +197,35 @@ module Shell_dsl : sig
   val ( % ) : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c
 end
 
+(** Workflow constructors *)
 module Workflow : sig
+  val input :
+    ?version:int ->
+    string -> 'a pworkflow
+  (** Workflow constructor from an existing path *)
+
+  val shell :
+    ?descr:string ->
+    ?mem:int workflow ->
+    ?np:int ->
+    ?version:int ->
+    Shell_dsl.command list -> 'a path workflow
+  (** Constructor for a workflow that execute a shell script. Its main
+    argument is a list of {!Shell_dsl.cmd} values. Other arguments
+    are:
+      - {b descr} description of the workflow, used for logging
+      - {b mem} required memory
+      - {b np} maximum number of cores (could be given less at execution)
+      - {b version} version number, used to force the rebuild of a workflow
+  *)
+
+  val select :
+    #directory path workflow ->
+    string list ->
+    'a path workflow
+  (** Constructs a workflow from a directory workflow, by selecting a
+     file in it *)
+
   val cached_value :
     ?descr:string ->
     ?np:int ->
@@ -190,10 +233,6 @@ module Workflow : sig
     ?version:int ->
     (unit -> 'a) workflow ->
     'a workflow
-
-  val input :
-    ?version:int ->
-    string -> 'a path workflow
 
   val cached_path :
     ?descr:string ->
@@ -203,29 +242,25 @@ module Workflow : sig
     (string -> unit) workflow ->
     'a path workflow
 
-  val select :
-    #directory path workflow ->
-    string list ->
-    'a path workflow
-
-  val shell :
-    ?descr:string ->
-    ?mem:int workflow ->
-    ?np:int ->
-    ?version:int ->
-    Shell_dsl.command list -> 'a path workflow
-  (** Workflow constructor, taking a list of commands in input. Other arguments are:
-      @param descr description of the workflow, used for logging
-      @param mem required memory
-      @param np maximum number of cores (could be given less at execution)
-      @param version version number, used to force the rebuild of a workflow *)
-
   val pure : id:string -> 'a -> 'a workflow
+  (** [pure ~id x] is a workflow that computes the value [x]. [id]
+     should be a string identifying [x], like a digest. *)
+
   val pure_data : 'a -> 'a workflow
+  (** Similar to {!pure}, but computes a digest as identifier. Does
+     not work with closures or objects. *)
+
   val int : int -> int workflow
+  (** [int i] is [pure_data i] *)
+
   val string : string -> string workflow
+  (** [string s] is [pure_data s] *)
+
   val app : ('a -> 'b) workflow -> 'a workflow -> 'b workflow
+  (** Applicative structure *)
+
   val both : 'a workflow -> 'b workflow -> ('a * 'b) workflow
+  (** Applicative structure, useful for parallel binds *)
 
   val eval_path : 'a path workflow -> string workflow
 
@@ -253,6 +288,7 @@ module Workflow : sig
     'a path list workflow
 end
 
+(** Access to internal representation *)
 module Private : sig
   val reveal : 'a workflow -> 'a Bistro_internals.Workflow.t
 end
