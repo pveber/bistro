@@ -38,7 +38,7 @@ let mapped_reads x =
   Bowtie.bowtie ~v:1 bowtie_index (`single_end (fastq x))
 
 let mapped_reads_bam x =
-  Samtools.bam_of_sam (mapped_reads x)
+  Samtools.indexed_bam_of_sam (mapped_reads x)
 
 let tf_peaks treatment_sample =
   let control_sample = control_sample treatment_sample in

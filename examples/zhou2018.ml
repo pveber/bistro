@@ -29,11 +29,11 @@ module Dataset = struct
 end
 
 module Raxml = struct
-  let env = docker_image ~account:"pveber" ~name:"raxml" ~tag:"8.2.9" ()
+  let img = [ docker_image ~account:"pveber" ~name:"raxml" ~tag:"8.2.9" () ]
 
   let hpc alignment =
     Workflow.shell ~descr:"raxmlhpc" ~np:4 [
-      docker env (
+      within_container img (
         and_list [
           cd tmp ;
           cmd "raxmlHPC" [
@@ -49,11 +49,11 @@ module Raxml = struct
 end
 
 module Fasttree = struct
-  let env = docker_image ~account:"pveber" ~name:"fasttree" ~tag:"2.1.10" ()
+  let img = [ docker_image ~account:"pveber" ~name:"fasttree" ~tag:"2.1.10" () ]
 
   let fasttree fa =
     Workflow.shell ~descr:"fasttree" [
-      cmd ~env "/usr/local/bin/FastTree" ~stdout:dest [
+      cmd ~img "/usr/local/bin/FastTree" ~stdout:dest [
         string "-nt -gtr -gamma -spr 4 -mlacc 2 -slownni" ;
         dep fa ;
       ]
@@ -61,16 +61,16 @@ module Fasttree = struct
 end
 
 module IQTree = struct
-  let env = docker_image ~account:"pveber" ~name:"iqtree" ~tag:"1.4.2" ()
+  let img = [ docker_image ~account:"pveber" ~name:"iqtree" ~tag:"1.4.2" () ]
 
   let iqtree fa =
     let tmp_ali_fn = "data.fa" in
     let tmp_ali = tmp // tmp_ali_fn in
     Workflow.shell ~descr:"iqtree" [
-      docker env (
+      within_container img (
         and_list [
           cmd "ln" [ string "-s" ; dep fa ; tmp_ali ] ;
-          cmd ~env "/usr/local/bin/iqtree" [ (* iqtree save its output right next to its input, hence this mess *)
+          cmd "/usr/local/bin/iqtree" [ (* iqtree save its output right next to its input, hence this mess *)
             string "-m GTR+G4" ;
             opt "-s" ident tmp_ali ;
             string "-seed 1" ;
@@ -83,13 +83,13 @@ module IQTree = struct
 end
 
 module PhyML = struct
-  let env = docker_image ~account:"pveber" ~name:"phyml" ~tag:"3.3.20180129" ()
+  let img = [ docker_image ~account:"pveber" ~name:"phyml" ~tag:"3.3.20180129" () ]
 
   let phyml alignment =
     let tmp_ali_fn = "alignment" in
     let tmp_ali = tmp // tmp_ali_fn in
     Workflow.shell ~descr:"phyml" [
-      docker env (
+      within_container img (
         and_list [
           cd tmp ;
           cmd "ln" [ string "-s" ; dep alignment ; tmp_ali ] ;
@@ -104,11 +104,11 @@ module PhyML = struct
 end
 
 module Goalign = struct
-  let env = docker_image ~account:"pveber" ~name:"goalign" ~tag:"0.2.9" ()
+  let img = [ docker_image ~account:"pveber" ~name:"goalign" ~tag:"0.2.9" () ]
 
   let phylip_of_fasta fa =
     Workflow.shell ~descr:"goalign.reformat" [
-      cmd "goalign" ~env [
+      cmd "goalign" ~img [
         string "reformat phylip" ;
         opt "-i" dep fa ;
         opt "-o" ident dest ;
@@ -117,11 +117,11 @@ module Goalign = struct
 end
 
 module Gotree = struct
-  let env = docker_image ~account:"pveber" ~name:"gotree" ~tag:"0.2.10" ()
+  let img = [ docker_image ~account:"pveber" ~name:"gotree" ~tag:"0.2.10" () ]
 
   let compare_trees ~input ~reference =
     Workflow.shell ~descr:"gotree.compare" [
-      cmd "/usr/local/bin/gotree" ~stdout:dest ~env [
+      cmd "/usr/local/bin/gotree" ~stdout:dest ~img [
         string "compare trees --binary" ;
         opt "-i" dep input ;
         opt "-c" dep reference ;
