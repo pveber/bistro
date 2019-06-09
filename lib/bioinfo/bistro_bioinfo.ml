@@ -1698,11 +1698,6 @@ module Meme_suite = struct
 
   let img = [ docker_image ~account:"pveber" ~name:"meme" ~tag:"4.11.2" () ]
 
-  class type meme_output = object
-    inherit text_file
-    method format : [`meme_output]
-  end
-
   let meme_chip ?meme_nmotifs ?meme_minw ?meme_maxw (* ?np:threads *) fa =
     Workflow.shell ~descr:"meme-chip" (* ?np:threads *) [
       cmd "meme-chip" ~img [
@@ -1737,6 +1732,9 @@ module Meme_suite = struct
         dep fa ;
       ]
     ]
+
+  let meme_logo dir ?(rc = false) n =
+    Workflow.select dir [ sprintf "logo%s%d.png" (if rc then "" else "_rc") n ]
 
   let fimo
       ?alpha ?bgfile ?max_stored_scores ?max_strand ?motif ?motif_pseudo
