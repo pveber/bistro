@@ -7,11 +7,11 @@ let tag = function
   | Some t -> ":" ^ t
 
 let url_of_image : Command.container_image -> string = function
-  | Docker_image img ->
+  | `Docker_image img ->
     sprintf "docker://%s/%s%s"
       img.account img.name
       (tag img.tag)
-  | Singularity_image img ->
+  | `Singularity_image img ->
     sprintf "shub://%s/%s%s"
       img.account img.name
       (tag img.tag)

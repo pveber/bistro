@@ -18,20 +18,34 @@ module Singularity_image = struct
   }
 end
 
-type container_image =
-  | Docker_image of Docker_image.t
-  | Singularity_image of Singularity_image.t
+module Guix_environment = struct
+  type package = {
+    name : string ;
+    version : string ;
+  }
+  type t = package list
+end
+
+type container_image = [
+  | `Docker_image of Docker_image.t
+  | `Singularity_image of Singularity_image.t
+]
+
+type env = [
+  container_image
+| `Guix_environment of Guix_environment.t
+]
 
 let docker_image ?tag ?registry ~account ~name () =
-  Docker_image {
-    account = account ;
+  `Docker_image {
+    Docker_image.account = account ;
     name = name ;
     tag = tag ;
     registry = registry ;
   }
 
 type 'a t =
-  | Within_container of container_image list * 'a t
+  | Within_env of env list * 'a t
   | Simple_command of 'a template
   | And_list of 'a t list
   | Or_list of 'a t list
@@ -48,10 +62,10 @@ let rec deps = function
     |> List.concat
     |> List.dedup_and_sort ~compare:Caml.compare
   | Simple_command tokens -> Template.deps tokens
-  | Within_container (_, c) -> deps c
+  | Within_env (_, c) -> deps c
 
 let rec map x ~f = match x with
-  | Within_container (im, cmd) -> Within_container (im, map ~f cmd)
+  | Within_env (im, cmd) -> Within_env (im, map ~f cmd)
   | Simple_command toks ->
     Simple_command (Template.map ~f toks)
   | And_list cmds -> And_list (List.map cmds ~f:(map ~f))
@@ -59,7 +73,7 @@ let rec map x ~f = match x with
   | Pipe_list cmds -> Pipe_list (List.map cmds ~f:(map ~f))
 
 let rec uses_container = function
-  | Within_container (_, _) -> true
+  | Within_env (_, _) -> true
   | Simple_command _ -> false
   | And_list xs
   | Or_list xs

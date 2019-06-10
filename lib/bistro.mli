@@ -126,13 +126,13 @@ end
 module Shell_dsl : sig
   type template = Template_dsl.template
   type command
-  type container_image
+  type env
 
   include module type of Template_dsl with type template := template
 
   val cmd :
     string ->
-    ?img:container_image list ->
+    ?env:env list ->
     ?stdin:template -> ?stdout:template -> ?stderr:template ->
     template list -> command
   (** Command-line constructor, e.g.
@@ -146,7 +146,7 @@ module Shell_dsl : sig
       @param stderr adds a ["2> /some/path"] token at the end of the command *)
 
   val bash :
-    ?img:container_image list ->
+    ?env:env list ->
     template ->
     command
   (** Run a bash script, best used with [%script {|...|}] *)
@@ -182,7 +182,7 @@ module Shell_dsl : sig
   val rm_rf : template -> command
   val mv : template -> template -> command
 
-  val within_container : container_image list -> command -> command
+  val within_env : env list -> command -> command
   (** [docker cmd] transforms [cmd] so that it can be executed in a
       Docker container. *)
 
@@ -191,7 +191,7 @@ module Shell_dsl : sig
     ?registry:string ->
     account:string ->
     name:string ->
-    unit -> container_image
+    unit -> env
   (** Construct a description of a publicly available docker image *)
 
   val ( % ) : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c

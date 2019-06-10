@@ -10,7 +10,7 @@ module Server : sig
   type t
 
   val create :
-    ?allowed_containers:[`Docker | `Singularity] list ->
+    ?allowed_environments:[`Docker | `Singularity | `Guix] list ->
     ?loggers:Logger.t list ->
     ?collect:bool ->
     ?port:int ->
@@ -27,7 +27,7 @@ module Server : sig
   val stop : t -> unit Lwt.t
 
   val simple_app :
-    ?allowed_containers:[`Docker | `Singularity] list ->
+    ?allowed_environments:[`Docker | `Singularity | `Guix] list ->
     ?loggers:Logger.t list ->
     ?collect:bool ->
     ?port:int ->

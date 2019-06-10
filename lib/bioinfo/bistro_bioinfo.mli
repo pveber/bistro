@@ -246,7 +246,7 @@ end
 (** {3 NGS utilities} *)
 
 module Bedtools : sig
-  val img : Shell_dsl.container_image list
+  val env : Shell_dsl.env list
 
   type 'a input
 
@@ -645,7 +645,7 @@ module Samtools : sig
 end
 
 module Picardtools : sig
-  val img : Shell_dsl.container_image list
+  val env : Shell_dsl.env list
 
   val markduplicates :
     ?remove_duplicates:bool ->
@@ -662,7 +662,7 @@ module Picardtools : sig
 end
 
 module Sra_toolkit : sig
-  val img : Shell_dsl.container_image list
+  val env : Shell_dsl.env list
 
   val fastq_dump :
     [`id of string | `idw of string workflow | `file of sra pworkflow] ->
@@ -877,7 +877,7 @@ module Tophat : sig
 end
 
 module Hisat2 : sig
-  val img : Shell_dsl.container_image list
+  val env : Shell_dsl.env list
 
   val hisat2_build :
     ?large_index:bool ->
@@ -931,7 +931,7 @@ module Kallisto : sig
     method f5 : [`tpm] * float
   end
 
-  val img : Shell_dsl.container_image list
+  val env : Shell_dsl.env list
   val index : fasta pworkflow list -> index pworkflow
   val quant :
     ?bootstrap_samples:int ->
@@ -1010,7 +1010,7 @@ end
 
 module DESeq2 : sig
 
-  val img : Shell_dsl.container_image list
+  val env : Shell_dsl.env list
 
   class type table = object
     inherit tsv

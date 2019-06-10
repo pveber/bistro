@@ -12,7 +12,7 @@ type insert =
 
 type t = {
   db : Db.t ;
-  allowed_containers : [`Docker | `Singularity] list ;
+  allowed_environments : [`Docker | `Singularity | `Guix] list ;
   tmp_dir : string ; (* host all execution *)
   dest : string ;    (* expected path for the target *)
   tmp : string ;     (* temp dir for the process *)
@@ -26,7 +26,7 @@ type t = {
 }
 
 
-let make ~db  ~allowed_containers ~np ~mem ~id =
+let make ~db  ~allowed_environments ~np ~mem ~id =
   let tmp_dir = Db.tmp db id in
   let file_dump toks =
     Filename.concat tmp_dir (Misc.digest toks)
@@ -34,7 +34,7 @@ let make ~db  ~allowed_containers ~np ~mem ~id =
   {
     db ;
     tmp_dir ;
-    allowed_containers ;
+    allowed_environments ;
     tmp = Filename.concat tmp_dir "tmp" ;
     dest = Filename.concat tmp_dir "dest" ;
     stdout = Db.stdout db id ;
@@ -103,7 +103,7 @@ let container_mount
 let dockerize env = {
   db = env.db ;
   tmp_dir = "/bistro" ;
-  allowed_containers = [] ;
+  allowed_environments = [] ;
   dest = "/bistro/dest" ;
   tmp = "/bistro/tmp" ;
   file_dump = (fun toks -> Filename.concat docker_cache_dir (Misc.digest toks)) ;
@@ -115,50 +115,65 @@ let dockerize env = {
   uid = env.uid ;
 }
 
-let allows_docker env = List.mem ~equal:Poly.equal env.allowed_containers `Docker
+let allows_docker env = List.mem ~equal:Poly.equal env.allowed_environments `Docker
 
 let singularize env = {
-  env with allowed_containers = [] ;
+  env with allowed_environments = [] ;
 }
 
 let find_docker_image env =
-  List.find_map env ~f:Command.(function
-      | Docker_image i -> Some i
-      | Singularity_image _ -> None
+  List.find_map env ~f:(function
+      | `Docker_image i -> Some i
+      | `Guix_environment _
+      | `Singularity_image _ -> None
     )
 
 let find_singularity_image env =
-  List.find_map env ~f:Command.(function
-      | Docker_image _ -> None
-      | Singularity_image i -> Some i
+  List.find_map env ~f:(function
+      | `Guix_environment _
+      | `Docker_image _ -> None
+      | `Singularity_image i -> Some i
     )
 
-let rec choose_container allowed_containers images =
-  match allowed_containers with
+let find_guix_environment env =
+  List.find_map env ~f:(function
+      | `Guix_environment e -> Some e
+      | `Docker_image _
+      | `Singularity_image _ -> None
+    )
+
+let rec choose_environment allowed_environments (images : Command.env list) =
+  match allowed_environments with
   | [] -> `Plain
   | `Docker :: others -> ( (* docker only accepts docker images *)
       match find_docker_image images with
       | Some i -> `Docker_container i
-      | None -> choose_container others images
+      | None -> choose_environment others images
     )
   | `Singularity :: others -> (
       match find_singularity_image images with
-      | Some i -> `Singularity_container (Command.Singularity_image i)
+      | Some i -> `Singularity_container (`Singularity_image i)
       | None ->
         match find_docker_image images with
-        | Some i -> `Singularity_container (Command.Docker_image i)
-        | None -> choose_container others images
+        | Some i -> `Singularity_container (`Docker_image i)
+        | None -> choose_environment others images
+    )
+  | `Guix :: others -> (
+      match find_guix_environment images with
+      | Some e -> `Guix e
+      | None -> choose_environment others images
     )
 
-let rec images_for_singularity allowed_containers = function
+let rec images_for_singularity allowed_environments = function
   | Command.Simple_command _ -> []
   | And_list xs
   | Or_list xs
-  | Pipe_list xs -> images_for_singularity_aux allowed_containers xs
-  | Within_container (img, _) ->
-    match choose_container allowed_containers img with
+  | Pipe_list xs -> images_for_singularity_aux allowed_environments xs
+  | Within_env (img, _) ->
+    match choose_environment allowed_environments img with
     | `Plain
+    | `Guix _
     | `Docker_container _ -> []
     | `Singularity_container img -> [ img ]
-and images_for_singularity_aux allowed_containers xs =
-  List.concat_map xs ~f:(images_for_singularity allowed_containers)
+and images_for_singularity_aux allowed_environments xs =
+  List.concat_map xs ~f:(images_for_singularity allowed_environments)

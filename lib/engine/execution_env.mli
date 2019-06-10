@@ -11,7 +11,7 @@ type insert =
 
 type t = {
   db : Db.t ;
-  allowed_containers : [`Docker | `Singularity] list ;
+  allowed_environments : [`Docker | `Singularity | `Guix] list ;
   tmp_dir : string ; (* host all execution *)
   dest : string ;    (* expected path for the target *)
   tmp : string ;     (* temp dir for the process *)
@@ -26,7 +26,7 @@ type t = {
 
 val make :
   db:Db.t ->
-  allowed_containers:[`Docker | `Singularity] list ->
+  allowed_environments:[`Docker | `Singularity | `Guix] list ->
   np:int ->
   mem:int ->
   id:string ->
@@ -44,14 +44,15 @@ val docker_cache_dir : string
 val allows_docker : t -> bool
 val singularize : t -> t
 
-val choose_container :
-  [`Docker | `Singularity] list ->
-  Command.container_image list ->
+val choose_environment :
+  [`Docker | `Singularity | `Guix] list ->
+  Command.env list ->
   [ `Plain
+  | `Guix of Command.Guix_environment.t
   | `Docker_container of Command.Docker_image.t
   | `Singularity_container of Command.container_image ]
 
 val images_for_singularity :
-  [`Docker | `Singularity] list ->
+  [`Docker | `Singularity | `Guix] list ->
   _ Command.t ->
   Command.container_image list

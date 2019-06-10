@@ -30,7 +30,7 @@ val workflow :
   ?descr:string ->
   ?np:int ->
   ?mem:int workflow ->
-  ?img:Shell_dsl.container_image list ->
+  ?env:Shell_dsl.env list ->
   template ->
   'a pworkflow
 
@@ -38,6 +38,6 @@ val workflow' :
   ?descr:string ->
   ?np:int ->
   ?mem:int workflow ->
-  ?img:Shell_dsl.container_image list ->
+  ?env:Shell_dsl.env list ->
   expr list ->
   'a pworkflow

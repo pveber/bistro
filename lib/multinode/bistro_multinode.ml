@@ -352,9 +352,9 @@ module Server = struct
 
   type t = Scheduler.t
 
-  let create ?allowed_containers ?loggers ?collect ?(port = 6666) db =
+  let create ?allowed_environments ?loggers ?collect ?(port = 6666) db =
     Backend.create ?loggers ~port db >|= fun backend ->
-    Scheduler.create ?allowed_containers ?loggers ?collect backend db
+    Scheduler.create ?allowed_environments ?loggers ?collect backend db
 
   let start sched =
     Scheduler.start sched
@@ -365,9 +365,9 @@ module Server = struct
   let eval sched w =
     Scheduler.eval sched w
 
-  let simple_app ?allowed_containers ?loggers ?collect ?port ?(db = "_bistro") w =
+  let simple_app ?allowed_environments ?loggers ?collect ?port ?(db = "_bistro") w =
     let t =
-      create ?allowed_containers ?loggers ?collect ?port (Db.init_exn db) >>= fun server ->
+      create ?allowed_environments ?loggers ?collect ?port (Db.init_exn db) >>= fun server ->
       start server ;
       eval server w >|= (
         function

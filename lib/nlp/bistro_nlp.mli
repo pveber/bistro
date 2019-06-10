@@ -5,7 +5,7 @@ val wikipedia_summary :
   text_file path workflow
 
 module Stanford_parser : sig
-  val img : Shell_dsl.container_image list
+  val env : Shell_dsl.env list
 
   class type deps = object
     inherit text_file

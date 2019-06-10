@@ -333,7 +333,7 @@ module Make(Backend : Backend) = struct
     mutable closed : bool ;
     db : Db.t ;
     logger : Logger.t ;
-    allowed_containers : [`Docker | `Singularity] list ;
+    allowed_environments : [`Docker | `Singularity | `Guix] list ;
     traces : Execution_trace.t thread Table.t ;
     gc : Gc.t option ;
     backend : Backend.t ;
@@ -341,7 +341,7 @@ module Make(Backend : Backend) = struct
   }
 
   let create
-      ?(allowed_containers = [`Docker])
+      ?(allowed_environments = [`Docker])
       ?(loggers = [])
       ?(collect = false)
       backend
@@ -353,7 +353,7 @@ module Make(Backend : Backend) = struct
       _end_ = Synchro.create () ;
       closed = false ;
       db ;
-      allowed_containers ;
+      allowed_environments ;
       traces = String.Table.create () ;
       logger ;
       gc =
@@ -398,10 +398,10 @@ module Make(Backend : Backend) = struct
     | 0, false -> `Missing_output
     | _ -> `Failed
 
-  let perform_shell { backend ; allowed_containers ; db ; _ } token (Allocator.Resource { np ; mem }) ~id ~descr cmd =
+  let perform_shell { backend ; allowed_environments ; db ; _ } token (Allocator.Resource { np ; mem }) ~id ~descr cmd =
     let env =
       Execution_env.make
-        ~allowed_containers
+        ~allowed_environments
         ~db
         ~np ~mem ~id
     in
@@ -491,7 +491,7 @@ module Make(Backend : Backend) = struct
     let evaluator = blocking_evaluator db workflow in
     let env =
       Execution_env.make
-        ~allowed_containers:[]
+        ~allowed_environments:[]
         ~db
         ~np ~mem ~id
     in
@@ -567,9 +567,9 @@ module Make(Backend : Backend) = struct
       list xs >|= fun xs -> Or_list xs
     | Pipe_list xs ->
       list xs >|= fun xs -> Pipe_list xs
-    | Within_container (env, cmd) ->
+    | Within_env (env, cmd) ->
       shallow_eval_command sched cmd >|= fun cmd ->
-      Within_container (env, cmd)
+      Within_env (env, cmd)
 
   and shallow_eval_template sched toks =
     Lwt_list.map_p (shallow_eval_token sched) toks
@@ -693,7 +693,7 @@ module Make(Backend : Backend) = struct
     |> Eval_thread.ignore
 
   let schedule_shell_container_image_fetch sched w cmd =
-    let images = Execution_env.images_for_singularity sched.allowed_containers cmd in
+    let images = Execution_env.images_for_singularity sched.allowed_environments cmd in
     List.iter images ~f:(Maybe_gc.uses_singularity_image sched.gc w) ;
     Eval_thread.join images ~f:(schedule_container_image_fetch sched)
 
@@ -798,17 +798,17 @@ include Make(Local_backend)
 
 let create
     ?np ?mem
-    ?allowed_containers
+    ?allowed_environments
     ?loggers
     ?collect db =
   let backend = Local_backend.create ?np ?mem ?loggers db in
-  create ?allowed_containers ?loggers ?collect backend db
+  create ?allowed_environments ?loggers ?collect backend db
 
 let simple_eval_exn
-    ?np ?mem ?allowed_containers ?loggers
+    ?np ?mem ?allowed_environments ?loggers
     ?collect ?(db_path = "_bistro") w =
   let db = Db.init_exn db_path in
-  let sched = create ?np ?mem ?allowed_containers ?loggers ?collect db in
+  let sched = create ?np ?mem ?allowed_environments ?loggers ?collect db in
   let thread = eval_exn sched w in
   start sched ;
   Lwt_main.run thread

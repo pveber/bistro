@@ -44,7 +44,7 @@ module Make(Backend : Backend) : sig
   type t
 
   val create :
-    ?allowed_containers:[`Docker | `Singularity] list ->
+    ?allowed_environments:[`Docker | `Singularity | `Guix] list ->
     ?loggers:Logger.t list ->
     ?collect:bool ->
     Backend.t ->
@@ -78,7 +78,7 @@ include module type of Make(Local_backend)
 val create :
   ?np:int ->
   ?mem:[`GB of int] ->
-  ?allowed_containers:[`Docker | `Singularity] list ->
+  ?allowed_environments:[`Docker | `Singularity | `Guix] list ->
   ?loggers:Logger.t list ->
   ?collect:bool ->
   Db.t ->
@@ -87,7 +87,7 @@ val create :
 val simple_eval_exn :
   ?np:int ->
   ?mem:[`GB of int] ->
-  ?allowed_containers:[`Docker | `Singularity] list ->
+  ?allowed_environments:[`Docker | `Singularity | `Guix] list ->
   ?loggers:Logger.t list ->
   ?collect:bool ->
   ?db_path:string ->

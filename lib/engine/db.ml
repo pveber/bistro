@@ -155,8 +155,8 @@ let container_image_identifier img =
       (Bistro_internals.Workflow.digest img)
   in
   match (img : Bistro_internals.Command.container_image) with
-  | Docker_image i -> f i.account i.name i.tag
-  | Singularity_image i -> f i.account i.name i.tag
+  | `Docker_image i -> f i.account i.name i.tag
+  | `Singularity_image i -> f i.account i.name i.tag
 
 let singularity_image db img =
   Filename.concat (singularity_image_dir db) (container_image_identifier img)

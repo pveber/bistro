@@ -52,7 +52,7 @@ let rec file_dumps_of_command in_docker =
     List.map xs ~f:(file_dumps_of_command in_docker)
     |> List.concat
     |> List.dedup_and_sort ~compare:Caml.compare
-  | Within_container (_, cmd) -> file_dumps_of_command true cmd
+  | Within_env (_, cmd) -> file_dumps_of_command true cmd
 
 let string_of_token (env : Execution_env.t) =
   let open Template in
@@ -132,8 +132,8 @@ let rec string_of_command env =
   | And_list xs -> par (string_of_command_aux env " && " xs)
   | Or_list xs -> par (string_of_command_aux env " || " xs)
   | Pipe_list xs -> par (string_of_command_aux env " | " xs)
-  | Within_container (img, cmd) ->
-    match Execution_env.choose_container env.Execution_env.allowed_containers img with
+  | Within_env (img, cmd) ->
+    match Execution_env.choose_environment env.Execution_env.allowed_environments img with
     | `Plain ->
       string_of_command env cmd
     | `Docker_container image ->
@@ -152,6 +152,11 @@ let rec string_of_command env =
         "singularity exec %s bash -c '%s'"
         (Db.singularity_image env.Execution_env.db img)
         (string_of_command env cmd)
+    | `Guix gui_env ->
+      let pkgs = List.map gui_env ~f:(fun p -> sprintf "%s@%s" p.name p.version) in
+      sprintf "guix environment --ad-hoc %s -- %s"
+        (String.concat ~sep:" " pkgs)
+        (string_of_command env cmd)
 
 and string_of_command_aux env sep xs =
   List.map xs ~f:(string_of_command env)
@@ -162,11 +167,12 @@ let rec command_uses_docker env = function
   | And_list xs
   | Or_list xs
   | Pipe_list xs -> command_uses_docker_aux env xs
-  | Within_container (img, _) ->
-    match Execution_env.choose_container env.Execution_env.allowed_containers img with
-    | `Plain -> false
-    | `Docker_container _ -> true
+  | Within_env (img, _) ->
+    match Execution_env.choose_environment env.Execution_env.allowed_environments img with
+    | `Plain
+    | `Guix _
     | `Singularity_container _ -> false
+    | `Docker_container _ -> true
 and command_uses_docker_aux env xs =
   List.exists xs ~f:(command_uses_docker env)
 
