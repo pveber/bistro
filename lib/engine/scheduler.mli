@@ -2,7 +2,6 @@ type error = [
   | `Msg of string
 ]
 
-
 module Gc : sig
   open Bistro_internals
 
@@ -12,7 +11,69 @@ module Gc : sig
   }
 end
 
-type t
+module type Backend = sig
+  open Bistro_internals
+
+  type t
+  type token
+
+  val run_shell_command :
+    t ->
+    token ->
+    Shell_command.t ->
+    (int * bool) Lwt.t
+
+  val eval :
+    t ->
+    token ->
+    ('a -> unit) ->
+    'a ->
+    (unit, string) Lwt_result.t
+
+  val build_trace :
+    t ->
+    _ Workflow.t ->
+    Allocator.request ->
+    (token -> Allocator.resource -> Task_result.t Eval_thread.t) ->
+    Execution_trace.t Eval_thread.t
+
+  val stop : t -> unit Lwt.t
+end
+
+module Make(Backend : Backend) : sig
+  type t
+
+  val create :
+    ?allowed_containers:[`Docker | `Singularity] list ->
+    ?loggers:Logger.t list ->
+    ?collect:bool ->
+    Backend.t ->
+    Db.t ->
+    t
+
+  val gc_state : t -> Gc.state option
+
+  val start : t -> unit
+
+  val eval :
+    t ->
+    'a Bistro.workflow ->
+    ('a, Execution_trace.t list) Lwt_result.t
+
+  val eval_exn :
+    t ->
+    'a Bistro.workflow ->
+    'a Lwt.t
+
+  val error_report :
+    t ->
+    Execution_trace.t list ->
+    string
+
+  val stop : t -> unit Lwt.t
+end
+
+include module type of Make(Local_backend)
 
 val create :
   ?np:int ->
@@ -22,27 +83,6 @@ val create :
   ?collect:bool ->
   Db.t ->
   t
-
-val gc_state : t -> Gc.state option
-
-val start : t -> unit
-
-val eval :
-  t ->
-  'a Bistro.workflow ->
-  ('a, Execution_trace.t list) Lwt_result.t
-
-val eval_exn :
-  t ->
-  'a Bistro.workflow ->
-  'a Lwt.t
-
-val error_report :
-  Db.t ->
-  Execution_trace.t list ->
-  string
-
-val stop : t -> unit Lwt.t
 
 val simple_eval_exn :
   ?np:int ->

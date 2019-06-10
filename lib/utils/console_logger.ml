@@ -65,8 +65,13 @@ let output_event t = function
   | Logger.Workflow_allocation_error (Shell s, err) ->
     msg t "allocation error for %s.%s (%s)" s.descr s.id err
 
+  | Logger.Workflow_allocation_error (Plugin s, err) ->
+    msg t "allocation error for %s.%s (%s)" s.descr s.id err
+
   | Workflow_collected w ->
     msg t "collected %s" (Bistro_internals.Workflow.id w)
+
+  | Debug m -> msg t "%s" m
   | _ -> ()
 
 let rec loop stop queue new_event =

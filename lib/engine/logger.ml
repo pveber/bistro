@@ -14,6 +14,7 @@ type event =
   | Workflow_allocation_error : _ Workflow.t * string -> event
   | Workflow_collected : _ Workflow.t -> event
   | Singularity_image_collected : Command.container_image -> event
+  | Debug : string -> event
 
 class type t = object
   method event : Db.t -> time -> event -> unit

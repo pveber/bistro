@@ -146,7 +146,7 @@ let rec choose_container allowed_containers images =
       | Some i -> `Singularity_container (Command.Singularity_image i)
       | None ->
         match find_docker_image images with
-        | Some i -> `Singularity_container (Docker_image i)
+        | Some i -> `Singularity_container (Command.Docker_image i)
         | None -> choose_container others images
     )
 
