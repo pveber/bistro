@@ -173,7 +173,8 @@ let dot_output ?db oc g ~needed =
 let workflow_to_channel ?db ?(reduce = false) oc w =
   let dep_graph = G.of_workflow (Bistro.Private.reveal w) in
   let dep_graph = if reduce then G.reduce_to_paths dep_graph else dep_graph in
-  dot_output ~needed:S.empty ?db oc dep_graph
+  let module O = Graph.Oper.P(G) in
+  dot_output ~needed:S.empty ?db oc (O.mirror dep_graph)
 
 let workflow_to_file ?db ?reduce fn w =
   Out_channel.with_file fn ~f:(fun oc -> workflow_to_channel ?db ?reduce oc w)
