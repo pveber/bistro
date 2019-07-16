@@ -13,6 +13,7 @@ depends: [
   "jbuilder" {build & >= "1.0+beta8"}
   "core" {>= "0.11.0"}
   "lwt" {>= "3.2.0"}
+  "lwt_react"
   "ocamlgraph" {>= "1.8.7"}
   "ppx_sexp_conv"
   "rresult"
