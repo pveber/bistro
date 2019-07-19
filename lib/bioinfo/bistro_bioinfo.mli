@@ -916,6 +916,21 @@ module Hisat2 : sig
     sam pworkflow
 end
 
+module Star : sig
+  val genomeGenerate : fasta pworkflow -> [`star_index] dworkflow
+
+  val alignReads :
+    ?max_mem:[`GB of int] ->
+    ?outFilterMismatchNmax:int ->
+    ?outFilterMultimapNmax:int ->
+    ?outSAMstrandField:[`None | `intronMotif] ->
+    ?alignIntronMax:int ->
+    [`star_index] dworkflow ->
+    [ `single_end of sanger_fastq pworkflow
+    | `paired_end of sanger_fastq pworkflow * sanger_fastq pworkflow ] ->
+    bam pworkflow
+end
+
 module Kallisto : sig
   class type index = object
     inherit binary_file
