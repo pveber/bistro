@@ -3,6 +3,7 @@ open Bistro
 module Cmd : sig
   val wget :
     ?no_check_certificate:bool ->
+    ?user_agent:string ->
     ?user:string ->
     ?password:string ->
     ?dest:Shell_dsl.template ->
@@ -14,6 +15,7 @@ end
 val wget :
   ?descr_url:string ->
   ?no_check_certificate:bool ->
+  ?user_agent:string ->
   ?user:string ->
   ?password:string ->
   string -> #file pworkflow
@@ -21,6 +23,7 @@ val wget :
 val wget_dyn :
   ?descr_url:string ->
   ?no_check_certificate:bool ->
+  ?user_agent:string ->
   ?user:string ->
   ?password:string ->
   string workflow -> #file pworkflow
