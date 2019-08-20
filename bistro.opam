@@ -9,6 +9,7 @@ bug-reports: "https://github.com/pveber/bistro/issues"
 license: "GPL"
 build: ["jbuilder" "build" "-p" name "-j" jobs]
 depends: [
+  "base64"
   "bos"
   "jbuilder" {build & >= "1.0+beta8"}
   "core" {>= "0.11.0"}
