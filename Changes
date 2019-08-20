@@ -1,3 +1,22 @@
+v0.5.0 2019-08-20 Lyon
+----------------------
+
+new design: 'a workflow evals to 'a
+ - workflows can now compute any (serializable) value besides paths
+ - list workflows can be spawned for parallel execution
+ - execution engine entirely rewritten, still allows exact incremental
+   garbage collection
+ - templates for bash script can now contain int and string variable
+   parts
+
+- singularity support
+- multinode execution engine
+- HTML reports
+- dynamic memory and processor requirements
+- utils.Repo are best-effort rendered in case of errors
+- many new modules in bioinfo
+- ppx for templates with antiquotations
+
 v0.4.0 2018-06-16 Lyon
 ----------------------
 
