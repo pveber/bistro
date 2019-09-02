@@ -42,6 +42,7 @@ related to computational biology and unix for now).
     (lwt (>= 3.2.0))
     lwt_react
     (ocamlgraph (>= 1.8.7))
+    (ocaml (>= 4.07.0))
     ppx_sexp_conv
     rresult
     (sexplib (>= 113.24.00))
