@@ -53,7 +53,7 @@ let lexer s : lexing_result =
     else `Text
   in
   let add_text_item acc start stop =
-    if Position.(start.cnum < stop.cnum - 1) then `Text (start, stop) :: acc else acc
+    if Position.(start.cnum < stop.cnum) then `Text (start, stop) :: acc else acc
   in
   let rec loop pos state acc =
     match classify_current_pos pos, state with
@@ -95,6 +95,16 @@ let%expect_test "text only" =
   print_lexing_result @@ lexer "rien" ;
   [%expect {| (Ok ((Text (((cnum 0) (bol 0) (lnum 0)) ((cnum 4) (bol 0) (lnum 0)))))) |}]
 
+let%expect_test "text only" =
+  print_lexing_result @@ lexer "ad{{a}} {{e}}b" ;
+  [%expect {|
+    (Ok
+     ((Text (((cnum 0) (bol 0) (lnum 0)) ((cnum 2) (bol 0) (lnum 0))))
+      (Antiquotation (((cnum 4) (bol 0) (lnum 0)) ((cnum 5) (bol 0) (lnum 0))))
+      (Text (((cnum 7) (bol 0) (lnum 0)) ((cnum 8) (bol 0) (lnum 0))))
+      (Antiquotation (((cnum 10) (bol 0) (lnum 0)) ((cnum 11) (bol 0) (lnum 0))))
+      (Text (((cnum 13) (bol 0) (lnum 0)) ((cnum 14) (bol 0) (lnum 0)))))) |}]
+
 let%expect_test "text + antiquot" =
   print_lexing_result @@ lexer "ri{{en}}{{}}";
   [%expect {|
@@ -109,5 +119,6 @@ let%expect_test "text + antiquot + eol" =
     (Ok
      ((Text (((cnum 0) (bol 0) (lnum 0)) ((cnum 2) (bol 0) (lnum 0))))
       (Antiquotation (((cnum 4) (bol 0) (lnum 0)) ((cnum 6) (bol 0) (lnum 0))))
+      (Text (((cnum 8) (bol 0) (lnum 0)) ((cnum 9) (bol 9) (lnum 1))))
       (Antiquotation
        (((cnum 11) (bol 9) (lnum 1)) ((cnum 20) (bol 15) (lnum 2)))))) |}]
