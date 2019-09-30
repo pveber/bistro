@@ -39,7 +39,7 @@ let genome : fasta pworkflow =
 let bowtie2_index = Bowtie2.bowtie2_build genome
 
 let mapped_reads x =
-  Bowtie2.bowtie2 bowtie2_index (`single_end [ fastq x ])
+  Bowtie2.bowtie2 bowtie2_index (SE_or_PE.Single_end [ fastq x ])
 
 let annotation : gff pworkflow =
   Bistro_unix.wget "ftp://ftp.ensemblgenomes.org/pub/bacteria/release-41/gff3/bacteria_21_collection/listeria_monocytogenes_10403s/Listeria_monocytogenes_10403s.ASM16869v2.41.chromosome.Chromosome.gff3.gz"

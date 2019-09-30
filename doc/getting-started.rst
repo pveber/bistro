@@ -77,7 +77,7 @@ paste the following program:
    let genome = Ucsc_gb.genome_sequence `sacCer2    (* Fetch a reference genome *)
    let bowtie2_index = Bowtie2.bowtie2_build genome (* Build a Bowtie2 index from it *)
    let sample_sam =                                 (* Map the reads on the reference genome *)
-     Bowtie2.bowtie2 bowtie2_index (`single_end [ sample_fq ])
+     Bowtie2.bowtie2 bowtie2_index (SE_or_PE.Single_end [ sample_fq ])
    let sample_peaks =                               (* Call peaks on mapped reads *)
      Macs2.(callpeak sam [ sample_sam ])
 

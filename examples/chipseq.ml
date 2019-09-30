@@ -1,4 +1,4 @@
-(** 
+(**
    Paper: https://www.ncbi.nlm.nih.gov/pubmed/21700227
    Datasets: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE29506
 *)
@@ -13,7 +13,7 @@ let bowtie_index = Bowtie.bowtie_build genome
 
 let mapped_reads srrid =
   let fastq = Sra_toolkit.fastq_dump (`id srrid) in
-  Bowtie.bowtie ~v:1 bowtie_index (`single_end [ fastq ])
+  Bowtie.bowtie ~v:1 bowtie_index (SE_or_PE.Single_end [ fastq ])
 
 let macs2 =
   Macs2.callpeak ~qvalue:1e-10 ~mfold:(1,100) Macs2.sam
@@ -44,5 +44,5 @@ let () =
     ~allowed_containers:[`Singularity]
     ~np:4 ~mem:(`GB 4)
     ~outdir:"res"
-    ~loggers:[ Console_logger.create () ] 
+    ~loggers:[ Console_logger.create () ]
     repo

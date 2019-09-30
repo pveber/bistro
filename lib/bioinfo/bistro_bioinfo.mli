@@ -92,6 +92,14 @@ class type sra = object
   method format : [`sra]
 end
 
+module SE_or_PE : sig
+  type 'a t =
+    | Single_end of 'a
+    | Paired_end of 'a * 'a
+
+  val map : 'a t -> f:('a -> 'b) -> 'b t
+end
+
 (** {3 File_formats} *)
 
 module Bed : sig
@@ -792,8 +800,7 @@ module Bowtie : sig
     ?n:int -> ?v:int ->
     ?maxins:int ->
     index pworkflow ->
-    [ `single_end of 'a pworkflow list
-    | `paired_end of 'a pworkflow list * 'a pworkflow list ] ->
+    'a pworkflow list SE_or_PE.t ->
     sam pworkflow
 end
 
@@ -847,8 +854,7 @@ module Bowtie2 : sig
     ?seed:int ->
     ?fastq_format:'a Fastq.format ->
     index pworkflow ->
-    [ `single_end of 'a pworkflow list
-    | `paired_end of 'a pworkflow list * 'a pworkflow list ] ->
+    'a pworkflow list SE_or_PE.t ->
     sam pworkflow
 end
 
@@ -862,14 +868,12 @@ module Tophat : sig
   val tophat1 :
     ?color:bool ->
     Bowtie.index pworkflow ->
-    [ `single_end of #fastq pworkflow list
-    | `paired_end of (#fastq as 'a) pworkflow list * 'a pworkflow list ] ->
+    #fastq pworkflow list SE_or_PE.t ->
     output pworkflow
 
   val tophat2 :
     Bowtie2.index pworkflow ->
-    [ `single_end of #fastq pworkflow list
-    | `paired_end of (#fastq as 'a) pworkflow list * 'a pworkflow list ] ->
+    #fastq pworkflow list SE_or_PE.t ->
     output pworkflow
 
   val accepted_hits : output pworkflow -> bam pworkflow
@@ -911,8 +915,7 @@ module Hisat2 : sig
     ?no_discordant:bool ->
     ?seed:int ->
     [`hisat2_index] dworkflow ->
-    [ `single_end of sanger_fastq pworkflow list
-    | `paired_end of sanger_fastq pworkflow list * sanger_fastq pworkflow list ] ->
+    sanger_fastq pworkflow list SE_or_PE.t ->
     sam pworkflow
 end
 
@@ -926,8 +929,7 @@ module Star : sig
     ?outSAMstrandField:[`None | `intronMotif] ->
     ?alignIntronMax:int ->
     [`star_index] dworkflow ->
-    [ `single_end of sanger_fastq pworkflow
-    | `paired_end of sanger_fastq pworkflow * sanger_fastq pworkflow ] ->
+    sanger_fastq pworkflow SE_or_PE.t ->
     bam pworkflow
 end
 

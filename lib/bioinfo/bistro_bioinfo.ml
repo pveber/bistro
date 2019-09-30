@@ -116,6 +116,16 @@ module Bed = struct
   let keep6 x = keep ~n:6 x
 end
 
+module SE_or_PE = struct
+  type 'a t =
+    | Single_end of 'a
+    | Paired_end of 'a * 'a
+
+  let map x ~f = match x with
+    | Single_end x -> Single_end (f x)
+    | Paired_end (x, y) -> Paired_end (f x, f y)
+end
+
 module Fastq = struct
 
   type _ format =
@@ -402,9 +412,9 @@ module Bowtie2 = struct
       ?fastq_format index fqs =
 
     let args = match fqs with
-      | `single_end fqs ->
+      | SE_or_PE.Single_end fqs ->
         opt "-U" (list dep ~sep:",") fqs
-      | `paired_end (fqs1, fqs2) ->
+      | Paired_end (fqs1, fqs2) ->
         seq [
           opt "-1" (list dep ~sep:",") fqs1 ;
           string " " ;
@@ -474,8 +484,8 @@ module Bowtie = struct
 
   let bowtie ?l ?e ?m ?fastq_format ?n ?v ?maxins index fastq_files =
     let args = match fastq_files with
-      | `single_end fqs -> list dep ~sep:"," fqs
-      | `paired_end (fqs1, fqs2) ->
+      | SE_or_PE.Single_end fqs -> list dep ~sep:"," fqs
+      | Paired_end (fqs1, fqs2) ->
         seq [
           opt "-1" (list dep ~sep:",") fqs1 ;
           string " " ;
@@ -1963,8 +1973,8 @@ module Tophat = struct
 
   let tophat1 ?color index fqs =
     let args = match fqs with
-      | `single_end fqs -> list dep ~sep:"," fqs
-      | `paired_end (fqs1, fqs2) ->
+      | SE_or_PE.Single_end fqs -> list dep ~sep:"," fqs
+      | Paired_end (fqs1, fqs2) ->
         seq [
           list dep ~sep:"," fqs1 ;
           string " " ;
@@ -1984,8 +1994,8 @@ module Tophat = struct
 
   let tophat2 index fqs =
     let args = match fqs with
-      | `single_end fqs -> list dep ~sep:"," fqs
-      | `paired_end (fqs1, fqs2) ->
+      | SE_or_PE.Single_end fqs -> list dep ~sep:"," fqs
+      | Paired_end (fqs1, fqs2) ->
         seq [
           list dep ~sep:"," fqs1 ;
           string " " ;
@@ -2695,9 +2705,9 @@ module Hisat2 = struct
       fqs
     =
     let args = match fqs with
-      | `single_end fqs ->
+      | SE_or_PE.Single_end fqs ->
         opt "-U" (list dep ~sep:",") fqs
-      | `paired_end (fqs1, fqs2) ->
+      | Paired_end (fqs1, fqs2) ->
         seq [
           opt "-1" (list dep ~sep:",") fqs1 ;
           string " " ;
@@ -2838,9 +2848,9 @@ module Star = struct
     ]
 
   let fq_args = function
-    | `paired_end (fq1, fq2) ->
+    | SE_or_PE.Single_end fq -> [ dep fq ]
+    | Paired_end (fq1, fq2) ->
       [dep fq1 ; dep fq2]
-    | `single_end fq -> [ dep fq ]
 
   let samStrandField = function
     | `None -> string "None"

@@ -35,7 +35,7 @@ let fastq x = List.map (srr_id x) ~f:(fun id ->
 let bowtie_index = Bowtie.bowtie_build genome
 
 let mapped_reads x =
-  Bowtie.bowtie ~v:1 bowtie_index (`single_end (fastq x))
+  Bowtie.bowtie ~v:1 bowtie_index (SE_or_PE.Single_end (fastq x))
 
 let mapped_reads_bam x =
   Samtools.indexed_bam_of_sam (mapped_reads x)
