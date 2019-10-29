@@ -33,6 +33,11 @@ class type fasta = object
   method format : [`fasta]
 end
 
+class type indexed_fasta = object
+  inherit directory
+  method contents : [`indexed_fasta]
+end
+
 class type fastq = object
   inherit text_file
   method format : [`fastq]
@@ -650,6 +655,12 @@ module Samtools : sig
     < file_kind : [`regular] ;
       format : [< `bam | `sam] ; .. > pworkflow ->
     'o pworkflow
+
+  val faidx :
+    fasta pworkflow -> indexed_fasta pworkflow
+
+  val fasta_of_indexed_fasta :
+    indexed_fasta pworkflow -> fasta pworkflow
 end
 
 module Picardtools : sig

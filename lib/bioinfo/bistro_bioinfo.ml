@@ -38,6 +38,11 @@ class type fasta = object
   method format : [`fasta]
 end
 
+class type indexed_fasta = object
+  inherit directory
+  method contents : [`indexed_fasta]
+end
+
 class type fastq = object
   inherit text_file
   method format : [`fastq]
@@ -344,6 +349,15 @@ module Samtools = struct
         opt "-o" Fn.id dest ;
       ]
     ]
+
+  let faidx fa =
+    Workflow.shell ~descr:"samtools.faidx" [
+      mkdir_p dest ;
+      cmd "cp" [ dep fa ; dest // "sequences.fa" ] ;
+      samtools "faidx" [ dest // "sequences.fa" ] ;
+    ]
+
+  let fasta_of_indexed_fasta dir = Workflow.select dir ["sequences.fa"]
 end
 
 module Bowtie2 = struct
