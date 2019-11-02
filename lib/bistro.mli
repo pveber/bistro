@@ -1,6 +1,6 @@
 (** A library to build scientific workflows.
 
-    This module introduces a type ['a worfklow] that describes a set
+    This module introduces a type ['a workflow] that describes a set
    of inter-dependent steps that will eventually generate a value of
    type ['a]. Steps may be either command lines to be executed, or
    OCaml expressions to be evaluated.
