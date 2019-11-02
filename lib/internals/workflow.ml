@@ -220,6 +220,8 @@ let rec independent_workflows_aux cache w ~from:u =
     else Map.add w (false, Set.singleton w) cache
   )
 
+(* gathers all descendants of [w] excluding those having [u] as a
+   descendant *)
 let independent_workflows w ~from:u =
   let cache = independent_workflows_aux Map.empty w ~from:u in
   Map.find w cache |> snd |> Set.elements
