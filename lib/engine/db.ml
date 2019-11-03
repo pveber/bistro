@@ -74,6 +74,7 @@ sig
   type nonrec db = t
   val check : db -> unit result
   val create : db -> unit result
+  val mem : db -> K.t -> bool
   val get : db -> K.t -> V.t option
   val set : db -> K.t -> V.t -> unit
   val fold :
@@ -103,6 +104,14 @@ struct
 
   let create db =
     with_dbm db (const ())
+
+  let mem db key =
+    with_dbm db (fun dbh ->
+        match Dbm.find dbh (K.to_string key) with
+        | _ -> true
+        | exception Caml.Not_found -> false
+      )
+    |> ok_exn
 
   let get db key =
     with_dbm db (fun dbh ->
