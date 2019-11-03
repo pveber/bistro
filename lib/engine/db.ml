@@ -189,6 +189,23 @@ end
 
 module Workflow_registration_table = Table(Workflow_as_key)(Workflow_info)
 
+module Dep_link = struct
+  type t = Depends_on of W.Any.t * W.Any.t
+
+  let to_string (Depends_on (u, v)) =
+    W.Any.id u ^ "_" ^ W.Any.id v
+end
+
+module Workflow_deps = struct
+  include Table(Dep_link)(struct
+      let id = "workflow_deps"
+      include String
+    end)
+  let register t u v =
+    set t (Dep_link.Depends_on (u, v)) ""
+end
+
+
 let cache_dir base = base / "cache"
 let build_dir base = base / "build"
 let tmp_dir base = base / "tmp"
@@ -214,6 +231,7 @@ let create_db path =
   Unix.mkdir_p (stdout_dir path) ;
   Unix.mkdir_p (singularity_image_dir path) ;
   Workflow_registration_table.create path >>= fun () ->
+  Workflow_deps.create path >>= fun () ->
   Ok ()
 
 let dir_is_empty path =
@@ -268,7 +286,8 @@ let dirs_of_db_exist path =
 let db_is_well_formed path =
   let open Rresult in
   dirs_of_db_exist path >>= fun () ->
-  Workflow_registration_table.check path
+  Workflow_registration_table.check path >>= fun () ->
+  Workflow_deps.check path
 
 let path_has_valid_db path =
   R.reword_error_msg
