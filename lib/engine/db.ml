@@ -91,8 +91,8 @@ struct
   let check db =
     let open R in
     let p = prefix db in
-    check_path `File (p ^ ".pag") >>= fun () ->
-    check_path `File (p ^ ".dir")
+    check_path `File (p ^ ".pag")(*  >>= fun () ->
+                                  * check_path `File (p ^ ".dir") *) (* seems that dir files are not created anymore... *)
 
   let m = Mutex.create ()
 
