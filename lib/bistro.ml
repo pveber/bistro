@@ -25,6 +25,32 @@ module Workflow = struct
     |> spawn ~f:(fun p -> f (fst p) (snd p))
 
   let eval_paths xs = list (List.map xs ~f:eval_path)
+
+  let collect ?ext ~prefix w =
+    let f paths __dest__ =
+      Unix.mkdir __dest__ 0o700 ;
+      let n = List.length paths in
+      let m = Float.(n |> of_int |> log10 |> to_int |> Int.succ) in
+      let ext = match ext with
+        | None -> ""
+        | Some s -> "." ^ s
+      in
+      let format =
+        Caml.Scanf.format_from_string
+          (Printf.sprintf {|%%s_%%0%dd%%s|} m)
+          "%s%d%s" in
+      List.iteri paths ~f:(fun i p ->
+          let dst =
+            Printf.sprintf format prefix i ext
+            |> Caml.Filename.concat __dest__
+          in
+          let cmd = Printf.sprintf "cp %s %s" p dst in
+          ignore @@ Caml.Sys.command cmd
+        )
+    in
+    cached_path ~descr:"collect" (
+      app (pure ~id:"__collect__" f) (spawn ~f:eval_path w)
+    )
 end
 
 

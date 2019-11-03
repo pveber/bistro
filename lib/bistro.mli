@@ -286,6 +286,12 @@ module Workflow : sig
     ?type_selection:[`File | `Directory] ->
     #directory pworkflow ->
     'a path list workflow
+
+  val collect :
+    ?ext:string ->
+    prefix:string ->
+    'a path list workflow ->
+    #directory path workflow
 end
 
 (** Access to internal representation *)
