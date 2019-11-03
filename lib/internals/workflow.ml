@@ -98,17 +98,25 @@ let id : type s. s t -> string = function
 let any x = Any x
 
 module Any = struct
-  type t = any
+  module T = struct
+    type t = any
 
-  let id (Any w) = id w
+    let id (Any w) = id w
 
-  let compare x y =
-    String.compare (id x) (id y)
+    let compare x y =
+      String.compare (id x) (id y)
 
-  let equal x y =
-    String.equal (id x) (id y)
+    let equal x y =
+      String.equal (id x) (id y)
 
-  let hash x = Hashtbl.hash (id x)
+    let hash x = Hashtbl.hash (id x)
+  end
+
+  module Set = Set.Make(T)
+  module Table = Hashtbl.Make(T)
+  module Map = Map.Make(T)
+
+  include T
 
   let deps (Any w) = match w with
     | Pure _ -> []
@@ -198,33 +206,29 @@ let list elts =
   let id = digest ("list", List.map id elts) in
   List { id ; elts }
 
-module Set = Set.Make(Any)
-module Table = Hashtbl.Make(Any)
-module Map = Map.Make(Any)
-
 let rec independent_workflows_aux cache w ~from:u =
-  if Any.equal w u then Map.add w (true, Set.empty) cache
-  else if Map.mem w cache then cache
+  if Any.equal w u then Any.Map.add w (true, Any.Set.empty) cache
+  else if Any.Map.mem w cache then cache
   else (
     let deps = Any.deps w in
     let f acc w = independent_workflows_aux acc w ~from:u in
     let cache = List.fold_left f cache deps in
-    let children = List.map (fun k -> Map.find k cache) deps in
+    let children = List.map (fun k -> Any.Map.find k cache) deps in
     if List.exists fst children
     then
       let union =
         List.fold_left
-          (fun acc (_, s) -> Set.union acc s)
-          Set.empty children in
-      Map.add w (true, union) cache
-    else Map.add w (false, Set.singleton w) cache
+          (fun acc (_, s) -> Any.Set.union acc s)
+          Any.Set.empty children in
+      Any.Map.add w (true, union) cache
+    else Any.Map.add w (false, Any.Set.singleton w) cache
   )
 
 (* gathers all descendants of [w] excluding those having [u] as a
    descendant *)
 let independent_workflows w ~from:u =
-  let cache = independent_workflows_aux Map.empty w ~from:u in
-  Map.find w cache |> snd |> Set.elements
+  let cache = independent_workflows_aux Any.Map.empty w ~from:u in
+  Any.Map.find w cache |> snd |> Any.Set.elements
 
 let spawn elts ~f =
   let hd = pure ~id:"__should_never_be_executed__" List.hd in
