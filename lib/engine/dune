@@ -1,4 +1,6 @@
 (library
   (name bistro_engine)
   (public_name bistro.engine)
-  (libraries bistro bos core lwt.unix re rresult))
+  (libraries bistro bos core dbm lwt.unix re rresult)
+  (flags -short-paths)
+  (preprocess (pps ppx_jane)))
