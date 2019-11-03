@@ -331,3 +331,9 @@ let container_image_identifier img =
 
 let singularity_image db img =
   Filename.concat (singularity_image_dir db) (container_image_identifier img)
+
+let register_workflow db w =
+  let module T = Workflow_registration_table in
+  match T.get db w with
+  | Some _ -> ()
+  | None -> T.set db w (Workflow_info.of_workflow w)

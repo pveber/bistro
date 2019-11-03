@@ -52,3 +52,8 @@ val is_in_cache :
   t ->
   Bistro_internals.Workflow.any ->
   bool
+
+val register_workflow :
+  t ->
+  Bistro_internals.Workflow.any ->
+  unit
