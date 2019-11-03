@@ -131,6 +131,29 @@ module Any = struct
     | Plugin v -> v.deps
     | Shell s -> s.deps
     | Glob g -> [ Any g.dir ]
+
+  let descr (Any w) = match w with
+    | Shell s -> Some s.descr
+    | Plugin s -> Some s.descr
+    | Input i -> Some i.path
+    | Select s -> Some (List.fold_left Filename.concat "" s.sel)
+    | _ -> None
+
+  let rec fold_aux w ~seen ~init ~f =
+    if Set.mem w seen then init, seen
+    else
+      let acc, seen =
+        List.fold_left
+          (fun (acc, seen) w -> fold_aux w ~seen ~init:acc ~f)
+          (init, seen)
+          (deps w)
+      in
+      f acc w,
+      Set.add w seen
+
+  let fold w ~init ~f =
+    fold_aux w ~seen:Set.empty ~init ~f
+    |> fst
 end
 
 let input ?version path =
