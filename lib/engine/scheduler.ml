@@ -775,6 +775,7 @@ module Make(Backend : Backend) = struct
     let target = Bistro.Private.reveal target in
     Synchro.wait sched.start >>= fun () ->
     Maybe_gc.register sched.gc target >>= fun () ->
+    Db.register_workflow sched.db (W.Any target) ;
     build sched target
     >>= (fun r -> Maybe_gc.stop sched.gc >|= fun () -> r) (* FIXME: is this the right moment?
                                                              what if eval is called several times? *)

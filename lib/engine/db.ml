@@ -360,8 +360,62 @@ let container_image_identifier img =
 let singularity_image db img =
   Filename.concat (singularity_image_dir db) (container_image_identifier img)
 
-let register_workflow db w =
-  let module T = Workflow_registration_table in
-  match T.get db w with
-  | Some _ -> ()
-  | None -> T.set db w (Workflow_info.of_workflow w)
+let workflow_is_registered db w =
+  Workflow_registration_table.mem db w
+
+let register_workflow_info db w =
+  if not (workflow_is_registered db w)
+  then
+    Workflow_registration_table.set db w (Workflow_info.of_workflow w)
+
+let rec register : type u v. t -> ?target:u W.t -> v W.t -> unit = fun db ?target w ->
+  match w with
+  | Pure _ -> ()
+  | App app ->
+    register db ?target app.f ;
+    register db ?target app.x
+  | Both both ->
+    register db ?target both.fst ;
+    register db ?target both.snd
+  | List l ->
+    List.iter ~f:(register ?target db) l.elts
+  | Eval_path x ->
+    register db ?target x.workflow
+  | Spawn x ->
+    List.iter ~f:(register_any db ?target) x.deps
+  | List_nth l ->
+    register db ?target l.elts
+  | Input _ -> ()
+  | Select x -> register db ?target x.dir
+  | Plugin { task = Value_plugin v ; _ } ->
+    register_use db target w ;
+    if stop_register db w then ()
+    else register db ~target:w v
+  | Plugin { task = Path_plugin p ; _ } ->
+    register_use db target w ;
+    if stop_register db w then ()
+    else register db ~target:w p
+  | Shell s ->
+    register_use db target w ;
+    if stop_register db w then ()
+    else List.iter ~f:(register_any db ~target:w) s.deps
+  | Glob g ->
+    register db ?target g.dir
+
+and register_any
+  : type u. t -> ?target:u W.t -> W.any -> unit
+  = fun db ?target (W.Any w) ->
+  register db ?target w
+
+and stop_register : type u. t -> u W.t -> bool = fun db w ->
+  workflow_is_registered db (W.Any w)
+
+and register_use
+  : type u v. t -> u W.t option -> v W.t -> unit =
+  fun db target w ->
+  match target with
+  | None -> ()
+  | Some t -> Workflow_deps.register db (W.Any t) (W.Any w)
+
+let register_workflow gc (W.Any w) =
+  register gc w
