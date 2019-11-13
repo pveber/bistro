@@ -19,7 +19,7 @@ let pipeline n debug =
   let middle = append l1 "middle" in
   let l2 = List.init n ~f:(fun i -> append [ middle ] (sprintf "l2_%d" i)) in
   let final = append l2 "final" in
-  List.map (final :: if debug then l2 else []) ~f:(fun x -> Workflow.eval_path x)
+  List.map (final :: if debug then l2 else []) ~f:Workflow.path
   |> Workflow.list
 
 let main ~n ~debug ~dot_output () =

@@ -226,7 +226,7 @@ module Workflow : sig
   (** Constructs a workflow from a directory workflow, by selecting a
      file in it *)
 
-  val cached_value :
+  val plugin :
     ?descr:string ->
     ?np:int ->
     ?mem:int workflow ->
@@ -234,7 +234,7 @@ module Workflow : sig
     (unit -> 'a) workflow ->
     'a workflow
 
-  val cached_path :
+  val path_plugin :
     ?descr:string ->
     ?np:int ->
     ?mem:int workflow ->
@@ -246,7 +246,7 @@ module Workflow : sig
   (** [pure ~id x] is a workflow that computes the value [x]. [id]
      should be a string identifying [x], like a digest. *)
 
-  val pure_data : 'a -> 'a workflow
+  val data : 'a -> 'a workflow
   (** Similar to {!pure}, but computes a digest as identifier. Does
      not work with closures or objects. *)
 
@@ -262,9 +262,9 @@ module Workflow : sig
   val both : 'a workflow -> 'b workflow -> ('a * 'b) workflow
   (** Applicative structure, useful for parallel binds *)
 
-  val eval_path : 'a path workflow -> string workflow
+  val path : 'a path workflow -> string workflow
 
-  val eval_paths :
+  val path_list :
     'a path workflow list -> string list workflow
 
   val list :

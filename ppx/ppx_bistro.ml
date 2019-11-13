@@ -81,8 +81,8 @@ end
 let add_renamings ~loc deps init =
   List.fold deps ~init ~f:(fun acc (tmpvar, expr, ext) ->
       let rhs = match ext with
-        | Path  -> [%expr Bistro.Workflow.eval_path [%e expr]]
-        | Param -> [%expr Bistro.Workflow.pure_data [%e expr]]
+        | Path  -> [%expr Bistro.Workflow.path [%e expr]]
+        | Param -> [%expr Bistro.Workflow.data [%e expr]]
         | Value -> expr
       in
       [%expr let [%p B.pvar tmpvar] = [%e rhs] in [%e acc]]
@@ -139,7 +139,7 @@ let str_item_rewriter ~loc ~path:_ descr version var expr =
   let rewritten_body, deps = new payload_rewriter#expression body [] in
   let applicative_body = build_applicative ~loc deps [%expr fun () -> [%e rewritten_body]] in
   let workflow_body = [%expr
-    Bistro.Workflow.cached_value
+    Bistro.Workflow.plugin
       ~descr:[%e descr]
       ?version:[%e B.eopt version]
       [%e applicative_body]] in
@@ -149,6 +149,19 @@ let str_item_rewriter ~loc ~path:_ descr version var expr =
   in
   [%stri let [%p B.pvar var] = [%e replace_body workflow_body_with_type expr]]
 
+let gen_letin_rewriter ~loc (vbs : value_binding list) (body : expression) =
+  let id = digest body in
+  let f = List.fold_right vbs ~init:body ~f:(fun vb acc ->
+      B.pexp_fun Nolabel None vb.pvb_pat acc
+    )
+  in
+  List.fold vbs ~init:[%expr Bistro.Workflow.pure ~id:[%e B.estring id] [%e f]] ~f:(fun acc vb ->
+      let e = B.pexp_open Override (B.Located.lident "Bistro.Workflow") vb.pvb_expr in
+      [%expr Bistro.Workflow.app [%e acc] [%e e]]
+    )
+
+let letin_rewriter ~loc ~path:_ vbs body = gen_letin_rewriter ~loc vbs [%expr fun () -> [%e body]]
+let pletin_rewriter ~loc ~path:_ vbs body = gen_letin_rewriter ~loc vbs [%expr fun __dest__ -> [%e body]]
 
 let pstr_item_rewriter ~loc ~path:_ descr version var expr =
   let descr = match descr with
@@ -159,7 +172,7 @@ let pstr_item_rewriter ~loc ~path:_ descr version var expr =
   let rewritten_body, deps = new payload_rewriter#expression body [] in
   let applicative_body = build_applicative ~loc deps [%expr fun __dest__ -> [%e rewritten_body]] in
   let workflow_body = [%expr
-    Bistro.Workflow.cached_path
+    Bistro.Workflow.path_plugin
       ~descr:[%e descr]
       ?version:[%e B.eopt version]
       [%e applicative_body]] in
@@ -220,7 +233,15 @@ let script_ext =
 
 let expression_ext =
   let open Extension in
-  declare "workflow" Context.expression Ast_pattern.(single_expr_payload __) expression_rewriter
+  declare "workflow_expr" Context.expression Ast_pattern.(single_expr_payload __) expression_rewriter
+
+let letin_ext =
+  let open Extension in
+  declare "workflow" Context.expression Ast_pattern.(single_expr_payload (pexp_let nonrecursive __ __)) letin_rewriter
+
+let pletin_ext =
+  let open Extension in
+  declare "pworkflow" Context.expression Ast_pattern.(single_expr_payload (pexp_let nonrecursive __ __)) pletin_rewriter
 
 let _np_attr =
   Attribute.declare "bistro.np"
@@ -265,6 +286,8 @@ let () =
   Driver.register_transformation "bistro" ~extensions:[
     script_ext ;
     expression_ext ;
+    letin_ext ;
+    pletin_ext ;
     str_item_ext "workflow" str_item_rewriter ;
     str_item_ext "pworkflow" pstr_item_rewriter ;
   ]
