@@ -1,23 +1,27 @@
 open Core
 open Bistro
 
-let echo3 ~sep x = cached_path (fun%bistro dest ->
-    let x = [%eval x] in
-    let sep = [%param sep] in
-    Out_channel.write_lines dest [ x ; sep ; x ; sep ; x ]
+let echo3 ~sep x = Workflow.path_plugin (
+    let%pworkflow x = x
+    and         sep = data sep in
+    Out_channel.write_lines __dest__ [ x ; sep ; x ; sep ; x ]
   )
 
-let wc x = cached_value (fun%bistro () ->
-    In_channel.read_lines [%path x]
+let wc x = Workflow.plugin (
+    let%workflow x = path x in
+    In_channel.read_lines x
     |> List.length
   )
 
 let request x =
-  cached_value (fun%bistro () -> String.split ~on:' ' [%param x])
+  Workflow.plugin (
+    let%workflow x = data x in
+    String.split ~on:' ' x
+  )
 
 let main () =
   request "am stram gram"
-  |> spawn ~f:(fun x ->
+  |> Workflow.spawn ~f:(fun x ->
       echo3 ~sep:"foo" x
       |> wc
     )
@@ -36,6 +40,6 @@ module Pipeline(M : API) = struct
 
   let f req =
     db_request req
-    |> spawn ~f:(fun org -> fetch_sequences ~org)
+    |> Workflow.spawn ~f:(fun org -> fetch_sequences ~org)
     |> concat_fasta
 end

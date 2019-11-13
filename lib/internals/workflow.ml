@@ -140,9 +140,9 @@ let select dir sel =
   Select { id ; dir ; sel }
 
 let pure ~id value = Pure { id ; value }
-let pure_data value = pure ~id:(digest value) value
-let int = pure_data
-let string = pure_data
+let data value = pure ~id:(digest value) value
+let int = data
+let string = data
 let app f x =
   let id = digest (`App, id f, id x) in
   App { id ; f ; x }
@@ -155,19 +155,19 @@ let add_mem_dep mem deps = match mem with
   | None -> deps
   | Some mem -> any mem :: deps
 
-let cached_value ?(descr = "") ?(np = 1) ?mem ?version workflow =
+let plugin ?(descr = "") ?(np = 1) ?mem ?version workflow =
   let id = digest (`Value, id workflow, version) in
   Plugin { id ; descr ; np ; mem ; version ;
            task = Value_plugin workflow ;
            deps = add_mem_dep mem [ any workflow ] }
 
-let cached_path ?(descr = "") ?(np = 1) ?mem ?version workflow =
+let path_plugin ?(descr = "") ?(np = 1) ?mem ?version workflow =
   let id = digest (`Value, id workflow, version) in
   Plugin { id ; descr ; np ; mem ; version ;
            task = Path_plugin workflow ;
            deps = add_mem_dep mem [ any workflow ] }
 
-let eval_path w = Eval_path { id = digest (`Eval_path, id w) ; workflow = w }
+let path w = Eval_path { id = digest (`Eval_path, id w) ; workflow = w }
 
 let digestible_cmd = Command.map ~f:(function
     | Path_token w -> id w

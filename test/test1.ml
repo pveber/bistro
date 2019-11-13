@@ -1,7 +1,7 @@
 open Core
 open Bistro
 
-let add x y = Workflow.cached_value (fun%workflow () ->
+let add x y = Workflow.plugin (fun%workflow_expr () ->
     [%eval x] + [%eval y]
   )
 

@@ -23,7 +23,7 @@ struct
 
   let eval w = with_workflow w ~f:(fun x -> x)
 
-  let with_pworkflow w ~f = with_workflow (Workflow.eval_path w) ~f
+  let with_pworkflow w ~f = with_workflow (Workflow.path w) ~f
 
   let path w =
     with_pworkflow w ~f:(fun x -> x)

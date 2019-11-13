@@ -96,11 +96,11 @@ let generate outdir items =
 
 let item_to_workflow = function
   | Item (path, w) ->
-    [%workflow [ normalized_repo_item ~repo_path:path ~id:(W.id (Private.reveal w)) ~cache_path:[%path w] ]]
+    [%workflow_expr [ normalized_repo_item ~repo_path:path ~id:(W.id (Private.reveal w)) ~cache_path:[%path w] ]]
   | Item_list l ->
-    [%workflow
+    [%workflow_expr
       let id = W.id (Private.reveal l.elts) in
-      let elts = [%eval Workflow.spawn l.elts ~f:Workflow.eval_path] in
+      let elts = [%eval Workflow.spawn l.elts ~f:Workflow.path] in
       let n = List.length elts in
       let m = Float.(n |> of_int |> log10 |> to_int) in
       let ext = match l.ext with
@@ -124,7 +124,7 @@ let to_workflow ~outdir items =
     List.map items ~f:item_to_workflow
     |> Workflow.list
   in
-  [%workflow
+  [%workflow_expr
     [%eval normalized_items]
     |> List.concat
     |> remove_redundancies
