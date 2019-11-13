@@ -2324,9 +2324,12 @@ module Kallisto = struct
     | `fq_gz x -> Bistro_unix.Cmd.psgunzip x
     | `fq x -> dep x
 
-  let quant ?bootstrap_samples ?threads ?fragment_length ?sd idx ~fq1 ?fq2 () =
+  let quant ?bias ?bootstrap_samples ?fr_stranded ?rf_stranded ?threads ?fragment_length ?sd idx ~fq1 ?fq2 () =
     Workflow.shell ~descr:"kallisto-quant" ?np:threads [
       cmd "kallisto quant" ~img [
+        option (flag string "--bias") bias ;
+        option (flag string "--fr-stranded") fr_stranded ;
+        option (flag string "--rf-stranded") rf_stranded ;
         opt "-i" dep idx ;
         opt "-o" Fn.id dest ;
         opt "-t" Fn.id np ;

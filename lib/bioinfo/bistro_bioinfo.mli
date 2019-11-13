@@ -865,7 +865,10 @@ module Kallisto : sig
   val img : Shell_dsl.container_image list
   val index : fasta pworkflow list -> index pworkflow
   val quant :
+    ?bias:bool ->
     ?bootstrap_samples:int ->
+    ?fr_stranded:bool ->
+    ?rf_stranded:bool ->
     ?threads:int ->
     ?fragment_length:float ->
     ?sd:float ->
