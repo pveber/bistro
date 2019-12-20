@@ -50,7 +50,7 @@ let find_bottom items item =
 let remove_redundancies repo =
   List.map repo ~f:(fun item ->
       let bottom = find_bottom repo item in
-      if bottom = item then item
+      if Poly.(bottom = item) then item
       else
         let cache_path =
           Filename.concat
@@ -143,7 +143,9 @@ let build ?np ?mem ?loggers ?allowed_containers ?(bistro_dir = "_bistro") ?colle
   Lwt.map partition_results results >>= fun (res, errors) ->
   Scheduler.stop sched >|= fun () ->
   generate outdir (List.concat res) ;
-  if errors <> [] then (
+  match errors with
+  | [] -> ()
+  | _ :: _ -> (
     let errors =
       List.concat errors
       |> Execution_trace.gather_failures

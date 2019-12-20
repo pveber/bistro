@@ -19,7 +19,7 @@ type t =
     }
 
 module S = struct
-  module Elt = struct type nonrec t = t let compare = compare end
+  module Elt = struct type nonrec t = t let compare = Poly.compare end
   include Caml.Set.Make(Elt)
 end
 

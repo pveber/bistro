@@ -371,7 +371,7 @@ module Make(Backend : Backend) = struct
    *   sched.logger#event sched.db time event *)
 
   let perform_input ~path ~id =
-    let pass = Sys.file_exists path = `Yes in
+    let pass = match Sys.file_exists path with `Yes -> true | `Unknown | `No -> false in
     (* (
      *   if pass then Misc.cp path (Db.cache sched.db id)
      *   else Lwt.return ()
@@ -382,7 +382,7 @@ module Make(Backend : Backend) = struct
 
   let perform_select ~db ~id ~dir ~sel =
     let p = Filename.concat (Db.path db dir) (Path.to_string sel) in
-    let pass = Sys.file_exists p = `Yes in
+    let pass = match Sys.file_exists p with `Yes -> true | `Unknown | `No -> false in
     Eval_thread.return (
       Task_result.Select {
         id ;
@@ -410,10 +410,11 @@ module Make(Backend : Backend) = struct
     let cache_dest = Db.cache db id in
     let outcome = step_outcome ~exit_code ~dest_exists in
     Misc.(
-      if outcome = `Succeeded then
+      match outcome with
+      | `Succeeded ->
         mv env.dest cache_dest >>= fun () ->
         remove_if_exists env.tmp_dir
-      else
+      | `Failed | `Missing_output ->
         Lwt.return ()
     ) >>= fun () ->
     Eval_thread.return (Task_result.Shell {
@@ -423,7 +424,8 @@ module Make(Backend : Backend) = struct
         exit_code ;
         cmd = Shell_command.text cmd ;
         file_dumps = Shell_command.file_dumps cmd ;
-        cache = if outcome = `Succeeded then Some cache_dest else None ;
+        cache =
+          (match outcome with `Succeeded -> Some cache_dest | `Failed | `Missing_output -> None) ;
         stdout = env.stdout ;
         stderr = env.stderr ;
       })
@@ -501,14 +503,16 @@ module Make(Backend : Backend) = struct
     Backend.eval backend token (Fn.flip evaluator env.dest) () >>= function
     | Ok () ->
       let outcome =
-        if Sys.file_exists env.dest = `Yes then `Succeeded
-        else `Missing_output
+        match Sys.file_exists env.dest with
+        | `Yes -> `Succeeded
+        | `Unknown | `No -> `Missing_output
       in
       Misc.(
-        if outcome = `Succeeded then
+        match outcome with
+        | `Succeeded ->
           mv env.dest cache_dest >>= fun () ->
           remove_if_exists env.tmp_dir
-        else Lwt.return ()
+        | `Missing_output -> Lwt.return ()
       ) >>= fun () ->
       Lwt_result.return (Task_result.Plugin { id ; outcome ; msg = None ; descr })
     | Error msg ->
@@ -641,9 +645,9 @@ module Make(Backend : Backend) = struct
     Backend.build_trace sched.backend w requirement perform
 
   let cached_build sched ~id ~f =
-    if Sys.file_exists (Db.cache sched.db id) = `Yes
-    then Eval_thread.return (Execution_trace.Done_already { id })
-    else f ()
+    match Sys.file_exists (Db.cache sched.db id) with
+    | `Yes -> Eval_thread.return (Execution_trace.Done_already { id })
+    | `Unknown | `No -> f ()
 
   let signal_trace_to_gc sched w t =
     if not (Execution_trace.is_errored t) then (
@@ -671,9 +675,10 @@ module Make(Backend : Backend) = struct
     let ready = Unix.gettimeofday () in
     register_build sched ~id ~build_trace:(fun () ->
         let dest = Db.singularity_image sched.db img in
-        if Sys.file_exists dest = `Yes then
+        match Sys.file_exists dest with
+        | `Yes ->
           Eval_thread.return (Execution_trace.Done_already { id })
-        else (
+        | `Unknown | `No -> (
           let req = Allocator.Request { np = 1 ; mem = 0 } in
           Allocator.request sched.allocator req >>= function
           | Ok resource ->

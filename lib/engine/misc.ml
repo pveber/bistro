@@ -16,9 +16,10 @@ let mv src dst =
   exec_exn [| "mv" ; src ; dst |]
 
 let remove_if_exists fn =
-  if Sys.file_exists fn = `Yes then
+  match Sys.file_exists fn with
+  | `Yes ->
     exec_exn [| "rm" ; "-rf" ; fn |]
-  else
+  | `No | `Unknown ->
     Lwt.return ()
 
 let redirection filename =

@@ -217,7 +217,7 @@ let run (Command cmd) =
       | WSTOPPED code -> code
     )
   in
-  let dest_exists = Sys.file_exists cmd.env.dest = `Yes in
+  let dest_exists = match Sys.file_exists cmd.env.dest with `Yes -> true | `Unknown | `No -> false in
   (
     if Execution_env.allows_docker cmd.env && cmd.uses_docker then (
       Misc.docker_chown ~path:cmd.env.tmp_dir ~uid:cmd.env.uid >>= fun () ->

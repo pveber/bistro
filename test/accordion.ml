@@ -29,8 +29,7 @@ let main ~n ~debug ~dot_output () =
   in
   let w = pipeline n debug in
   if dot_output then Dot_output.workflow_to_file "accordion.dot" w ;
-  Scheduler.simple_eval_exn ~loggers w
-  |> ignore
+  ignore (Scheduler.simple_eval_exn ~loggers w : string list)
 
 let command =
   let open Command.Let_syntax in

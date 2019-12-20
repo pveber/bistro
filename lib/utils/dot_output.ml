@@ -13,7 +13,7 @@ end
 module E = struct
   type t = Dependency | GC_link
   let default = Dependency
-  let compare = compare
+  let compare = Poly.compare
 end
 
 module S = Set.Make(V)
@@ -107,7 +107,7 @@ let dot_output ?db oc g ~needed =
     ]
   in
   let vertex_attributes u =
-    let needed = db = None || S.mem needed u in
+    let needed = (match db with None -> true | Some _ -> false) || S.mem needed u in
     let color = if needed then black else light_gray in
     let shape = `Shape (shape u) in
     let W.Any w = u in
@@ -137,7 +137,7 @@ let dot_output ?db oc g ~needed =
       | _ -> []
     in
     let color =
-      if db = None || (S.mem needed u && not (already_done u))
+      if (match db with None -> true | Some _ -> false) || (S.mem needed u && not (already_done u))
       then black else light_gray in
     style @ [ `Color color ]
   in
