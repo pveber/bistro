@@ -5,8 +5,8 @@ open Bistro_utils
 
 let cut_deps x = [%workflow
   let lines = In_channel.read_lines [%path x] in
-  List.group lines ~break:(fun _ l -> l = "")
-  |> List.filter ~f:(( <> ) [""])
+  List.group lines ~break:(fun _ l -> String.equal l "")
+  |> List.filter ~f:(Poly.( <> ) [""])
 ]
 
 let%pworkflow dump_lines x =
@@ -30,7 +30,7 @@ let dump_gc_state sched db fn =
   let open Bistro_engine in
   Option.iter (Scheduler.gc_state sched) ~f:(Bistro_utils.Dot_output.gc_state_to_file ~db ~condensed:false fn)
 
-let _ =
+let () =
   let open Bistro_engine in
   let db = Db.init_exn "_bistro" in
   let pipeline = Repo.to_workflow repo ~outdir:"res" in

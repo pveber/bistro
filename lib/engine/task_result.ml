@@ -47,7 +47,8 @@ let succeeded_of_outcome = function
 let succeeded = function
   | Input { pass ; _ }
   | Select { pass ; _ } -> pass
-  | Container_image_fetch f -> f.outcome = Ok ()
+  | Container_image_fetch { outcome = Ok (); _ } -> true
+  | Container_image_fetch _ -> false
   | Plugin { outcome ; _ }
   | Shell { outcome ; _ } -> succeeded_of_outcome outcome
 

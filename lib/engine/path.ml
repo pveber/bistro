@@ -9,7 +9,7 @@ let rec normalize = function
   | "" :: t -> normalize t
   | h :: ".." :: t ->
     let t = normalize t in
-    if h <> ".." then t
+    if not (String.equal h "..") then t
     else ".." :: ".." :: t
   | h :: t -> h :: normalize t
   | [] -> []
@@ -17,7 +17,7 @@ let rec normalize = function
 let common_prefix p q =
   let rec aux res p q =
     match p, q with
-    | h_p :: t_p, h_q :: t_q when h_p = h_q ->
+    | h_p :: t_p, h_q :: t_q when Poly.(h_p = h_q) ->
       aux (h_p :: res) t_p t_q
     | _ -> List.rev res, p, q
   in

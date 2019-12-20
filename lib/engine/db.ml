@@ -45,7 +45,9 @@ let create_db path =
   Ok ()
 
 let dir_is_empty path =
-  Sys.readdir path = [||]
+  match Sys.readdir path with
+  | [||] -> true
+  | _ -> false
 
 let no_such_path_error path =
   R.error_msgf "Path %s doesn't exist, is not readable or writable" path
@@ -53,15 +55,18 @@ let no_such_path_error path =
 (* [check_path sort p] checks that [p] exists and is of the right
    sort *)
 let check_path sort p =
-  if Sys.file_exists p = `Yes then
-    match sort with
+  match Sys.file_exists p with
+  | `Yes ->
+    (match sort with
     | `Dir ->
-      if Sys.is_directory p = `Yes then Ok ()
-      else R.error_msgf "Path %s should be a directory" p
+      (match Sys.is_directory p with
+       | `Yes -> Ok ()
+       | `Unknown | `No -> R.error_msgf "Path %s should be a directory" p)
     | `File ->
-      if Sys.is_file p = `Yes then Ok ()
-      else R.error_msgf "Path %s should be a file" p
-  else
+      (match Sys.is_file p with
+       | `Yes -> Ok ()
+       | `Unknown | `No -> R.error_msgf "Path %s should be a file" p))
+  | `Unknown | `No ->
     no_such_path_error p
 
 let dirs_of_db_exist path =
@@ -145,8 +150,9 @@ let rec workflow_path db (Bistro_internals.Workflow.Any w) =
 let is_in_cache db u =
   workflow_path db u
   |> Option.value_map ~default:false ~f:(fun u ->
-      Sys.file_exists (path db u) = `Yes
-    )
+      match Sys.file_exists (path db u) with
+      | `Yes -> true
+      | `Unknown | `No -> false)
 
 let container_image_identifier img =
   let f account name tag =

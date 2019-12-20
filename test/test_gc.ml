@@ -32,11 +32,11 @@ let dump_gc_state sched db fn =
   let open Bistro_engine in
   Option.iter (Scheduler.gc_state sched) ~f:(Bistro_utils.Dot_output.gc_state_to_file ~db ~condensed:false fn)
 
-let _ =
+let () =
   let open Bistro_engine in
   let db = Db.init_exn "_bistro" in
   let sched = Scheduler.create ~np:4 ~loggers:[Bistro_utils.Console_logger.create ()] ~collect:true db in
   let thread = Scheduler.eval_exn sched pipeline in
   Scheduler.start sched ;
-  ignore (Lwt_main.run thread) ;
+  ignore (Lwt_main.run thread : text_file path) ;
   dump_gc_state sched db "gc_final.dot"

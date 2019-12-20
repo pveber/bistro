@@ -10,7 +10,7 @@ let%workflow mul x y : int workflow =
 
 let pipeline = add (Workflow.int 1) (Workflow.int 41)
 
-let _ =
+let () =
   let open Bistro_engine in
   let db = Db.init_exn "_bistro" in
   let sched = Scheduler.create db in

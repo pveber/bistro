@@ -151,7 +151,7 @@ module Server = struct
         let t, u = Lwt.wait () in
         let waiters =
           ((np, mem), u) :: pool.waiters
-          |> List.sort ~compare:(fun (x, _) (y,_) -> compare y x)
+          |> List.sort ~compare:(fun (x, _) (y,_) -> Poly.compare y x)
         in
         pool.waiters <- waiters ;
         allocation_pass pool ;
