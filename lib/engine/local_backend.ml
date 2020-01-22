@@ -45,7 +45,7 @@ let eval _ () f x =
     Marshal.to_channel oc res [] ;
     Caml.flush oc ;
     Unix.close write_to_parent ;
-    ignore (Caml.input_value (Unix.in_channel_of_descr read_from_parent)) ;
+    ignore (Caml.input_value (Unix.in_channel_of_descr read_from_parent) : 'a) ;
     assert false
   | `In_the_parent pid ->
     Unix.close write_to_parent ;

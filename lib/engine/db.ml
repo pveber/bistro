@@ -27,15 +27,24 @@ let no_such_path_error path =
 (* [check_path sort p] checks that [p] exists and is of the right
    sort *)
 let check_path sort p =
-  if Sys.file_exists p = `Yes then
-    match sort with
-    | `Dir ->
-      if Sys.is_directory p = `Yes then Ok ()
-      else R.error_msgf "Path %s should be a directory" p
-    | `File ->
-      if Sys.is_file p = `Yes then Ok ()
-      else R.error_msgf "Path %s should be a file" p
-  else
+  match Sys.file_exists p with
+  | `Yes -> (
+      match sort with
+      | `Dir -> (
+          match Sys.is_directory p with
+          | `Yes -> Ok ()
+          | `No | `Unknown ->
+            R.error_msgf "Path %s should be a directory" p
+        )
+      | `File -> (
+          match Sys.is_file p with
+          | `Yes -> Ok ()
+          | `No | `Unknown ->
+            R.error_msgf "Path %s should be a file" p
+        )
+    )
+  | `No
+  | `Unknown ->
     no_such_path_error p
 
 
@@ -95,10 +104,10 @@ struct
     check_path `File (p ^ ".pag")(*  >>= fun () ->
                                   * check_path `File (p ^ ".dir") *) (* seems that dir files are not created anymore... *)
 
-  let m = Mutex.create ()
+  let m = Error_checking_mutex.create ()
 
   let with_dbm db f =
-    Mutex.critical_section m ~f:(fun () ->
+    Error_checking_mutex.critical_section m ~f:(fun () ->
         with_dbm (prefix db) f
       )
 
