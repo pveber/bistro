@@ -53,6 +53,8 @@ module Make(Backend : Backend) : sig
 
   val gc_state : t -> Gc.state option
 
+  val protect : t -> _ Bistro.workflow -> unit
+
   val start : t -> unit
 
   val eval :
