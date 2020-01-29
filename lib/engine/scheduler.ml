@@ -23,6 +23,7 @@ module Gc : sig
   val tag_workflow_as_built : t -> _ W.t -> unit
   val uses_singularity_image : t -> _ W.t -> Command.container_image -> unit
   val stop : t -> unit Lwt.t
+  val protect : t -> _ W.t -> unit
   (* val fold_deps :
    *   t ->
    *   init:'a ->
@@ -162,10 +163,12 @@ struct
   let tag_workflow_as_built gc w =
     Lwt_queue.push gc.inbox (Built (Elt.workflow w))
 
+  let protect gc w =
+    gc.protected <- S.add (Elt.workflow w) gc.protected
+
   let uses gc u v =
     match u with
-    | None ->
-      gc.protected <- S.add (Elt.workflow v) gc.protected
+    | None -> protect gc v
     | Some u ->
       let u = Elt.workflow u and v = Elt.workflow v in
       T.adj_add gc.depends_on u v ;
@@ -261,6 +264,7 @@ module Maybe_gc : sig
   val uses_singularity_image : t -> _ W.t -> Command.container_image -> unit
   val tag_workflow_as_built : t -> _ W.t -> unit
   val stop : t -> unit Lwt.t
+  val protect : t -> _ W.t -> unit
 end
 =
 struct
@@ -280,6 +284,11 @@ struct
   let stop = function
     | Some gc -> Gc.stop gc
     | None -> Lwt.return ()
+
+  let protect o w =
+    match o with
+    | Some gc -> Gc.protect gc w
+    | None -> ()
 end
 
 module Synchro : sig
@@ -366,6 +375,9 @@ module Make(Backend : Backend) = struct
     }
 
   let gc_state sched = Option.map ~f:Gc.state sched.gc
+
+  let protect sched w =
+    Maybe_gc.protect sched.gc (Bistro.Private.reveal w)
 
   (* let log ?(time = Unix.gettimeofday ()) sched event =
    *   sched.logger#event sched.db time event *)
