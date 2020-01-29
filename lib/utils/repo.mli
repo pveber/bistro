@@ -9,6 +9,8 @@ val ( %> ) : string list -> 'a path workflow -> item
 
 val item : string list -> 'a path workflow -> item
 
+val precious_item : _ path workflow -> item
+
 val singleton : string -> 'a path workflow -> t
 
 val items :

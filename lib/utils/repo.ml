@@ -13,6 +13,7 @@ type item =
       ext : string option ;
       elts : _ path list workflow ;
     } -> item
+  | Precious_item : _ path workflow -> item
 
 type t = item list
 
@@ -31,6 +32,8 @@ let normalized_repo_item ~repo_path ~id ~cache_path = {
 let item path w = Item (path, w)
 
 let items path ~prefix ?ext elts = Item_list { path ; prefix ; ext ; elts }
+
+let precious_item w = Precious_item w
 
 let ( %> ) path w = item path w
 
@@ -114,6 +117,7 @@ let item_to_workflow = function
       List.mapi elts ~f:(fun i path_w ->
           normalized_repo_item ~repo_path:(list_elt_path i) ~id:(Misc.digest (id, i)) ~cache_path:path_w
         )]
+  | Precious_item _ -> Workflow.pure_data []
 
 let to_workflow ~outdir items =
   let normalized_items =
@@ -134,10 +138,17 @@ let partition_results xs =
   in
   inner [] [] xs
 
+let protect sched items =
+  List.iter items ~f:(function
+      | Precious_item w -> Scheduler.protect sched w
+      | Item _ | Item_list _ -> ()
+    )
+
 let build ?np ?mem ?loggers ?allowed_containers ?(bistro_dir = "_bistro") ?collect ~outdir repo =
   let db = Db.init_exn bistro_dir in
   let expressions = List.map repo ~f:(item_to_workflow) in
   let sched = Scheduler.create ?np ?mem ?loggers ?allowed_containers ?collect db in
+  protect sched repo ;
   let results = Lwt_list.map_p (Scheduler.eval sched) expressions in
   Scheduler.start sched ;
   Lwt.map partition_results results >>= fun (res, errors) ->
@@ -162,6 +173,7 @@ let add_prefix prefix items =
   List.map items ~f:(function
       | Item  (p, w) -> Item  (prefix @ p, w)
       | Item_list l -> Item_list { l with path = prefix @ l.path}
+      | Precious_item _ as i -> i
     )
 
 let shift dir items = add_prefix [ dir ] items
