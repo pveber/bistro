@@ -306,4 +306,18 @@ module Shell_dsl = struct
   let docker_image = Command.docker_image
 
   let bash ?img script = cmd "bash" ?img [ file_dump script ]
+
+  let gzdep (gz : _ gz pworkflow) =
+    seq ~sep:"" [
+      string "<(gunzip -c " ;
+      dep gz ;
+      string ")"
+    ]
+
+  let gzdest =
+    seq ~sep:"" [
+      string ">(gzip -c > " ;
+      dest ;
+      string ")" ;
+    ]
 end

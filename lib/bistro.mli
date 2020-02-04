@@ -50,249 +50,6 @@ end
 type 'a dworkflow = < directory ; contents : 'a > path workflow
 (** Type alias for workflows that produce a directory *)
 
-
-(** {2 Building shell-based workflow} *)
-
-(** Representation of scripts *)
-module Template_dsl : sig
-  type template
-
-  val dest : template
-  (** Symbol representing the location where a workflow is expected to
-      produce its result *)
-
-  val tmp : template
-  (** Symbol representing an existing empty directory that can be used
-      as a temporary space for a workflow's execution. *)
-
-  val np : template
-  (** Symbol representing the number of cores allocated to the
-      workflow *)
-
-  val mem : template
-  (** Symbol representing the memory size allocated to the workflow,
-      in GB. *)
-
-  val string : string -> template
-  (** A chunk of text *)
-
-  val int : int -> template
-  (** Int formatting *)
-
-  val float : float -> template
-  (** Float formatting *)
-
-  val dep : _ path workflow -> template
-  (** [dep w] is interpreted as the path where to find the result of
-      workflow [w] *)
-
-  val deps :
-    ?quote:char ->
-    sep:string ->
-    _ path list workflow ->
-    template
-
-  val string_dep : string workflow -> template
-  (** [string_dep w] is interpreted as the result of workflow [w] *)
-
-  val int_dep : int workflow -> template
-  (** [int_dep w] is interpreted as result of workflow [w] *)
-
-  val quote : ?using:char -> template -> template
-  (** [quote ~using:c t] surrounds template [t] with character [c] *)
-
-  val option : ('a -> template) -> 'a option -> template
-  (** [option f o] is [f x] if [o = Some x] and [string ""]
-      otherwise *)
-
-  val list : ('a -> template) -> ?sep:string -> 'a list -> template
-  (** list combinator, optional value of [sep] is [","] *)
-
-  val seq : ?sep:string -> template list -> template
-  (** another list combinator, default value for [sep] is [""] *)
-
-  val enum : ('a * string) list -> 'a -> template
-  (** combinator for enumerations *)
-
-  val file_dump : template -> template
-  (** [file_dump t] can be used when a command needs a configuration
-      script: at run-time, it will generate a text using [t], save it
-      to a path, deterministically chosen as a function of
-      [t]. Finally the template [file_dump t] is interpreted as this
-      path. *)
-end
-
-(** Command-line construction *)
-module Shell_dsl : sig
-  type template = Template_dsl.template
-  type command
-  type container_image
-
-  include module type of Template_dsl with type template := template
-
-  val cmd :
-    string ->
-    ?img:container_image list ->
-    ?stdin:template -> ?stdout:template -> ?stderr:template ->
-    template list -> command
-  (** Command-line constructor, e.g.
-        [cmd "echo" ~stdout:dest [ string "foo" ]]
-      will generate a shell command like
-        ["echo foo > /some/path"].
-
-      @param env specifies a Docker image where to run the command
-      @param stdin adds a ["< /some/path"] token at the end of the command
-      @param stdout adds a ["> /some/path"] token at the end of the command
-      @param stderr adds a ["2> /some/path"] token at the end of the command *)
-
-  val bash :
-    ?img:container_image list ->
-    template ->
-    command
-  (** Run a bash script, best used with [%script {|...|}] *)
-
-  val opt : string -> ('a -> template) -> 'a -> template
-  (** Command-line option formatting, e.g.: [opt "--output" dep dest]
-      will be rendered like ["--output /some/path"] *)
-
-  val opt' : string -> ('a -> template) -> 'a -> template
-  (** Same as {!val:opt} but renders options with an equal sign,
-      e.g. ["--output=/some/path"] *)
-
-  val flag : ('a -> template) -> 'a -> bool -> template
-  (** [flag f x b] renders as [f x] if [b] is true *)
-
-  val or_list : command list -> command
-  (** OR-sequence of commands ([ || ]) *)
-
-  val and_list : command list -> command
-  (** AND-sequence of commands ([ && ]) *)
-
-  val pipe : command list -> command
-  (** Pipe of commands ([ | ]) *)
-
-  val ( // ) : template -> string -> template
-  (** Similar to {!val:Filename.concat}, but with other types. *)
-
-  (** {4 Useful commands} *)
-
-  val mkdir : template -> command
-  val mkdir_p : template -> command
-  val cd : template -> command
-  val rm_rf : template -> command
-  val mv : template -> template -> command
-
-  val within_container : container_image list -> command -> command
-  (** [docker cmd] transforms [cmd] so that it can be executed in a
-      Docker container. *)
-
-  val docker_image :
-    ?tag:string ->
-    ?registry:string ->
-    account:string ->
-    name:string ->
-    unit -> container_image
-  (** Construct a description of a publicly available docker image *)
-
-  val ( % ) : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c
-end
-
-(** Workflow constructors *)
-module Workflow : sig
-  val input :
-    ?version:int ->
-    string -> 'a pworkflow
-  (** Workflow constructor from an existing path *)
-
-  val shell :
-    ?descr:string ->
-    ?mem:int workflow ->
-    ?np:int ->
-    ?version:int ->
-    Shell_dsl.command list -> 'a path workflow
-  (** Constructor for a workflow that execute a shell script. Its main
-    argument is a list of {!Shell_dsl.cmd} values. Other arguments
-    are:
-      - {b descr} description of the workflow, used for logging
-      - {b mem} required memory
-      - {b np} maximum number of cores (could be given less at execution)
-      - {b version} version number, used to force the rebuild of a workflow
-  *)
-
-  val select :
-    #directory path workflow ->
-    string list ->
-    'a path workflow
-  (** Constructs a workflow from a directory workflow, by selecting a
-     file in it *)
-
-  val cached_value :
-    ?descr:string ->
-    ?np:int ->
-    ?mem:int workflow ->
-    ?version:int ->
-    (unit -> 'a) workflow ->
-    'a workflow
-
-  val cached_path :
-    ?descr:string ->
-    ?np:int ->
-    ?mem:int workflow ->
-    ?version:int ->
-    (string -> unit) workflow ->
-    'a path workflow
-
-  val pure : id:string -> 'a -> 'a workflow
-  (** [pure ~id x] is a workflow that computes the value [x]. [id]
-     should be a string identifying [x], like a digest. *)
-
-  val pure_data : 'a -> 'a workflow
-  (** Similar to {!pure}, but computes a digest as identifier. Does
-     not work with closures or objects. *)
-
-  val int : int -> int workflow
-  (** [int i] is [pure_data i] *)
-
-  val string : string -> string workflow
-  (** [string s] is [pure_data s] *)
-
-  val app : ('a -> 'b) workflow -> 'a workflow -> 'b workflow
-  (** Applicative structure *)
-
-  val both : 'a workflow -> 'b workflow -> ('a * 'b) workflow
-  (** Applicative structure, useful for parallel binds *)
-
-  val eval_path : 'a path workflow -> string workflow
-
-  val eval_paths :
-    'a path workflow list -> string list workflow
-
-  val list :
-    'a workflow list -> 'a list workflow
-
-  val spawn :
-    'a list workflow ->
-    f:('a workflow -> 'b workflow) ->
-    'b list workflow
-
-  val spawn2 :
-    'a list workflow ->
-    'b list workflow ->
-    f:('a workflow -> 'b workflow -> 'c workflow) ->
-    'c list workflow
-
-  val glob :
-    ?pattern:string ->
-    ?type_selection:[`File | `Directory] ->
-    #directory pworkflow ->
-    'a path list workflow
-end
-
-(** Access to internal representation *)
-module Private : sig
-  val reveal : 'a workflow -> 'a Bistro_internals.Workflow.t
-end
-
 (** {2 File formats} *)
 
 class type text_file = object
@@ -456,6 +213,256 @@ end
 class type sra = object
   inherit binary_file
   method format : [`sra]
+end
+
+(** {2 Building shell-based workflow} *)
+
+(** Representation of scripts *)
+module Template_dsl : sig
+  type template
+
+  val dest : template
+  (** Symbol representing the location where a workflow is expected to
+      produce its result *)
+
+  val tmp : template
+  (** Symbol representing an existing empty directory that can be used
+      as a temporary space for a workflow's execution. *)
+
+  val np : template
+  (** Symbol representing the number of cores allocated to the
+      workflow *)
+
+  val mem : template
+  (** Symbol representing the memory size allocated to the workflow,
+      in GB. *)
+
+  val string : string -> template
+  (** A chunk of text *)
+
+  val int : int -> template
+  (** Int formatting *)
+
+  val float : float -> template
+  (** Float formatting *)
+
+  val dep : _ path workflow -> template
+  (** [dep w] is interpreted as the path where to find the result of
+      workflow [w] *)
+
+  val deps :
+    ?quote:char ->
+    sep:string ->
+    _ path list workflow ->
+    template
+
+  val string_dep : string workflow -> template
+  (** [string_dep w] is interpreted as the result of workflow [w] *)
+
+  val int_dep : int workflow -> template
+  (** [int_dep w] is interpreted as result of workflow [w] *)
+
+  val quote : ?using:char -> template -> template
+  (** [quote ~using:c t] surrounds template [t] with character [c] *)
+
+  val option : ('a -> template) -> 'a option -> template
+  (** [option f o] is [f x] if [o = Some x] and [string ""]
+      otherwise *)
+
+  val list : ('a -> template) -> ?sep:string -> 'a list -> template
+  (** list combinator, optional value of [sep] is [","] *)
+
+  val seq : ?sep:string -> template list -> template
+  (** another list combinator, default value for [sep] is [""] *)
+
+  val enum : ('a * string) list -> 'a -> template
+  (** combinator for enumerations *)
+
+  val file_dump : template -> template
+  (** [file_dump t] can be used when a command needs a configuration
+      script: at run-time, it will generate a text using [t], save it
+      to a path, deterministically chosen as a function of
+      [t]. Finally the template [file_dump t] is interpreted as this
+      path. *)
+end
+
+(** Command-line construction *)
+module Shell_dsl : sig
+  type template = Template_dsl.template
+  type command
+  type container_image
+
+  include module type of Template_dsl with type template := template
+
+  val cmd :
+    string ->
+    ?img:container_image list ->
+    ?stdin:template -> ?stdout:template -> ?stderr:template ->
+    template list -> command
+  (** Command-line constructor, e.g.
+        [cmd "echo" ~stdout:dest [ string "foo" ]]
+      will generate a shell command like
+        ["echo foo > /some/path"].
+
+      @param env specifies a Docker image where to run the command
+      @param stdin adds a ["< /some/path"] token at the end of the command
+      @param stdout adds a ["> /some/path"] token at the end of the command
+      @param stderr adds a ["2> /some/path"] token at the end of the command *)
+
+  val bash :
+    ?img:container_image list ->
+    template ->
+    command
+  (** Run a bash script, best used with [%script {|...|}] *)
+
+  val opt : string -> ('a -> template) -> 'a -> template
+  (** Command-line option formatting, e.g.: [opt "--output" dep dest]
+      will be rendered like ["--output /some/path"] *)
+
+  val opt' : string -> ('a -> template) -> 'a -> template
+  (** Same as {!val:opt} but renders options with an equal sign,
+      e.g. ["--output=/some/path"] *)
+
+  val flag : ('a -> template) -> 'a -> bool -> template
+  (** [flag f x b] renders as [f x] if [b] is true *)
+
+  val or_list : command list -> command
+  (** OR-sequence of commands ([ || ]) *)
+
+  val and_list : command list -> command
+  (** AND-sequence of commands ([ && ]) *)
+
+  val pipe : command list -> command
+  (** Pipe of commands ([ | ]) *)
+
+  val ( // ) : template -> string -> template
+  (** Similar to {!val:Filename.concat}, but with other types. *)
+
+  (** {4 Useful commands} *)
+
+  val mkdir : template -> command
+  val mkdir_p : template -> command
+  val cd : template -> command
+  val rm_rf : template -> command
+  val mv : template -> template -> command
+
+  val within_container : container_image list -> command -> command
+  (** [docker cmd] transforms [cmd] so that it can be executed in a
+      Docker container. *)
+
+  val docker_image :
+    ?tag:string ->
+    ?registry:string ->
+    account:string ->
+    name:string ->
+    unit -> container_image
+  (** Construct a description of a publicly available docker image *)
+
+  val gzdep : _ gz pworkflow -> template
+  (** Process-substitution construct. Use it to pass an gzipped file
+     to a command that expects a decompressed file *)
+
+  val gzdest : template
+  (** Use [gzdest] instead of [dest] to produce a gzipped file from
+     the output of a command. *)
+
+  val ( % ) : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c
+end
+
+(** Workflow constructors *)
+module Workflow : sig
+  val input :
+    ?version:int ->
+    string -> 'a pworkflow
+  (** Workflow constructor from an existing path *)
+
+  val shell :
+    ?descr:string ->
+    ?mem:int workflow ->
+    ?np:int ->
+    ?version:int ->
+    Shell_dsl.command list -> 'a path workflow
+  (** Constructor for a workflow that execute a shell script. Its main
+    argument is a list of {!Shell_dsl.cmd} values. Other arguments
+    are:
+      - {b descr} description of the workflow, used for logging
+      - {b mem} required memory
+      - {b np} maximum number of cores (could be given less at execution)
+      - {b version} version number, used to force the rebuild of a workflow
+  *)
+
+  val select :
+    #directory path workflow ->
+    string list ->
+    'a path workflow
+  (** Constructs a workflow from a directory workflow, by selecting a
+     file in it *)
+
+  val cached_value :
+    ?descr:string ->
+    ?np:int ->
+    ?mem:int workflow ->
+    ?version:int ->
+    (unit -> 'a) workflow ->
+    'a workflow
+
+  val cached_path :
+    ?descr:string ->
+    ?np:int ->
+    ?mem:int workflow ->
+    ?version:int ->
+    (string -> unit) workflow ->
+    'a path workflow
+
+  val pure : id:string -> 'a -> 'a workflow
+  (** [pure ~id x] is a workflow that computes the value [x]. [id]
+     should be a string identifying [x], like a digest. *)
+
+  val pure_data : 'a -> 'a workflow
+  (** Similar to {!pure}, but computes a digest as identifier. Does
+     not work with closures or objects. *)
+
+  val int : int -> int workflow
+  (** [int i] is [pure_data i] *)
+
+  val string : string -> string workflow
+  (** [string s] is [pure_data s] *)
+
+  val app : ('a -> 'b) workflow -> 'a workflow -> 'b workflow
+  (** Applicative structure *)
+
+  val both : 'a workflow -> 'b workflow -> ('a * 'b) workflow
+  (** Applicative structure, useful for parallel binds *)
+
+  val eval_path : 'a path workflow -> string workflow
+
+  val eval_paths :
+    'a path workflow list -> string list workflow
+
+  val list :
+    'a workflow list -> 'a list workflow
+
+  val spawn :
+    'a list workflow ->
+    f:('a workflow -> 'b workflow) ->
+    'b list workflow
+
+  val spawn2 :
+    'a list workflow ->
+    'b list workflow ->
+    f:('a workflow -> 'b workflow -> 'c workflow) ->
+    'c list workflow
+
+  val glob :
+    ?pattern:string ->
+    ?type_selection:[`File | `Directory] ->
+    #directory pworkflow ->
+    'a path list workflow
+end
+
+(** Access to internal representation *)
+module Private : sig
+  val reveal : 'a workflow -> 'a Bistro_internals.Workflow.t
 end
 
 (* val file_size : file path workflow -> int workflow
