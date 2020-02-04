@@ -9,7 +9,13 @@ module Cmd : sig
     ?dest:Shell_dsl.template ->
     string workflow -> Shell_dsl.command
 
-  val psgunzip : _ gz pworkflow -> Shell_dsl.template
+  val gzdep : _ gz pworkflow -> Shell_dsl.template
+  (** Process-substitution construct. Use it to pass a gzipped file
+     to a command that expects a decompressed file *)
+
+  val gzdest : Shell_dsl.template
+  (** Use [gzdest] instead of [dest] to produce a gzipped file from
+     the output of a command. *)
 end
 
 val wget :

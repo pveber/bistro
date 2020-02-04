@@ -16,8 +16,19 @@ module Cmd = struct
     ]
 
   (* process substitution for gunzip *)
-  let psgunzip x =
-    seq ~sep:"" [ string "<(gunzip -c " ; dep x ; string ";)" ]
+  let gzdep (gz : _ gz pworkflow) =
+    seq ~sep:"" [
+      string "<(gunzip -c " ;
+      dep gz ;
+      string ")"
+    ]
+
+  let gzdest =
+    seq ~sep:"" [
+      string ">(gzip -c > " ;
+      dest ;
+      string ")" ;
+    ]
 end
 
 let wget_dyn ?descr_url ?no_check_certificate ?user_agent ?user ?password url =
