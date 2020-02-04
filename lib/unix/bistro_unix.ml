@@ -34,6 +34,11 @@ let unzip zip =
     cmd "unzip" [ opt "-d" ident dest ; dep zip ]
   ]
 
+let gzip x =
+  Workflow.shell ~descr:"unix.gunzip" [
+    cmd "gzip" [ opt "-c" dep x ] ~stdout:dest
+  ]
+
 let gunzip gz =
   Workflow.shell ~descr:"unix.gunzip" [
     cmd "gunzip" [ opt "-c" dep gz ] ~stdout:dest

@@ -28,6 +28,7 @@ val wget_dyn :
   ?password:string ->
   string workflow -> #file pworkflow
 
+val gzip : (#file as 'a) pworkflow -> 'a gz pworkflow
 val gunzip : 'a gz pworkflow -> 'a pworkflow
 val bunzip2 : 'a bz2 pworkflow -> 'a pworkflow
 val unzip : 'a zip pworkflow -> 'a pworkflow
