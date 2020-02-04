@@ -3,13 +3,17 @@ open Bistro_internals
 
 type 'a path = Workflow.path
 
-class type directory = object
+class type regular_file_t = object
+  method file_kind : [`regular]
+end
+
+class type directory_t = object
   method file_kind : [`directory]
 end
 
 type 'a workflow = 'a Workflow.t
-type 'a pworkflow = 'a path workflow
-type 'a dworkflow = < directory ; contents : 'a > path workflow
+type 'a file = (#regular_file_t as 'a) path workflow
+type 'a directory = < directory_t ; contents : 'a > path workflow
 
 module Workflow = struct
   include Workflow
@@ -32,23 +36,18 @@ module Private = struct
   let reveal x = x
 end
 
-
-class type file = object
-  method file_kind : [`regular]
-end
-
 class type text_file = object
-  inherit file
+  inherit regular_file_t
   method encoding : [`text]
 end
 
 class type ['a] sexp_value = object
-  inherit file
+  inherit regular_file_t
   method ty : 'a
 end
 
 class type binary_file = object
-  inherit file
+  inherit regular_file_t
   method encoding : [`binary]
 end
 
@@ -84,14 +83,14 @@ class type ['a] zip = object
 end
 
 class type ['a] gz = object
-  constraint 'a = #file
+  constraint 'a = #regular_file_t
   inherit binary_file
   method format : [`gz]
   method content_format : 'a
 end
 
 class type ['a] bz2 = object
-  constraint 'a = #file
+  constraint 'a = #regular_file_t
   inherit binary_file
   method format : [`bz2]
   method content_format : 'a
@@ -136,11 +135,6 @@ class type fasta = object
   method format : [`fasta]
 end
 
-class type indexed_fasta = object
-  inherit directory
-  method contents : [`indexed_fasta]
-end
-
 class type fastq = object
   inherit text_file
   method format : [`fastq]
@@ -183,11 +177,6 @@ end
 class type gff3 = object
   inherit gff
   method version : [`v3]
-end
-
-class type indexed_bam = object
-  inherit directory
-  method contents : [`indexed_bam]
 end
 
 class type sam = object

@@ -16,7 +16,7 @@ module Cmd = struct
     ]
 
   (* process substitution for gunzip *)
-  let gzdep (gz : _ gz pworkflow) =
+  let gzdep (gz : _ gz file) =
     seq ~sep:"" [
       string "<(gunzip -c " ;
       dep gz ;

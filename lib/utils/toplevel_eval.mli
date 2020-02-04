@@ -2,12 +2,12 @@ open Bistro
 
 module Make(P : sig val np : int val mem : int end)() : sig
   val eval : 'a workflow -> 'a
-  val path : _ pworkflow -> string
-  val file : _ pworkflow -> unit
-  val ls : _ pworkflow -> unit
-  val less : #text_file pworkflow -> unit
-  val firefox : _ pworkflow -> unit
-  val evince : pdf pworkflow -> unit
-  val wc : #text_file pworkflow -> unit
-  val rm : _ pworkflow -> unit
+  val path : _ path workflow -> string
+  val file : _ path workflow -> unit
+  val ls : _ path workflow -> unit
+  val less : #text_file path workflow -> unit
+  val firefox : _ path workflow -> unit
+  val evince : pdf path workflow -> unit
+  val wc : #text_file path workflow -> unit
+  val rm : _ path workflow -> unit
 end

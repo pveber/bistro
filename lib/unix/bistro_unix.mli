@@ -9,7 +9,7 @@ module Cmd : sig
     ?dest:Shell_dsl.template ->
     string workflow -> Shell_dsl.command
 
-  val gzdep : _ gz pworkflow -> Shell_dsl.template
+  val gzdep : _ gz file -> Shell_dsl.template
   (** Process-substitution construct. Use it to pass a gzipped file
      to a command that expects a decompressed file *)
 
@@ -24,7 +24,7 @@ val wget :
   ?user_agent:string ->
   ?user:string ->
   ?password:string ->
-  string -> #file pworkflow
+  string -> _ file
 
 val wget_dyn :
   ?descr_url:string ->
@@ -32,27 +32,27 @@ val wget_dyn :
   ?user_agent:string ->
   ?user:string ->
   ?password:string ->
-  string workflow -> #file pworkflow
+  string workflow -> _ file
 
-val gzip : (#file as 'a) pworkflow -> 'a gz pworkflow
-val gunzip : 'a gz pworkflow -> 'a pworkflow
-val bunzip2 : 'a bz2 pworkflow -> 'a pworkflow
-val unzip : 'a zip pworkflow -> 'a pworkflow
+val gzip : 'a file -> 'a gz file
+val gunzip : 'a gz file -> 'a file
+val bunzip2 : 'a bz2 file -> 'a file
+val unzip : 'a zip file -> 'a file
 val tar_xf :
   ?strip_components:int ->
-  'a tar pworkflow ->
-  'a pworkflow
+  'a tar file ->
+  'a file
 val tar_xfz :
   ?strip_components:int ->
-  'a tar gz pworkflow ->
-  'a pworkflow
+  'a tar gz file ->
+  'a file
 val tar_xfj :
   ?strip_components:int ->
-  'a tar bz2 pworkflow ->
-  'a pworkflow
-val crlf2lf : (#text_file as 'a) pworkflow -> 'a pworkflow
+  'a tar bz2 file ->
+  'a file
+val crlf2lf : (#text_file as 'a) file -> 'a file
 
 val head :
   n:int ->
-  (#text_file as 'a) pworkflow ->
-  'a pworkflow
+  (#text_file as 'a) file ->
+  'a file

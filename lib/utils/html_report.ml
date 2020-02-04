@@ -7,9 +7,9 @@ type cell =
   | Text of string
   | Section of string
   | Subsection of string
-  | Pdf of pdf pworkflow
-  | Svg of svg pworkflow
-  | Png of png pworkflow
+  | Pdf of pdf file
+  | Svg of svg file
+  | Png of png file
 
 type t = {
   title : string ;
@@ -26,7 +26,7 @@ let png x = Png x
 let section x = Section x
 let subsection x = Subsection x
 
-let svg_of_pdf (pdf : pdf pworkflow) : svg pworkflow =
+let svg_of_pdf (pdf : pdf file) : svg file =
   Workflow.shell ~descr:"notebook.convert" Shell_dsl.[
     cmd "convert" [
       string "-append" ;

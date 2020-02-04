@@ -11,10 +11,10 @@ end
 (** {3 File_formats} *)
 
 module Bed : sig
-  val keep3 : #bed3 pworkflow -> bed3 pworkflow
-  val keep4 : #bed4 pworkflow -> bed4 pworkflow
-  val keep5 : #bed5 pworkflow -> bed5 pworkflow
-  val keep6 : #bed6 pworkflow -> bed6 pworkflow
+  val keep3 : #bed3 file -> bed3 file
+  val keep4 : #bed4 file -> bed4 file
+  val keep5 : #bed5 file -> bed5 file
+  val keep6 : #bed6 file -> bed6 file
 end
 
 module Fastq : sig
@@ -22,10 +22,10 @@ module Fastq : sig
     | Sanger  : sanger_fastq format
     | Solexa  : solexa_fastq format
     | Phred64 : phred64_fastq format
-  (* val to_sanger : 'a format -> < fastq ; phred_encoding : 'a ; .. > pworkflow -> sanger_fastq pworkflow *)
+  (* val to_sanger : 'a format -> < fastq ; phred_encoding : 'a ; .. > file -> sanger_fastq file *)
 
-  val concat : (#fastq as 'a) pworkflow list -> 'a pworkflow
-  val head : int -> (#fastq as 'a) pworkflow -> 'a pworkflow
+  val concat : (#fastq as 'a) file list -> 'a file
+  val head : int -> (#fastq as 'a) file -> 'a file
 end
 
 (** {3 Genome databases} *)
@@ -69,43 +69,38 @@ module Ucsc_gb : sig
   val genome_of_string : string -> genome option
 
   (** {4 Dealing with genome sequences} *)
-  class type chromosome_sequences = object
-    inherit directory
-    method contents : [`ucsc_chromosome_sequences]
-  end
-
   val chromosome_sequence :
     [< genome] ->
     string ->
-    fasta pworkflow
-  val chromosome_sequences : [< genome] -> chromosome_sequences pworkflow
-  val genome_sequence : [< genome] -> fasta pworkflow
-  val genome_2bit_sequence : [< genome] -> twobit pworkflow
-  val twoBitToFa : twobit pworkflow -> #bed4 pworkflow -> fasta pworkflow
+    fasta file
+  val chromosome_sequences : [< genome] -> [`ucsc_chromosome_sequences] directory
+  val genome_sequence : [< genome] -> fasta file
+  val genome_2bit_sequence : [< genome] -> twobit file
+  val twoBitToFa : twobit file -> #bed4 file -> fasta file
 
 
   (** {4 Chromosome size and clipping} *)
-  val fetchChromSizes : [< genome] -> chrom_sizes pworkflow
-  val bedClip : chrom_sizes pworkflow -> (#bed3 as 'a) pworkflow -> 'a pworkflow
+  val fetchChromSizes : [< genome] -> chrom_sizes file
+  val bedClip : chrom_sizes file -> (#bed3 as 'a) file -> 'a file
 
 
   (** {4 Conversion between annotation file formats} *)
   (* val wig_of_bigWig : bigWig file -> wig file *)
   (* val bigWig_of_wig : ?clip:bool -> [< genome] -> wig file -> bigWig file *)
-  val bedGraphToBigWig : [< genome] -> bedGraph pworkflow -> bigWig pworkflow
+  val bedGraphToBigWig : [< genome] -> bedGraph file -> bigWig file
 
   val bedToBigBed :
     [< genome] ->
-    [ `bed3 of bed3 pworkflow | `bed5 of bed5 pworkflow ] ->
-    bigBed pworkflow
+    [ `bed3 of bed3 file | `bed5 of bed5 file ] ->
+    bigBed file
   (** bedToBigBed utility. Fails when given an empty BED file on
       input. Note that the underlying bedToBigBed expects BED
       files with {i exactly} 3 or 5 columns. *)
 
   val bedToBigBed_failsafe :
     [< genome] ->
-    [ `bed3 of bed3 pworkflow | `bed5 of bed5 pworkflow ] ->
-    bigBed pworkflow
+    [ `bed3 of bed3 file | `bed5 of bed5 file ] ->
+    bigBed file
   (** sam  as {! Ucsc_gb.bedToBigBed} but produces an empty file when
       given an empty BED on input. *)
 
@@ -119,28 +114,24 @@ module Ucsc_gb : sig
 
   module Lift_over : sig
     class type chain_file = object
-      inherit file
+      inherit regular_file_t
       method format : [`lift_over_chain_file]
-    end
-    class type ['a] output = object
-      inherit directory
-      method format : [`ucsc_lift_over of 'a]
     end
 
     val chain_file :
       org_from:[< genome] ->
       org_to:[< genome] ->
-      chain_file pworkflow
+      chain_file file
 
     val bed :
       org_from:[< genome] ->
       org_to:[< genome] ->
-      (* chain_file pworkflow -> *)
-      (#bed3 as 'a) pworkflow ->
-      'a output pworkflow
+      (* chain_file file -> *)
+      (#bed3 as 'a) file ->
+      [`ucsc_lift_over of 'a] directory
 
-    val mapped : 'a output pworkflow -> 'a pworkflow
-    val unmapped : 'a output pworkflow -> 'a pworkflow
+    val mapped : [`ucsc_lift_over of 'a] directory -> 'a file
+    val unmapped : [`ucsc_lift_over of 'a] directory -> 'a file
   end
 end
 
@@ -153,10 +144,10 @@ module Ensembl : sig
 
   val ucsc_reference_genome : release:int -> species:species -> Ucsc_gb.genome
 
-  val gff : ?chr_name : [`ensembl | `ucsc] -> release:int -> species:species -> gff pworkflow
-  val gtf : ?chr_name : [`ensembl | `ucsc] -> release:int -> species:species -> gff pworkflow
+  val gff : ?chr_name : [`ensembl | `ucsc] -> release:int -> species:species -> gff file
+  val gtf : ?chr_name : [`ensembl | `ucsc] -> release:int -> species:species -> gff file
 
-  val cdna : release:int -> species:species -> fasta gz pworkflow
+  val cdna : release:int -> species:species -> fasta gz file
 end
 
 (** {3 NGS utilities} *)
@@ -182,8 +173,8 @@ module Bedtools : sig
         | `left_pct of float
         | `right_pct of float
       ] ->
-      'a pworkflow ->
-      Ucsc_gb.chrom_sizes pworkflow ->
+      'a file ->
+      Ucsc_gb.chrom_sizes file ->
       Bistro.Shell_dsl.command
   end
 
@@ -200,9 +191,9 @@ module Bedtools : sig
       | `right_pct of float
     ] ->
     'a input ->
-    'a pworkflow ->
-    Ucsc_gb.chrom_sizes pworkflow ->
-    'a pworkflow
+    'a file ->
+    Ucsc_gb.chrom_sizes file ->
+    'a file
 
 
   val intersect :
@@ -223,14 +214,14 @@ module Bedtools : sig
     ?_S:bool ->
     ?split:bool ->
     ?sorted:bool ->
-    ?g:Ucsc_gb.chrom_sizes pworkflow ->
+    ?g:Ucsc_gb.chrom_sizes file ->
     ?header:bool ->
     ?filenames:bool ->
     ?sortout:bool ->
     'a input ->
-    'a pworkflow ->
-    #bed3 pworkflow list ->
-    'a pworkflow
+    'a file ->
+    #bed3 file list ->
+    'a file
 
   val bamtobed :
     ?bed12:bool ->
@@ -239,8 +230,8 @@ module Bedtools : sig
     ?ed:bool ->
     ?tag:bool ->
     ?cigar:bool ->
-    bam pworkflow ->
-    #bed6 pworkflow
+    bam file ->
+    #bed6 file
 
   val closest :
     ?strand:[`same | `opposite] ->
@@ -254,9 +245,9 @@ module Bedtools : sig
     ?k:int ->
     ?header:bool ->
     'a input ->
-    'a pworkflow ->
-    #bed3 pworkflow list ->
-    'a pworkflow
+    'a file ->
+    #bed3 file list ->
+    'a file
 end
 
 
@@ -275,7 +266,7 @@ module Deeptools : sig
     ?scalefactor:float ->
     ?filterrnastrand: [ `forward | `reverse ] ->
     ?binsize:int ->
-    ?blacklist:#bed3 pworkflow ->
+    ?blacklist:#bed3 file ->
     ?threads:int ->
     ?normalizeUsing:[`RPKM | `CPM | `BPM | `RPGC] ->
     ?ignorefornormalization:string list ->
@@ -290,8 +281,8 @@ module Deeptools : sig
     ?minfragmentlength:int ->
     ?maxfragmentlength:int ->
     'a signal_format ->
-    indexed_bam pworkflow ->
-    'a pworkflow
+    [`indexed_bam] directory ->
+    'a file
 
 
   val bamcompare :
@@ -303,7 +294,7 @@ module Deeptools : sig
     ?pseudocount:int ->
     ?binsize:int ->
     ?region:string ->
-    ?blacklist:#bed3 pworkflow ->
+    ?blacklist:#bed3 file ->
     ?threads:int ->
     ?normalizeUsing:[`RPKM | `CPM | `BPM | `RPGC] ->
     ?ignorefornormalization:string list ->
@@ -318,9 +309,9 @@ module Deeptools : sig
     ?minfragmentlength:int ->
     ?maxfragmentlength:int ->
     'a signal_format ->
-    indexed_bam pworkflow ->
-    indexed_bam pworkflow ->
-    'a pworkflow
+    [`indexed_bam] directory ->
+    [`indexed_bam] directory ->
+    'a file
 
 
   val bigwigcompare :
@@ -329,12 +320,12 @@ module Deeptools : sig
     ?pseudocount:int ->
     ?binsize:int ->
     ?region:string ->
-    ?blacklist:#bed3 pworkflow ->
+    ?blacklist:#bed3 file ->
     ?threads:int ->
     'a signal_format ->
-    Ucsc_gb.bigWig pworkflow ->
-    Ucsc_gb.bigWig pworkflow ->
-    'a pworkflow
+    Ucsc_gb.bigWig file ->
+    Ucsc_gb.bigWig file ->
+    'a file
 
   class type compressed_numpy_array = object
     inherit binary_file
@@ -345,7 +336,7 @@ module Deeptools : sig
     ?binsize:int ->
     ?distancebetweenbins:int ->
     ?region:string ->
-    ?blacklist:#bed3 pworkflow ->
+    ?blacklist:#bed3 file ->
     ?threads:int ->
     ?outrawcounts:bool ->
     ?extendreads:int ->
@@ -356,13 +347,13 @@ module Deeptools : sig
     ?samflagexclude:int ->
     ?minfragmentlength:int ->
     ?maxfragmentlength:int ->
-    indexed_bam pworkflow list ->
-    compressed_numpy_array pworkflow
+    [`indexed_bam] directory list ->
+    compressed_numpy_array file
 
 
   val multibamsummary_bed :
     ?region:string ->
-    ?blacklist:#bed3 pworkflow ->
+    ?blacklist:#bed3 file ->
     ?threads:int ->
     ?outrawcounts:bool ->
     ?extendreads:int ->
@@ -377,9 +368,9 @@ module Deeptools : sig
     ?transcriptid:bool ->
     ?exonid:bool ->
     ?transcriptiddesignator:bool->
-    #bed3 pworkflow ->
-    indexed_bam pworkflow list ->
-    compressed_numpy_array pworkflow
+    #bed3 file ->
+    [`indexed_bam] directory list ->
+    compressed_numpy_array file
 
   class type deeptools_matrix = object
     inherit binary_file
@@ -400,13 +391,13 @@ module Deeptools : sig
     ?skipZeros:bool ->
     ?minThreshold:float ->
     ?maxThreshold:float ->
-    ?blackList:#bed3 pworkflow ->
+    ?blackList:#bed3 file ->
     ?scale:float ->
     ?numberOfProcessors:int ->
-    regions:#bed3 pworkflow list ->
-    scores:Ucsc_gb.bigWig pworkflow list ->
+    regions:#bed3 file list ->
+    scores:Ucsc_gb.bigWig file list ->
     unit ->
-    deeptools_matrix gz pworkflow
+    deeptools_matrix gz file
 
   val plotHeatmap :
     ?dpi:int ->
@@ -440,8 +431,8 @@ module Deeptools : sig
     ?legendLocation:[`best | `upper_right | `upper_left | `upper_center | `lower_left | `lower_right | `lower_center | `center | `center_left | `center_right | `none] ->
     ?perGroup:bool ->
     'a img_format ->
-    deeptools_matrix gz pworkflow ->
-    'a pworkflow
+    deeptools_matrix gz file ->
+    'a file
 
   val plotCorrelation :
     ?skipZeros:bool ->
@@ -454,8 +445,8 @@ module Deeptools : sig
     corMethod:[`spearman | `pearson] ->
     whatToPlot:[`heatmap | `scatterplot] ->
     'a img_format ->
-    compressed_numpy_array pworkflow ->
-    'a pworkflow
+    compressed_numpy_array file ->
+    'a file
 
   val plotProfile :
     ?dpi:int ->
@@ -479,8 +470,8 @@ module Deeptools : sig
     ?legendLocation:[`best | `upper_right | `upper_left | `upper_center | `lower_left | `lower_right | `lower_center | `center | `center_left | `center_right | `none] ->
     ?perGroup:bool ->
     'a img_format ->
-    deeptools_matrix gz pworkflow ->
-    'a pworkflow
+    deeptools_matrix gz file ->
+    'a file
 
   val plotEnrichment :
     ?labels:string list ->
@@ -493,12 +484,12 @@ module Deeptools : sig
     ?numPlotsPerRow:int ->
     ?alpha:float ->
     ?offset:int ->
-    ?blackList:#bed3 pworkflow ->
+    ?blackList:#bed3 file ->
     ?numberOfProcessors:int ->
-    bams:bam pworkflow list ->
-    beds:#bed3 pworkflow list ->
+    bams:bam file list ->
+    beds:#bed3 file list ->
     'a img_format ->
-    'a pworkflow
+    'a file
 end
 
 module Htseq : sig
@@ -517,9 +508,9 @@ module Htseq : sig
     ?feature_type:string ->
     ?minaqual:int ->
     ?idattribute:string ->
-    [`sam of sam pworkflow | `bam of bam pworkflow] ->
-    gff pworkflow ->
-    count_tsv pworkflow
+    [`sam of sam file | `bam of bam file] ->
+    gff file ->
+    count_tsv file
 end
 
 
@@ -532,14 +523,14 @@ module Samtools : sig
 
   val sort :
     ?on:[`name | `position] ->
-    bam pworkflow -> bam pworkflow
-  val indexed_bam_of_sam : sam pworkflow -> indexed_bam pworkflow
-  val indexed_bam_of_bam : bam pworkflow -> indexed_bam pworkflow
-  val indexed_bam_to_bam : indexed_bam pworkflow -> bam pworkflow
-  val bam_of_sam : sam pworkflow -> bam pworkflow
-  val sam_of_bam : bam pworkflow -> sam pworkflow
+    bam file -> bam file
+  val indexed_bam_of_sam : sam file -> [`indexed_bam] directory
+  val indexed_bam_of_bam : bam file -> [`indexed_bam] directory
+  val indexed_bam_to_bam : [`indexed_bam] directory -> bam file
+  val bam_of_sam : sam file -> bam file
+  val sam_of_bam : bam file -> sam file
 
-  (* val rmdup : ?single_end_mode:bool -> bam pworkflow -> bam pworkflow *)
+  (* val rmdup : ?single_end_mode:bool -> bam file -> bam file *)
 
   val view :
     output:'o format ->
@@ -548,7 +539,7 @@ module Samtools : sig
     ?h:bool ->
     ?_H:bool ->
     (* ?c:bool -> *)
-    (* ?_L: #bed3 pworkflow -> *)
+    (* ?_L: #bed3 file -> *)
     ?q:int ->
     (* ?m:int ->
      * ?f:int ->
@@ -556,14 +547,14 @@ module Samtools : sig
      * ?_B:bool ->
      * ?s:float -> *)
     < file_kind : [`regular] ;
-      format : [< `bam | `sam] ; .. > pworkflow ->
-    'o pworkflow
+      format : [< `bam | `sam] ; .. > file ->
+    'o file
 
   val faidx :
-    fasta pworkflow -> indexed_fasta pworkflow
+    fasta file -> [`indexed_fasta] directory
 
   val fasta_of_indexed_fasta :
-    indexed_fasta pworkflow -> fasta pworkflow
+    [`indexed_fasta] directory -> fasta file
 end
 
 module Picardtools : sig
@@ -571,36 +562,36 @@ module Picardtools : sig
 
   val markduplicates :
     ?remove_duplicates:bool ->
-    [`indexed_bam] dworkflow ->
-    [`picard_markduplicates] dworkflow
+    [`indexed_bam] directory ->
+    [`picard_markduplicates] directory
 
   val reads :
-    [`picard_markduplicates] dworkflow ->
-    bam pworkflow
+    [`picard_markduplicates] directory ->
+    bam file
 
   val sort_bam_by_name :
-    bam pworkflow ->
-    bam pworkflow
+    bam file ->
+    bam file
 end
 
 module Sra_toolkit : sig
   val img : Shell_dsl.container_image list
 
   val fastq_dump :
-    [`id of string | `idw of string workflow | `file of sra pworkflow] ->
-    sanger_fastq pworkflow
+    [`id of string | `idw of string workflow | `file of sra file] ->
+    sanger_fastq file
 
   val fastq_dump_gz :
-    [`id of string | `file of sra pworkflow] ->
-    sanger_fastq gz pworkflow
+    [`id of string | `file of sra file] ->
+    sanger_fastq gz file
 
-  val fastq_dump_pe : sra pworkflow -> sanger_fastq pworkflow * sanger_fastq pworkflow
+  val fastq_dump_pe : sra file -> sanger_fastq file * sanger_fastq file
 
   val fastq_dump_pe_gz :
-    [`id of string | `file of sra pworkflow] ->
-    sanger_fastq gz pworkflow * sanger_fastq gz pworkflow
+    [`id of string | `file of sra file] ->
+    sanger_fastq gz file * sanger_fastq gz file
 
-  val fastq_dump_to_fasta : sra pworkflow -> fasta pworkflow
+  val fastq_dump_to_fasta : sra file -> fasta file
 
 end
 
@@ -624,13 +615,13 @@ module Subread : sig
     ?strandness:[`Unstranded | `Stranded | `Reversely_stranded] ->
     ?q:int ->
     ?nthreads:int ->
-    gff pworkflow ->
-    < format : [< `bam | `sam] ; .. > pworkflow -> (*FIXME: handle paired-hand, just add other file next to the other*)
-    [`featureCounts] dworkflow
+    gff file ->
+    < format : [< `bam | `sam] ; .. > file -> (*FIXME: handle paired-hand, just add other file next to the other*)
+    [`featureCounts] directory
 
-  val featureCounts_tsv : [`featureCounts] dworkflow -> count_table pworkflow
-  val featureCounts_htseq_tsv : [`featureCounts] dworkflow -> Htseq.count_tsv pworkflow
-  val featureCounts_summary : [`featureCounts] dworkflow -> text_file pworkflow
+  val featureCounts_tsv : [`featureCounts] directory -> count_table file
+  val featureCounts_htseq_tsv : [`featureCounts] directory -> Htseq.count_tsv file
+  val featureCounts_summary : [`featureCounts] directory -> text_file file
 end
 
 (** {3 NGS quality} *)
@@ -641,40 +632,24 @@ module ChIPQC : sig
     tissue : string ;
     factor : string ;
     replicate : string ;
-    bam : indexed_bam pworkflow ;
-    peaks : (#bed3 as 'a) pworkflow ;
+    bam : [`indexed_bam] directory ;
+    peaks : (#bed3 as 'a) file ;
   }
 
-  class type output = object
-    inherit directory
-    method contents : [`ChIPQC]
-  end
-
-  val run : 'a sample list -> output pworkflow
+  val run : 'a sample list -> [`ChIPQC] directory
   (** Beware: doesn't work with only one sample (see
      https://support.bioconductor.org/p/84754/) *)
 end
 
 
 module FastQC : sig
-
-  class type report = object
-    inherit directory
-    method contents : [`fastQC_report]
-  end
-
-  val run : #fastq pworkflow -> report pworkflow
-  val html_report : report pworkflow -> html pworkflow
-  val per_base_quality : report pworkflow -> png pworkflow
-  val per_base_sequence_content : report pworkflow -> png pworkflow
+  val run : #fastq file -> [`fastQC] directory
+  val html_report : [`fastQC] directory -> html file
+  val per_base_quality : [`fastQC] directory -> png file
+  val per_base_sequence_content : [`fastQC] directory -> png file
 end
 
 module Fastq_screen : sig
-  class type output = object
-    inherit directory
-    method contents : [`fastq_screen]
-  end
-
   val fastq_screen :
     ?bowtie2_opts:string ->
     ?filter: [ `Not_map | `Uniquely | `Multi_maps | `Maps | `Not_map_or_Uniquely | `Not_map_or_Multi_maps | `Ignore ] list ->
@@ -686,45 +661,33 @@ module Fastq_screen : sig
     ?threads:int ->
     ?top: [ `top1 of int | `top2 of int * int ] ->
     ?lightweight:bool ->
-    #fastq pworkflow ->
-    (string * fasta pworkflow) list ->
-    output pworkflow
+    #fastq file ->
+    (string * fasta file) list ->
+    [`fastq_screen] directory
 
-  val html_report : output pworkflow -> html pworkflow
+  val html_report : [`fastq_screen] directory -> html file
 
 end
 
 (** {3 NGS aligners} *)
 
 module Bowtie : sig
-
-  class type index = object
-    method contents : [`bowtie_index]
-    inherit directory
-  end
-
   val bowtie_build :
     ?packed:bool ->
     ?color:bool  ->
-    fasta pworkflow -> index pworkflow
+    fasta file -> [`bowtie_index] directory
 
   val bowtie :
     ?l:int -> ?e:int -> ?m:int ->
     ?fastq_format:'a Fastq.format ->
     ?n:int -> ?v:int ->
     ?maxins:int ->
-    index pworkflow ->
-    'a pworkflow list SE_or_PE.t ->
-    sam pworkflow
+    [`bowtie_index] directory ->
+    'a file list SE_or_PE.t ->
+    sam file
 end
 
 module Bowtie2 : sig
-
-  class type index = object
-    method contents : [`bowtie2_index]
-    inherit directory
-  end
-
   val bowtie2_build :
     ?large_index:bool ->
     ?noauto:bool ->
@@ -739,8 +702,8 @@ module Bowtie2 : sig
     ?ftabchars:int ->
     ?seed:int ->
     ?cutoff:int ->
-    fasta pworkflow ->
-    index pworkflow
+    fasta file ->
+    [`bowtie2_index] directory
 
   val bowtie2 :
     ?skip:int ->
@@ -767,31 +730,26 @@ module Bowtie2 : sig
     ?no_unal:bool ->
     ?seed:int ->
     ?fastq_format:'a Fastq.format ->
-    index pworkflow ->
-    'a pworkflow list SE_or_PE.t ->
-    sam pworkflow
+    [`bowtie2_index] directory ->
+    'a file list SE_or_PE.t ->
+    sam file
 end
 
 
 module Tophat : sig
-  class type output = object
-    inherit directory
-    method contents : [`tophat]
-  end
-
   val tophat1 :
     ?color:bool ->
-    Bowtie.index pworkflow ->
-    #fastq pworkflow list SE_or_PE.t ->
-    output pworkflow
+    [`bowtie_index] directory ->
+    #fastq file list SE_or_PE.t ->
+    [`tophat] directory
 
   val tophat2 :
-    Bowtie2.index pworkflow ->
-    #fastq pworkflow list SE_or_PE.t ->
-    output pworkflow
+    [`bowtie_index] directory ->
+    #fastq file list SE_or_PE.t ->
+    [`tophat] directory
 
-  val accepted_hits : output pworkflow -> bam pworkflow
-  val junctions : output pworkflow -> bed6 pworkflow
+  val accepted_hits : [`tophat] directory -> bam file
+  val junctions : [`tophat] directory -> bed6 file
 end
 
 module Hisat2 : sig
@@ -811,8 +769,8 @@ module Hisat2 : sig
     ?ftabchars:int ->
     ?seed:int ->
     ?cutoff:int ->
-    fasta pworkflow ->
-    [`hisat2_index] dworkflow
+    fasta file ->
+    [`hisat2_index] directory
 
 
   val hisat2 :
@@ -828,13 +786,13 @@ module Hisat2 : sig
     ?no_mixed:bool ->
     ?no_discordant:bool ->
     ?seed:int ->
-    [`hisat2_index] dworkflow ->
-    sanger_fastq pworkflow list SE_or_PE.t ->
-    sam pworkflow
+    [`hisat2_index] directory ->
+    sanger_fastq file list SE_or_PE.t ->
+    sam file
 end
 
 module Star : sig
-  val genomeGenerate : fasta pworkflow -> [`star_index] dworkflow
+  val genomeGenerate : fasta file -> [`star_index] directory
 
   val alignReads :
     ?max_mem:[`GB of int] ->
@@ -842,9 +800,9 @@ module Star : sig
     ?outFilterMultimapNmax:int ->
     ?outSAMstrandField:[`None | `intronMotif] ->
     ?alignIntronMax:int ->
-    [`star_index] dworkflow ->
-    sanger_fastq pworkflow SE_or_PE.t ->
-    bam pworkflow
+    [`star_index] directory ->
+    sanger_fastq file SE_or_PE.t ->
+    bam file
 end
 
 module Kallisto : sig
@@ -863,7 +821,7 @@ module Kallisto : sig
   end
 
   val img : Shell_dsl.container_image list
-  val index : fasta pworkflow list -> index pworkflow
+  val index : fasta file list -> index file
   val quant :
     ?bias:bool ->
     ?bootstrap_samples:int ->
@@ -872,23 +830,23 @@ module Kallisto : sig
     ?threads:int ->
     ?fragment_length:float ->
     ?sd:float ->
-    index pworkflow ->
-    fq1:[`fq of sanger_fastq pworkflow | `fq_gz of sanger_fastq gz pworkflow] ->
-    ?fq2:[`fq of sanger_fastq pworkflow | `fq_gz of sanger_fastq gz pworkflow] ->
+    index file ->
+    fq1:[`fq of sanger_fastq file | `fq_gz of sanger_fastq gz file] ->
+    ?fq2:[`fq of sanger_fastq file | `fq_gz of sanger_fastq gz file] ->
     unit ->
-    [`kallisto_output] dworkflow
+    [`kallisto_output] directory
 
-  val abundance : [`kallisto_output] dworkflow -> abundance_table pworkflow
+  val abundance : [`kallisto_output] directory -> abundance_table file
 
   val merge_eff_counts :
     sample_ids:string list ->
-    kallisto_outputs:abundance_table pworkflow list ->
-    tsv pworkflow
+    kallisto_outputs:abundance_table file list ->
+    tsv file
 
   val merge_tpms :
     sample_ids:string list ->
-    kallisto_outputs:abundance_table pworkflow list ->
-    tsv pworkflow
+    kallisto_outputs:abundance_table file list ->
+    tsv file
 end
 
 (** {3 Genome assembly} *)
@@ -897,47 +855,47 @@ module Spades : sig
   val spades :
     ?single_cell:bool ->
     ?iontorrent:bool ->
-    ?pe:sanger_fastq pworkflow list * sanger_fastq pworkflow list ->
+    ?pe:sanger_fastq file list * sanger_fastq file list ->
     ?threads:int ->
     ?memory:int ->
     unit ->
-    [`spades] dworkflow
+    [`spades] directory
 
-  val contigs : [`spades] dworkflow -> fasta pworkflow
-  val scaffolds : [`spades] dworkflow -> fasta pworkflow
+  val contigs : [`spades] directory -> fasta file
+  val scaffolds : [`spades] directory -> fasta file
 end
 
 module Idba : sig
   val fq2fa :
     ?filter:bool ->
-    [ `Se of sanger_fastq pworkflow
-    | `Pe_merge of sanger_fastq pworkflow * sanger_fastq pworkflow
-    | `Pe_paired of sanger_fastq pworkflow ] ->
-    fasta pworkflow
+    [ `Se of sanger_fastq file
+    | `Pe_merge of sanger_fastq file * sanger_fastq file
+    | `Pe_paired of sanger_fastq file ] ->
+    fasta file
 
-  val idba_ud : ?mem_spec:int -> fasta pworkflow -> [`idba] dworkflow
+  val idba_ud : ?mem_spec:int -> fasta file -> [`idba] directory
 
-  val idba_ud_contigs : [`idba] dworkflow -> fasta pworkflow
-  val idba_ud_scaffolds : [`idba] dworkflow -> fasta pworkflow
+  val idba_ud_contigs : [`idba] directory -> fasta file
+  val idba_ud_scaffolds : [`idba] directory -> fasta file
 end
 
 module Cisa : sig
   val merge :
     ?min_length:int ->
-    (string * fasta pworkflow) list -> fasta pworkflow
+    (string * fasta file) list -> fasta file
 
   val cisa :
     genome_size:int ->
-    fasta pworkflow ->
-    fasta pworkflow
+    fasta file ->
+    fasta file
 end
 
 module Quast : sig
   val quast :
-    ?reference:fasta pworkflow ->
+    ?reference:fasta file ->
     ?labels:string list ->
-    fasta pworkflow list ->
-    [`quast] dworkflow
+    fasta file list ->
+    [`quast] directory
 end
 
 module Busco : sig
@@ -997,8 +955,8 @@ module Busco : sig
     threads:int ->
     mode:[`genome | `transcriptome | `proteins] ->
     db:db ->
-    fasta pworkflow ->
-    directory pworkflow
+    fasta file ->
+    [`busco] directory
 end
 
 (** {3 Differential analysis} *)
@@ -1014,18 +972,18 @@ module DESeq2 : sig
 
   type output =
     <
-      comparison_summary : table pworkflow ;
-      comparisons : ((string * string * string) * table pworkflow) list ;
-      effect_table : table pworkflow ;
-      normalized_counts : table pworkflow ;
-      sample_clustering : svg pworkflow ;
-      sample_pca : svg pworkflow ;
-      directory : directory pworkflow
+      comparison_summary : table file ;
+      comparisons : ((string * string * string) * table file) list ;
+      effect_table : table file ;
+      normalized_counts : table file ;
+      sample_clustering : svg file ;
+      sample_pca : svg file ;
+      directory : [`deseq2] directory ;
     >
 
   val main_effects :
     string list ->
-    (string list * #Htseq.count_tsv pworkflow) list ->
+    (string list * #Htseq.count_tsv file) list ->
     output
 end
 
@@ -1037,16 +995,11 @@ module Macs : sig
 
   type _ format
 
-  class type output = object
-    inherit directory
-    method contents : [`macs]
-  end
-
   val sam : sam format
   val bam : bam format
 
   val run :
-    ?control: 'a pworkflow list ->
+    ?control: 'a file list ->
     ?petdist:int ->
     ?gsize:gsize ->
     ?tsize:int ->
@@ -1071,8 +1024,8 @@ module Macs : sig
     ?fe_max:int ->
     ?fe_step:int ->
     'a format ->
-    'a pworkflow list ->
-    output pworkflow
+    'a file list ->
+    [`macs] directory
 
   class type peaks_xls = object
     inherit bed3
@@ -1084,7 +1037,7 @@ module Macs : sig
     method f9 : float
   end
 
-  val peaks_xls : output pworkflow -> peaks_xls pworkflow
+  val peaks_xls : [`macs] directory -> peaks_xls file
 
   class type narrow_peaks = object
     inherit bed5
@@ -1096,7 +1049,7 @@ module Macs : sig
   end
 
   val narrow_peaks :
-    output pworkflow -> narrow_peaks pworkflow
+    [`macs] directory -> narrow_peaks file
 
   class type peak_summits = object
     inherit bed4
@@ -1104,15 +1057,14 @@ module Macs : sig
   end
 
   val peak_summits :
-    output pworkflow -> peak_summits pworkflow
+    [`macs] directory -> peak_summits file
 end
 
 module Macs2 : sig
-
   val pileup :
     ?extsize:int ->
     ?both_direction:bool ->
-    bam pworkflow -> Ucsc_gb.bedGraph pworkflow
+    bam file -> Ucsc_gb.bedGraph file
 
   type gsize = [`hs | `mm | `ce | `dm | `gsize of int]
   type keep_dup = [ `all | `auto | `int of int ]
@@ -1121,21 +1073,6 @@ module Macs2 : sig
 
   val sam : sam format
   val bam : bam format
-
-  class type output = object
-    inherit directory
-    method contents : [`macs2]
-  end
-
-  class type narrow_output = object
-    inherit output
-    method peak_type : [`narrow]
-  end
-
-  class type broad_output = object
-    inherit output
-    method peak_type : [`broad]
-  end
 
   val callpeak :
     ?pvalue:float ->
@@ -1147,11 +1084,11 @@ module Macs2 : sig
     ?extsize:int ->
     ?nomodel:bool ->
     ?bdg:bool ->
-    ?control:'a pworkflow list ->
+    ?control:'a file list ->
     ?keep_dup:keep_dup ->
     'a format ->
-    'a pworkflow list ->
-    narrow_output pworkflow
+    'a file list ->
+    [`macs2_narrow] directory
 
   class type peaks_xls = object
     inherit bed3
@@ -1163,7 +1100,7 @@ module Macs2 : sig
     method f9 : float
   end
 
-  val peaks_xls : #output pworkflow -> peaks_xls pworkflow
+  val peaks_xls : [< `macs2_narrow | `macs2_broad] directory -> peaks_xls file
 
   class type narrow_peaks = object
     inherit bed5
@@ -1174,14 +1111,14 @@ module Macs2 : sig
     method f10 : int
   end
 
-  val narrow_peaks : narrow_output pworkflow -> narrow_peaks pworkflow
+  val narrow_peaks : [`macs2_narrow] directory -> narrow_peaks file
 
   class type peak_summits = object
     inherit bed4
     method f5 : float
   end
 
-  val peak_summits : #output pworkflow -> peak_summits pworkflow
+  val peak_summits : [< `macs2_narrow | `macs2_broad] directory -> peak_summits file
 
   val callpeak_broad :
     ?pvalue:float ->
@@ -1193,11 +1130,11 @@ module Macs2 : sig
     ?extsize:int ->
     ?nomodel:bool ->
     ?bdg:bool ->
-    ?control:'a pworkflow list ->
+    ?control:'a file list ->
     ?keep_dup:keep_dup ->
     'a format ->
-    'a pworkflow list ->
-    broad_output pworkflow
+    'a file list ->
+    [`macs2_broad] directory
 
   class type broad_peaks = object
     inherit bed5
@@ -1207,7 +1144,7 @@ module Macs2 : sig
     method f9 : float
   end
 
-  val broad_peaks : broad_output pworkflow -> broad_peaks pworkflow
+  val broad_peaks : [`macs2_broad] directory -> broad_peaks file
 end
 
 module Idr : sig
@@ -1227,13 +1164,13 @@ module Idr : sig
     ?peak_merge_method:[ `sum | `avg | `min | `max] ->
     ?rank:[ `signal | `pvalue | `qvalue ] ->
     ?random_seed:int ->
-    ?peak_list:'a pworkflow ->
-    'a pworkflow ->
-    'a pworkflow ->
-    'a output dworkflow
+    ?peak_list:'a file ->
+    'a file ->
+    'a file ->
+    'a output directory
 
-  val items : 'a output dworkflow -> 'a pworkflow
-  val figure : _ output dworkflow -> png pworkflow
+  val items : 'a output directory -> 'a file
+  val figure : _ output directory -> png file
 end
 
 module Meme_suite : sig
@@ -1245,27 +1182,27 @@ module Meme_suite : sig
     ?maxsize:int ->
     ?alphabet:[`dna | `rna | `protein] ->
     (* ?threads:int -> *)
-    fasta pworkflow ->
-    [`meme] dworkflow
+    fasta file ->
+    [`meme] directory
 
   val meme_logo :
-    [`meme] dworkflow ->
+    [`meme] directory ->
     ?rc:bool ->
     int ->
-    png pworkflow
+    png file
 
   val meme_chip :
     ?meme_nmotifs:int ->
     ?meme_minw:int ->
     ?meme_maxw:int ->
     (* ?np:int -> *)
-    fasta pworkflow ->
-    [`meme_chip] dworkflow
+    fasta file ->
+    [`meme_chip] directory
 
   (** http://meme-suite.org/doc/fimo.html?man_type=web *)
   val fimo :
     ?alpha: float ->
-    ?bgfile:text_file pworkflow ->
+    ?bgfile:text_file file ->
     ?max_stored_scores: int ->
     ?max_strand:bool ->
     ?motif:string ->
@@ -1273,13 +1210,13 @@ module Meme_suite : sig
     ?no_qvalue:bool ->
     ?norc:bool ->
     ?parse_genomic_coord:bool ->
-    ?prior_dist:text_file pworkflow ->
-    ?psp:text_file pworkflow ->
+    ?prior_dist:text_file file ->
+    ?psp:text_file file ->
     ?qv_thresh:bool ->
     ?thresh: float ->
-    [`meme] dworkflow ->
-    fasta pworkflow ->
-    directory pworkflow
+    [`meme] directory ->
+    fasta file ->
+    [`fimo] directory
 end
 
 module Prokka : sig
@@ -1311,19 +1248,19 @@ module Prokka : sig
     ?norrna:bool ->
     ?notrna:bool ->
     ?rnammer:bool ->
-    fasta pworkflow ->
-    directory pworkflow
+    fasta file ->
+    [`prokka] directory
 
 end
 
 module Srst2 : sig
 
   val run_gen_cmd :
-    ?mlst_db:fasta pworkflow ->
+    ?mlst_db:fasta file ->
     ?mlst_delimiter:string ->
-    ?mlst_definitions:fasta pworkflow ->
+    ?mlst_definitions:fasta file ->
     ?mlst_max_mismatch:int ->
-    ?gene_db:fasta pworkflow list ->
+    ?gene_db:fasta file list ->
     ?no_gene_details:bool ->
     ?gene_max_mismatch:int ->
     ?min_coverage:int ->
@@ -1345,11 +1282,11 @@ module Srst2 : sig
 
 
   val run_se :
-    ?mlst_db:fasta pworkflow ->
+    ?mlst_db:fasta file ->
     ?mlst_delimiter:string ->
-    ?mlst_definitions:fasta pworkflow ->
+    ?mlst_definitions:fasta file ->
     ?mlst_max_mismatch:int ->
-    ?gene_db:fasta pworkflow list ->
+    ?gene_db:fasta file list ->
     ?no_gene_details:bool ->
     ?gene_max_mismatch:int ->
     ?min_coverage:int ->
@@ -1366,16 +1303,16 @@ module Srst2 : sig
     ?report_new_consensus:bool ->
     ?report_all_consensus:bool ->
     ?threads:int ->
-    #fastq pworkflow list ->
-    directory pworkflow
+    #fastq file list ->
+    [`srst2] directory
 
 
   val run_pe :
-    ?mlst_db:fasta pworkflow ->
+    ?mlst_db:fasta file ->
     ?mlst_delimiter:string ->
-    ?mlst_definitions:fasta pworkflow ->
+    ?mlst_definitions:fasta file ->
     ?mlst_max_mismatch:int ->
-    ?gene_db:fasta pworkflow list ->
+    ?gene_db:fasta file list ->
     ?no_gene_details:bool ->
     ?gene_max_mismatch:int ->
     ?min_coverage:int ->
@@ -1392,6 +1329,6 @@ module Srst2 : sig
     ?report_new_consensus:bool ->
     ?report_all_consensus:bool ->
     ?threads:int ->
-    #fastq pworkflow list ->
-    directory pworkflow
+    #fastq file list ->
+    [`srst2] directory
 end

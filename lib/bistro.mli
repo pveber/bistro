@@ -34,20 +34,20 @@ type 'a path
    parameter can be used to provide information on the format of a
    file (this is an instance of phantom-typing). *)
 
-type 'a pworkflow = 'a path workflow
-(** Type alias for path workflows *)
-
 (** Base class for files when typing a {!path} *)
-class type file = object
+class type regular_file_t = object
   method file_kind : [`regular]
 end
 
 (** Base class for directories when typing a {!path} *)
-class type directory = object
+class type directory_t = object
   method file_kind : [`directory]
 end
 
-type 'a dworkflow = < directory ; contents : 'a > path workflow
+type 'a file = (#regular_file_t as 'a) path workflow
+(** Type alias for workflows that produce a regular file *)
+
+type 'a directory = < directory_t ; contents : 'a > path workflow
 (** Type alias for workflows that produce a directory *)
 
 (** {2 Building shell-based workflow} *)
@@ -200,7 +200,7 @@ end
 module Workflow : sig
   val input :
     ?version:int ->
-    string -> 'a pworkflow
+    string -> 'a path workflow
   (** Workflow constructor from an existing path *)
 
   val shell :
@@ -219,7 +219,7 @@ module Workflow : sig
   *)
 
   val select :
-    #directory path workflow ->
+    _ directory ->
     string list ->
     'a path workflow
   (** Constructs a workflow from a directory workflow, by selecting a
@@ -283,24 +283,24 @@ module Workflow : sig
   val glob :
     ?pattern:string ->
     ?type_selection:[`File | `Directory] ->
-    #directory pworkflow ->
+    _ directory ->
     'a path list workflow
 end
 
 (** {2 File formats} *)
 
 class type text_file = object
-  inherit file
+  inherit regular_file_t
   method encoding : [`text]
 end
 
 class type ['a] sexp_value = object
-  inherit file
+  inherit regular_file_t
   method ty : 'a
 end
 
 class type binary_file = object
-  inherit file
+  inherit regular_file_t
   method encoding : [`binary]
 end
 
@@ -336,14 +336,14 @@ class type ['a] zip = object
 end
 
 class type ['a] gz = object
-  constraint 'a = #file
+  constraint 'a = #regular_file_t
   inherit binary_file
   method format : [`gz]
   method content_format : 'a
 end
 
 class type ['a] bz2 = object
-  constraint 'a = #file
+  constraint 'a = #regular_file_t
   inherit binary_file
   method format : [`bz2]
   method content_format : 'a
@@ -388,11 +388,6 @@ class type fasta = object
   method format : [`fasta]
 end
 
-class type indexed_fasta = object
-  inherit directory
-  method contents : [`indexed_fasta]
-end
-
 class type fastq = object
   inherit text_file
   method format : [`fastq]
@@ -435,11 +430,6 @@ end
 class type gff3 = object
   inherit gff
   method version : [`v3]
-end
-
-class type indexed_bam = object
-  inherit directory
-  method contents : [`indexed_bam]
 end
 
 class type sam = object

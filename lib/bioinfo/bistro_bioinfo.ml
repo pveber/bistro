@@ -264,12 +264,6 @@ module Samtools = struct
 end
 
 module Bowtie2 = struct
-
-  class type index = object
-    method contents : [`bowtie2_index]
-    inherit directory
-  end
-
   let img = [ docker_image ~account:"pveber" ~name:"bowtie2" ~tag:"2.3.3" () ]
 
   (* memory bound correspond to storing a human index in memory, following bowtie manual *)
@@ -373,13 +367,6 @@ module Bowtie2 = struct
 end
 
 module Bowtie = struct
-
-
-  class type index = object
-    method contents : [`bowtie_index]
-    inherit directory
-  end
-
   let img = [ docker_image ~account:"pveber" ~name:"bowtie" ~tag:"1.1.2" () ]
 
   (* memory bound correspond to storing a human index in memory, following bowtie manual *)
@@ -428,20 +415,14 @@ module Bowtie = struct
 end
 
 module ChIPQC = struct
-
   type 'a sample = {
     id : string ;
     tissue : string ;
     factor : string ;
     replicate : string ;
-    bam : indexed_bam pworkflow ;
-    peaks : (#bed3 as 'a) pworkflow ;
+    bam : [`indexed_bam] directory ;
+    peaks : (#bed3 as 'a) file ;
   }
-
-  class type output = object
-    inherit directory
-    method contents : [`ChIPQC]
-  end
 
   let img = [ docker_image ~account:"pveber" ~name:"bioconductor" ~tag:"3.8" () ]
 
@@ -944,13 +925,13 @@ module DESeq2 = struct
 
   type output =
     <
-      comparison_summary : table pworkflow ;
-      comparisons : ((string * string * string) * table pworkflow) list ;
-      effect_table : table pworkflow ;
-      normalized_counts : table pworkflow ;
-      sample_clustering : svg pworkflow ;
-      sample_pca : svg pworkflow ;
-      directory : directory pworkflow ;
+      comparison_summary : table file ;
+      comparisons : ((string * string * string) * table file) list ;
+      effect_table : table file ;
+      normalized_counts : table file ;
+      sample_clustering : svg file ;
+      sample_pca : svg file ;
+      directory : [`deseq2] directory ;
     >
 
   let img = [ docker_image ~account:"pveber" ~name:"bioconductor" ~tag:"3.3" () ]
@@ -1234,11 +1215,6 @@ end
 module FastQC = struct
   let img = [ docker_image ~account:"pveber" ~name:"fastqc" ~tag:"0.11.5" () ]
 
-  class type report = object
-    inherit directory
-    method contents : [`fastQC_report]
-  end
-
   let run fq = Workflow.shell ~descr:"fastQC" [
       mkdir_p dest ;
       cmd "fastqc" ~img [
@@ -1262,11 +1238,6 @@ module FastQC = struct
 end
 
 module Fastq_screen = struct
-  class type output = object
-    inherit directory
-    method contents : [`fastq_screen]
-  end
-
   let img = [ docker_image ~account:"pveber" ~name:"fastq-screen" ~tag:"0.11.1" () ]
 
   let rec filter_expr res = function
@@ -1390,21 +1361,6 @@ module Macs2 = struct
     | Sam
     | Bam
 
-  class type output = object
-    inherit directory
-    method contents : [`macs2]
-  end
-
-  class type narrow_output = object
-    inherit output
-    method peak_type : [`narrow]
-  end
-
-  class type broad_output = object
-    inherit output
-    method peak_type : [`broad]
-  end
-
   let sam = Sam
   let bam = Bam
 
@@ -1520,11 +1476,6 @@ module Macs = struct
   type _ format =
     | Sam
     | Bam
-
-  class type output = object
-    inherit directory
-    method contents : [`macs]
-  end
 
   let sam = Sam
   let bam = Bam
@@ -1883,11 +1834,6 @@ end
 module Tophat = struct
   let img = [ docker_image ~account:"pveber" ~name:"tophat" ~tag:"2.1.1" () ]
 
-  class type output = object
-    inherit directory
-    method contents : [`tophat]
-  end
-
   let tophat1 ?color index fqs =
     let args = match fqs with
       | SE_or_PE.Single_end fqs -> list dep ~sep:"," fqs
@@ -1990,11 +1936,6 @@ module Ucsc_gb = struct
   class type bigWig = object
     method format : [`bigWig]
     inherit binary_file
-  end
-
-  class type chromosome_sequences = object
-    inherit directory
-    method contents : [`ucsc_chromosome_sequences]
   end
 
   let img = [ docker_image ~account:"pveber" ~name:"ucsc-kent" ~tag:"330" () ]
@@ -2206,12 +2147,8 @@ module Ucsc_gb = struct
 
   module Lift_over = struct
     class type chain_file = object
-      inherit file
+      inherit regular_file_t
       method format : [`lift_over_chain_file]
-    end
-    class type ['a] output = object
-      inherit directory
-      method format : [`ucsc_lift_over of 'a]
     end
 
     let chain_file ~org_from ~org_to =
