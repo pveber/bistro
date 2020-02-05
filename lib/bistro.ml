@@ -36,7 +36,7 @@ module Private = struct
   let reveal x = x
 end
 
-class type text_file = object
+class type text = object
   inherit regular_file_t
   method encoding : [`text]
 end
@@ -52,12 +52,12 @@ class type binary_file = object
 end
 
 class type pdf = object
-  inherit text_file
+  inherit text
   method format : [`pdf]
 end
 
 class type html = object
-  inherit text_file
+  inherit text
   method format : [`html]
 end
 
@@ -67,12 +67,12 @@ class type png = object
 end
 
 class type svg = object
-  inherit text_file
+  inherit text
   method format : [`svg]
 end
 
 class type tsv = object
-  inherit text_file
+  inherit text
   method colum_separator : [`tab]
 end
 
@@ -131,12 +131,12 @@ class type bed6 = object
 end
 
 class type fasta = object
-  inherit text_file
+  inherit text
   method format : [`fasta]
 end
 
 class type fastq = object
-  inherit text_file
+  inherit text
   method format : [`fastq]
 end
 
@@ -180,7 +180,7 @@ class type gff3 = object
 end
 
 class type sam = object
-  inherit text_file
+  inherit text
   method format : [`sam]
 end
 

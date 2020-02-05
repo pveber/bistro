@@ -50,9 +50,9 @@ val tar_xfj :
   ?strip_components:int ->
   'a tar bz2 file ->
   'a file
-val crlf2lf : (#text_file as 'a) file -> 'a file
+val crlf2lf : (#text as 'a) file -> 'a file
 
 val head :
   n:int ->
-  (#text_file as 'a) file ->
+  (#text as 'a) file ->
   'a file

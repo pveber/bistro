@@ -1930,7 +1930,7 @@ module Ucsc_gb = struct
 
   class type wig = object
     method format : [`wig]
-    inherit text_file
+    inherit text
   end
 
   class type bigWig = object

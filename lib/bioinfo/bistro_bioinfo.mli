@@ -56,7 +56,7 @@ module Ucsc_gb : sig
 
   class type wig = object
     method format : [`wig]
-    inherit text_file
+    inherit text
   end
 
   class type bigWig = object
@@ -621,7 +621,7 @@ module Subread : sig
 
   val featureCounts_tsv : [`featureCounts] directory -> count_table file
   val featureCounts_htseq_tsv : [`featureCounts] directory -> Htseq.count_tsv file
-  val featureCounts_summary : [`featureCounts] directory -> text_file file
+  val featureCounts_summary : [`featureCounts] directory -> text file
 end
 
 (** {3 NGS quality} *)
@@ -1202,7 +1202,7 @@ module Meme_suite : sig
   (** http://meme-suite.org/doc/fimo.html?man_type=web *)
   val fimo :
     ?alpha: float ->
-    ?bgfile:text_file file ->
+    ?bgfile:text file ->
     ?max_stored_scores: int ->
     ?max_strand:bool ->
     ?motif:string ->
@@ -1210,8 +1210,8 @@ module Meme_suite : sig
     ?no_qvalue:bool ->
     ?norc:bool ->
     ?parse_genomic_coord:bool ->
-    ?prior_dist:text_file file ->
-    ?psp:text_file file ->
+    ?prior_dist:text file ->
+    ?psp:text file ->
     ?qv_thresh:bool ->
     ?thresh: float ->
     [`meme] directory ->
