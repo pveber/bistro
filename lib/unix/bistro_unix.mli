@@ -37,7 +37,7 @@ val wget_dyn :
 val gzip : 'a file -> 'a gz file
 val gunzip : 'a gz file -> 'a file
 val bunzip2 : 'a bz2 file -> 'a file
-val unzip : 'a zip file -> 'a file
+val unzip : 'a zip file -> 'a path workflow
 val tar_xf :
   ?strip_components:int ->
   'a tar file ->
