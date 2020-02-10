@@ -329,6 +329,11 @@ class type tsv = object
   method colum_separator : [`tab]
 end
 
+class type csv = object
+  inherit text
+  method colum_separator : [`comma]
+end
+
 class type ['a] zip = object
   inherit binary_file
   method format : [`zip]
