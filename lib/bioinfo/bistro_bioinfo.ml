@@ -2286,68 +2286,77 @@ module Kallisto = struct
   let abundance x =
     Workflow.select x [ "abundance.tsv" ]
 
-  let%pworkflow merge_eff_counts ~sample_ids ~kallisto_outputs =
+  let merge_eff_counts ~sample_ids ~kallisto_outputs =
+    Workflow.path_plugin ~descr:"kallisto.merge_eff_counts" (
 
-    let parse_eff_counts fn =
-      In_channel.read_lines fn
-      |> Fn.flip List.drop 1
-      |> List.map ~f:(fun l ->
-          String.split ~on:'\t' l
-          |> Fn.flip List.nth_exn 3
-        )
-    in
-    let parse_names fn =
-      In_channel.read_lines fn
-      |> Fn.flip List.drop 1
-      |> List.map ~f:(fun l ->
-          String.split ~on:'\t' l
-          |> List.hd_exn
-        )
-    in
+      let%pdeps kallisto_outputs = path_list kallisto_outputs
+      and             sample_ids = data sample_ids in
 
-    let names = parse_names [%path List.hd_exn kallisto_outputs] in
-    let counts  = List.map [%eval Workflow.(path_list kallisto_outputs)] ~f:parse_eff_counts in
+      let parse_eff_counts fn =
+        In_channel.read_lines fn
+        |> Fn.flip List.drop 1
+        |> List.map ~f:(fun l ->
+            String.split ~on:'\t' l
+            |> Fn.flip List.nth_exn 3
+          )
+      in
+      let parse_names fn =
+        In_channel.read_lines fn
+        |> Fn.flip List.drop 1
+        |> List.map ~f:(fun l ->
+            String.split ~on:'\t' l
+            |> List.hd_exn
+          )
+      in
 
-    let table = List.transpose_exn (names :: counts) in
+      let names = parse_names (List.hd_exn kallisto_outputs) in
+      let counts  = List.map kallisto_outputs ~f:parse_eff_counts in
 
-    let lines =
-      ("transcript" :: [%param sample_ids]) :: table
-      |> List.map ~f:(String.concat ~sep:"\t")
-    in
+      let table = List.transpose_exn (names :: counts) in
 
-    Out_channel.write_lines [%dest] lines
+      let lines =
+        ("transcript" :: sample_ids) :: table
+        |> List.map ~f:(String.concat ~sep:"\t")
+      in
 
+      Out_channel.write_lines [%dest] lines
+    )
 
-  let%pworkflow merge_tpms ~sample_ids ~kallisto_outputs =
+  let merge_tpms ~sample_ids ~kallisto_outputs =
+    Workflow.path_plugin ~descr:"kallisto.merge_tpms" (
 
-    let parse_tpms fn =
-      In_channel.read_lines fn
-      |> Fn.flip List.drop 1
-      |> List.map ~f:(fun l ->
-          String.split ~on:'\t' l
-          |> Fn.flip List.nth_exn 4
-        )
-    in
-    let parse_names fn =
-      In_channel.read_lines fn
-      |> Fn.flip List.drop 1
-      |> List.map ~f:(fun l ->
-          String.split ~on:'\t' l
-          |> List.hd_exn
-        )
-    in
+      let%pdeps kallisto_outputs = path_list kallisto_outputs
+      and             sample_ids = data sample_ids in
 
-    let names = parse_names [%eval Workflow.path (List.hd_exn kallisto_outputs)] in
-    let tpms  = List.map [%eval Workflow.(path_list kallisto_outputs)] ~f:parse_tpms in
+      let parse_tpms fn =
+        In_channel.read_lines fn
+        |> Fn.flip List.drop 1
+        |> List.map ~f:(fun l ->
+            String.split ~on:'\t' l
+            |> Fn.flip List.nth_exn 4
+          )
+      in
+      let parse_names fn =
+        In_channel.read_lines fn
+        |> Fn.flip List.drop 1
+        |> List.map ~f:(fun l ->
+            String.split ~on:'\t' l
+            |> List.hd_exn
+          )
+      in
 
-    let table = List.transpose_exn (names :: tpms) in
+      let names = parse_names (List.hd_exn kallisto_outputs) in
+      let tpms  = List.map kallisto_outputs ~f:parse_tpms in
 
-    let lines =
-      ("transcript" :: [%param sample_ids]) :: table
-      |> List.map ~f:(String.concat ~sep:"\t")
-    in
+      let table = List.transpose_exn (names :: tpms) in
 
-    Out_channel.write_lines [%dest] lines
+      let lines =
+        ("transcript" :: sample_ids) :: table
+        |> List.map ~f:(String.concat ~sep:"\t")
+      in
+
+      Out_channel.write_lines [%dest] lines
+    )
 end
 
 module Spades = struct

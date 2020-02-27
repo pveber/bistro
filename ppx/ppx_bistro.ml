@@ -46,7 +46,7 @@ let insert_type_of_ext = function
   | "param" -> Param
   | ext -> failwith ("Unknown insert " ^ ext)
 
-class payload_rewriter = object
+class payload_env_rewriter = object
   inherit [(string * expression * insert_type) list] Ast_traverse.fold_map as super
   method! expression expr acc =
     match expr with
@@ -65,6 +65,13 @@ class payload_rewriter = object
         | _ -> failwith "expected empty payload"
 
       )
+    | _ -> super#expression expr acc
+end
+
+class payload_rewriter = object
+  inherit payload_env_rewriter as super
+  method! expression expr acc =
+    match expr with
     | { pexp_desc = Pexp_extension ({txt = ("eval" | "path" | "param" as ext) ; loc ; _}, payload) ; _ } -> (
         match payload with
         | PStr [ { pstr_desc = Pstr_eval (e, _) ; _ } ] ->
@@ -149,9 +156,14 @@ let str_item_rewriter ~loc ~path:_ descr version var expr =
   in
   [%stri let [%p B.pvar var] = [%e replace_body workflow_body_with_type expr]]
 
-let gen_letin_rewriter ~loc (vbs : value_binding list) (body : expression) =
+let gen_letin_rewriter ~loc ~env_rewrite (vbs : value_binding list) (body : expression) =
   let id = digest body in
-  let f = List.fold_right vbs ~init:body ~f:(fun vb acc ->
+  let rewritten_body, _ =
+    if env_rewrite
+    then new payload_env_rewriter#expression body []
+    else body, []
+  in
+  let f = List.fold_right vbs ~init:rewritten_body ~f:(fun vb acc ->
       B.pexp_fun Nolabel None vb.pvb_pat acc
     )
   in
@@ -162,8 +174,8 @@ let gen_letin_rewriter ~loc (vbs : value_binding list) (body : expression) =
       [%expr Bistro.Workflow.app [%e acc] [%e e]]
     )
 
-let letin_rewriter ~loc ~path:_ vbs body = gen_letin_rewriter ~loc vbs [%expr fun () -> [%e body]]
-let pletin_rewriter ~loc ~path:_ vbs body = gen_letin_rewriter ~loc vbs [%expr fun __dest__ -> [%e body]]
+let letin_rewriter ~loc ~path:_ vbs body = gen_letin_rewriter ~loc vbs ~env_rewrite:false [%expr fun () -> [%e body]]
+let pletin_rewriter ~loc ~path:_ vbs body = gen_letin_rewriter ~loc ~env_rewrite:true vbs [%expr fun __dest__ -> [%e body]]
 
 let pstr_item_rewriter ~loc ~path:_ descr version var expr =
   let descr = match descr with
@@ -235,15 +247,15 @@ let script_ext =
 
 let expression_ext =
   let open Extension in
-  declare "workflow_expr" Context.expression Ast_pattern.(single_expr_payload __) expression_rewriter
+  declare "workflow" Context.expression Ast_pattern.(single_expr_payload __) expression_rewriter
 
 let letin_ext =
   let open Extension in
-  declare "workflow" Context.expression Ast_pattern.(single_expr_payload (pexp_let nonrecursive __ __)) letin_rewriter
+  declare "deps" Context.expression Ast_pattern.(single_expr_payload (pexp_let nonrecursive __ __)) letin_rewriter
 
 let pletin_ext =
   let open Extension in
-  declare "pworkflow" Context.expression Ast_pattern.(single_expr_payload (pexp_let nonrecursive __ __)) pletin_rewriter
+  declare "pdeps" Context.expression Ast_pattern.(single_expr_payload (pexp_let nonrecursive __ __)) pletin_rewriter
 
 let _np_attr =
   Attribute.declare "bistro.np"

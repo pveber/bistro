@@ -1,21 +1,21 @@
 open Core
 open Bistro
 
-let echo3 ~sep x = Workflow.path_plugin (
-    let%pworkflow x = x
-    and         sep = data sep in
+let echo3 ~sep x = Workflow.path_plugin ~descr:"echo3" (
+    let%pdeps x = x
+    and     sep = data sep in
     Out_channel.write_lines __dest__ [ x ; sep ; x ; sep ; x ]
   )
 
-let wc x = Workflow.plugin (
-    let%workflow x = path x in
+let wc x = Workflow.plugin ~descr:"wc" (
+    let%deps x = path x in
     In_channel.read_lines x
     |> List.length
   )
 
 let request x =
-  Workflow.plugin (
-    let%workflow x = data x in
+  Workflow.plugin ~descr:"request" (
+    let%deps x = data x in
     String.split ~on:' ' x
   )
 

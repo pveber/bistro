@@ -3,7 +3,7 @@ open Bistro
 open Bistro_nlp
 open Bistro_utils
 
-let cut_deps x = [%workflow_expr
+let cut_deps x = [%workflow
   let lines = In_channel.read_lines [%path x] in
   List.group lines ~break:(fun _ l -> String.equal l "")
   |> List.filter ~f:(Poly.( <> ) [""])

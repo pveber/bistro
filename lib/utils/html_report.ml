@@ -49,12 +49,12 @@ let picture  ?(alt = "") format path =
     ~alt ()
 
 let render_cell = function
-  | Text str -> [%workflow_expr H.p [ H.txt [%param str] ]]
-  | Pdf w -> [%workflow_expr picture `svg [%path svg_of_pdf w] ]
-  | Svg w -> [%workflow_expr picture `svg [%path w] ]
-  | Png w -> [%workflow_expr picture `png [%path w] ]
-  | Section s -> [%workflow_expr H.h2 [ H.txt [%param s] ]]
-  | Subsection s -> [%workflow_expr H.h3 [ H.txt [%param s] ]]
+  | Text str -> [%workflow H.p [ H.txt [%param str] ]]
+  | Pdf w -> [%workflow picture `svg [%path svg_of_pdf w] ]
+  | Svg w -> [%workflow picture `svg [%path w] ]
+  | Png w -> [%workflow picture `png [%path w] ]
+  | Section s -> [%workflow H.h2 [ H.txt [%param s] ]]
+  | Subsection s -> [%workflow H.h3 [ H.txt [%param s] ]]
 
 let%pworkflow render nb =
   let cells = [%eval Workflow.list @@ List.map nb.cells ~f:render_cell] in

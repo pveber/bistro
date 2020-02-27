@@ -1,7 +1,7 @@
 open Core
 open Bistro
 
-let add x y = Workflow.plugin (fun%workflow_expr () ->
+let add x y = Workflow.plugin ~descr:"add" (fun%workflow () ->
     [%eval x] + [%eval y]
   )
 
