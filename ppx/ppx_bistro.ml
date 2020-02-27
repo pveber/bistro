@@ -156,7 +156,9 @@ let gen_letin_rewriter ~loc (vbs : value_binding list) (body : expression) =
     )
   in
   List.fold vbs ~init:[%expr Bistro.Workflow.pure ~id:[%e B.estring id] [%e f]] ~f:(fun acc vb ->
-      let e = B.pexp_open Override (B.Located.lident "Bistro.Workflow") vb.pvb_expr in
+      let module_expr = B.pmod_ident (B.Located.lident "Bistro.Workflow") in
+      let oi = B.open_infos ~expr:module_expr ~override:Override in
+      let e = B.pexp_open oi vb.pvb_expr in
       [%expr Bistro.Workflow.app [%e acc] [%e e]]
     )
 

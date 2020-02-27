@@ -2306,7 +2306,7 @@ module Kallisto = struct
     in
 
     let names = parse_names [%path List.hd_exn kallisto_outputs] in
-    let counts  = List.map [%eval Workflow.(eval_paths kallisto_outputs)] ~f:parse_eff_counts in
+    let counts  = List.map [%eval Workflow.(path_list kallisto_outputs)] ~f:parse_eff_counts in
 
     let table = List.transpose_exn (names :: counts) in
 
@@ -2337,8 +2337,8 @@ module Kallisto = struct
         )
     in
 
-    let names = parse_names [%eval Workflow.eval_path (List.hd_exn kallisto_outputs)] in
-    let tpms  = List.map [%eval Workflow.(eval_paths kallisto_outputs)] ~f:parse_tpms in
+    let names = parse_names [%eval Workflow.path (List.hd_exn kallisto_outputs)] in
+    let tpms  = List.map [%eval Workflow.(path_list kallisto_outputs)] ~f:parse_tpms in
 
     let table = List.transpose_exn (names :: tpms) in
 

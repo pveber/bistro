@@ -117,7 +117,7 @@ let item_to_workflow = function
       List.mapi elts ~f:(fun i path_w ->
           normalized_repo_item ~repo_path:(list_elt_path i) ~id:(Misc.digest (id, i)) ~cache_path:path_w
         )]
-  | Precious_item _ -> Workflow.pure_data []
+  | Precious_item _ -> Workflow.data []
 
 let to_workflow ~outdir items =
   let normalized_items =
