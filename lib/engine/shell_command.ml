@@ -207,7 +207,7 @@ let run (Command cmd) =
             (fun oc -> write oc cmd.text)) >>= fun () ->
   Misc.redirection cmd.env.stdout >>= fun stdout ->
   Misc.redirection cmd.env.stderr >>= fun stderr ->
-  Lwt_process.exec ~stdout ~stderr ("", [| "sh" ; script_file |])
+  Lwt_process.exec ~stdout ~stderr ("", [| "bash" ; script_file |])
   >>= fun status ->
   Lwt_unix.unlink script_file >>= fun () ->
   let exit_code = Caml.Unix.(
