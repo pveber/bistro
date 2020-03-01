@@ -18,7 +18,7 @@ let url_of_image : Command.container_image -> string = function
 
 let fetch_image img dest =
   let url = url_of_image img in
-  let cmd = [| "singularity" ; "pull" ; "--name" ; dest ; url |] in
+  let cmd = [| "singularity" ; "pull" ; dest ; url |] in
   Lwt_process.exec ~stderr:`Dev_null ~stdout:`Dev_null ("", cmd) >>= function
   | WEXITED 0 -> Lwt_result.return ()
   | WEXITED n
