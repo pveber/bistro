@@ -51,12 +51,20 @@ let eval _ () f x =
     Unix.close write_to_parent ;
     Unix.close read_from_parent ;
     let ic = Lwt_io.of_unix_fd ~mode:Lwt_io.input read_from_child in
-    Lwt_io.read_value ic >>= fun (res : (unit, string) result) ->
-    Caml.Unix.kill (Pid.to_int pid) Caml.Sys.sigkill;
-    Misc.waitpid (Pid.to_int pid) >>= fun _ ->
-    Unix.close read_from_child ;
-    Unix.close write_to_child ;
-    Lwt.return res
+    Lwt.catch
+      (fun () ->
+         Lwt_io.read_value ic >>= fun (res : (unit, string) result) ->
+         Caml.Unix.kill (Pid.to_int pid) Caml.Sys.sigkill;
+         Misc.waitpid (Pid.to_int pid) >>= fun _ ->
+         Unix.close read_from_child ;
+         Unix.close write_to_child ;
+         Lwt.return res)
+      (function
+        | End_of_file ->
+          Lwt_result.fail "Lost communication with child process (End_of_file due to segfault?)"
+        | exn ->
+          let msg = Exn.to_string exn in
+          Lwt_result.fail ("Lost communication with child process: " ^ msg))
 
 let build_trace backend w requirement perform =
   let ready = Unix.gettimeofday () in
