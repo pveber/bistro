@@ -144,10 +144,49 @@ let build_main ?np ?mem ?loggers ?allowed_containers ?bistro_dir ?collect ~outdi
 let add_prefix prefix items =
   List.map items ~f:(function
       | Item  (p, w) -> Item  (prefix @ p, w)
-      | Item_list l -> Item_list { l with path = prefix @ l.path}
       | Precious_item _ as i -> i
     )
 
 let shift dir items = add_prefix [ dir ] items
 
 let singleton dir w = [ [ dir ] %> w ]
+
+let protected_set repo =
+  let rec fold_path_workflow acc (W.Any w) =
+    match w with
+    | Select s -> fold_path_workflow acc (W.Any s.dir)
+    | Input _ -> acc
+    | Shell _
+    | Plugin _ -> String.Set.add acc (W.id w)
+    | App _
+    | Both _
+    | Eval_path _
+    | Glob _
+    | List _
+    | List_nth _
+    | Pure _
+    | Spawn _ -> assert false
+  in
+  let k acc w = fold_path_workflow acc (W.Any (Bistro.Private.reveal w)) in
+  List.fold repo ~init:String.Set.empty ~f:(fun acc it ->
+      match it with
+      | Item (_, w) -> k acc w
+      | Precious_item w -> k acc w
+    )
+
+let cache_clip_dry_run ~bistro_dir repo =
+  let protected = protected_set repo in
+  let db = Db.init_exn bistro_dir in
+  Db.fold_cache db ~init:(0,0,0,0) ~f:(fun (total_files, total_size, deleted_files, deleted_size) fn ->
+      let id = Filename.basename fn in
+      match Misc.du fn with
+      | Ok size ->
+        let total_files = total_files + 1 in
+        let total_size = total_size + size in
+        if String.Set.mem protected id then
+          (total_files, total_size, deleted_files, deleted_size)
+        else
+          (total_files, total_size, deleted_files + 1, deleted_size + size)
+      | Error (`Msg msg) ->
+        failwithf "du: %s" msg ()
+    )

@@ -39,3 +39,8 @@ val to_workflow :
   outdir:string ->
   t ->
   unit workflow
+
+val cache_clip_dry_run :
+  bistro_dir:string ->
+  t ->
+  int * int * int * int
