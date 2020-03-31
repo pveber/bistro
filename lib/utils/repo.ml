@@ -7,12 +7,6 @@ module W = Bistro_internals.Workflow
 
 type item =
   | Item  : string list * _ path workflow -> item
-  | Item_list : {
-      path : string list ;
-      prefix : string ;
-      ext : string option ;
-      elts : _ path list workflow ;
-    } -> item
   | Precious_item : _ path workflow -> item
 
 type t = item list
@@ -30,8 +24,6 @@ let normalized_repo_item ~repo_path ~id ~cache_path = {
   }
 
 let item path w = Item (path, w)
-
-let items path ~prefix ?ext elts = Item_list { path ; prefix ; ext ; elts }
 
 let precious_item w = Precious_item w
 
@@ -97,26 +89,6 @@ let generate outdir items =
 let item_to_workflow = function
   | Item (path, w) ->
     [%workflow [ normalized_repo_item ~repo_path:path ~id:(W.id (Private.reveal w)) ~cache_path:[%path w] ]]
-  | Item_list l ->
-    [%workflow
-      let id = W.id (Private.reveal l.elts) in
-      let elts = [%eval Workflow.spawn l.elts ~f:Workflow.path] in
-      let n = List.length elts in
-      let m = Float.(n |> of_int |> log10 |> to_int) in
-      let ext = match l.ext with
-        | None -> ""
-        | Some s -> "." ^ s
-      in
-      let format =
-        Scanf.format_from_string
-          (sprintf {|%%s_%%0%dd%%s|} m)
-          "%s%d%s" in
-      let list_elt_path i =
-        l.path @ [ sprintf format l.prefix i ext ]
-      in
-      List.mapi elts ~f:(fun i path_w ->
-          normalized_repo_item ~repo_path:(list_elt_path i) ~id:(Misc.digest (id, i)) ~cache_path:path_w
-        )]
   | Precious_item _ -> Workflow.data []
 
 let to_workflow ~outdir items =
@@ -141,7 +113,7 @@ let partition_results xs =
 let protect sched items =
   List.iter items ~f:(function
       | Precious_item w -> Scheduler.protect sched w
-      | Item _ | Item_list _ -> ()
+      | Item _ -> ()
     )
 
 let build ?np ?mem ?loggers ?allowed_containers ?(bistro_dir = "_bistro") ?collect ~outdir repo =
