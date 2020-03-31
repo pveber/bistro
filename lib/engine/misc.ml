@@ -100,6 +100,11 @@ let du fn =
   | Ok _ -> R.error_msg "expected exactly one line"
   | Error _ as e -> e
 
+let rm_rf fn =
+  let open Bos in
+  let rm_cmd = Cmd.(v "rm" % "-rf" % p (Fpath.v fn)) in
+  OS.Cmd.run rm_cmd
+
 let rec waitpid pid =
   try Lwt_unix.waitpid [] pid
   with Unix.Unix_error (Unix.EINTR, _, _) -> waitpid pid
