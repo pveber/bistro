@@ -124,9 +124,12 @@ let init path =
 let init_exn path = ok_exn (init path)
 
 let fold_cache db ~init ~f =
-  Array.fold
-    (Sys.readdir (cache_dir db))
-    ~init ~f
+  Sys.readdir (cache_dir db)
+  |> Array.fold ~init ~f:(fun acc fn ->
+      match fn with
+      | "." | ".." -> acc
+      | fn -> f acc (cache db fn)
+    )
 
 let rec path : t -> Bistro_internals.Workflow.path -> string = fun db p ->
   match p with
