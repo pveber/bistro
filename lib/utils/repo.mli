@@ -44,3 +44,8 @@ val cache_clip_dry_run :
   bistro_dir:string ->
   t ->
   int * int * int * int
+
+val cache_clip :
+  bistro_dir:string ->
+  t ->
+  unit

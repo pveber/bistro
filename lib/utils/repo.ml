@@ -174,19 +174,36 @@ let protected_set repo =
       | Precious_item w -> k acc w
     )
 
-let cache_clip_dry_run ~bistro_dir repo =
+let cache_clip_fold ~bistro_dir repo ~f ~init =
   let protected = protected_set repo in
   let db = Db.init_exn bistro_dir in
-  Db.fold_cache db ~init:(0,0,0,0) ~f:(fun (total_files, total_size, deleted_files, deleted_size) fn ->
+  Db.fold_cache db ~init ~f:(fun acc fn ->
       let id = Filename.basename fn in
+      f acc (if String.Set.mem protected id then `Protected fn else `Unprotected fn)
+    )
+
+let cache_clip_dry_run ~bistro_dir repo =
+  cache_clip_fold ~bistro_dir repo ~init:(0,0,0,0) ~f:(fun (total_files, total_size, deleted_files, deleted_size) file ->
+      let fn, protected = match file with
+        | `Protected fn -> fn, true
+        | `Unprotected fn -> fn, false
+      in
       match Misc.du fn with
       | Ok size ->
         let total_files = total_files + 1 in
         let total_size = total_size + size in
-        if String.Set.mem protected id then
-          (total_files, total_size, deleted_files, deleted_size)
-        else
-          (total_files, total_size, deleted_files + 1, deleted_size + size)
+        if protected then (total_files, total_size, deleted_files, deleted_size)
+        else (total_files, total_size, deleted_files + 1, deleted_size + size)
       | Error (`Msg msg) ->
         failwithf "du: %s" msg ()
+    )
+
+let cache_clip ~bistro_dir repo =
+  cache_clip_fold ~bistro_dir repo ~init:() ~f:(fun () file ->
+      match file with
+      | `Protected _ -> ()
+      | `Unprotected fn ->
+        match Misc.rm_rf fn with
+        | Ok () -> ()
+        | Error (`Msg msg) -> failwithf "rm: %s" msg ()
     )
