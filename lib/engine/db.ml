@@ -128,7 +128,7 @@ let fold_cache db ~init ~f =
   |> Array.fold ~init ~f:(fun acc fn ->
       match fn with
       | "." | ".." -> acc
-      | fn -> f acc (cache db fn)
+      | id -> f acc id
     )
 
 let rec path : t -> Bistro_internals.Workflow.path -> string = fun db p ->
