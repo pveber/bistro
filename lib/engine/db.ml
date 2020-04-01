@@ -124,9 +124,12 @@ let init path =
 let init_exn path = ok_exn (init path)
 
 let fold_cache db ~init ~f =
-  Array.fold
-    (Sys.readdir (cache_dir db))
-    ~init ~f
+  Sys.readdir (cache_dir db)
+  |> Array.fold ~init ~f:(fun acc fn ->
+      match fn with
+      | "." | ".." -> acc
+      | id -> f acc id
+    )
 
 let rec path : t -> Bistro_internals.Workflow.path -> string = fun db p ->
   match p with
@@ -166,3 +169,9 @@ let container_image_identifier img =
 
 let singularity_image db img =
   Filename.concat (singularity_image_dir db) (container_image_identifier img)
+
+let remove db id =
+  let open Result in
+  Misc.rm_rf (cache db id) >>= fun () ->
+  Misc.rm_rf (stdout db id) >>= fun () ->
+  Misc.rm_rf (stderr db id)

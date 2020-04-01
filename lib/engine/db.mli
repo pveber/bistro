@@ -40,7 +40,7 @@ val container_image_identifier : Bistro_internals.Command.container_image -> str
 val fold_cache :
   t ->
   init:'a ->
-  f:('a -> string -> 'a) ->
+  f:('a -> id -> 'a) ->
   'a
 
 val path :
@@ -52,3 +52,8 @@ val is_in_cache :
   t ->
   Bistro_internals.Workflow.any ->
   bool
+
+val remove :
+  t ->
+  id ->
+  (unit, [> `Msg of string]) result

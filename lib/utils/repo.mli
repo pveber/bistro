@@ -13,13 +13,6 @@ val precious_item : _ path workflow -> item
 
 val singleton : string -> 'a path workflow -> t
 
-val items :
-  string list ->
-  prefix:string ->
-  ?ext:string ->
-  'a path list workflow ->
-  item
-
 val add_prefix : string list -> t -> t
 
 val shift : string -> t -> t
@@ -46,3 +39,13 @@ val to_workflow :
   outdir:string ->
   t ->
   unit workflow
+
+val cache_clip_dry_run :
+  bistro_dir:string ->
+  t ->
+  int * int * int * int
+
+val cache_clip :
+  bistro_dir:string ->
+  t ->
+  unit

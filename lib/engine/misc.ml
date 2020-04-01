@@ -83,6 +83,28 @@ let glob ~type_selection ~pattern root =
   in
   Ok res
 
+let du fn =
+  let open Bos in
+  let open Rresult in
+  let du_cmd = Cmd.(v "du" % "-s" % p (Fpath.v fn)) in
+  match OS.Cmd.(run_out du_cmd |> to_lines) with
+  | Ok [ line ] -> (
+      match String.lsplit2 line ~on:'\t' with
+      | Some (size, _) ->
+        (
+          try Ok (Int.of_string size)
+          with _ -> R.error_msg "not an integer"
+        )
+      | None -> R.error_msg "unexpected syntax"
+    )
+  | Ok _ -> R.error_msg "expected exactly one line"
+  | Error _ as e -> e
+
+let rm_rf fn =
+  let open Bos in
+  let rm_cmd = Cmd.(v "rm" % "-rf" % p (Fpath.v fn)) in
+  OS.Cmd.run rm_cmd
+
 let rec waitpid pid =
   try Lwt_unix.waitpid [] pid
   with Unix.Unix_error (Unix.EINTR, _, _) -> waitpid pid
