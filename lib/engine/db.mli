@@ -52,3 +52,8 @@ val is_in_cache :
   t ->
   Bistro_internals.Workflow.any ->
   bool
+
+val remove :
+  t ->
+  id ->
+  (unit, [> `Msg of string]) result
