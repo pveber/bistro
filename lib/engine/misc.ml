@@ -86,7 +86,7 @@ let glob ~type_selection ~pattern root =
 let du fn =
   let open Bos in
   let open Rresult in
-  let du_cmd = Cmd.(v "du" % "-s" % p (Fpath.v fn)) in
+  let du_cmd = Cmd.(v "du" % "-sb" % p (Fpath.v fn)) in
   match OS.Cmd.(run_out du_cmd |> to_lines) with
   | Ok [ line ] -> (
       match String.lsplit2 line ~on:'\t' with
