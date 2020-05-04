@@ -6,3 +6,5 @@ let f x y =
     and      y = y in
     x + y
   )
+
+let%workflow [@np 1] [@mem Workflow.int 300] g x y = [%eval x] + [%eval y]

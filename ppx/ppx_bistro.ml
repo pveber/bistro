@@ -137,7 +137,7 @@ let default_descr var =
     Caml.Filename.(remove_extension (basename !L.input_name))
     var
 
-let str_item_rewriter ~loc ~path:_ descr version var expr =
+let str_item_rewriter ~loc ~path:_ descr version mem np var expr =
   let descr = match descr with
     | Some d -> d
     | None -> B.estring (default_descr var)
@@ -149,6 +149,8 @@ let str_item_rewriter ~loc ~path:_ descr version var expr =
     Bistro.Workflow.plugin
       ~descr:[%e descr]
       ?version:[%e B.eopt version]
+      ?np:[%e B.eopt np]
+      ?mem:[%e B.eopt mem]
       [%e applicative_body]] in
   let workflow_body_with_type = match body_type with
     | None -> workflow_body
@@ -177,7 +179,7 @@ let gen_letin_rewriter ~loc ~env_rewrite (vbs : value_binding list) (body : expr
 let letin_rewriter ~loc ~path:_ vbs body = gen_letin_rewriter ~loc vbs ~env_rewrite:false [%expr fun () -> [%e body]]
 let pletin_rewriter ~loc ~path:_ vbs body = gen_letin_rewriter ~loc ~env_rewrite:true vbs [%expr fun __dest__ -> [%e body]]
 
-let pstr_item_rewriter ~loc ~path:_ descr version var expr =
+let pstr_item_rewriter ~loc ~path:_ descr version mem np var expr =
   let descr = match descr with
     | Some d -> d
     | None -> B.estring (default_descr var)
@@ -189,6 +191,8 @@ let pstr_item_rewriter ~loc ~path:_ descr version var expr =
     Bistro.Workflow.path_plugin
       ~descr:[%e descr]
       ?version:[%e B.eopt version]
+      ?np:[%e B.eopt np]
+      ?mem:[%e B.eopt mem]
       [%e applicative_body]] in
   let workflow_body_with_type = match body_type with
     | None -> workflow_body
@@ -257,13 +261,13 @@ let pletin_ext =
   let open Extension in
   declare "pdeps" Context.expression Ast_pattern.(single_expr_payload (pexp_let nonrecursive __ __)) pletin_rewriter
 
-let _np_attr =
+let np_attr =
   Attribute.declare "bistro.np"
     Attribute.Context.value_binding
     Ast_pattern.(single_expr_payload (__))
     (fun x -> x)
 
-let _mem_attr =
+let mem_attr =
   Attribute.declare "bistro.mem"
     Attribute.Context.value_binding
     Ast_pattern.(single_expr_payload (__))
@@ -287,8 +291,8 @@ let str_item_ext label rewriter =
     let open Ast_pattern in
     let vb =
       value_binding ~expr:__ ~pat:(ppat_var __)
-      (* |> Attribute.pattern np_attr *)
-      (* |> Attribute.pattern mem_attr *)
+      |> Attribute.pattern np_attr
+      |> Attribute.pattern mem_attr
       |> Attribute.pattern version_attr
       |> Attribute.pattern descr_attr
     in
