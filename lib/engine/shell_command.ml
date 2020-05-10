@@ -115,6 +115,18 @@ let dest_mount env dck_env =
     ~host_paths:Filename.[ dirname env.dest ]
     ~container_paths:Filename.[ dirname dck_env.dest ]
 
+let singularity_mounts (env : Execution_env.t) cmd =
+  let deps =
+    Command.deps cmd
+    |> List.concat_map ~f:(
+      function
+      | Execution_env.Path p -> [ Db.path env.db p ]
+      | Path_list pl -> List.map pl.elts ~f:(Db.path env.db)
+      | String _ -> []
+    )
+  in
+  Db.build_dir env.db :: deps
+  |> String.concat ~sep:","
 
 let command_path_deps cmd =
   Command.deps cmd
@@ -149,7 +161,8 @@ let rec string_of_command env =
     | `Singularity_container img ->
       let env = Execution_env.singularize env in
       sprintf
-        "singularity exec %s bash -c '%s'"
+        "singularity exec --no-home -B %s %s bash -c '%s'"
+        (singularity_mounts env cmd)
         (Db.singularity_image env.Execution_env.db img)
         (string_of_command env cmd)
 
