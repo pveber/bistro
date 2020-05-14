@@ -125,7 +125,7 @@ let singularity_mounts (env : Execution_env.t) cmd =
       | String _ -> []
     )
   in
-  Db.build_dir env.db :: deps
+  Db.build_dir env.db :: Db.tmp_dir env.db :: deps
   |> String.concat ~sep:","
 
 let command_path_deps cmd =
@@ -161,7 +161,7 @@ let rec string_of_command env =
     | `Singularity_container img ->
       let env = Execution_env.singularize env in
       sprintf
-        "singularity exec --no-home -B %s %s bash -c '%s'"
+        "singularity exec -c --no-home -B %s %s bash -c '%s'"
         (singularity_mounts env cmd)
         (Db.singularity_image env.Execution_env.db img)
         (string_of_command env cmd)
