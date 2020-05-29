@@ -153,7 +153,7 @@ end
 (** {3 NGS utilities} *)
 
 module Bedtools : sig
-  val img : Shell_dsl.container_image list
+  val img : container_image list
 
   type 'a input
 
@@ -558,7 +558,7 @@ module Samtools : sig
 end
 
 module Picardtools : sig
-  val img : Shell_dsl.container_image list
+  val img : container_image list
 
   val markduplicates :
     ?remove_duplicates:bool ->
@@ -575,7 +575,7 @@ module Picardtools : sig
 end
 
 module Sra_toolkit : sig
-  val img : Shell_dsl.container_image list
+  val img : container_image list
 
   val fastq_dump :
     [`id of string | `idw of string workflow | `file of sra file] ->
@@ -683,7 +683,7 @@ module Bowtie : sig
     ?n:int -> ?v:int ->
     ?maxins:int ->
     [`bowtie_index] directory ->
-    'a file list SE_or_PE.t ->
+    sanger_fastq file list SE_or_PE.t ->
     sam file
 end
 
@@ -753,7 +753,7 @@ module Tophat : sig
 end
 
 module Hisat2 : sig
-  val img : Shell_dsl.container_image list
+  val img : container_image list
 
   val hisat2_build :
     ?large_index:bool ->
@@ -820,7 +820,7 @@ module Kallisto : sig
     method f5 : [`tpm] * float
   end
 
-  val img : Shell_dsl.container_image list
+  val img : container_image list
   val index : fasta file list -> index file
   val quant :
     ?bias:bool ->
@@ -899,7 +899,7 @@ module Quast : sig
 end
 
 module Busco : sig
-  val img : Shell_dsl.container_image list
+  val img : container_image list
 
   type db = [
     | `bacteria
@@ -962,8 +962,7 @@ end
 (** {3 Differential analysis} *)
 
 module DESeq2 : sig
-
-  val img : Shell_dsl.container_image list
+  val img : container_image list
 
   class type table = object
     inherit tsv

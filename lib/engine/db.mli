@@ -33,9 +33,9 @@ val cache : t -> id -> string
 val stdout : t -> id -> string
 val stderr : t -> id -> string
 val build : t -> id -> string
-val singularity_image : t -> Bistro_internals.Command.container_image -> string
+val singularity_image : t -> Bistro_internals.Workflow.container_image -> string
 
-val container_image_identifier : Bistro_internals.Command.container_image -> string
+val container_image_identifier : Bistro_internals.Workflow.container_image -> string
 
 val fold_cache :
   t ->

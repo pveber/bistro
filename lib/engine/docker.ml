@@ -7,7 +7,7 @@ let mount_options ~host_paths ~container_paths =
     )
   |> String.concat ~sep:" "
 
-let image_url (image : Command.Docker_image.t) =
+let image_url (image : Workflow.Docker_image.t) =
   sprintf "%s%s/%s%s"
     (Option.value_map ~default:"" ~f:(sprintf "%s/") image.registry)
     image.account

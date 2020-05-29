@@ -5,7 +5,7 @@ val mount_options :
   container_paths:string list ->
   string
 
-val image_url : Command.Docker_image.t -> string
+val image_url : Workflow.Docker_image.t -> string
 
 val chown_command :
   path:string ->

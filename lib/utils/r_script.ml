@@ -75,8 +75,8 @@ let assign var e =
   seq ~sep:" " [ string var ; string "<-" ; e ]
 
 let workflow ?descr ?np ?mem ?img script =
-  Workflow.shell ?descr ?np ?mem Shell_dsl.[
-    cmd "Rscript" ?img [ file_dump script ] ;
+  Workflow.shell ?descr ?img ?np ?mem Shell_dsl.[
+    cmd "Rscript" [ file_dump script ] ;
   ]
 
 let workflow' ?descr ?np ?mem ?img exprs =

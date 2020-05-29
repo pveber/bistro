@@ -163,7 +163,7 @@ let container_image_identifier img =
       (Option.value_map tag ~default:"" ~f:(( ^ ) "_"))
       (Bistro_internals.Workflow.digest img)
   in
-  match (img : Bistro_internals.Command.container_image) with
+  match (img : Bistro_internals.Workflow.container_image) with
   | Docker_image i -> f i.account i.name i.tag
   | Singularity_image i -> f i.account i.name i.tag
 

@@ -6,15 +6,16 @@ let tag = function
   | None -> ""
   | Some t -> ":" ^ t
 
-let url_of_image : Command.container_image -> string = function
+let url_of_image : Workflow.container_image -> string = function
   | Docker_image img ->
-    sprintf "docker://%s/%s%s"
-      img.account img.name
-      (tag img.tag)
+     sprintf "docker://%s%s/%s%s"
+       (Option.value_map img.registry ~default:"" ~f:(sprintf "%s/"))
+       img.account img.name
+       (tag img.tag)
   | Singularity_image img ->
-    sprintf "shub://%s/%s%s"
-      img.account img.name
-      (tag img.tag)
+     sprintf "shub://%s/%s%s"
+       img.account img.name
+       (tag img.tag)
 
 let fetch_image img dest =
   let url = url_of_image img in

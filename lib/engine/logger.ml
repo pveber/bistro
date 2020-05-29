@@ -13,7 +13,7 @@ type event =
   | Workflow_skipped : _ Workflow.t * [ `Done_already | `Missing_dep ] -> event
   | Workflow_allocation_error : _ Workflow.t * string -> event
   | Workflow_collected : _ Workflow.t -> event
-  | Singularity_image_collected : Command.container_image -> event
+  | Singularity_image_collected : Workflow.container_image -> event
   | Debug : string -> event
 
 class type t = object
