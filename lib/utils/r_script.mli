@@ -30,7 +30,7 @@ val workflow :
   ?descr:string ->
   ?np:int ->
   ?mem:int workflow ->
-  ?img:Shell_dsl.container_image list ->
+  ?img:container_image list ->
   template ->
   'a path workflow
 
@@ -38,6 +38,6 @@ val workflow' :
   ?descr:string ->
   ?np:int ->
   ?mem:int workflow ->
-  ?img:Shell_dsl.container_image list ->
+  ?img:container_image list ->
   expr list ->
   'a path workflow

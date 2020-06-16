@@ -8,25 +8,27 @@ type file_dump = File_dump of {
 
 type symbolic_file_dump = Symbolic_file_dump of {
     contents : Execution_env.insert Template.t ;
-    in_docker_container : bool ;
   }
 
 type t = Command of {
-    text : string ;
-    file_dumps : file_dump list ;
+    text : Execution_env.insert Command.t ;
     env : Execution_env.t ;
-    uses_docker : bool ; (* only used to chown results when done through docker *)
+    container : [ `Docker_container of Workflow.Docker_image.t
+                | `Singularity_container of Workflow.container_image ] option ;
   }
 
-let text (Command cmd) = cmd.text
-let file_dumps (Command cmd) = cmd.file_dumps
+let container_env (Command { container ; env ; text = _ }) =
+  match container with
+  | None -> env
+  | Some (`Docker_container _) -> Execution_env.dockerize env
+  | Some (`Singularity_container _) -> Execution_env.singularize env
 
-let rec file_dumps_of_tokens in_docker toks =
-  List.map toks ~f:(file_dumps_of_token in_docker)
+let rec file_dumps_of_tokens toks =
+  List.map toks ~f:file_dumps_of_token
   |> List.concat
   |> List.dedup_and_sort ~compare:Caml.compare
 
-and file_dumps_of_token in_docker_container =
+and file_dumps_of_token =
   let open Template in
   function
   | NP
@@ -38,21 +40,19 @@ and file_dumps_of_token in_docker_container =
   | F contents ->
     Symbolic_file_dump {
       contents = contents ;
-      in_docker_container ;
-    } :: file_dumps_of_tokens in_docker_container contents
+    } :: file_dumps_of_tokens contents
     |> List.dedup_and_sort ~compare:Caml.compare
 
-let rec file_dumps_of_command in_docker =
+let rec file_dumps_of_command =
   let open Command in
   function
-  | Simple_command toks -> file_dumps_of_tokens in_docker toks
+  | Simple_command toks -> file_dumps_of_tokens toks
   | And_list xs
   | Or_list xs
   | Pipe_list xs ->
-    List.map xs ~f:(file_dumps_of_command in_docker)
+    List.map xs ~f:file_dumps_of_command
     |> List.concat
     |> List.dedup_and_sort ~compare:Caml.compare
-  | Within_container (_, cmd) -> file_dumps_of_command true cmd
 
 let string_of_token (env : Execution_env.t) =
   let open Template in
@@ -77,56 +77,16 @@ let string_of_tokens env xs =
   List.map ~f:(string_of_token env) xs
   |> String.concat
 
+let compile_file_dump (env : Execution_env.t) (container_env : Execution_env.t) (Symbolic_file_dump { contents }) =
+  let path = env.file_dump contents in
+  let text = string_of_tokens container_env contents in
+  File_dump { path ; text }
+
+let file_dumps (Command cmd as c) =
+  file_dumps_of_command cmd.text
+  |> List.map ~f:(compile_file_dump cmd.env (container_env c))
+
 let par x = "(" ^ x ^ ")"
-
-let deps_mount ~env deps =
-  let open Execution_env in
-  let mounts = List.map deps ~f:(Execution_env.container_mount env.db) in
-  let host_paths, container_paths =
-    List.map mounts ~f:Execution_env.(fun m -> m.mount_host_location, m.mount_container_location)
-    |> List.dedup_and_sort ~compare:Caml.compare
-    |> List.unzip
-  in
-  Docker.mount_options ~host_paths ~container_paths
-
-(* let cache_mount env =
- *   Docker.mount_options
- *     ~host_paths:[Db.cache_dir env.Execution_env.db]
- *     ~container_paths:[Execution_env.docker_cache_dir] *)
-
-let file_dumps_mount env dck_env file_dumps =
-  let open Execution_env in
-  let f env (Symbolic_file_dump { contents = fd ; _ }) =
-    env.file_dump fd
-  in
-  Docker.mount_options
-    ~host_paths:(List.map file_dumps ~f:(f env))
-    ~container_paths:(List.map file_dumps ~f:(f dck_env))
-
-let tmp_mount env dck_env =
-  let open Execution_env in
-  Docker.mount_options
-    ~host_paths:[env.tmp]
-    ~container_paths:[dck_env.tmp]
-
-let dest_mount env dck_env =
-  let open Execution_env in
-  Docker.mount_options
-    ~host_paths:Filename.[ dirname env.dest ]
-    ~container_paths:Filename.[ dirname dck_env.dest ]
-
-let singularity_mounts (env : Execution_env.t) cmd =
-  let deps =
-    Command.deps cmd
-    |> List.concat_map ~f:(
-      function
-      | Execution_env.Path p -> [ Db.path env.db p ]
-      | Path_list pl -> List.map pl.elts ~f:(Db.path env.db)
-      | String _ -> []
-    )
-  in
-  Db.build_dir env.db :: Db.tmp_dir env.db :: deps
-  |> String.concat ~sep:","
 
 let command_path_deps cmd =
   Command.deps cmd
@@ -137,6 +97,77 @@ let command_path_deps cmd =
     )
   |> List.concat
 
+module Mounts = struct
+  type t = {
+      host_paths : string list ;
+      container_paths : string list ;
+    }
+
+  let of_pair (host_paths, container_paths) = {
+      host_paths ;
+      container_paths ;
+    }
+
+  let deps ~env (Command cmd) =
+    let open Execution_env in
+    command_path_deps cmd.text
+    |> List.map ~f:(Execution_env.container_mount env.db)
+    |> List.map ~f:Execution_env.(fun m -> m.mount_host_location, m.mount_container_location)
+    |> List.dedup_and_sort ~compare:Caml.compare
+    |> List.unzip
+    |> of_pair
+
+  let file_dumps env container_env (Command cmd) =
+    let open Execution_env in
+    let file_dumps = file_dumps_of_command cmd.text in
+    let f env (Symbolic_file_dump { contents = fd ; _ }) =
+      env.file_dump fd
+    in
+    {
+      host_paths = List.map file_dumps ~f:(f env) ;
+      container_paths = List.map file_dumps ~f:(f container_env) ;
+    }
+
+  let tmp env container_env =
+    let open Execution_env in
+    {
+      host_paths = [env.tmp] ;
+      container_paths = [container_env.tmp] ;
+    }
+
+  let script script =
+    {
+      host_paths = [script] ;
+      container_paths = [script] ;
+    }
+
+  let dest env container_env =
+    let open Execution_env in
+    {
+      host_paths = Filename.[ dirname env.dest ] ;
+      container_paths = Filename.[ dirname container_env.dest ] ;
+    }
+
+  let docker_opt { host_paths ; container_paths } =
+    Docker.mount_options ~host_paths ~container_paths
+end
+
+let singularity_mounts (env : Execution_env.t) (container_env : Execution_env.t) cmd script_fn =
+  let binding (m : Mounts.t) =
+    List.map2_exn m.host_paths m.container_paths ~f:(fun hp cp ->
+        sprintf "%s:%s" hp cp
+      )
+  in
+  Mounts.[
+      deps ~env cmd ;
+      dest env container_env ;
+      script script_fn ;
+      file_dumps env container_env cmd ;
+      tmp env container_env ;
+  ]
+  |> List.concat_map ~f:binding
+  |> String.concat ~sep:","
+
 let rec string_of_command env =
   let open Command in
   function
@@ -144,63 +175,20 @@ let rec string_of_command env =
   | And_list xs -> par (string_of_command_aux env " && " xs)
   | Or_list xs -> par (string_of_command_aux env " || " xs)
   | Pipe_list xs -> par (string_of_command_aux env " | " xs)
-  | Within_container (img, cmd) ->
-    match Execution_env.choose_container env.Execution_env.allowed_containers img with
-    | `Plain ->
-      string_of_command env cmd
-    | `Docker_container image ->
-      let dck_env = Execution_env.dockerize env in
-      sprintf
-        "docker run --log-driver=none --rm %s %s %s %s -i %s bash -c '%s'"
-        (deps_mount ~env (command_path_deps cmd))
-        (file_dumps_mount env dck_env (file_dumps_of_command true cmd))
-        (tmp_mount env dck_env)
-        (dest_mount env dck_env)
-        (Docker.image_url image)
-        (string_of_command dck_env cmd)
-    | `Singularity_container img ->
-      let env = Execution_env.singularize env in
-      sprintf
-        "singularity exec -c --no-home -B %s %s bash -c '%s'"
-        (singularity_mounts env cmd)
-        (Db.singularity_image env.Execution_env.db img)
-        (string_of_command env cmd)
 
 and string_of_command_aux env sep xs =
   List.map xs ~f:(string_of_command env)
   |> String.concat ~sep
 
-let rec command_uses_docker env = function
-  | Command.Simple_command _ -> false
-  | And_list xs
-  | Or_list xs
-  | Pipe_list xs -> command_uses_docker_aux env xs
-  | Within_container (img, _) ->
-    match Execution_env.choose_container env.Execution_env.allowed_containers img with
-    | `Plain -> false
-    | `Docker_container _ -> true
-    | `Singularity_container _ -> false
-and command_uses_docker_aux env xs =
-  List.exists xs ~f:(command_uses_docker env)
+let text (Command cmd as c) =
+  string_of_command (container_env c) cmd.text
 
-let compile_file_dump env (Symbolic_file_dump { contents ; in_docker_container }) =
-  let exec_env =
-    if in_docker_container && Execution_env.allows_docker env
-    then Execution_env.dockerize env
-    else env
-  in
-  let path = env.file_dump contents in
-  let text = string_of_tokens exec_env contents in
-  File_dump { path ; text }
-
-let make env cmd =
+let make env img cmd =
+  let container = Execution_env.choose_container env.Execution_env.allowed_containers img in
   Command {
-    text = string_of_command env cmd ;
-    file_dumps =
-      file_dumps_of_command false cmd
-      |> List.map ~f:(compile_file_dump env) ;
+    text = cmd ;
     env ;
-    uses_docker = command_uses_docker env cmd ;
+    container ;
   }
 
 let write_file_dumps xs =
@@ -209,20 +197,48 @@ let write_file_dumps xs =
   in
   Lwt_list.iter_p f xs
 
-let run (Command cmd) =
+let uses_docker (Command cmd) = match cmd.container with
+  | None | Some (`Singularity_container _) -> false
+  | Some (`Docker_container _) -> true
+
+let invocation (Command cmd as c) script =
+  match cmd.container with
+  | None -> sprintf "/bin/bash %s" script
+  | Some (`Docker_container image) ->
+     let container_env = container_env c in
+     sprintf
+       "docker run --log-driver=none --rm %s %s %s %s %s -i %s /bin/bash %s"
+       (Mounts.deps ~env:cmd.env c |> Mounts.docker_opt)
+       (Mounts.file_dumps cmd.env container_env c |> Mounts.docker_opt)
+       (Mounts.tmp cmd.env container_env |> Mounts.docker_opt)
+       (Mounts.dest cmd.env container_env |> Mounts.docker_opt)
+       (Mounts.script script |> Mounts.docker_opt)
+       (Docker.image_url image)
+       script
+  | Some (`Singularity_container image) ->
+     let container_env = container_env c in
+     sprintf
+       "singularity exec --no-home -B %s %s /bin/bash '%s'"
+       (singularity_mounts cmd.env container_env c script)
+       (Db.singularity_image cmd.env.Execution_env.db image)
+       script
+
+let run (Command cmd as c) =
   let open Lwt in
-  let script_file = Filename.temp_file "guizmin" ".sh" in
+  let script_file = Filename.concat cmd.env.tmp_dir "script.sh" in
+  let invocation = invocation c script_file in
+  print_endline invocation ;
   Misc.remove_if_exists cmd.env.tmp_dir >>= fun () ->
   Unix.mkdir_p cmd.env.tmp ;
-  write_file_dumps cmd.file_dumps >>= fun () ->
+  write_file_dumps (file_dumps c) >>= fun () ->
   Lwt_io.(with_file
             ~mode:output script_file
-            (fun oc -> write oc cmd.text)) >>= fun () ->
+            (fun oc -> write oc (text c))) >>= fun () ->
   Misc.redirection cmd.env.stdout >>= fun stdout ->
   Misc.redirection cmd.env.stderr >>= fun stderr ->
-  Lwt_process.exec ~stdout ~stderr ("", [| "bash" ; script_file |])
+  Lwt_process.exec ~stdout ~stderr (Lwt_process.shell invocation)
   >>= fun status ->
-  Lwt_unix.unlink script_file >>= fun () ->
+  (* Lwt_unix.unlink script_file >>= fun () -> *)
   let exit_code = Caml.Unix.(
       match status with
       | WEXITED code
@@ -232,7 +248,7 @@ let run (Command cmd) =
   in
   let dest_exists = match Sys.file_exists cmd.env.dest with `Yes -> true | `Unknown | `No -> false in
   (
-    if Execution_env.allows_docker cmd.env && cmd.uses_docker then (
+    if Execution_env.allows_docker cmd.env && uses_docker c then (
       Misc.docker_chown ~path:cmd.env.tmp_dir ~uid:cmd.env.uid >>= fun () ->
       if dest_exists then Misc.docker_chown ~path:cmd.env.dest ~uid:cmd.env.uid
       else Lwt.return ()
@@ -240,3 +256,5 @@ let run (Command cmd) =
     else Lwt.return ()
   ) >>= fun () ->
   Lwt.return (exit_code, dest_exists)
+
+let container (Command cmd) = cmd.container

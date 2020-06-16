@@ -46,8 +46,11 @@ let make ~db  ~allowed_containers ~np ~mem ~id =
     uid = Unix.getuid () ;
   }
 
-let docker_cache_dir = "/bistro/data"
+let container_cache_dir = "/bistro/data"
 
+(* This type is used to allow a form of compression, by noticing some
+   mounted files are in the same directory, and mount that directory
+   only once. This is particularly useful for /bistro/data *)
 type container_mount = {
   mount_host_location : string ;
   mount_container_location : string ;
@@ -61,13 +64,13 @@ let container_mount
     | Cache_id id ->
       {
         mount_host_location = Db.cache_dir db ;
-        mount_container_location = docker_cache_dir ;
-        file_container_location = Filename.concat docker_cache_dir id
+        mount_container_location = container_cache_dir ;
+        file_container_location = Filename.concat container_cache_dir id
       }
 
     | FS_path path ->
       let id = Misc.digest path in
-      let container_path = Filename.concat docker_cache_dir id in
+      let container_path = Filename.concat container_cache_dir id in
       {
         mount_host_location = path ;
         mount_container_location = container_path ;
@@ -77,10 +80,10 @@ let container_mount
     | Cd (Cache_id id, sel) ->
       {
         mount_host_location = Db.cache_dir db ;
-        mount_container_location = docker_cache_dir ;
+        mount_container_location = container_cache_dir ;
         file_container_location =
           List.reduce_exn ~f:Filename.concat [
-            docker_cache_dir ;
+            container_cache_dir ;
             id ;
             Path.to_string sel
           ]
@@ -89,10 +92,10 @@ let container_mount
       let id = Misc.digest path in
       {
         mount_host_location = path ;
-        mount_container_location = Filename.concat docker_cache_dir id ;
+        mount_container_location = Filename.concat container_cache_dir id ;
         file_container_location =
           List.reduce_exn ~f:Filename.concat [
-            docker_cache_dir ;
+            container_cache_dir ;
             id ;
             Path.to_string sel
           ]
@@ -102,11 +105,11 @@ let container_mount
 
 let dockerize env = {
   db = env.db ;
-  tmp_dir = "/bistro" ;
+  tmp_dir = "/bistro/build" ;
   allowed_containers = [] ;
-  dest = "/bistro/dest" ;
-  tmp = "/bistro/tmp" ;
-  file_dump = (fun toks -> Filename.concat docker_cache_dir (Misc.digest toks)) ;
+  dest = "/bistro/build/dest" ;
+  tmp = "/bistro/build/tmp" ;
+  file_dump = (fun toks -> Filename.concat container_cache_dir (Misc.digest toks)) ;
   dep = (fun u -> (container_mount env.db u).file_container_location) ;
   np = env.np ;
   mem = env.mem ;
@@ -119,46 +122,38 @@ let allows_docker env = List.mem ~equal:Poly.equal env.allowed_containers `Docke
 
 let singularize env = {
   env with allowed_containers = [] ;
+           tmp_dir = "/bistro/build" ;
+           dest = "/bistro/build/dest" ;
+           tmp = "/bistro/build/tmp" ;
+           file_dump = (fun toks -> Filename.concat container_cache_dir (Misc.digest toks)) ;
+           dep = (fun u -> (container_mount env.db u).file_container_location) ;
 }
 
 let find_docker_image env =
-  List.find_map env ~f:Command.(function
+  List.find_map env ~f:Workflow.(function
       | Docker_image i -> Some i
       | Singularity_image _ -> None
     )
 
 let find_singularity_image env =
-  List.find_map env ~f:Command.(function
+  List.find_map env ~f:Workflow.(function
       | Docker_image _ -> None
       | Singularity_image i -> Some i
     )
 
 let rec choose_container allowed_containers images =
   match allowed_containers with
-  | [] -> `Plain
+  | [] -> None
   | `Docker :: others -> ( (* docker only accepts docker images *)
       match find_docker_image images with
-      | Some i -> `Docker_container i
+      | Some i -> Some (`Docker_container i)
       | None -> choose_container others images
     )
   | `Singularity :: others -> (
       match find_singularity_image images with
-      | Some i -> `Singularity_container (Command.Singularity_image i)
+      | Some i -> Some (`Singularity_container (Workflow.Singularity_image i))
       | None ->
         match find_docker_image images with
-        | Some i -> `Singularity_container (Command.Docker_image i)
+        | Some i -> Some (`Singularity_container (Workflow.Docker_image i))
         | None -> choose_container others images
     )
-
-let rec images_for_singularity allowed_containers = function
-  | Command.Simple_command _ -> []
-  | And_list xs
-  | Or_list xs
-  | Pipe_list xs -> images_for_singularity_aux allowed_containers xs
-  | Within_container (img, _) ->
-    match choose_container allowed_containers img with
-    | `Plain
-    | `Docker_container _ -> []
-    | `Singularity_container img -> [ img ]
-and images_for_singularity_aux allowed_containers xs =
-  List.concat_map xs ~f:(images_for_singularity allowed_containers)

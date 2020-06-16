@@ -52,6 +52,8 @@ type 'a directory = < directory_t ; contents : 'a > path workflow
 
 (** {2 Building shell-based workflow} *)
 
+type container_image
+
 (** Representation of scripts *)
 module Template_dsl : sig
   type template
@@ -125,13 +127,11 @@ end
 module Shell_dsl : sig
   type template = Template_dsl.template
   type command
-  type container_image
 
   include module type of Template_dsl with type template := template
 
   val cmd :
     string ->
-    ?img:container_image list ->
     ?stdin:template -> ?stdout:template -> ?stderr:template ->
     template list -> command
   (** Command-line constructor, e.g.
@@ -145,7 +145,6 @@ module Shell_dsl : sig
       @param stderr adds a ["2> /some/path"] token at the end of the command *)
 
   val bash :
-    ?img:container_image list ->
     template ->
     command
   (** Run a bash script, best used with [%script {|...|}] *)
@@ -181,10 +180,6 @@ module Shell_dsl : sig
   val rm_rf : template -> command
   val mv : template -> template -> command
 
-  val within_container : container_image list -> command -> command
-  (** [docker cmd] transforms [cmd] so that it can be executed in a
-      Docker container. *)
-
   val docker_image :
     ?tag:string ->
     ?registry:string ->
@@ -208,6 +203,7 @@ module Workflow : sig
     ?mem:int workflow ->
     ?np:int ->
     ?version:int ->
+    ?img:container_image list ->
     Shell_dsl.command list -> 'a path workflow
   (** Constructor for a workflow that execute a shell script. Its main
     argument is a list of {!Shell_dsl.cmd} values. Other arguments

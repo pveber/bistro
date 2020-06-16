@@ -40,18 +40,12 @@ type container_mount = {
 
 val container_mount : Db.t -> Workflow.path -> container_mount
 val dockerize : t -> t
-val docker_cache_dir : string
+val container_cache_dir : string
 val allows_docker : t -> bool
 val singularize : t -> t
 
 val choose_container :
   [`Docker | `Singularity] list ->
-  Command.container_image list ->
-  [ `Plain
-  | `Docker_container of Command.Docker_image.t
-  | `Singularity_container of Command.container_image ]
-
-val images_for_singularity :
-  [`Docker | `Singularity] list ->
-  _ Command.t ->
-  Command.container_image list
+  Workflow.container_image list ->
+  [ `Docker_container of Workflow.Docker_image.t
+  | `Singularity_container of Workflow.container_image ] option

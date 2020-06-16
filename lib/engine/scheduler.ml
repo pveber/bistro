@@ -21,7 +21,7 @@ module Gc : sig
   val create : Db.t -> (Logger.event -> unit) -> t
   val register : t -> ?target:_ W.t -> _ W.t -> unit Lwt.t
   val tag_workflow_as_built : t -> _ W.t -> unit
-  val uses_singularity_image : t -> _ W.t -> Command.container_image -> unit
+  val uses_singularity_image : t -> _ W.t -> Workflow.container_image -> unit
   val stop : t -> unit Lwt.t
   val protect : t -> _ W.t -> unit
   (* val fold_deps :
@@ -41,7 +41,7 @@ struct
   module Elt = struct
     type t =
       | Workflow : W.any -> t
-      | Singularity_image : Command.container_image -> t
+      | Singularity_image : Workflow.container_image -> t
 
     let workflow w = Workflow (W.Any w)
     let singularity_image x = Singularity_image x
@@ -261,7 +261,7 @@ end
 module Maybe_gc : sig
   type t = Gc.t option
   val register : t -> ?target:_ W.t -> _ W.t -> unit Lwt.t
-  val uses_singularity_image : t -> _ W.t -> Command.container_image -> unit
+  val uses_singularity_image : t -> _ W.t -> Workflow.container_image -> unit
   val tag_workflow_as_built : t -> _ W.t -> unit
   val stop : t -> unit Lwt.t
   val protect : t -> _ W.t -> unit
@@ -410,14 +410,14 @@ module Make(Backend : Backend) = struct
     | 0, false -> `Missing_output
     | _ -> `Failed
 
-  let perform_shell { backend ; allowed_containers ; db ; _ } token (Allocator.Resource { np ; mem }) ~id ~descr cmd =
+  let perform_shell { backend ; allowed_containers ; db ; _ } token (Allocator.Resource { np ; mem }) ~id ~descr images cmd =
     let env =
       Execution_env.make
         ~allowed_containers
         ~db
         ~np ~mem ~id
     in
-    let cmd = Shell_command.make env cmd in
+    let cmd = Shell_command.make env images cmd in
     Backend.run_shell_command backend token cmd >>= fun (exit_code, dest_exists) ->
     let cache_dest = Db.cache db id in
     let outcome = step_outcome ~exit_code ~dest_exists in
@@ -583,9 +583,6 @@ module Make(Backend : Backend) = struct
       list xs >|= fun xs -> Or_list xs
     | Pipe_list xs ->
       list xs >|= fun xs -> Pipe_list xs
-    | Within_container (env, cmd) ->
-      shallow_eval_command sched cmd >|= fun cmd ->
-      Within_container (env, cmd)
 
   and shallow_eval_template sched toks =
     Lwt_list.map_p (shallow_eval_token sched) toks
@@ -709,10 +706,13 @@ module Make(Backend : Backend) = struct
       )
     |> Eval_thread.ignore
 
-  let schedule_shell_container_image_fetch sched w cmd =
-    let images = Execution_env.images_for_singularity sched.allowed_containers cmd in
-    List.iter images ~f:(Maybe_gc.uses_singularity_image sched.gc w) ;
-    Eval_thread.join images ~f:(schedule_container_image_fetch sched)
+  let schedule_shell_container_image_fetch sched w (cmd : W.shell_command) =
+    match Execution_env.choose_container sched.allowed_containers cmd.images with
+    | Some (`Singularity_container i) ->
+       Maybe_gc.uses_singularity_image sched.gc w i ;
+       schedule_container_image_fetch sched i
+    | Some (`Docker_container _) | None ->
+       Eval_thread.return ()
 
   let rec build
     : type u v. t -> ?target:v W.t -> u W.t -> unit thread
@@ -773,8 +773,8 @@ module Make(Backend : Backend) = struct
                 (schedule_shell_container_image_fetch sched w task)
                 (join deps ~f:(fun (W.Any x) -> build sched ~target:w x)))
           ~perform:(fun token resource ->
-              shallow_eval_command sched task >> fun cmd ->
-              perform_shell sched token resource ~id ~descr cmd >>= fun r ->
+              shallow_eval_command sched task.cmd >> fun cmd ->
+              perform_shell sched token resource ~id ~descr task.images cmd >>= fun r ->
               Eval_thread.return r)
 
       | List l ->

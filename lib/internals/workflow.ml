@@ -7,6 +7,36 @@ let cd dir sel = match dir with
   | Cd (indir, insel) -> Cd (indir, insel @ sel)
   | FS_path _ | Cache_id _ -> Cd (dir, sel)
 
+module Docker_image = struct
+  type t = {
+    account : string ;
+    name : string ;
+    tag : string option ;
+    registry : string option ;
+  }
+end
+
+module Singularity_image = struct
+  type t = {
+    account : string ;
+    name : string ;
+    tag : string option ;
+    registry : string option ;
+  }
+end
+
+type container_image =
+  | Docker_image of Docker_image.t
+  | Singularity_image of Singularity_image.t
+
+let docker_image ?tag ?registry ~account ~name () =
+  Docker_image {
+    account = account ;
+    name = name ;
+    tag = tag ;
+    registry = registry ;
+  }
+
 type _ t =
   | Pure : { id : string ; value : 'a } -> 'a t
   | App : {
@@ -65,7 +95,10 @@ and 'a plugin =
   | Value_plugin : (unit -> 'a) t -> 'a plugin
   | Path_plugin : (string -> unit) t -> path plugin
 
-and shell_command = token Command.t
+and shell_command = {
+    cmd : token Command.t ;
+    images : container_image list ;
+  }
 
 and token =
   | Path_token of path t
@@ -211,8 +244,14 @@ let shell
     ?mem
     ?(np = 1)
     ?version
+    ?(img = [])
     cmds =
   let cmd = Command.And_list cmds in
+  let shell_cmd = {
+      cmd ;
+      images = img ;
+    }
+  in
   let id = digest ("shell", version, digestible_cmd cmd) in
   let deps = add_mem_dep mem (
       Command.deps cmd
@@ -223,7 +262,7 @@ let shell
         )
     )
   in
-  Shell { descr ; task = cmd ; np ; mem ; version ; id ; deps }
+  Shell { descr ; task = shell_cmd ; np ; mem ; version ; id ; deps }
 
 let list elts =
   let id = digest ("list", List.map id elts) in

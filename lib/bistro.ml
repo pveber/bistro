@@ -15,6 +15,8 @@ type 'a workflow = 'a Workflow.t
 type 'a file = (#regular_file_t as 'a) path workflow
 type 'a directory = < directory_t ; contents : 'a > path workflow
 
+type container_image = Workflow.container_image
+
 module Workflow = struct
   include Workflow
 
@@ -238,12 +240,9 @@ end
 module Shell_dsl = struct
   include Template_dsl
 
-  type command = Workflow.shell_command
-  type container_image = Command.container_image
+  type command = Workflow.token Command.t
 
-  let within_container images cmd = Command.Within_container (images, cmd)
-
-  let gen_cmd prog_expr ?img ?stdin ?stdout ?stderr args =
+  let gen_cmd prog_expr ?stdin ?stdout ?stderr args =
     let stdout_expr =
       match stdout with
       | None -> []
@@ -265,10 +264,7 @@ module Shell_dsl = struct
       |> List.intersperse ~sep:(string " ")
       |> List.concat
     in
-    let cmd = Command.Simple_command tokens in
-    match img with
-    | None -> cmd
-    | Some image -> within_container image cmd
+    Command.Simple_command tokens
 
   let cmd p = gen_cmd [ S p ]
 
@@ -297,7 +293,7 @@ module Shell_dsl = struct
 
   let ( % ) f g x = g (f x)
 
-  let docker_image = Command.docker_image
+  let docker_image = Workflow.docker_image
 
-  let bash ?img script = cmd "bash" ?img [ file_dump script ]
+  let bash script = cmd "bash" [ file_dump script ]
 end

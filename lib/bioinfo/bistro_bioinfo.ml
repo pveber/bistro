@@ -62,7 +62,7 @@ module Bedtools = struct
   let img = [ docker_image ~account:"pveber" ~name:"bedtools" ~tag:"2.21.0" () ]
 
   let bedtools ?stdout subcmd args =
-    cmd "bedtools" ?stdout ~img (string subcmd :: args)
+    cmd "bedtools" ?stdout (string subcmd :: args)
 
   type 'a input = Bed | Gff
 
@@ -93,14 +93,14 @@ module Bedtools = struct
   end
 
   let slop ?strand ?header ~mode _ input chrom_size =
-    Workflow.shell ~descr:"bedtools.slop" [
+    Workflow.shell ~descr:"bedtools.slop" ~img [
       Cmd.slop ?strand ?header ~mode input chrom_size
     ]
 
   let intersect ?ubam ?wa ?wb ?loj ?wo ?wao ?u ?c ?v ?f ?_F ?r ?e ?s ?_S
       ?split ?sorted ?g ?header ?filenames ?sortout _ file files =
-    Workflow.shell ~descr:"bedtools.intersect" [
-      cmd "bedtools intersect" ~img ~stdout:dest [
+    Workflow.shell ~descr:"bedtools.intersect" ~img [
+      cmd "bedtools intersect" ~stdout:dest [
         option (flag string "-ubam") ubam ;
         option (flag string "-wa") wa ;
         option (flag string "-wb") wb ;
@@ -128,8 +128,8 @@ module Bedtools = struct
     ]
 
   let closest ?strand ?io ?iu ?id ?fu ?fd ?ties ?mdb ?k ?header _ query beds =
-    Workflow.shell ~descr:"bedtools.intersect" [
-      cmd "bedtools.closest" ~img ~stdout:dest [
+    Workflow.shell ~descr:"bedtools.intersect" ~img [
+      cmd "bedtools.closest" ~stdout:dest [
         option ((function `same -> "-s" | `opposite -> "-S") % string) strand ;
         option (flag string "-io") io ;
         option (flag string "-iu") iu ;
@@ -146,8 +146,8 @@ module Bedtools = struct
     ]
 
   let bamtobed ?bed12 ?split ?splitD ?ed ?tag ?cigar bam =
-    Workflow.shell ~descr:"bedtools.bamtobed" ~mem:(Workflow.int  (3 * 1024)) ~np:8 [
-      cmd "bedtools bamtobed" ~stdout:dest ~img [
+    Workflow.shell ~descr:"bedtools.bamtobed" ~img ~mem:(Workflow.int  (3 * 1024)) ~np:8 [
+      cmd "bedtools bamtobed" ~stdout:dest [
         option (flag string "-bed12") bed12 ;
         option (flag string "-split") split ;
         option (flag string "-splitD") splitD ;
@@ -171,10 +171,10 @@ module Samtools = struct
   let img = [ docker_image ~account:"pveber" ~name:"samtools" ~tag:"1.3.1" () ]
 
   let samtools subcmd args =
-    cmd "samtools" ~img (string subcmd :: args)
+    cmd "samtools" (string subcmd :: args)
 
   let sam_of_bam bam =
-    Workflow.shell ~descr:"samtools.sam_of_bam" [
+    Workflow.shell ~img ~descr:"samtools.sam_of_bam" [
       samtools "view" [
         opt "-o" Fn.id dest ;
         dep bam ;
@@ -182,7 +182,7 @@ module Samtools = struct
     ]
 
   let bam_of_sam sam =
-    Workflow.shell ~descr:"samtools.bam_of_sam" [
+    Workflow.shell ~img ~descr:"samtools.bam_of_sam" [
       samtools "view" [
         string "-S -b" ;
         opt "-o" Fn.id dest ;
@@ -191,7 +191,7 @@ module Samtools = struct
     ]
 
   let indexed_bam_of_sam sam =
-    Workflow.shell ~descr:"samtools.indexed_bam_of_sam" [
+    Workflow.shell ~img ~descr:"samtools.indexed_bam_of_sam" [
       mkdir_p dest ;
       samtools "view" [
         string "-S -b" ;
@@ -207,7 +207,7 @@ module Samtools = struct
     ]
 
   let sort ?on:order bam =
-    Workflow.shell ~descr:"samtools.sort" [
+    Workflow.shell ~img ~descr:"samtools.sort" [
       samtools "sort" [
         option (fun o -> flag string "-n" (o = `name)) order ;
         dep bam ;
@@ -216,7 +216,7 @@ module Samtools = struct
     ]
 
   let indexed_bam_of_bam bam =
-    Workflow.shell ~descr:"samtools.indexed_bam_of_bam" [
+    Workflow.shell ~img ~descr:"samtools.indexed_bam_of_bam" [
       mkdir_p dest ;
       samtools "sort" [
         dep bam ;
@@ -233,8 +233,8 @@ module Samtools = struct
 
 
   let view ~output (* ?_1 ?u *) ?h ?_H (* ?c ?_L *) ?q (* ?m ?f ?_F ?_B ?s *) file =
-    Workflow.shell ~descr:"samtools.view" [
-      cmd "samtools view" ~img [
+    Workflow.shell ~img ~descr:"samtools.view" [
+      cmd "samtools view" [
         output_format_expr output ;
         (* option (flag string "-1") _1 ; *)
         (* option (flag string "-u") u ; *)
@@ -254,7 +254,7 @@ module Samtools = struct
     ]
 
   let faidx fa =
-    Workflow.shell ~descr:"samtools.faidx" [
+    Workflow.shell ~img ~descr:"samtools.faidx" [
       mkdir_p dest ;
       cmd "cp" [ dep fa ; dest // "sequences.fa" ] ;
       samtools "faidx" [ dest // "sequences.fa" ] ;
@@ -268,9 +268,9 @@ module Bowtie2 = struct
 
   (* memory bound correspond to storing a human index in memory, following bowtie manual *)
   let bowtie2_build ?large_index ?noauto ?packed ?bmax ?bmaxdivn ?dcv ?nodc ?noref ?justref ?offrate ?ftabchars ?seed ?cutoff fa =
-    Workflow.shell ~descr:"bowtie2_build" ~np:8 ~mem:(Workflow.int (3 * 1024)) [
+    Workflow.shell ~descr:"bowtie2_build" ~img ~np:8 ~mem:(Workflow.int (3 * 1024)) [
       mkdir_p dest ;
-      cmd "bowtie2-build" ~img [
+      cmd "bowtie2-build" [
         option (flag string "--large-index") large_index ;
         option (flag string "--no-auto") noauto ;
         option (flag string "--packed") packed ;
@@ -332,8 +332,8 @@ module Bowtie2 = struct
           opt "-2" (list dep ~sep:",") fqs2
         ]
     in
-    Workflow.shell ~descr:"bowtie2" ~mem:(Workflow.int (3 * 1024)) ~np:8 [
-      cmd "bowtie2" ~img [
+    Workflow.shell ~descr:"bowtie2" ~img ~mem:(Workflow.int (3 * 1024)) ~np:8 [
+      cmd "bowtie2" [
         option (opt "--skip" int) skip ;
         option (opt "--qupto" int) qupto ;
         option (opt "--trim5" int) trim5 ;
@@ -371,9 +371,9 @@ module Bowtie = struct
 
   (* memory bound correspond to storing a human index in memory, following bowtie manual *)
   let bowtie_build ?packed ?color fa =
-    Workflow.shell ~descr:"bowtie_build" ~mem:(Workflow.int (3 * 1024)) [
+    Workflow.shell ~descr:"bowtie_build" ~img ~mem:(Workflow.int (3 * 1024)) [
       mkdir_p dest ;
-      cmd "bowtie-build" ~img [
+      cmd "bowtie-build" [
         option (flag string "-a -p") packed ;
         option (flag string "--color") color ;
         opt "-f" dep fa ;
@@ -396,8 +396,8 @@ module Bowtie = struct
           opt "-2" (list dep ~sep:",") fqs2
         ]
     in
-    Workflow.shell ~descr:"bowtie" ~mem:(Workflow.int (3 * 1024)) ~np:8 [
-      cmd "bowtie" ~img [
+    Workflow.shell ~descr:"bowtie" ~img ~mem:(Workflow.int (3 * 1024)) ~np:8 [
+      cmd "bowtie" [
         string "-S" ;
         option (opt "-n" int) n ;
         option (opt "-l" int) l ;
@@ -450,8 +450,8 @@ module ChIPQC = struct
     ]
 
   let run samples =
-    Workflow.shell ~descr:"ChIPQC" [
-      cmd "Rscript" ~img [ file_dump (rscript (sample_sheet samples)) ] ;
+    Workflow.shell ~descr:"ChIPQC" ~img [
+      cmd "Rscript" [ file_dump (rscript (sample_sheet samples)) ] ;
     ]
 
 end
@@ -516,7 +516,7 @@ module Deeptools = struct
       ?smoothlength ?extendreads ?ignoreduplicates ?minmappingquality
       ?samflaginclude ?samflagexclude ?minfragmentlength ?maxfragmentlength
       cmd_name other_args =
-    cmd cmd_name ~img (
+    cmd cmd_name (
       List.append [
         option (opt "--outFileFormat" file_format_expr) outfileformat ;
         option (opt "--scaleFactor" float) scalefactor ;
@@ -542,7 +542,7 @@ module Deeptools = struct
       ?skipnoncoveredregions ?smoothlength ?extendreads ?ignoreduplicates
       ?minmappingquality ?centerreads ?samflaginclude ?samflagexclude
       ?minfragmentlength ?maxfragmentlength outfileformat indexed_bam =
-    Workflow.shell ~descr:"bamcoverage" ~np:threads [
+    Workflow.shell ~descr:"bamcoverage" ~np:threads ~img [
       bam_gen_cmd "bamCoverage" ?scalefactor ?blacklist
         ?normalizeUsing ?ignorefornormalization
         ?skipnoncoveredregions ?smoothlength ?extendreads ?ignoreduplicates
@@ -563,7 +563,7 @@ module Deeptools = struct
       ?smoothlength ?extendreads ?ignoreduplicates ?minmappingquality
       ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
       ?maxfragmentlength outfileformat indexed_bam1 indexed_bam2 =
-    Workflow.shell ~descr:"bamcompare" ~np:threads [
+    Workflow.shell ~descr:"bamcompare" ~np:threads ~img [
       bam_gen_cmd "bamCompare"
         ?scalefactor ?blacklist
         ?normalizeUsing ?ignorefornormalization ?skipnoncoveredregions
@@ -589,8 +589,8 @@ module Deeptools = struct
   let bigwigcompare ?scalefactor ?ratio ?pseudocount ?binsize
       ?region ?blacklist ?(threads = 1)
       outfileformat bigwig1 bigwig2 =
-    Workflow.shell ~descr:"bigwigcompare" ~np:threads [
-      cmd "bigwigCompare" ~img [
+    Workflow.shell ~descr:"bigwigcompare" ~np:threads ~img [
+      cmd "bigwigCompare" [
         option (opt "--scaleFactor" float) scalefactor ;
         option (opt "--ratio" ratio_expr) ratio ;
         option (opt "--pseudocount" int) pseudocount ;
@@ -609,7 +609,7 @@ module Deeptools = struct
   let multibamsum_gen_cmd ?outrawcounts ?extendreads ?ignoreduplicates
       ?minmappingquality ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
       ?maxfragmentlength ?blacklist ?region cmd_name other_args =
-    cmd cmd_name ~img (
+    cmd cmd_name (
       List.append [
         option (opt "--region" string) region ;
         option (flag string "--outRawCounts") outrawcounts ;
@@ -631,7 +631,7 @@ module Deeptools = struct
       ?(threads = 1) ?outrawcounts ?extendreads ?ignoreduplicates ?minmappingquality
       ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
       ?maxfragmentlength indexed_bams =
-    Workflow.shell ~descr:"multibamsummary_bins" ~np:threads [
+    Workflow.shell ~descr:"multibamsummary_bins" ~np:threads ~img [
       multibamsum_gen_cmd "multiBamSummary bins"
         ?region ?blacklist
         ?outrawcounts ?extendreads ?ignoreduplicates ?minmappingquality
@@ -651,7 +651,7 @@ module Deeptools = struct
       ?centerreads ?samflaginclude ?samflagexclude ?minfragmentlength
       ?maxfragmentlength ?metagene ?transcriptid ?exonid ?transcriptiddesignator bed
       indexed_bams =
-    Workflow.shell ~descr:"multibamsummary_bed" ~np:threads [
+    Workflow.shell ~descr:"multibamsummary_bed" ~np:threads ~img [
       multibamsum_gen_cmd "multiBamSummary BED-file"
         ?region ?blacklist
         ?outrawcounts ?extendreads ?ignoreduplicates ?minmappingquality
@@ -743,8 +743,8 @@ module Deeptools = struct
       ?averageTypeBins ?missingDataAsZero ?skipZeros
       ?minThreshold ?maxThreshold ?blackList ?scale
       ?(numberOfProcessors = 1) ~regions ~scores () =
-    Workflow.shell ~descr:"deeptools.computeMatrix_reference_point" ~np:numberOfProcessors [
-      cmd "computeMatrix" ~img [
+    Workflow.shell ~descr:"deeptools.computeMatrix_reference_point" ~img ~np:numberOfProcessors [
+      cmd "computeMatrix" [
         string "reference-point" ;
         option (opt "--referencePoint" reference_point_enum) referencePoint ;
         option (opt "--upstream" int) upstream ;
@@ -777,8 +777,8 @@ module Deeptools = struct
       ?yAxisLabel ?yMin ?yMax ?legendLocation ?perGroup
       output_format matrix =
     let tmp_file = tmp // ("file." ^ ext_of_format output_format) in
-    Workflow.shell ~descr:"deeptools.plotHeatmap" [
-      cmd "plotHeatmap" ~img [
+    Workflow.shell ~descr:"deeptools.plotHeatmap" ~img [
+      cmd "plotHeatmap" [
         option (opt "--dpi" int) dpi ;
         option (opt "--kmeans" int) kmeans ;
         option (opt "--hclust" int) hclust ;
@@ -837,8 +837,8 @@ module Deeptools = struct
       ?colorMap ?plotNumbers ?log1p
       ~corMethod ~whatToPlot output_format corData
     =
-    Workflow.shell ~descr:"deeptools.plotCorrelation" [
-      cmd "plotCorrelation" ~img [
+    Workflow.shell ~descr:"deeptools.plotCorrelation" ~img [
+      cmd "plotCorrelation" [
         opt "--corData" dep corData ;
         opt "--corMethod" corMethod_enum corMethod ;
         opt "--whatToPlot" whatToPlot_enum whatToPlot ;
@@ -862,8 +862,8 @@ module Deeptools = struct
       ?legendLocation ?perGroup
       output_format matrix
     =
-    Workflow.shell ~descr:"deeptools.plotProfile" [
-      cmd "plotProfile" ~img [
+    Workflow.shell ~descr:"deeptools.plotProfile" ~img [
+      cmd "plotProfile" [
         option (opt "--dpi" int) dpi ;
         option (opt "--kmeans" int) kmeans ;
         option (opt "--hclust" int) hclust ;
@@ -895,8 +895,8 @@ module Deeptools = struct
       ?plotWidth ?colors ?numPlotsPerRow ?alpha ?offset ?blackList
       ?(numberOfProcessors = 1) ~bams ~beds output_format
     =
-    Workflow.shell ~np:numberOfProcessors ~descr:"deeptools.plotEnrichment" [
-      cmd "plotEnrichment" ~img [
+    Workflow.shell ~np:numberOfProcessors ~descr:"deeptools.plotEnrichment" ~img [
+      cmd "plotEnrichment" [
         option (opt "--labels" (list ~sep:" " (string % quote ~using:'"'))) labels ;
         option (opt "--regionLabels" (list ~sep:" " (string % quote ~using:'"'))) regionLabels ;
         option (opt "--plotTitle" (string % quote ~using:'"')) plotTitle ;
@@ -1078,8 +1078,8 @@ main <- function(outdir, factor_names, sample_files, conditions) {
 
 
   let wrapper factors samples =
-    Workflow.shell ~descr:"deseq2.wrapper" [
-      cmd "Rscript" ~img [ file_dump (script factors samples) ] ;
+    Workflow.shell ~descr:"deseq2.wrapper" ~img [
+      cmd "Rscript" [ file_dump (script factors samples) ] ;
     ]
 
 (*
@@ -1215,9 +1215,9 @@ end
 module FastQC = struct
   let img = [ docker_image ~account:"pveber" ~name:"fastqc" ~tag:"0.11.5" () ]
 
-  let run fq = Workflow.shell ~descr:"fastQC" [
+  let run fq = Workflow.shell ~descr:"fastQC" ~img [
       mkdir_p dest ;
-      cmd "fastqc" ~img [
+      cmd "fastqc" [
         seq ~sep:"" [ string "--outdir=" ; dest ] ;
         dep fq ;
       ] ;
@@ -1272,9 +1272,9 @@ module Fastq_screen = struct
 
   let fastq_screen ?bowtie2_opts ?filter ?illumina ?nohits ?pass ?subset
       ?tag ?(threads = 1) ?top ?(lightweight = true) fq genomes =
-    Workflow.shell ~descr:"fastq_screen" ~np:threads ~mem:(Workflow.int (3 * 1024)) [
+    Workflow.shell ~descr:"fastq_screen" ~np:threads ~mem:(Workflow.int (3 * 1024)) ~img [
       mkdir_p dest ;
-      cmd "fastq_screen" ~img [
+      cmd "fastq_screen" [
         string "--aligner bowtie2" ;
         option (opt "--bowtie2" string) bowtie2_opts ;
         option (opt "--filter" (filter_expr "")) filter ;
@@ -1326,8 +1326,8 @@ module Htseq = struct
       | `sam sam -> "sam", dep sam
       | `bam bam -> "bam", dep bam
     in
-    Workflow.shell ~descr:"htseq-count" [
-      cmd "htseq-count" ~img ~stdout:dest [
+    Workflow.shell ~descr:"htseq-count" ~img [
+      cmd "htseq-count" ~stdout:dest [
         opt "-f" string format ;
         option (opt "-m" (string_of_mode % string)) mode ;
         option (opt "-r" (string_of_order % string)) order ;
@@ -1345,10 +1345,10 @@ module Macs2 = struct
   let img = [ docker_image ~account:"pveber" ~name:"macs2" ~tag:"2.1.1" () ]
 
   let macs2 subcmd opts =
-    cmd "macs2" ~img (string subcmd :: opts)
+    cmd "macs2" (string subcmd :: opts)
 
   let pileup ?extsize ?both_direction bam =
-    Workflow.shell ~descr:"macs2.pileup" [
+    Workflow.shell ~descr:"macs2.pileup" ~img [
       macs2 "pileup" [
         opt "-i" dep bam ;
         opt "-o" Fn.id dest ;
@@ -1389,7 +1389,7 @@ module Macs2 = struct
   let callpeak_gen
       ?broad ?pvalue ?qvalue ?gsize ?call_summits
       ?fix_bimodal ?mfold ?extsize ?nomodel ?bdg ?control ?keep_dup format treatment =
-    Workflow.shell ~descr:"macs2.callpeak" [
+    Workflow.shell ~descr:"macs2.callpeak" ~img [
       macs2 "callpeak" [
         option (flag string "--broad") broad ;
         opt "--outdir" Fn.id dest ;
@@ -1506,9 +1506,9 @@ module Macs = struct
       ?slocal ?llocal ?on_auto ?nomodel ?shiftsize ?keep_dup
       ?to_large ?wig ?bdg ?single_profile ?space ?call_subpeaks
       ?diag ?fe_min ?fe_max ?fe_step format treatment =
-    Workflow.shell ~descr:"macs" ~mem:(Workflow.int (3 * 1024)) ~np:8  [
+    Workflow.shell ~descr:"macs" ~mem:(Workflow.int (3 * 1024)) ~np:8 ~img [
       mkdir_p dest ;
-      cmd "macs14" ~img [
+      cmd "macs14" [
         option (opt "--control" (list ~sep:"," dep)) control ;
         opt "--name" seq [ dest ; string "/" ; string name ] ;
         opt "--format" (fun x -> x |> opt_of_format |> string) format ;
@@ -1577,8 +1577,8 @@ module Meme_suite = struct
   let img = [ docker_image ~account:"pveber" ~name:"meme" ~tag:"4.11.2" () ]
 
   let meme_chip ?meme_nmotifs ?meme_minw ?meme_maxw (* ?np:threads *) fa =
-    Workflow.shell ~descr:"meme-chip" (* ?np:threads *) [
-      cmd "meme-chip" ~img [
+    Workflow.shell ~descr:"meme-chip" ~img (* ?np:threads *) [
+      cmd "meme-chip" [
         option (opt "-meme-nmotifs" int) meme_nmotifs ;
         option (opt "-meme-minw" int) meme_minw ;
         option (opt "-meme-maxw" int) meme_maxw ;
@@ -1597,8 +1597,8 @@ module Meme_suite = struct
     string ("-" ^ string_of_alphabet x)
 
   let meme ?nmotifs ?minw ?maxw ?revcomp ?maxsize ?alphabet (* ?threads *) fa =
-    Workflow.shell ~descr:"meme" (* ?np:threads *) [
-      cmd "meme" ~img [
+    Workflow.shell ~descr:"meme" ~img (* ?np:threads *) [
+      cmd "meme" [
         option (opt "-nmotifs" int) nmotifs ;
         option (opt "-minw" int) minw ;
         option (opt "-maxw" int) maxw ;
@@ -1618,8 +1618,8 @@ module Meme_suite = struct
       ?alpha ?bgfile ?max_stored_scores ?max_strand ?motif ?motif_pseudo
       ?no_qvalue ?norc ?parse_genomic_coord ?prior_dist ?psp
       ?qv_thresh ?thresh meme_motifs seqs =
-    Bistro.Workflow.shell ~descr:"meme_suite.fimo"  [
-      cmd "fimo" ~img [
+    Bistro.Workflow.shell ~descr:"meme_suite.fimo" ~img [
+      cmd "fimo" [
         option (opt "--alpha" float) alpha ;
         option (opt "--bgfile" dep) bgfile ;
         option (opt "--max-stored-scores" int) max_stored_scores ;
@@ -1651,9 +1651,9 @@ module Prokka = struct
       ?centre ?genus ?species ?strain ?plasmid ?kingdom ?gcode ?gram
       ?usegenus ?proteins ?hmms ?metagenome ?rawproduct ?fast ?(threads = 1)
       ?mincontiglen ?evalue ?rfam ?norrna ?notrna ?rnammer fa =
-    Workflow.shell ~descr:"prokka" ~np:threads ~mem:(Workflow.int (3 * 1024)) [
+    Workflow.shell ~descr:"prokka" ~img ~np:threads ~mem:(Workflow.int (3 * 1024)) [
       mkdir_p dest ;
-      cmd "prokka" ~img [
+      cmd "prokka" [
         string "--force" ;
         option (opt "--prefix" string) prefix ;
         option (flag string "--addgenes") addgenes ;
@@ -1690,7 +1690,7 @@ end
 
 module Sra_toolkit = struct
 
-  let img = [ docker_image ~account:"pegi3s" ~name:"sratoolkit" ~tag:"2.10.0" () ]
+  let img = [ docker_image ~account:"biocontainers" ~name:"sra-toolkit" ~tag:"v2.9.3dfsg-1b1-deb_cv1" () ]
 
   let sra_of_input = function
     | `id id -> string id
@@ -1698,21 +1698,21 @@ module Sra_toolkit = struct
     | `file w -> dep w
 
   let fastq_dump sra =
-    Workflow.shell ~descr:"sratoolkit.fastq_dump" [
-      cmd ~img "fastq-dump" [ string "-Z" ; sra_of_input sra ] ~stdout:dest
+    Workflow.shell ~descr:"sratoolkit.fastq_dump" ~img [
+      cmd "fastq-dump" [ string "-Z" ; sra_of_input sra ] ~stdout:dest
     ]
 
   let fastq_dump_gz input =
     let sra = sra_of_input input in
-    Workflow.shell ~descr:"sratoolkit.fastq_dump" [
-      cmd ~img "fastq-dump" [ string "--gzip" ; string "-Z" ; sra ] ~stdout:dest
+    Workflow.shell ~descr:"sratoolkit.fastq_dump" ~img [
+      cmd "fastq-dump" [ string "--gzip" ; string "-Z" ; sra ] ~stdout:dest
     ]
 
   let fastq_dump_pe sra =
     let dir =
-      Workflow.shell ~descr:"sratoolkit.fastq_dump" [
+      Workflow.shell ~descr:"sratoolkit.fastq_dump" ~img [
         mkdir_p dest ;
-        cmd ~img "fastq-dump" [
+        cmd "fastq-dump" [
           opt "-O" Fn.id dest ;
           string "--split-files" ;
           dep sra
@@ -1728,9 +1728,9 @@ module Sra_toolkit = struct
   let fastq_dump_pe_gz input =
     let sra = sra_of_input input in
     let dir =
-      Workflow.shell ~descr:"sratoolkit.fastq_dump" [
+      Workflow.shell ~descr:"sratoolkit.fastq_dump" ~img [
         mkdir_p dest ;
-        cmd ~img "fastq-dump" [
+        cmd "fastq-dump" [
           opt "-O" Fn.id dest ;
           string "--split-files" ;
           string "--gzip" ;
@@ -1744,8 +1744,8 @@ module Sra_toolkit = struct
     Workflow.select dir ["reads_2.fq.gz"]
 
   let fastq_dump_to_fasta sra =
-    Workflow.shell ~descr:"sratoolkit.fastq_dump" [
-      cmd ~img "fastq-dump" [
+    Workflow.shell ~descr:"sratoolkit.fastq_dump" ~img [
+      cmd "fastq-dump" [
         string "-Z" ;
         string "--fasta" ;
         dep sra
@@ -1764,7 +1764,7 @@ module Srst2 = struct
       ?truncation_score_tolerance ?other ?max_unaligned_overlap ?mapq
       ?baseq ?samtools_args ?report_new_consensus
       ?report_all_consensus cmd_name other_args =
-    cmd cmd_name ~img (
+    cmd cmd_name (
       List.append [
         option (opt "--mlst_db" dep) mlst_db ;
         option (opt "--mlst_delimiter" string) mlst_delimiter ;
@@ -1796,7 +1796,7 @@ module Srst2 = struct
       ?truncation_score_tolerance ?other ?max_unaligned_overlap ?mapq
       ?baseq ?samtools_args ?report_new_consensus
       ?report_all_consensus ?(threads = 1) fq =
-    Workflow.shell ~descr:"srst2" ~np:threads ~mem:(Workflow.int (3 * 1024)) [
+    Workflow.shell ~descr:"srst2" ~img ~np:threads ~mem:(Workflow.int (3 * 1024)) [
       mkdir_p dest ;
       run_gen_cmd "srst2" ?mlst_db ?mlst_delimiter ?mlst_definitions
         ?mlst_max_mismatch ?gene_db ?no_gene_details ?gene_max_mismatch
@@ -1816,7 +1816,7 @@ module Srst2 = struct
       ?truncation_score_tolerance ?other ?max_unaligned_overlap ?mapq
       ?baseq ?samtools_args ?report_new_consensus
       ?report_all_consensus ?(threads = 1) fq =
-    Workflow.shell ~descr:"srst2" ~np:threads ~mem:(Workflow.int (3 * 1024)) [
+    Workflow.shell ~descr:"srst2" ~img ~np:threads ~mem:(Workflow.int (3 * 1024)) [
       mkdir_p dest ;
       run_gen_cmd "srst2" ?mlst_db ?mlst_delimiter ?mlst_definitions
         ?mlst_max_mismatch ?gene_db ?no_gene_details ?gene_max_mismatch
@@ -1844,8 +1844,8 @@ module Tophat = struct
           list dep ~sep:"," fqs2
         ]
     in
-    Workflow.shell ~np:8 ~mem:(Workflow.int (4 * 1024)) ~descr:"tophat" [
-      cmd ~img "tophat" [
+    Workflow.shell ~np:8 ~mem:(Workflow.int (4 * 1024)) ~img ~descr:"tophat" [
+      cmd "tophat" [
         string "--bowtie1" ;
         opt "--num-threads" Fn.id np ;
         option (flag string "--color") color ;
@@ -1865,8 +1865,8 @@ module Tophat = struct
           list dep ~sep:"," fqs2
         ]
     in
-    Workflow.shell ~np:8 ~mem:(Workflow.int (4 * 1024)) ~descr:"tophat2" [
-      cmd ~img "tophat2" [
+    Workflow.shell ~np:8 ~img ~mem:(Workflow.int (4 * 1024)) ~descr:"tophat2" [
+      cmd "tophat2" [
         opt "--num-threads" Fn.id np ;
         opt "--output-dir" Fn.id dest ;
         seq [ dep index ; string "/index" ] ;
@@ -2003,8 +2003,8 @@ module Ucsc_gb = struct
   (* (\* let wg_encode_crg_mappability_100 org = wg_encode_crg_mappability 100 org *\) *)
 
   let twoBitToFa twobits bed =
-    Workflow.shell ~descr:"ucsc_gb.twoBitToFa" [
-      cmd ~img "twoBitToFa" [
+    Workflow.shell ~descr:"ucsc_gb.twoBitToFa" ~img [
+      cmd "twoBitToFa" [
         opt' "-bed" dep bed ;
         dep twobits ;
         dest
@@ -2043,15 +2043,16 @@ module Ucsc_gb = struct
   (** {5 Chromosome size and clipping} *)
 
   let fetchChromSizes org =
-    Workflow.shell ~descr:"ucsc_gb.fetchChromSizes" [
-      cmd "fetchChromSizes" ~img ~stdout:dest [
-        string (string_of_genome org) ;
+    Workflow.shell ~descr:"ucsc_gb.fetchChromSizes" ~img [
+        cd tmp ;
+        cmd "fetchChromSizes" ~stdout:dest [
+            string (string_of_genome org) ;
+          ]
       ]
-    ]
 
   let bedClip org bed =
-    Workflow.shell ~descr:"ucsc_gb.bedClip" [
-      cmd "bedClip -verbose=2" ~img [
+    Workflow.shell ~descr:"ucsc_gb.bedClip" ~img [
+      cmd "bedClip -verbose=2" [
         dep bed ;
         dep org ;
         dest ;
@@ -2085,13 +2086,13 @@ module Ucsc_gb = struct
 
   let bedGraphToBigWig org bg =
     let tmp = seq [ tmp ; string "/sorted.bedGraph" ] in
-    Workflow.shell ~descr:"bedGraphToBigWig" [
+    Workflow.shell ~descr:"bedGraphToBigWig" ~img [
       cmd "sort" ~stdout:tmp [
         string "-k1,1" ;
         string "-k2,2n" ;
         dep bg ;
       ] ;
-      cmd "bedGraphToBigWig" ~img [
+      cmd "bedGraphToBigWig" [
         tmp ;
         dep (fetchChromSizes org) ;
         dest ;
@@ -2107,7 +2108,7 @@ module Ucsc_gb = struct
         dep bed ;
       ] in
     let bedToBigBed =
-      cmd "bedToBigBed" ~img [
+      cmd "bedToBigBed" [
         tmp ;
         dep (fetchChromSizes org) ;
         dest ;
@@ -2119,6 +2120,7 @@ module Ucsc_gb = struct
     let f bed =
       Workflow.shell
         ~descr:"ucsc_gb.bedToBigBed"
+         ~img
         (bedToBigBed_command org bed)
     in
     function
@@ -2138,7 +2140,7 @@ module Ucsc_gb = struct
           and_list [ test ; touch ] ;
           and_list (bedToBigBed_command org bed) ;
         ] in
-      Workflow.shell [ cmd ]
+      Workflow.shell ~img [ cmd ]
     in
     function
     | `bed3 bed -> f bed
@@ -2163,9 +2165,9 @@ module Ucsc_gb = struct
 
     let bed ~org_from ~org_to bed =
       let chain_file = chain_file ~org_from ~org_to in
-      Workflow.shell ~descr:"ucsc.liftOver" [
+      Workflow.shell ~descr:"ucsc.liftOver" ~img [
         mkdir_p dest ;
-        cmd "liftOver" ~img [
+        cmd "liftOver" [
           dep bed ;
           dep chain_file ;
           dest // "mapped.bed" ;
@@ -2204,9 +2206,9 @@ module Subread = struct
       ?feature_type ?attribute_type ?strandness
       ?q ?nthreads
       gff mapped_reads =
-    Workflow.shell ~descr:"featureCounts" ~np:(Option.value ~default:1 nthreads) [
+    Workflow.shell ~descr:"featureCounts" ~img ~np:(Option.value ~default:1 nthreads) [
       mkdir_p dest ;
-      cmd "featureCounts" ~img [
+      cmd "featureCounts" [
         option (opt "-t" string) feature_type ;
         option (opt "-g" string) attribute_type ;
         option (opt "-s" strandness_token) strandness ;
@@ -2250,8 +2252,8 @@ module Kallisto = struct
   let img = [ docker_image ~account:"pveber" ~name:"kallisto" ~tag:"0.43.0" () ]
 
   let index fas =
-    Workflow.shell ~descr:"kallisto-index" [
-      cmd "kallisto index" ~img [
+    Workflow.shell ~descr:"kallisto-index" ~img [
+      cmd "kallisto index" [
         opt "-i" Fn.id dest ;
         list ~sep:" " dep fas ;
       ]
@@ -2262,8 +2264,8 @@ module Kallisto = struct
     | `fq x -> dep x
 
   let quant ?bias ?bootstrap_samples ?fr_stranded ?rf_stranded ?threads ?fragment_length ?sd idx ~fq1 ?fq2 () =
-    Workflow.shell ~descr:"kallisto-quant" ?np:threads [
-      cmd "kallisto quant" ~img [
+    Workflow.shell ~descr:"kallisto-quant" ~img ?np:threads [
+      cmd "kallisto quant" [
         option (flag string "--bias") bias ;
         option (flag string "--fr-stranded") fr_stranded ;
         option (flag string "--rf-stranded") rf_stranded ;
@@ -2387,24 +2389,25 @@ module Spades = struct
       | None -> None, []
       | Some files -> renamings files
     in
-    Workflow.shell ~np:threads ~mem:(Workflow.int (memory * 1024)) ~descr:"spades" [
+    Workflow.shell ~np:threads ~img ~mem:(Workflow.int (memory * 1024)) ~descr:"spades" [
       mkdir_p tmp ;
-      mkdir_p dest ;
-      within_container img (
-        and_list (
-          ln_commands @ [
-            cmd "spades.py" ~img [
-              option (flag string "--sc") single_cell ;
-              option (flag string "--iontorrent") iontorrent ;
-              opt "--threads" Fn.id np ;
-              opt "--memory" Fn.id (seq [ string "$((" ; mem ; string " / 1024))" ]) ;
-              option Fn.id pe_args ;
-              opt "-o" Fn.id dest ;
+      and_list (
+          List.concat [
+              [ mkdir_p dest ] ;
+              ln_commands ;
+              [
+                cmd "spades.py" [
+                    option (flag string "--sc") single_cell ;
+                    option (flag string "--iontorrent") iontorrent ;
+                    opt "--threads" Fn.id np ;
+                    opt "--memory" Fn.id (seq [ string "$((" ; mem ; string " / 1024))" ]) ;
+                    option Fn.id pe_args ;
+                    opt "-o" Fn.id dest ;
+                  ]
+              ]
             ]
-          ]
         )
-      )
-    ]
+      ]
 
   let contigs x = Workflow.select x ["contigs.fasta"]
   let scaffolds x = Workflow.select x ["scaffolds.fasta"]
@@ -2421,8 +2424,8 @@ module Idba = struct
       | `Pe_paired fq ->
         opt "--paired" dep fq
     in
-    Workflow.shell ~descr:"fq2fa" [
-      cmd "fq2fa" ~img [
+    Workflow.shell ~descr:"fq2fa" ~img [
+      cmd "fq2fa" [
         option (flag string "--filter") filter ;
         args ;
         dest ;
@@ -2430,9 +2433,9 @@ module Idba = struct
     ]
 
   let idba_ud ?(mem_spec = 10) fa =
-    Workflow.shell ~np:4 ~mem:(Workflow.int (mem_spec * 1024)) ~descr:"idba_ud" [
+    Workflow.shell ~np:4 ~mem:(Workflow.int (mem_spec * 1024)) ~descr:"idba_ud" ~img [
       mkdir_p dest ;
-      cmd "idba_ud" ~img [
+      cmd "idba_ud" [
         opt "--read" dep fa ;
         opt "--num_threads" Fn.id np ;
         opt "--out" Fn.id dest ;
@@ -2466,9 +2469,8 @@ module Cisa = struct
         |> seq ~sep:""
       )
     in
-    Workflow.shell ~descr:"cisa.Merge" [
-      mkdir_p tmp ;
-      cmd "Merge.py" ~img [ config_file ] ;
+    Workflow.shell ~descr:"cisa.Merge" ~img [
+      cmd "Merge.py" [ config_file ] ;
     ]
 
   let cisa ~genome_size contigs =
@@ -2506,9 +2508,8 @@ yes | CISA.py $CONFIG
         ]
       )
     in
-    Workflow.shell ~descr:"cisa" [
-      mkdir_p tmp ;
-      cmd "bash" ~img [ script ] ;
+    Workflow.shell ~descr:"cisa" ~img [
+      cmd "bash" [ script ] ;
     ]
 end
 
@@ -2516,8 +2517,8 @@ module Quast = struct
   let img = [ docker_image ~account:"pveber" ~name:"quast" ~tag:"4.3" () ]
 
   let quast ?reference ?labels fas =
-    Workflow.shell ~descr:"quast" [
-      cmd "quast.py" ~img [
+    Workflow.shell ~descr:"quast" ~img [
+      cmd "quast.py" [
         option (opt "-R" dep) reference ;
         option (opt "--labels" (list ~sep:"," string)) labels ;
         opt "--output-dir" (fun x -> seq [x ; string "/results"]) dest ;
@@ -2530,9 +2531,9 @@ module Hisat2 = struct
   let img = [ docker_image ~account:"pveber" ~name:"hisat2" ~tag:"2.1.0" () ]
 
   let hisat2_build ?large_index ?noauto ?packed ?bmax ?bmaxdivn ?dcv ?nodc ?noref ?justref ?offrate ?ftabchars ?seed ?cutoff fa =
-    Workflow.shell ~descr:"hisat2-build" ~mem:(Workflow.int (8 * 1024)) ~np:8 [
+    Workflow.shell ~descr:"hisat2-build" ~img ~mem:(Workflow.int (8 * 1024)) ~np:8 [
       mkdir_p dest ;
-      cmd "hisat2-build" ~img [
+      cmd "hisat2-build" [
         option (flag string "--large-index") large_index ;
         option (flag string "--no-auto") noauto ;
         option (flag string "--packed") packed ;
@@ -2580,8 +2581,8 @@ module Hisat2 = struct
           opt "-2" (list dep ~sep:",") fqs2
         ]
     in
-    Workflow.shell ~descr:"hisat2" ~mem:(Workflow.int (4 * 1024)) ~np:8 [
-      cmd "hisat2" ~img [
+    Workflow.shell ~descr:"hisat2" ~img ~mem:(Workflow.int (4 * 1024)) ~np:8 [
+      cmd "hisat2" [
         option (opt "--skip" int) skip ;
         option (opt "--qupto" int) qupto ;
         option (opt "--trim5" int) trim5 ;
@@ -2610,9 +2611,9 @@ module Picardtools = struct
     seq ~sep:"" [ string k ; string "=" ; v ]
 
   let markduplicates ?remove_duplicates indexed_bam =
-    Workflow.shell ~descr:"picard.markduplicates" ~mem:(Workflow.int (3 * 1024)) [
+    Workflow.shell ~descr:"picard.markduplicates" ~img ~mem:(Workflow.int (3 * 1024)) [
       mkdir_p dest ;
-      cmd "PicardCommandLine" ~img [
+      cmd "PicardCommandLine" [
         string "MarkDuplicates" ;
         arg "INPUT" (dep @@ Samtools.indexed_bam_to_bam indexed_bam) ;
         arg "OUTPUT" (dest // "reads.bam") ;
@@ -2626,8 +2627,8 @@ module Picardtools = struct
   let reads x = Workflow.select x ["reads.bam"]
 
   let sort_bam_by_name bam =
-    Workflow.shell ~descr:"picard.sort_bam_by_name" ~mem:(Workflow.int (1 * 1024)) [
-      cmd "PicardCommandLine" ~img [
+    Workflow.shell ~descr:"picard.sort_bam_by_name" ~img ~mem:(Workflow.int (1 * 1024)) [
+      cmd "PicardCommandLine" [
         string "SortSam" ;
         arg "INPUT" (dep bam) ;
         arg "OUTPUT" dest ;
@@ -2676,9 +2677,9 @@ module Idr = struct
       ~input_file_type ?idr_threshold ?soft_idr_threshold
       ?peak_merge_method ?rank ?random_seed ?peak_list
       sample1 sample2 =
-    Workflow.shell ~descr:"Idr.idr" [
+    Workflow.shell ~descr:"Idr.idr" ~img [
       mkdir_p dest ;
-      cmd "idr" ~img [
+      cmd "idr" [
         opt "--input-file-type" file_format input_file_type ;
         opt "--output-file" (fun x -> x) (dest // "items.tsv") ;
         option (opt "--idr-threshold" float) idr_threshold ;
@@ -2702,9 +2703,9 @@ module Star = struct
   let mem_in_bytes = seq ~sep:" " [string "$((" ; mem ; string " * 1024 * 1024))$"]
 
   let genomeGenerate fa =
-    Workflow.shell ~descr:"star.index" ~np:8 ~mem:(Workflow.int (30 * 1024)) [
+    Workflow.shell ~descr:"star.index" ~img ~np:8 ~mem:(Workflow.int (30 * 1024)) [
       mkdir_p dest ;
-      cmd "STAR" ~img [
+      cmd "STAR" [
         opt "--runThreadN" Fn.id np ;
         opt "--runMode" string "genomeGenerate" ;
         opt "--genomeDir" Fn.id dest ;
@@ -2732,9 +2733,9 @@ module Star = struct
       ?alignIntronMax
       idx fqs =
     let `GB max_mem = max_mem in
-    Workflow.shell ~descr:"star.map" ~np:8 ~mem:(Workflow.int (max_mem * 1024)) [
+    Workflow.shell ~descr:"star.map" ~img ~np:8 ~mem:(Workflow.int (max_mem * 1024)) [
       mkdir_p dest ;
-      cmd "STAR" ~stdout:(dest // "sorted.bam") ~img [
+      cmd "STAR" ~stdout:(dest // "sorted.bam") [
         opt "--outFileNamePrefix" Fn.id (dest // "star") ;
         opt "--runThreadN" Fn.id np ;
         option (opt "--outSAMstrandField" samStrandField) outSAMstrandField ;
@@ -2901,21 +2902,19 @@ path = /usr/bin/
     | `proteins -> "proteins"
 
   let busco ?evalue ?limit ?tarzip ~threads ~mode ~db fa =
-    Workflow.shell ~descr:"busco" ~np:threads [
-      within_container img (
+    Workflow.shell ~descr:"busco" ~img ~np:threads [
         and_list [
-          cmd "" [ seq ~sep:"" [ string "export BUSCO_CONFIG_FILE=" ; file_dump config_file ] ] ;
-          cmd "run_BUSCO.py" [
-            opt "--in" dep fa ;
-            opt "--lineage" dep (fetch_db db) ;
-            opt "--mode" (string_of_mode % string) mode ;
-            opt "--out" string "busco" ;
-            opt "--cpu" Fn.id np ;
-            option (opt "--evalue" float) evalue ;
-            option (opt "--limit" int) limit ;
-            option (flag string "--tarzip") tarzip ;
+            cmd "" [ seq ~sep:"" [ string "export BUSCO_CONFIG_FILE=" ; file_dump config_file ] ] ;
+            cmd "run_BUSCO.py" [
+                opt "--in" dep fa ;
+                opt "--lineage" dep (fetch_db db) ;
+                opt "--mode" (string_of_mode % string) mode ;
+                opt "--out" string "busco" ;
+                opt "--cpu" Fn.id np ;
+                option (opt "--evalue" float) evalue ;
+                option (opt "--limit" int) limit ;
+                option (flag string "--tarzip") tarzip ;
+              ]
           ]
-        ]
-      )
-    ]
+      ]
 end

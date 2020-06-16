@@ -3,7 +3,7 @@ open Bistro
 val wikipedia_summary : string -> text file
 
 module Stanford_parser : sig
-  val img : Shell_dsl.container_image list
+  val img : container_image list
 
   class type deps = object
     inherit text
@@ -16,4 +16,3 @@ module Stanford_parser : sig
 
   val dependensee : deps file -> png file
 end
-

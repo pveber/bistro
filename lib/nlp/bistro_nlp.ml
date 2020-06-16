@@ -21,13 +21,13 @@ module Stanford_parser = struct
   end
 
   let lexparser (x : text file) : deps file =
-    Workflow.shell ~descr:"stanford_parser" [
-      cmd ~img "lexparser.sh" ~stdout:dest [ dep x ]
+    Workflow.shell ~descr:"stanford_parser" ~img [
+      cmd "lexparser.sh" ~stdout:dest [ dep x ]
     ]
 
   let dependensee (x : deps file) : png file =
-    Workflow.shell ~descr:"stanford_dependensee" [
-      cmd "java" ~img [
+    Workflow.shell ~descr:"stanford_dependensee" ~img [
+      cmd "java" [
         opt "-cp" string "/usr/bin/DependenSee.2.0.5.jar:/usr/bin/stanford-parser.jar:/usr/bin/stanford-parser-3.3.0-models.jar" ;
         string "com.chaoticity.dependensee.Main" ;
         opt "-t" dep x ;
