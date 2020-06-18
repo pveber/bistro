@@ -80,6 +80,11 @@ type _ t =
       type_selection : [`File | `Directory] option ;
       dir : path t ;
     } -> path list t
+  | Trywith : {
+      id : string ;
+      w : 'a t ;
+      failsafe : 'a t ;
+    } -> 'a t
 
 and ('a, 'b) step = {
   id : string ;
@@ -127,6 +132,7 @@ let id : type s. s t -> string = function
   | List { id ; _ } -> id
   | List_nth { id ; _ } -> id
   | Glob { id ; _ } -> id
+  | Trywith { id ; _ } -> id
 
 let any x = Any x
 
@@ -151,7 +157,7 @@ module Any = struct
 
   include T
 
-  let deps (Any w) = match w with
+  let rec deps (Any w) = match w with
     | Pure _ -> []
     | App app -> [ Any app.f ; Any app.x ]
     | Both p -> [ Any p.fst ; Any p.snd ]
@@ -164,6 +170,7 @@ module Any = struct
     | Plugin v -> v.deps
     | Shell s -> s.deps
     | Glob g -> [ Any g.dir ]
+    | Trywith tw -> deps (Any tw.w) @ deps (Any tw.failsafe)
 
   let descr (Any w) = match w with
     | Shell s -> Some s.descr
@@ -307,3 +314,7 @@ let list_nth w i =
 let glob ?pattern ?type_selection dir =
   let id = digest (`Glob, id dir, pattern, type_selection) in
   Glob { id ; dir ; pattern ; type_selection }
+
+let trywith w failsafe =
+  let id = digest (`Trywith, id w, id failsafe) in
+  Trywith { id ; w ; failsafe }

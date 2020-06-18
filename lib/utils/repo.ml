@@ -158,6 +158,8 @@ let protected_set repo =
     | Input _ -> acc
     | Shell _
     | Plugin _ -> String.Set.add acc (W.id w)
+    | Trywith tw ->
+      fold_path_workflow (fold_path_workflow acc (W.Any tw.w)) (W.Any tw.failsafe)
     | App _
     | Both _
     | Eval_path _

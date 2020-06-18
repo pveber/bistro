@@ -71,6 +71,7 @@ module G = struct
     | Spawn _ -> false
     | List_nth _ -> false
     | Glob _ -> false
+    | Trywith _ -> false
 
   let reduce_to_paths g =
     let foreach_vertex v acc =
@@ -128,6 +129,7 @@ let dot_output ?db oc g ~needed =
     | Glob _ -> [ label "glob" u ; `Shape `Plaintext ]
     | Eval_path _ -> [ label "path" u ; `Shape `Plaintext ]
     | List_nth l -> [ label (sprintf "list_nth_%d" l.index) u ; `Shape `Plaintext ]
+    | Trywith _ -> [ label "trywith" u ; `Shape `Plaintext ]
   in
   let edge_attributes e =
     let u = G.E.src e and v = G.E.dst e in
