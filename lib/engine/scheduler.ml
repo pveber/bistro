@@ -217,6 +217,10 @@ struct
     | Trywith tw ->
       register gc ?target tw.w >>= fun () ->
       register gc ?target tw.failsafe
+    | Ifelse ie ->
+      register gc ?target ie.cond >>= fun () ->
+      register gc ?target ie._then_ >>= fun () ->
+      register gc ?target ie._else_
 
   and register_any : type u. t -> ?target:u W.t -> W.any -> unit Lwt.t = fun gc ?target (Workflow.Any w) ->
     register gc ?target w
@@ -582,6 +586,13 @@ module Make(Backend : Backend) = struct
                                     on workflow that has not been
                                     successfully built *)
         )
+      | Ifelse ie -> (
+          delayed_eval sched ie.cond >>= fun cond ->
+          match cond () with
+          | Some true -> delayed_eval sched ie._then_
+          | Some false -> delayed_eval sched ie._else_
+          | None -> Lwt.return (fun () -> None)
+        )
 
   let shallow_eval sched w =
     delayed_eval sched w >>= fun f ->
@@ -633,7 +644,7 @@ module Make(Backend : Backend) = struct
     else
       Lwt_result.return trace
 
-  let rec np_requirement
+  let np_requirement
     : type s. s Workflow.t -> int
     = function
       | Pure _ -> 0
@@ -648,13 +659,14 @@ module Make(Backend : Backend) = struct
       | Glob _ -> 0
       | Plugin x -> x.np
       | Shell x -> x.np
-      | Trywith tw -> Int.max (np_requirement tw.w) (np_requirement tw.failsafe)
+      | Trywith _ -> 0
+      | Ifelse _ -> 0
 
   let opt_mem_requirement sched = function
     | None -> Lwt.return 100
     | Some mem -> shallow_eval_exn sched mem
 
-  let rec mem_requirement
+  let mem_requirement
     : type u. t -> u Workflow.t -> int Lwt.t
     = fun sched -> function
       | Pure _ -> Lwt.return 0
@@ -669,11 +681,8 @@ module Make(Backend : Backend) = struct
       | Glob _ -> Lwt.return 0
       | Plugin x -> opt_mem_requirement sched x.mem
       | Shell x -> opt_mem_requirement sched x.mem
-      | Trywith tw ->
-        let open Lwt.Infix in
-        mem_requirement sched tw.w >>= fun mem_w ->
-        mem_requirement sched tw.failsafe >|= fun mem_failsafe ->
-        Int.max mem_w mem_failsafe
+      | Trywith _ -> Lwt.return 0
+      | Ifelse _ -> Lwt.return 0
 
   let build_trace sched w perform =
     mem_requirement sched w >>= fun mem ->
@@ -808,11 +817,18 @@ module Make(Backend : Backend) = struct
 
       | List l ->
         Eval_thread.join l.elts ~f:(build ?target sched)
-      | Trywith tw ->
-        build sched ?target tw.w >> function
-        | Ok () -> Eval_thread.return ()
-        | Error _ ->
-          build sched ?target tw.failsafe
+      | Trywith tw -> (
+          build sched ?target tw.w >> function
+          | Ok () -> Eval_thread.return ()
+          | Error _ ->
+            build sched ?target tw.failsafe
+        )
+      | Ifelse ie -> (
+          build sched ?target ie.cond >>= fun () ->
+          shallow_eval_exn sched ie.cond >> fun cond ->
+          if cond then build sched ?target ie._then_
+          else build sched ?target ie._else_
+        )
 
   let start sched = Synchro.signal sched.start ()
 

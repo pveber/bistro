@@ -85,6 +85,12 @@ type _ t =
       w : 'a t ;
       failsafe : 'a t ;
     } -> 'a t
+  | Ifelse : {
+      id : string ;
+      cond : bool t ;
+      _then_ : 'a t ;
+      _else_ : 'a t ;
+    } -> 'a t
 
 and ('a, 'b) step = {
   id : string ;
@@ -133,6 +139,7 @@ let id : type s. s t -> string = function
   | List_nth { id ; _ } -> id
   | Glob { id ; _ } -> id
   | Trywith { id ; _ } -> id
+  | Ifelse { id ; _ } -> id
 
 let any x = Any x
 
@@ -157,7 +164,7 @@ module Any = struct
 
   include T
 
-  let rec deps (Any w) = match w with
+  let deps (Any w) = match w with
     | Pure _ -> []
     | App app -> [ Any app.f ; Any app.x ]
     | Both p -> [ Any p.fst ; Any p.snd ]
@@ -170,7 +177,8 @@ module Any = struct
     | Plugin v -> v.deps
     | Shell s -> s.deps
     | Glob g -> [ Any g.dir ]
-    | Trywith tw -> deps (Any tw.w) @ deps (Any tw.failsafe)
+    | Trywith tw -> [ Any tw.w ; Any tw.failsafe ]
+    | Ifelse ie -> [ Any ie.cond ; Any ie._then_ ; Any ie._else_ ]
 
   let descr (Any w) = match w with
     | Shell s -> Some s.descr
@@ -318,3 +326,7 @@ let glob ?pattern ?type_selection dir =
 let trywith w failsafe =
   let id = digest (`Trywith, id w, id failsafe) in
   Trywith { id ; w ; failsafe }
+
+let ifelse cond _then_ _else_ =
+  let id = digest (`Ifelse, id cond, id _then_, id _else_) in
+  Ifelse { id ; cond ; _then_ ; _else_ }

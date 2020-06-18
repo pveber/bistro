@@ -286,6 +286,12 @@ module Workflow : sig
     'a workflow ->
     'a workflow ->
     'a workflow
+
+  val ifelse :
+    bool workflow ->
+    'a workflow ->
+    'a workflow ->
+    'a workflow
 end
 
 (** {2 File formats} *)
