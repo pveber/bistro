@@ -229,6 +229,7 @@ let run (Command cmd as c) =
   let invocation = invocation c script_file in
   Misc.remove_if_exists cmd.env.tmp_dir >>= fun () ->
   Unix.mkdir_p cmd.env.tmp ;
+  Out_channel.write_all (Filename.concat cmd.env.tmp_dir "run.sh") ~data:invocation ;
   write_file_dumps (file_dumps c) >>= fun () ->
   Lwt_io.(with_file
             ~mode:output script_file
