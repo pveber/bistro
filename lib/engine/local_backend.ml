@@ -50,9 +50,9 @@ let eval _ () f x =
   | `In_the_parent pid ->
     Unix.close write_to_parent ;
     Unix.close read_from_parent ;
-    let ic = Lwt_io.of_unix_fd ~mode:Lwt_io.input read_from_child in
     Lwt.catch
       (fun () ->
+         let ic = Lwt_io.of_unix_fd ~mode:Lwt_io.input read_from_child in
          Lwt_io.read_value ic >>= fun (res : (unit, string) result) ->
          Caml.Unix.kill (Pid.to_int pid) Caml.Sys.sigkill;
          Misc.waitpid (Pid.to_int pid) >>= fun _ ->
