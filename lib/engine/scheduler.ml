@@ -322,7 +322,7 @@ module type Backend = sig
     t ->
     token ->
     Shell_command.t ->
-    (int * bool) Lwt.t
+    (int * bool, string) Lwt_result.t
 
   val eval :
     t ->
@@ -335,7 +335,7 @@ module type Backend = sig
     t ->
     _ Workflow.t ->
     Allocator.request ->
-    (token -> Allocator.resource -> Task_result.t Eval_thread.t) ->
+    (token -> Allocator.resource -> Execution_trace.Run_details.t Eval_thread.t) ->
     Execution_trace.t Eval_thread.t
 
   val stop : t -> unit Lwt.t
@@ -396,14 +396,14 @@ module Make(Backend : Backend) = struct
      *   else Lwt.return ()
      * ) >>= fun () -> *)
     Eval_thread.return (
-      Task_result.Input { id ; pass ; path }
+      Execution_trace.Run_details.Input { id ; pass ; path }
     )
 
   let perform_select ~db ~id ~dir ~sel =
     let p = Filename.concat (Db.path db dir) (Path.to_string sel) in
     let pass = match Sys.file_exists p with `Yes -> true | `Unknown | `No -> false in
     Eval_thread.return (
-      Task_result.Select {
+      Execution_trace.Run_details.Select {
         id ;
         pass ;
         dir_path = Db.path db dir ;
@@ -415,7 +415,7 @@ module Make(Backend : Backend) = struct
     match exit_code, dest_exists with
       0, true -> `Succeeded
     | 0, false -> `Missing_output
-    | _ -> `Failed
+    | i, _ -> `Error_exit_code i
 
   let perform_shell { backend ; allowed_containers ; db ; _ } token (Allocator.Resource { np ; mem }) ~id ~descr images cmd =
     let env =
@@ -425,26 +425,32 @@ module Make(Backend : Backend) = struct
         ~np ~mem ~id
     in
     let cmd = Shell_command.make env images cmd in
-    Backend.run_shell_command backend token cmd >>= fun (exit_code, dest_exists) ->
+    Backend.run_shell_command backend token cmd >>= fun result ->
     let cache_dest = Db.cache db id in
-    let outcome = step_outcome ~exit_code ~dest_exists in
+    let outcome =
+      match result with
+      | Ok (exit_code, dest_exists) ->
+        step_outcome ~exit_code ~dest_exists
+      | Error msg -> `Failure (Some msg)
+    in
     Misc.(
-      match outcome with
-      | `Succeeded ->
+      if Execution_trace.Outcome.is_success outcome then
         mv env.dest cache_dest >>= fun () ->
         remove_if_exists env.tmp_dir
-      | `Failed | `Missing_output ->
-        Lwt.return ()
+      else Lwt.return ()
     ) >>= fun () ->
-    Eval_thread.return (Task_result.Shell {
+    Eval_thread.return (Execution_trace.Run_details.Shell {
         outcome ;
         id ;
         descr ;
-        exit_code ;
         cmd = Shell_command.text cmd ;
         file_dumps = Shell_command.file_dumps cmd ;
-        cache =
-          (match outcome with `Succeeded -> Some cache_dest | `Failed | `Missing_output -> None) ;
+        cache = (
+          match outcome with
+          | `Succeeded -> Some cache_dest
+          | `Failure _
+          | `Missing_output
+          | `Error_exit_code _ -> None) ;
         stdout = env.stdout ;
         stderr = env.stderr ;
       })
@@ -456,8 +462,8 @@ module Make(Backend : Backend) = struct
       ) () >|=
     function
     | Ok () ->
-      Ok (Task_result.Plugin { id ; outcome = `Succeeded ; msg = None ; descr })
-    | Error msg -> Ok (Task_result.Plugin { id ; outcome = `Failed ; msg = Some msg ; descr })
+      Ok (Execution_trace.Run_details.Plugin { id ; outcome = `Succeeded ; descr })
+    | Error msg -> Ok (Execution_trace.Run_details.Plugin { id ; outcome = `Failure (Some msg) ; descr })
 
   let perform_path_plugin { db ; backend ; _ } token (Allocator.Resource { mem ; np }) ~id ~descr f =
     let env =
@@ -483,9 +489,9 @@ module Make(Backend : Backend) = struct
           remove_if_exists env.tmp_dir
         | `Missing_output -> Lwt.return ()
       ) >>= fun () ->
-      Lwt_result.return (Task_result.Plugin { id ; outcome ; msg = None ; descr })
+      Lwt_result.return (Execution_trace.Run_details.Plugin { id ; outcome ; descr })
     | Error msg ->
-      Lwt_result.return (Task_result.Plugin { id ; outcome = `Failed ; msg = Some msg ; descr })
+      Lwt_result.return (Execution_trace.Run_details.Plugin { id ; outcome = `Failure (Some msg) ; descr })
 
   let rec delayed_eval
     : type s. t -> s W.t -> (unit -> s option) Lwt.t
@@ -734,7 +740,7 @@ module Make(Backend : Backend) = struct
               Allocator.release sched.allocator resource ;
               Eval_thread.return @@ Execution_trace.Run {
                 ready ; start ; _end_ ;
-                outcome = Task_result.Container_image_fetch { id ; outcome } ;
+                details = Execution_trace.Run_details.Container_image_fetch { id ; outcome } ;
               }
             | Error _ ->
               assert false (* should never happen, we're asking so little here! *)

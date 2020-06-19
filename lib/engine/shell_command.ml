@@ -227,7 +227,6 @@ let run (Command cmd as c) =
   let open Lwt in
   let script_file = Filename.concat cmd.env.tmp_dir "script.sh" in
   let invocation = invocation c script_file in
-  print_endline invocation ;
   Misc.remove_if_exists cmd.env.tmp_dir >>= fun () ->
   Unix.mkdir_p cmd.env.tmp ;
   write_file_dumps (file_dumps c) >>= fun () ->

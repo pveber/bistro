@@ -6,7 +6,7 @@ type event =
   | Workflow_ready : _ Workflow.t -> event
   | Workflow_started : _ Workflow.t * Allocator.resource -> event
   | Workflow_ended : {
-      outcome : Task_result.t ;
+      details : Execution_trace.Run_details.t ;
       start : time ;
       _end_ : time ;
     } -> event

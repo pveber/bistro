@@ -22,7 +22,10 @@ let create
 let log ?(time = Unix.gettimeofday ()) backend event =
   backend.logger#event backend.db time event
 
-let run_shell_command _ () = Shell_command.run
+let run_shell_command _ () cmd =
+  Lwt.catch
+    (fun () -> Shell_command.run cmd >|= Result.return)
+    (fun exn -> Lwt_result.fail (Exn.to_string exn))
 
 let eval _ () f x =
   let (read_from_child, write_to_parent) = Unix.pipe () in
@@ -74,12 +77,12 @@ let build_trace backend w requirement perform =
     let open Eval_thread.Infix in
     let start = Unix.gettimeofday () in
     log ~time:start backend (Logger.Workflow_started (w, resource)) ;
-    perform () resource >>= fun outcome ->
+    perform () resource >>= fun details ->
     let _end_ = Unix.gettimeofday () in
-    log ~time:_end_ backend (Logger.Workflow_ended { outcome ; start ; _end_ }) ;
+    log ~time:_end_ backend (Logger.Workflow_ended { details ; start ; _end_ }) ;
     Allocator.release backend.allocator resource ;
     Eval_thread.return (
-      Execution_trace.Run { ready ; start  ; _end_ ; outcome }
+      Execution_trace.Run { ready ; start  ; _end_ ; details }
     )
   | Error (`Msg msg) ->
     log backend (Logger.Workflow_allocation_error (w, msg)) ;

@@ -21,7 +21,7 @@ module type Backend = sig
     t ->
     token ->
     Shell_command.t ->
-    (int * bool) Lwt.t
+    (int * bool, string) Lwt_result.t
 
   val eval :
     t ->
@@ -34,7 +34,7 @@ module type Backend = sig
     t ->
     _ Workflow.t ->
     Allocator.request ->
-    (token -> Allocator.resource -> Task_result.t Eval_thread.t) ->
+    (token -> Allocator.resource -> Execution_trace.Run_details.t Eval_thread.t) ->
     Execution_trace.t Eval_thread.t
 
   val stop : t -> unit Lwt.t
