@@ -5,12 +5,14 @@ module Outcome = struct
     | `Succeeded
     | `Missing_output
     | `Error_exit_code of int
-    | `Failure of string option
+    | `Plugin_failure of string
+    | `Scheduler_error of string
   ]
 
   let is_success = function
     | `Succeeded -> true
-    | `Failure _ | `Missing_output | `Error_exit_code _ -> false
+    | `Plugin_failure _ | `Missing_output
+    | `Error_exit_code _ | `Scheduler_error _ -> false
 end
 
 module Run_details = struct
@@ -67,8 +69,8 @@ module Run_details = struct
     | `Succeeded ->
       let msg = "Execution_trace.error_short_descr: not an error result" in
       raise (Invalid_argument msg)
-    | `Failure (Some msg) -> sprintf "Failure: %s" msg
-    | `Failure None -> "Failure"
+    | `Plugin_failure msg -> sprintf "Plugin failure: %s" msg
+    | `Scheduler_error msg -> sprintf "Scheduler failure: %s" msg
 
   let error_short_descr = function
     | Input { path ; _ } -> sprintf "Input %s doesn't exist" path

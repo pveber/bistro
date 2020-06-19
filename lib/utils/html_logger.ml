@@ -173,10 +173,10 @@ module Render = struct
     | `Succeeded -> k""
     | `Error_exit_code i ->
       p [ kf "Command failed with code %d" i ]
-    | `Failure (Some msg) ->
-      p [ kf "Command failed with message: %s" msg ]
-    | `Failure None ->
-      p [ k "failure" ]
+    | `Plugin_failure msg ->
+      p [ kf "Plugin failed with message: %s" msg ]
+    | `Scheduler_error msg ->
+      p [ kf "Scheduler error: %s" msg ]
     | `Missing_output ->
       p [ k "Missing output" ]
 
@@ -264,8 +264,8 @@ module Render = struct
 
     | Input { pass = false ; _ }
     | Select { pass = false ; _ }
-    | Plugin { outcome = (`Error_exit_code _ | `Failure _) ; _ }
-    | Shell { outcome = (`Error_exit_code _ | `Failure _) ; _ } ->
+    | Plugin { outcome = (`Error_exit_code _ | `Plugin_failure _ | `Scheduler_error _) ; _ }
+    | Shell { outcome = (`Error_exit_code _ | `Plugin_failure _ | `Scheduler_error _) ; _ } ->
       event_label_text `RED "FAILED"
 
     | Plugin { outcome = `Missing_output ; _ }

@@ -13,11 +13,11 @@ let msg t fmt =
 
 let error_short_descr_of_outcome = function
   | `Succeeded -> assert false
-  | `Failure _ -> "failure"
+  | `Scheduler_error _
+  | `Plugin_failure _ -> "failure"
   | `Error_exit_code exit_code ->
     sprintf "ended with exit code %d" exit_code
-  | `Missing_output ->
-    "missing output"
+  | `Missing_output -> "missing output"
 
 let error_short_descr =
   let open Execution_trace.Run_details in

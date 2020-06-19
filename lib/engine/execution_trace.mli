@@ -5,7 +5,8 @@ module Outcome : sig
     | `Succeeded
     | `Missing_output
     | `Error_exit_code of int
-    | `Failure of string option
+    | `Plugin_failure of string
+    | `Scheduler_error of string
   ]
 
   val is_success : t -> bool

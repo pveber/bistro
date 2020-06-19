@@ -431,7 +431,7 @@ module Make(Backend : Backend) = struct
       match result with
       | Ok (exit_code, dest_exists) ->
         step_outcome ~exit_code ~dest_exists
-      | Error msg -> `Failure (Some msg)
+      | Error msg -> `Scheduler_error msg
     in
     Misc.(
       if Execution_trace.Outcome.is_success outcome then
@@ -448,9 +448,10 @@ module Make(Backend : Backend) = struct
         cache = (
           match outcome with
           | `Succeeded -> Some cache_dest
-          | `Failure _
+          | `Plugin_failure _
           | `Missing_output
-          | `Error_exit_code _ -> None) ;
+          | `Error_exit_code _
+          | `Scheduler_error _ -> None) ;
         stdout = env.stdout ;
         stderr = env.stderr ;
       })
@@ -463,7 +464,7 @@ module Make(Backend : Backend) = struct
     function
     | Ok () ->
       Ok (Execution_trace.Run_details.Plugin { id ; outcome = `Succeeded ; descr })
-    | Error msg -> Ok (Execution_trace.Run_details.Plugin { id ; outcome = `Failure (Some msg) ; descr })
+    | Error msg -> Ok (Execution_trace.Run_details.Plugin { id ; outcome = `Plugin_failure msg ; descr })
 
   let perform_path_plugin { db ; backend ; _ } token (Allocator.Resource { mem ; np }) ~id ~descr f =
     let env =
@@ -491,7 +492,23 @@ module Make(Backend : Backend) = struct
       ) >>= fun () ->
       Lwt_result.return (Execution_trace.Run_details.Plugin { id ; outcome ; descr })
     | Error msg ->
-      Lwt_result.return (Execution_trace.Run_details.Plugin { id ; outcome = `Failure (Some msg) ; descr })
+      Lwt_result.return (Execution_trace.Run_details.Plugin { id ; outcome = `Plugin_failure msg ; descr })
+
+  let run_trywith_recovery (rd : Execution_trace.Run_details.t) =
+    match rd with
+    | Input i -> not i.pass
+    | Select s -> not s.pass
+    | Container_image_fetch _ -> false
+    | Shell { outcome ; _ }
+    | Plugin { outcome ; _ } -> (
+        match outcome with
+        | `Error_exit_code _
+        | `Missing_output
+        | `Plugin_failure _ -> true
+        | `Succeeded
+        | `Scheduler_error _ -> false
+      )
+
 
   let rec delayed_eval
     : type s. t -> s W.t -> (unit -> s option) Lwt.t
@@ -584,9 +601,11 @@ module Make(Backend : Backend) = struct
           match Table.find sched.traces (Workflow.id tw.w) with
           | Some eventual_trace -> (
               eventual_trace >>= function
-              | Ok trace when not (Execution_trace.is_errored trace) ->
-                delayed_eval sched tw.w
-              | _ -> delayed_eval sched tw.failsafe
+              | Ok (Run r) ->
+                if run_trywith_recovery r.details then
+                  delayed_eval sched tw.failsafe
+                else Lwt.return (Fn.const None)
+              | _ -> Lwt.return (Fn.const None)
             )
           | None -> assert false (* delayed_eval should not be called
                                     on workflow that has not been
@@ -824,10 +843,15 @@ module Make(Backend : Backend) = struct
       | List l ->
         Eval_thread.join l.elts ~f:(build ?target sched)
       | Trywith tw -> (
-          build sched ?target tw.w >> function
-          | Ok () -> Eval_thread.return ()
-          | Error _ ->
-            build sched ?target tw.failsafe
+          build sched ?target tw.w >> fun w_result ->
+          match Table.find sched.traces (Workflow.id tw.w) with
+          | Some eventual_trace -> (
+              eventual_trace >>= function
+              | Run r when run_trywith_recovery r.details ->
+                build sched ?target tw.failsafe
+              | _ -> Lwt.return w_result
+            )
+          | None -> assert false (* cannot happen since build has been called *)
         )
       | Ifelse ie -> (
           build sched ?target ie.cond >>= fun () ->
