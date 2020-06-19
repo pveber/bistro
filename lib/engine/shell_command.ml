@@ -86,7 +86,9 @@ let file_dumps (Command cmd as c) =
   file_dumps_of_command cmd.text
   |> List.map ~f:(compile_file_dump cmd.env (container_env c))
 
-let par x = "(" ^ x ^ ")"
+let par x = "( " ^ x ^ " )"
+(* spaces after '(' and before ')' are essential here, to prevent '((
+   ))' which has a specific meaning for bash *)
 
 let command_path_deps cmd =
   Command.deps cmd
