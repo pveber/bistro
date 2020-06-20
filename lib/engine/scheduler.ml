@@ -604,8 +604,14 @@ module Make(Backend : Backend) = struct
               | Ok (Run r) ->
                 if run_trywith_recovery r.details then
                   delayed_eval sched tw.failsafe
-                else Lwt.return (Fn.const None)
-              | _ -> Lwt.return (Fn.const None)
+                else if Execution_trace.Run_details.succeeded r.details then
+                  delayed_eval sched tw.w
+                else
+                  Lwt.return (Fn.const None)
+              | Ok (Done_already _) -> delayed_eval sched tw.w
+              | Ok (Canceled _ | Allocation_error _)
+              | Error _ ->
+                Lwt.return (Fn.const None)
             )
           | None -> assert false (* delayed_eval should not be called
                                     on workflow that has not been
@@ -623,9 +629,9 @@ module Make(Backend : Backend) = struct
     delayed_eval sched w >>= fun f ->
     Lwt.return (f ())
 
-  let shallow_eval_exn sched w =
+  let shallow_eval_exn ~msg sched w =
     shallow_eval sched w >|= fun r ->
-    Option.value_exn r
+    Option.value_exn ~message:msg r
 
   let rec shallow_eval_command sched =
     let list xs = Lwt_list.map_p (shallow_eval_command sched) xs in
@@ -647,10 +653,10 @@ module Make(Backend : Backend) = struct
   and shallow_eval_token sched =
     let open Template in
     function
-    | D (Workflow.Path_token w) -> shallow_eval_exn sched w >|= fun p -> D (Execution_env.Path p)
+    | D (Workflow.Path_token w) -> shallow_eval_exn sched ~msg:"token D" w >|= fun p -> D (Execution_env.Path p)
     | D (Workflow.Path_list_token { elts ; quote ; sep }) ->
-      shallow_eval_exn sched elts >|= fun elts -> D (Execution_env.Path_list { elts ; quote ; sep })
-    | D (Workflow.String_token w) -> shallow_eval_exn sched w >|= fun p -> D (Execution_env.String p)
+      shallow_eval_exn sched elts  ~msg:"token Ds" >|= fun elts -> D (Execution_env.Path_list { elts ; quote ; sep })
+    | D (Workflow.String_token w) -> shallow_eval_exn sched w ~msg:"token S" >|= fun p -> D (Execution_env.String p)
     | F f -> shallow_eval_template sched f >|= fun t -> F t
     | DEST | TMP | NP | MEM | S _ as tok -> Lwt.return tok
 
@@ -689,7 +695,7 @@ module Make(Backend : Backend) = struct
 
   let opt_mem_requirement sched = function
     | None -> Lwt.return 100
-    | Some mem -> shallow_eval_exn sched mem
+    | Some mem -> shallow_eval_exn  ~msg:"opt mem" sched mem
 
   let mem_requirement
     : type u. t -> u Workflow.t -> int Lwt.t
@@ -792,7 +798,7 @@ module Make(Backend : Backend) = struct
       | Glob g -> build sched ?target g.dir
       | W.Spawn { elts ; f ; _ } ->
         build sched ?target elts >>= fun () ->
-        shallow_eval_exn sched elts >> fun elts_value ->
+        shallow_eval_exn  ~msg:"spawn"  sched elts >> fun elts_value ->
         let n = List.length elts_value in
         let targets = List.init n ~f:(fun i -> f (W.list_nth elts i)) in
         Lwt_list.iter_p (Maybe_gc.register ?target sched.gc) targets >> fun () ->
@@ -805,7 +811,7 @@ module Make(Backend : Backend) = struct
 
       | W.Select { id ; dir ; sel ; _ } ->
         build sched ?target dir >>= fun () ->
-        shallow_eval_exn sched dir >> fun dir ->
+        shallow_eval_exn  ~msg:"select" sched dir >> fun dir ->
         register_build sched ~id ~build_trace:(fun () ->
             build_trace sched w (fun _ _ ->
                 perform_select ~db:sched.db ~id ~dir ~sel
@@ -817,7 +823,7 @@ module Make(Backend : Backend) = struct
         schedule_cached_workflow sched ~id w
           ~deps:(fun () -> build sched ~target:w workflow)
           ~perform:(fun token resource ->
-              shallow_eval_exn sched workflow >> fun f ->
+              shallow_eval_exn ~msg:("plugin:"^descr) sched workflow >> fun f ->
               perform_plugin sched token resource ~id ~descr f
             )
 
@@ -825,7 +831,7 @@ module Make(Backend : Backend) = struct
         schedule_cached_workflow sched ~id w
           ~deps:(fun () -> build sched ~target:w workflow)
           ~perform:(fun token resource ->
-              shallow_eval_exn sched workflow >> fun f ->
+              shallow_eval_exn ~msg:"path_plugin" sched workflow >> fun f ->
               perform_path_plugin sched token resource ~id ~descr f
             )
 
@@ -855,7 +861,7 @@ module Make(Backend : Backend) = struct
         )
       | Ifelse ie -> (
           build sched ?target ie.cond >>= fun () ->
-          shallow_eval_exn sched ie.cond >> fun cond ->
+          shallow_eval_exn  ~msg:"ifelse" sched ie.cond >> fun cond ->
           if cond then build sched ?target ie._then_
           else build sched ?target ie._else_
         )
@@ -870,7 +876,7 @@ module Make(Backend : Backend) = struct
     build sched target
     >>= (fun r -> Maybe_gc.stop sched.gc >|= fun () -> r) (* FIXME: is this the right moment?
                                                              what if eval is called several times? *)
-    |> Fn.flip Lwt_result.bind Lwt.(fun () -> shallow_eval_exn sched target >|= Result.return)
+    |> Fn.flip Lwt_result.bind Lwt.(fun () -> shallow_eval_exn ~msg:"eval" sched target >|= Result.return)
     |> Lwt_result.map_err Execution_trace.Set.elements
 
   let error_report { db ; _ } traces =
