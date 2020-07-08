@@ -609,9 +609,10 @@ module Make(Backend : Backend) = struct
                 else
                   Lwt.return (Fn.const None)
               | Ok (Done_already _) -> delayed_eval sched tw.w
-              | Ok (Canceled _ | Allocation_error _)
-              | Error _ ->
+              | Ok (Canceled _ | Allocation_error _) ->
                 Lwt.return (Fn.const None)
+              | Error _ ->
+                delayed_eval sched tw.failsafe
             )
           | None -> assert false (* delayed_eval should not be called
                                     on workflow that has not been
@@ -631,7 +632,7 @@ module Make(Backend : Backend) = struct
 
   let shallow_eval_exn ~msg sched w =
     shallow_eval sched w >|= fun r ->
-    Option.value_exn ~message:msg r
+    Option.value_exn ~message:("shallow_eval_exn:" ^ msg) r
 
   let rec shallow_eval_command sched =
     let list xs = Lwt_list.map_p (shallow_eval_command sched) xs in
@@ -823,7 +824,7 @@ module Make(Backend : Backend) = struct
         schedule_cached_workflow sched ~id w
           ~deps:(fun () -> build sched ~target:w workflow)
           ~perform:(fun token resource ->
-              shallow_eval_exn ~msg:("plugin:"^descr) sched workflow >> fun f ->
+              shallow_eval_exn ~msg:("plugin:" ^ descr) sched workflow >> fun f ->
               perform_plugin sched token resource ~id ~descr f
             )
 
@@ -852,8 +853,10 @@ module Make(Backend : Backend) = struct
           build sched ?target tw.w >> fun w_result ->
           match Table.find sched.traces (Workflow.id tw.w) with
           | Some eventual_trace -> (
-              eventual_trace >>= function
-              | Run r when run_trywith_recovery r.details ->
+              eventual_trace >> function
+              | Ok (Run r) when run_trywith_recovery r.details ->
+                build sched ?target tw.failsafe
+              | Error _ ->
                 build sched ?target tw.failsafe
               | _ -> Lwt.return w_result
             )
