@@ -9,7 +9,7 @@ type event =
       id : string ;
       descr : string ;
     } -> event
-  | Workflow_ended : Task_result.t -> event
+  | Workflow_ended : Execution_trace.Run_details.t -> event
   | Workflow_done_already : {
       w : _ Workflow.t ;
       path : string ;
@@ -41,8 +41,8 @@ let translate_event db _ = function
   | Logger.Workflow_started (Shell {id ; descr ; _},  _) ->
     Some (Step_workflow_started { id ; descr })
 
-  | Workflow_ended { outcome ; _ } ->
-    Some (Workflow_ended outcome)
+  | Workflow_ended { details ; _ } ->
+    Some (Workflow_ended details)
 
   | Workflow_skipped (w, `Done_already) ->
     let path = Db.cache db (Workflow.id w) in
@@ -169,8 +169,19 @@ module Render = struct
       step_file_dumps file_dumps ;
     ]
 
+  let task_result_header = function
+    | `Succeeded -> k""
+    | `Error_exit_code i ->
+      p [ kf "Command failed with code %d" i ]
+    | `Plugin_failure msg ->
+      p [ kf "Plugin failed with message: %s" msg ]
+    | `Scheduler_error msg ->
+      p [ kf "Scheduler error: %s" msg ]
+    | `Missing_output ->
+      p [ k "Missing output" ]
+
   let task_result = function
-    | Task_result.Input { path ; pass ; _ } ->
+    | Execution_trace.Run_details.Input { path ; pass ; _ } ->
       [ p [ k "input " ; k path ] ;
         if pass then k"" else (
           p [ k"Input doesn't exist" ]
@@ -187,29 +198,15 @@ module Render = struct
               a ~a:[a_href dir_path] [k dir_path ] ]
         ) ]
 
-    | Shell { exit_code ; outcome ; stdout ; stderr ; cache ; file_dumps ; cmd ; descr ; id } ->
+    | Shell { outcome ; stdout ; stderr ; cache ; file_dumps ; cmd ; descr ; id } ->
       collapsible_panel
         ~title:[ k descr ]
-        ~header:[
-          match outcome with
-          | `Succeeded -> k""
-          | `Failed ->
-            p [ kf "Command failed with code %d" exit_code ]
-          | `Missing_output ->
-            p [ k "Missing output" ]
-        ]
+        ~header:[ task_result_header outcome ]
         ~body:(shell_result_details ~id:id ~cmd ~cache ~stderr ~stdout ~file_dumps)
     | Plugin res ->
       collapsible_panel
         ~title:[ k res.descr ]
-        ~header:[
-          match res.outcome with
-          | `Succeeded -> k""
-          | `Failed ->
-            p [ k (Option.value ~default:"" res.msg) ]
-          | `Missing_output ->
-            p [ k "missing_output" ]
-        ]
+        ~header:[ task_result_header res.outcome ]
         ~body:[]
     | Container_image_fetch f ->
       match f.outcome with
@@ -261,14 +258,14 @@ module Render = struct
     span ~a:[a_style style] [ k text ]
 
   let result_label = function
-    | Task_result.Input { pass = true ; _ }
+    | Execution_trace.Run_details.Input { pass = true ; _ }
     | Select { pass = true ; _ } ->
       event_label_text `BLACK "CHECKED"
 
     | Input { pass = false ; _ }
     | Select { pass = false ; _ }
-    | Plugin { outcome = `Failed ; _ }
-    | Shell { outcome = `Failed ; _ } ->
+    | Plugin { outcome = (`Error_exit_code _ | `Plugin_failure _ | `Scheduler_error _) ; _ }
+    | Shell { outcome = (`Error_exit_code _ | `Plugin_failure _ | `Scheduler_error _) ; _ } ->
       event_label_text `RED "FAILED"
 
     | Plugin { outcome = `Missing_output ; _ }

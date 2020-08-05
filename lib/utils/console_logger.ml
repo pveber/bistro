@@ -11,26 +11,21 @@ let msg t fmt =
   in
   ksprintf k fmt
 
+let error_short_descr_of_outcome = function
+  | `Succeeded -> assert false
+  | `Scheduler_error _
+  | `Plugin_failure _ -> "failure"
+  | `Error_exit_code exit_code ->
+    sprintf "ended with exit code %d" exit_code
+  | `Missing_output -> "missing output"
+
 let error_short_descr =
-  let open Task_result in
+  let open Execution_trace.Run_details in
   function
   | Input _ -> "input doesn't exist"
   | Select _ -> "invalid select"
-  | Shell { exit_code ; outcome ; _ } -> (
-      match outcome with
-      | `Succeeded -> assert false
-      | `Failed ->
-        sprintf "ended with exit code %d" exit_code
-      | `Missing_output ->
-        "missing output"
-    )
-  | Plugin { outcome ; _ } -> (
-      match outcome with
-      | `Succeeded -> assert false
-      | `Failed -> "failed"
-      | `Missing_output ->
-        "missing output"
-    )
+  | Shell { outcome ; _ } -> error_short_descr_of_outcome outcome
+  | Plugin { outcome ; _ } -> error_short_descr_of_outcome outcome
   | Container_image_fetch _ ->
     "failed to fetch container image"
 
@@ -44,19 +39,19 @@ let output_event t = function
   | Logger.Workflow_started (Plugin { id ; descr ; _ }, _) ->
     output_step_event t ~id ~descr
 
-  | Workflow_ended { outcome = (Task_result.Shell { id ; descr ; _ } as outcome) ; _ } ->
+  | Workflow_ended { details = (Execution_trace.Run_details.Shell { id ; descr ; _ } as outcome) ; _ } ->
     let id = String.prefix id 6 in
     let outcome_msg =
-      if Task_result.succeeded outcome then
+      if Execution_trace.Run_details.succeeded outcome then
         "success"
       else sprintf "error: %s" (error_short_descr outcome)
     in
     msg t "ended %s.%s (%s)" descr id outcome_msg
 
-  | Workflow_ended { outcome = (Task_result.Plugin { id ; descr ; _ } as outcome) ; _ } ->
+  | Workflow_ended { details = (Execution_trace.Run_details.Plugin { id ; descr ; _ } as outcome) ; _ } ->
     let id = String.prefix id 6 in
     let outcome_msg =
-      if Task_result.succeeded outcome then
+      if Execution_trace.Run_details.succeeded outcome then
         "success"
       else sprintf "error: %s" (error_short_descr outcome)
     in

@@ -86,7 +86,9 @@ let file_dumps (Command cmd as c) =
   file_dumps_of_command cmd.text
   |> List.map ~f:(compile_file_dump cmd.env (container_env c))
 
-let par x = "(" ^ x ^ ")"
+let par x = "( " ^ x ^ " )"
+(* spaces after '(' and before ')' are essential here, to prevent '((
+   ))' which has a specific meaning for bash *)
 
 let command_path_deps cmd =
   Command.deps cmd
@@ -227,9 +229,9 @@ let run (Command cmd as c) =
   let open Lwt in
   let script_file = Filename.concat cmd.env.tmp_dir "script.sh" in
   let invocation = invocation c script_file in
-  print_endline invocation ;
   Misc.remove_if_exists cmd.env.tmp_dir >>= fun () ->
   Unix.mkdir_p cmd.env.tmp ;
+  Out_channel.write_all (Filename.concat cmd.env.tmp_dir "run.sh") ~data:invocation ;
   write_file_dumps (file_dumps c) >>= fun () ->
   Lwt_io.(with_file
             ~mode:output script_file

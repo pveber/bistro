@@ -25,7 +25,7 @@ type _ api_request =
   | Shell_command_result : {
       client_id : string ;
       workflow_id : string ;
-      result : int * bool ;
+      result : (int * bool, string) Result.t ;
     } -> unit api_request
 
 module Client = struct
@@ -56,7 +56,10 @@ module Client = struct
         Local_backend.eval () () f () >>= fun result ->
         send_request client (Plugin_result { client_id ; workflow_id ; result })
       | Shell_command { workflow_id ; cmd } ->
-        Shell_command.run cmd >>= fun result ->
+        Lwt.catch
+          (fun () -> Shell_command.run cmd >|= Result.return)
+          (fun exn -> Lwt_result.fail (Exn.to_string exn))
+        >>= fun result ->
         send_request client (Shell_command_result { client_id ; workflow_id ; result })
     in
     let rec loop () =
@@ -94,7 +97,7 @@ module Server = struct
       | Waiting_shell_command of {
           workflow_id : string ;
           cmd : Shell_command.t ;
-          waiter : (int * bool) Lwt.u ;
+          waiter : (int * bool, string) result Lwt.u ;
         }
       | Waiting_plugin of {
           workflow_id : string ;
@@ -315,12 +318,12 @@ module Server = struct
       let start = Unix.gettimeofday () in
       log ~time:start backend (Logger.Workflow_started (w, resource)) ;
       let token = { worker_id = worker.id ; workflow_id = Bistro_internals.Workflow.id w } in
-      perform token resource >>= fun outcome ->
+      perform token resource >>= fun details ->
       let _end_ = Unix.gettimeofday () in
-      log ~time:_end_ backend (Logger.Workflow_ended { outcome ; start ; _end_ }) ;
+      log ~time:_end_ backend (Logger.Workflow_ended { details ; start ; _end_ }) ;
       release_resource backend worker.id resource ;
       Eval_thread.return (
-        Execution_trace.Run { ready ; start  ; _end_ ; outcome }
+        Execution_trace.Run { ready ; start  ; _end_ ; details }
       )
         (* | Error `Resource_unavailable ->
          *   let msg = "No worker with enough resource" in

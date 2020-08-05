@@ -281,6 +281,17 @@ module Workflow : sig
     ?type_selection:[`File | `Directory] ->
     _ directory ->
     'a path list workflow
+
+  val trywith :
+    'a workflow ->
+    'a workflow ->
+    'a workflow
+
+  val ifelse :
+    bool workflow ->
+    'a workflow ->
+    'a workflow ->
+    'a workflow
 end
 
 (** {2 File formats} *)
