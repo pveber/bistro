@@ -2,6 +2,8 @@ open Core_kernel
 open Bistro_engine
 open Lwt.Infix
 
+module Unix = Caml_unix
+
 type job =
   | Plugin of {
       workflow_id : string ;

@@ -1,6 +1,8 @@
 open Core_kernel
 open Bistro_internals
 
+module Unix = Caml_unix
+
 type insert =
   | Path of Workflow.path
   | Path_list of {
