@@ -1,5 +1,5 @@
 (library
-  (name bistro_bioinfo)
-  (public_name bistro.bioinfo)
+  (name bistro_bio)
+  (public_name bistro-bio)
   (libraries bistro.unix stdio)
   (preprocess (pps ppx_bistro)))

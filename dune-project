@@ -11,11 +11,12 @@
 
 (package
   (name bistro)
+  (tags (workflow pipeline))
   (synopsis "A library to build and run distributed scientific workflows")
   (description "
 bistro is an OCaml library to build and run computations represented
-by a collection of interdependent scripts, as is often found in
-data analysis (especially computational biology).
+by a collection of interdependent scripts or OCaml functions, as is
+often found in data analysis.
 
 Features:
 - build complex and composable workflows declaratively
@@ -26,14 +27,8 @@ Features:
 - development-friendly: when a script is modified, bistro
   automatically finds out what needs to be recomputed
 - automatic naming of generated files
-- static typing: detect file format errors at compile time!
-
-The library provides a datatype to represent scripts (including
-metadata and dependencies), an engine to run workflows and a standard
-library providing components for popular tools (although mostly
-related to computational biology and unix for now).
+- static typing: detect file format errors at compile time
 ")
-  (tags (bioinformatics workflow pipeline))
   (depends
     base64
     bos
@@ -47,3 +42,14 @@ related to computational biology and unix for now).
     rresult
     (sexplib (>= 113.24.00))
     (tyxml (>= 4.0))))
+
+(package
+  (name bistro-bio)
+  (synopsis "Bistro workflows for computational biology")
+  (tags (bioinformatics))
+  (description "
+This library provides wrappers for popular tools for genomics, transcriptomics
+and phylogeny, as well as custom tools to help piping data from one tool to the
+other.
+")
+  (depends biocaml biotk))
