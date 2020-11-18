@@ -176,30 +176,6 @@ let gen_letin_rewriter ~loc ~env_rewrite (vbs : value_binding list) (body : expr
       [%expr Bistro.Workflow.app [%e acc] [%e e]]
     )
 
-let letin_rewriter ~loc ~path:_ vbs body = gen_letin_rewriter ~loc vbs ~env_rewrite:false [%expr fun () -> [%e body]]
-let pletin_rewriter ~loc ~path:_ vbs body = gen_letin_rewriter ~loc ~env_rewrite:true vbs [%expr fun __dest__ -> [%e body]]
-
-let pstr_item_rewriter ~loc ~path:_ descr version mem np var expr =
-  let descr = match descr with
-    | Some d -> d
-    | None -> B.estring (default_descr var)
-  in
-  let body, body_type = extract_body expr in
-  let rewritten_body, deps = new payload_rewriter#expression body [] in
-  let applicative_body = build_applicative ~loc deps [%expr fun __dest__ -> [%e rewritten_body]] in
-  let workflow_body = [%expr
-    Bistro.Workflow.path_plugin
-      ~descr:[%e descr]
-      ?version:[%e B.eopt version]
-      ?np:[%e B.eopt np]
-      ?mem:[%e B.eopt mem]
-      [%e applicative_body]] in
-  let workflow_body_with_type = match body_type with
-    | None -> workflow_body
-    | Some ty -> [%expr ([%e workflow_body] : [%t ty])]
-  in
-  [%stri let [%p B.pvar var] = [%e replace_body workflow_body_with_type expr]]
-
 let translate_position (p : Lexing.position) ~from:(q : Lexing.position) =
   {
     q with pos_lnum = p.pos_lnum + q.pos_lnum - 1 ;
@@ -253,59 +229,8 @@ let expression_ext =
   let open Extension in
   declare "workflow" Context.expression Ast_pattern.(single_expr_payload __) expression_rewriter
 
-let letin_ext =
-  let open Extension in
-  declare "deps" Context.expression Ast_pattern.(single_expr_payload (pexp_let nonrecursive __ __)) letin_rewriter
-
-let pletin_ext =
-  let open Extension in
-  declare "pdeps" Context.expression Ast_pattern.(single_expr_payload (pexp_let nonrecursive __ __)) pletin_rewriter
-
-let np_attr =
-  Attribute.declare "bistro.np"
-    Attribute.Context.value_binding
-    Ast_pattern.(single_expr_payload (__))
-    (fun x -> x)
-
-let mem_attr =
-  Attribute.declare "bistro.mem"
-    Attribute.Context.value_binding
-    Ast_pattern.(single_expr_payload (__))
-    (fun x -> x)
-
-let descr_attr =
-  Attribute.declare "bistro.descr"
-    Attribute.Context.value_binding
-    Ast_pattern.(single_expr_payload (__))
-    (fun x -> x)
-
-let version_attr =
-  Attribute.declare "bistro.version"
-    Attribute.Context.value_binding
-    Ast_pattern.(single_expr_payload (__))
-    (fun x -> x)
-
-let str_item_ext label rewriter =
-  let open Extension in
-  let pattern =
-    let open Ast_pattern in
-    let vb =
-      value_binding ~expr:__ ~pat:(ppat_var __)
-      |> Attribute.pattern np_attr
-      |> Attribute.pattern mem_attr
-      |> Attribute.pattern version_attr
-      |> Attribute.pattern descr_attr
-    in
-    pstr ((pstr_value nonrecursive ((vb ^:: nil))) ^:: nil)
-  in
-    declare label Context.structure_item pattern rewriter
-
 let () =
   Driver.register_transformation "bistro" ~extensions:[
     script_ext ;
     expression_ext ;
-    letin_ext ;
-    pletin_ext ;
-    str_item_ext "workflow" str_item_rewriter ;
-    str_item_ext "pworkflow" pstr_item_rewriter ;
   ]

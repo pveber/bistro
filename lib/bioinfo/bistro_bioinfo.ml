@@ -2289,10 +2289,10 @@ module Kallisto = struct
     Workflow.select x [ "abundance.tsv" ]
 
   let merge_eff_counts ~sample_ids ~kallisto_outputs =
-    Workflow.path_plugin ~descr:"kallisto.merge_eff_counts" (
+    Workflow.path_plugin ~descr:"kallisto.merge_eff_counts" (fun%workflow dest ->
 
-      let%pdeps kallisto_outputs = path_list kallisto_outputs
-      and             sample_ids = data sample_ids in
+      let kallisto_outputs = [%eval Workflow.path_list kallisto_outputs] in
+      let sample_ids = [%param sample_ids] in
 
       let parse_eff_counts fn =
         In_channel.read_lines fn
@@ -2321,14 +2321,14 @@ module Kallisto = struct
         |> List.map ~f:(String.concat ~sep:"\t")
       in
 
-      Out_channel.write_lines [%dest] lines
+      Out_channel.write_lines dest lines
     )
 
   let merge_tpms ~sample_ids ~kallisto_outputs =
-    Workflow.path_plugin ~descr:"kallisto.merge_tpms" (
+    Workflow.path_plugin ~descr:"kallisto.merge_tpms" (fun%workflow dest ->
 
-      let%pdeps kallisto_outputs = path_list kallisto_outputs
-      and             sample_ids = data sample_ids in
+      let kallisto_outputs = [%eval Workflow.path_list kallisto_outputs]
+      and sample_ids = [%param sample_ids] in
 
       let parse_tpms fn =
         In_channel.read_lines fn
@@ -2357,7 +2357,7 @@ module Kallisto = struct
         |> List.map ~f:(String.concat ~sep:"\t")
       in
 
-      Out_channel.write_lines [%dest] lines
+      Out_channel.write_lines dest lines
     )
 end
 

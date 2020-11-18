@@ -87,8 +87,9 @@ let generate outdir items =
     )
 
 let item_to_workflow = function
-  | Item (path, w) ->
-    [%workflow [ normalized_repo_item ~repo_path:path ~id:(W.id (Private.reveal w)) ~cache_path:[%path w] ]]
+  | Item (repo_path, w) ->
+    let%workflow id = W.id (Private.reveal w) in
+    [normalized_repo_item ~repo_path ~id ~cache_path:[%path w]]
   | Precious_item _ -> Workflow.data []
 
 let to_workflow ~outdir items =
@@ -96,7 +97,7 @@ let to_workflow ~outdir items =
     List.map items ~f:item_to_workflow
     |> Workflow.list
   in
-  [%workflow
+  [%workflow 
     [%eval normalized_items]
     |> List.concat
     |> remove_redundancies

@@ -56,20 +56,22 @@ let render_cell = function
   | Section s -> [%workflow H.h2 [ H.txt [%param s] ]]
   | Subsection s -> [%workflow H.h3 [ H.txt [%param s] ]]
 
-let%pworkflow render nb =
-  let cells = [%eval Workflow.list @@ List.map nb.cells ~f:render_cell] in
-  let head_contents = [
-    H.link ~rel:[`Stylesheet] ~href:"https://unpkg.com/marx-css/css/marx.min.css" () ;
-    H.meta ~a:[H.a_name "viewport" ; H.a_content "width=device-width, initial-scale=1"] () ;
-  ]
-  in
-  let body_contents = [
-    H.main (
-      H.h1 [ H.txt nb.title ] :: H.hr () :: cells
-    ) ;
-  ]
-  in
-  let doc = H.html (H.head (H.title (H.txt nb.title)) head_contents) (H.body body_contents) in
-  Out_channel.with_file [%dest] ~f:(fun oc ->
-      Tyxml_html.pp () (Format.formatter_of_out_channel oc) doc
+let render nb =
+  Workflow.path_plugin ~descr:"html_report.render" (fun%workflow dest ->
+      let cells = [%eval Workflow.list @@ List.map nb.cells ~f:render_cell] in
+      let head_contents = [
+        H.link ~rel:[`Stylesheet] ~href:"https://unpkg.com/marx-css/css/marx.min.css" () ;
+        H.meta ~a:[H.a_name "viewport" ; H.a_content "width=device-width, initial-scale=1"] () ;
+      ]
+      in
+      let body_contents = [
+        H.main (
+          H.h1 [ H.txt nb.title ] :: H.hr () :: cells
+        ) ;
+      ]
+      in
+      let doc = H.html (H.head (H.title (H.txt nb.title)) head_contents) (H.body body_contents) in
+      Out_channel.with_file dest ~f:(fun oc ->
+          Tyxml_html.pp () (Format.formatter_of_out_channel oc) doc
+        )
     )
