@@ -97,7 +97,7 @@ let to_workflow ~outdir items =
     List.map items ~f:item_to_workflow
     |> Workflow.list
   in
-  [%workflow 
+  [%workflow
     [%eval normalized_items]
     |> List.concat
     |> remove_redundancies
