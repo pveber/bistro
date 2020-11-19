@@ -46,30 +46,8 @@ let insert_type_of_ext = function
   | "param" -> Param
   | ext -> failwith ("Unknown insert " ^ ext)
 
-class payload_env_rewriter = object
-  inherit [(string * expression * insert_type) list] Ast_traverse.fold_map as super
-  method! expression expr acc =
-    match expr with
-    | { pexp_desc = Pexp_extension ({txt = ("dest" | "np" | "mem" | "tmp" as ext) ; _ }, payload) ; pexp_loc = loc ; _ } -> (
-        match payload with
-        | PStr [] -> (
-            let expr' = match ext with
-              | "dest" -> [%expr __dest__]
-              (* | "tmp" -> [%expr env#tmp] *)
-              (* | "np" -> [%expr env#np] *)
-              (* | "mem" -> [%expr env#mem] *)
-              | _ -> assert false
-            in
-            expr', acc
-          )
-        | _ -> failwith "expected empty payload"
-
-      )
-    | _ -> super#expression expr acc
-end
-
 class payload_rewriter = object
-  inherit payload_env_rewriter as super
+  inherit [(string * expression * insert_type) list] Ast_traverse.fold_map as super
   method! expression expr acc =
     match expr with
     | { pexp_desc = Pexp_extension ({txt = ("eval" | "path" | "param" as ext) ; loc ; _}, payload) ; _ } -> (
@@ -157,24 +135,6 @@ let str_item_rewriter ~loc ~path:_ descr version mem np var expr =
     | Some ty -> [%expr ([%e workflow_body] : [%t ty])]
   in
   [%stri let [%p B.pvar var] = [%e replace_body workflow_body_with_type expr]]
-
-let gen_letin_rewriter ~loc ~env_rewrite (vbs : value_binding list) (body : expression) =
-  let id = digest body in
-  let rewritten_body, _ =
-    if env_rewrite
-    then new payload_env_rewriter#expression body []
-    else body, []
-  in
-  let f = List.fold_right vbs ~init:rewritten_body ~f:(fun vb acc ->
-      B.pexp_fun Nolabel None vb.pvb_pat acc
-    )
-  in
-  List.fold vbs ~init:[%expr Bistro.Workflow.pure ~id:[%e B.estring id] [%e f]] ~f:(fun acc vb ->
-      let module_expr = B.pmod_ident (B.Located.lident "Bistro.Workflow") in
-      let oi = B.open_infos ~expr:module_expr ~override:Override in
-      let e = B.pexp_open oi vb.pvb_expr in
-      [%expr Bistro.Workflow.app [%e acc] [%e e]]
-    )
 
 let translate_position (p : Lexing.position) ~from:(q : Lexing.position) =
   {
