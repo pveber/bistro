@@ -1,0 +1,6 @@
+(library
+  (name bistro_bio_examples)
+  (public_name bistro-bio.examples)
+  (libraries bistro_bio bistro.utils)
+  (preprocess (pps bistro.ppx ppx_enumerate ppx_deriving.std))
+  (optional))
