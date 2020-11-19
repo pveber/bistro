@@ -1,5 +1,6 @@
 (** http://subread.sourceforge.net/ *)
 open Bistro
+open Formats
 
 class type count_table = object
   inherit tsv

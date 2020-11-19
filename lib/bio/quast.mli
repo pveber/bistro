@@ -1,4 +1,5 @@
 open Bistro
+open Formats
 
 val quast :
   ?reference:fasta file ->

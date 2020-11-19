@@ -1,6 +1,7 @@
 open Core_kernel
 open Bistro
 open Biotk
+open Formats
 
 type t =
   | Fq of fastq file SE_or_PE.t

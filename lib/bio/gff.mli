@@ -1,4 +1,5 @@
 open Bistro
+open Formats
 
 val of_bed3 :
   feature_type:string ->

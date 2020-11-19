@@ -1,4 +1,5 @@
 open Bistro
+open Formats
 
 val fq2fa :
   ?filter:bool ->

@@ -1,4 +1,5 @@
 open Bistro
+open Formats
 
 val merge :
   ?min_length:int ->

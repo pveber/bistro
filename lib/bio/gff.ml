@@ -1,4 +1,5 @@
 open Bistro
+open Formats
 
 let of_bed3 ~feature_type ~attribute_type (bed : #bed3 file) : gff file =
   let f = fun%workflow dest ->

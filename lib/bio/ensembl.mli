@@ -1,4 +1,5 @@
 open Bistro
+open Formats
 
 type species = [
   | `homo_sapiens

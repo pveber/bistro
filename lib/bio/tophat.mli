@@ -1,4 +1,5 @@
 open Bistro
+open Formats
 
 val tophat1 :
   ?color:bool ->

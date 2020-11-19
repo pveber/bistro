@@ -1,6 +1,7 @@
 (** {{http://cab.spbu.ru/files/release3.14.0/manual.html}SPADES assembler} *)
 
 open Bistro
+open Formats
 
 val spades :
   ?single_cell:bool ->

@@ -1,4 +1,5 @@
 open Bistro
+open Formats
 
 class type count_tsv = object
   inherit tsv

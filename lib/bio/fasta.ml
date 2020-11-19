@@ -1,5 +1,6 @@
 open Bistro
 open Bistro.Shell_dsl
+open Formats
 
 type t = fasta file
 

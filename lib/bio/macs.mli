@@ -1,4 +1,5 @@
 open Bistro
+open Formats
 
 type gsize = [`hs | `mm | `ce | `dm | `gsize of int]
 type keep_dup = [ `all | `auto | `int of int ]

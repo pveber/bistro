@@ -1,4 +1,5 @@
 open Bistro
+open Formats
 
 val fastq_screen :
   ?bowtie2_opts:string ->

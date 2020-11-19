@@ -1,6 +1,7 @@
 open Core_kernel
 open Bistro
 open Bistro.Shell_dsl
+open Formats
 
 let img = [ docker_image ~account:"pveber" ~name:"macs2" ~tag:"2.1.1" () ]
 

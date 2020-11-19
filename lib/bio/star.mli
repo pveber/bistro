@@ -1,4 +1,5 @@
 open Bistro
+open Formats
 
 val genomeGenerate : fasta file -> [`star_index] directory
 

@@ -1,6 +1,7 @@
 open Core_kernel
 open Bistro
 open Bistro.Shell_dsl
+open Formats
 
 type 'a sample = {
   id : string ;

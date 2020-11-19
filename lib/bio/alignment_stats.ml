@@ -1,5 +1,6 @@
 open Core_kernel
 open Bistro
+open Formats
 
 let bamstats (bam : bam file) =
   let f = fun%workflow dest ->

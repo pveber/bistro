@@ -1,4 +1,5 @@
 open Bistro
+open Formats
 
 val img : container_image list
 

@@ -1,4 +1,5 @@
 open Bistro
+open Formats
 
 val keep3 : #bed3 file -> bed3 file
 val keep4 : #bed4 file -> bed4 file

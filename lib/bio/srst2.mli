@@ -1,4 +1,5 @@
 open Bistro
+open Formats
 
 val run_gen_cmd :
   ?mlst_db:fasta file ->

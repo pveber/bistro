@@ -1,5 +1,5 @@
 (library
   (name bistro_bio)
   (public_name bistro-bio)
-  (libraries bistro.unix stdio)
-  (preprocess (pps ppx_bistro)))
+  (libraries biocaml.ez biotk bistro.unix tyxml)
+  (preprocess (pps ppx_bistro ppx_sexp_conv)))

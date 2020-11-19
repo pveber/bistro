@@ -1,6 +1,7 @@
 open Core_kernel
 open Bistro
 open Biotk
+open Formats
 
 type reference_genome =
   | Ucsc_gb of Ucsc_gb.genome

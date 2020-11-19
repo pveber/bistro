@@ -1,4 +1,5 @@
 open Bistro
+open Formats
 
 type 'a signal_format
 val bigwig : Ucsc_gb.bigWig signal_format

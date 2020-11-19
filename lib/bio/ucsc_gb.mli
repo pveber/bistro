@@ -1,4 +1,5 @@
 open Bistro
+open Formats
 
 class type twobit = object
   method format : [`twobit]

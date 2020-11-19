@@ -1,4 +1,5 @@
 open Bistro
+open Formats
 
 val bowtie2_build :
   ?large_index:bool ->

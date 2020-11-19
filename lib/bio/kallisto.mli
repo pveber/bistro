@@ -1,4 +1,5 @@
 open Bistro
+open Formats
 
 class type index = object
   inherit binary_file

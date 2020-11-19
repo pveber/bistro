@@ -1,4 +1,5 @@
 open Bistro
+open Formats
 
 val bowtie_build :
   ?packed:bool ->
