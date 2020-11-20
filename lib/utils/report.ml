@@ -151,3 +151,26 @@ let to_html d =
         file_dump (document d) ;
       ]
   ]
+
+let build ?np ?mem ?loggers ?allowed_containers ?(bistro_dir = "_bistro") ?collect ~output report =
+  let open Bistro_engine in
+  let open Lwt in
+  let db = Db.init_exn bistro_dir in
+  let goal = Workflow.path (to_html report) in
+  let sched = Scheduler.create ?np ?mem ?loggers ?allowed_containers ?collect db in
+  let report_cache_path = Scheduler.eval sched goal in
+  Scheduler.start sched ;
+  report_cache_path >>= fun res ->
+  Scheduler.stop sched >>= fun () ->
+  match res with
+  | Ok path ->
+    Misc.exec_exn [|"cp" ; path ; output|]
+  | Error traces -> (
+    let errors = Execution_trace.gather_failures traces in
+    prerr_endline (Scheduler.error_report sched errors) ;
+    Lwt.fail_with "Some workflow failed!"
+  )
+
+let build_main ?np ?mem ?loggers ?allowed_containers ?bistro_dir ?collect ~output report =
+  build ?np ?mem ?loggers ?allowed_containers ?bistro_dir ?collect ~output report
+  |> Lwt_main.run
