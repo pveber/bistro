@@ -3,18 +3,18 @@ module L = Location
 open Ppxlib
 
 let digest x =
-  Caml.Digest.to_hex (Caml.Digest.string (Caml.Marshal.to_string x []))
+  Stdlib.Digest.to_hex (Stdlib.Digest.string (Stdlib.Marshal.to_string x []))
 
 let string_of_expression e =
   let buf = Buffer.create 251 in
-  let fmt = Caml.Format.formatter_of_buffer buf in
+  let fmt = Stdlib.Format.formatter_of_buffer buf in
   Pprintast.expression fmt e ;
-  Caml.Format.pp_print_flush fmt () ;
+  Stdlib.Format.pp_print_flush fmt () ;
   Buffer.contents buf
 
 let new_id =
   let c = ref 0 in
-  fun () -> Caml.incr c ; Printf.sprintf "__v%d__" !c
+  fun () -> Stdlib.incr c ; Printf.sprintf "__v%d__" !c
 
 module B = struct
   include Ast_builder.Make(struct let loc = Location.none end)
@@ -114,7 +114,7 @@ let rec replace_body new_body = function
 let default_descr var =
   Printf.sprintf
     "%s.%s"
-    Caml.Filename.(remove_extension (basename !L.input_name))
+    Stdlib.Filename.(remove_extension (basename !L.input_name))
     var
 
 let str_item_rewriter ~loc ~path:_ descr version mem np var expr =
