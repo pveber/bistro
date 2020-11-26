@@ -7,7 +7,9 @@ let digest x =
 
 let string_of_expression e =
   let buf = Buffer.create 251 in
-  Pprintast.expression (Caml.Format.formatter_of_buffer buf) e ;
+  let fmt = Caml.Format.formatter_of_buffer buf in
+  Pprintast.expression fmt e ;
+  Caml.Format.pp_print_flush fmt () ;
   Buffer.contents buf
 
 let new_id =
