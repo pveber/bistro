@@ -123,7 +123,7 @@ and token =
 and any = Any : _ t -> any
 
 let digest x =
-  Digest.to_hex (Digest.string (Marshal.to_string x []))
+  Digest.to_hex (Digest.string (Marshal.(to_string x [No_sharing])))
 
 let id : type s. s t -> string = function
   | Input { id ; _ } -> id
