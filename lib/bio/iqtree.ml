@@ -253,7 +253,7 @@ type model_spec =
 
 let model_spec ?freq_type ?rate_type m = m, freq_type, rate_type
 
-let iqtree ?t ?te ?o ?(nt = 1) ?seed ?n ?m ?z ?st ?spp ali =
+let iqtree ?t ?te ?o ?(nt = 1) ?seed ?n ?m ?z ?st ?spp ?keep_ident ali =
   let ali_dep = match ali with
     | `phylip f -> dep f
     | `fasta f -> dep f
@@ -274,6 +274,7 @@ let iqtree ?t ?te ?o ?(nt = 1) ?seed ?n ?m ?z ?st ?spp ali =
             option (opt "-z" dep) z ;
             option (opt "-st" sequence_type_token) st ;
             option (opt "-spp" dep) spp ;
+            option (flag string "-keep-ident") keep_ident ;
           ] ;
       ]
     ]

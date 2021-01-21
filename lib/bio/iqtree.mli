@@ -132,6 +132,7 @@ val iqtree :
   ?z:newick file ->
   ?st:sequence_type ->
   ?spp:nexus file ->
+  ?keep_ident:bool ->
   [`phylip of phylip file | `fasta of fasta file] ->
   [`iqtree] directory
 
