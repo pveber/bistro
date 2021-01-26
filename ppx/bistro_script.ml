@@ -1,4 +1,19 @@
 open Base
+open Ppxlib
+
+module B = struct
+  include Ast_builder.Make(struct let loc = Location.none end)
+  let econstr s args =
+    let args = match args with
+      | [] -> None
+      | [x] -> Some x
+      | l -> Some (pexp_tuple l)
+    in
+    pexp_construct (Located.lident s) args
+  let enil () = econstr "[]" []
+  let econs hd tl = econstr "::" [hd; tl]
+  let elist l = List.fold_right ~f:econs l ~init:(enil ())
+end
 
 module Position = struct
   type t = {
@@ -122,3 +137,49 @@ let%expect_test "text + antiquot + eol" =
       (Text (((cnum 8) (bol 0) (lnum 0)) ((cnum 9) (bol 9) (lnum 1))))
       (Antiquotation
        (((cnum 11) (bol 9) (lnum 1)) ((cnum 20) (bol 15) (lnum 2)))))) |}]
+
+
+let translate_position (p : Lexing.position) ~from:(q : Lexing.position) =
+  {
+    q with pos_lnum = p.pos_lnum + q.pos_lnum - 1 ;
+           pos_bol = if p.pos_lnum = 1 then q.pos_bol else q.pos_cnum + p.pos_bol ;
+           pos_cnum = p.pos_cnum + q.pos_cnum
+  }
+
+class ast_translation pos = object
+  inherit Ast.map
+  method bool x = x
+  method char c = c
+  method int x = x
+  method list f x = List.map x ~f
+  method option f x = Option.map x ~f
+  method string x = x
+  method! location loc =
+    {
+      loc with loc_start = translate_position loc.loc_start ~from:pos ;
+               loc_end = translate_position loc.loc_end ~from:pos
+    }
+end
+
+let rewriter ~loc:_ ~path:_ { txt = str ; loc } =
+  match lexer str with
+  | Error _ -> failwith "FIXME"
+  | Ok fragments ->
+    List.map fragments ~f:(function
+        | `Text (i, j) ->
+          let i = i.Position.cnum in
+          let j = j.Position.cnum in
+          let e = B.estring (String.sub str ~pos:i ~len:(j - i)) in
+          [%expr Bistro.Shell_dsl.string [%e e]]
+        | `Antiquotation (i, j) ->
+          let cnum_i = i.Position.cnum in
+          let cnum_j = j.Position.cnum in
+          let txt = String.sub str ~pos:cnum_i ~len:(cnum_j - cnum_i) in
+          let e = Parser.parse_expression Lexer.token (Lexing.from_string txt) in
+          let i' = Position.translate_lexing_position ~by:i loc.loc_start in
+          let j' = Position.translate_lexing_position ~by:j loc.loc_start in
+          let loc' = Location.{ loc with loc_start = i' ; loc_end = j' } in
+          (new ast_translation loc'.loc_start)#expression e
+      )
+    |> B.elist
+    |> (fun e -> [%expr Bistro.Shell_dsl.seq ~sep:"" [%e e]])
