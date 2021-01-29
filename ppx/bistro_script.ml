@@ -146,7 +146,7 @@ let translate_position (p : Lexing.position) ~from:(q : Lexing.position) =
            pos_cnum = p.pos_cnum + q.pos_cnum
   }
 
-class ast_translation pos = object
+class ast_loc_transform = object
   inherit Ast.map
   method bool x = x
   method char c = c
@@ -154,6 +154,10 @@ class ast_translation pos = object
   method list f x = List.map x ~f
   method option f x = Option.map x ~f
   method string x = x
+end
+
+class ast_translation pos = object
+  inherit ast_loc_transform
   method! location loc =
     {
       loc with loc_start = translate_position loc.loc_start ~from:pos ;
@@ -161,7 +165,7 @@ class ast_translation pos = object
     }
 end
 
-let rewriter ~loc:_ ~path:_ { txt = str ; loc } =
+let rewrite str loc =
   match lexer str with
   | Error _ -> failwith "FIXME"
   | Ok fragments ->
@@ -183,3 +187,24 @@ let rewriter ~loc:_ ~path:_ { txt = str ; loc } =
       )
     |> B.elist
     |> (fun e -> [%expr Bistro.Shell_dsl.seq ~sep:"" [%e e]])
+
+
+let rewriter ~loc:_ ~path:_ { txt = str ; loc } =
+  rewrite str loc
+
+class ast_constant_loc loc = object
+  inherit ast_loc_transform
+  method! location _ = loc
+end
+
+let include_rewriter ~loc:_ ~path:_ { txt = fn ; loc } =
+  match Stdio.In_channel.read_all fn with
+  | contents ->
+    rewrite contents loc
+    |> (new ast_constant_loc loc)#expression
+  | exception _ ->
+    let msg =
+      Printf.sprintf
+        "Cannot read %s, for dune users please use preprocessor_deps"
+        fn in
+    failwith msg

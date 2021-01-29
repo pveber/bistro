@@ -140,7 +140,17 @@ let str_item_rewriter ~loc ~path:_ descr version mem np var expr =
 
 let script_ext =
   let open Extension in
-  declare "script" Context.expression Ast_pattern.(single_expr_payload (estring __')) Bistro_script.rewriter
+  declare "script"
+    Context.expression
+    Ast_pattern.(single_expr_payload (estring __'))
+    Bistro_script.rewriter
+
+let include_script_ext =
+  let open Extension in
+  declare "include_script"
+    Context.expression
+    Ast_pattern.(single_expr_payload (estring __'))
+    Bistro_script.include_rewriter
 
 let expression_ext =
   let open Extension in
@@ -149,5 +159,6 @@ let expression_ext =
 let () =
   Driver.register_transformation "bistro" ~extensions:[
     script_ext ;
+    include_script_ext ;
     expression_ext ;
   ]

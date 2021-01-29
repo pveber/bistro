@@ -1,4 +1,5 @@
 (executables
   (names test test1 test2 test_gc accordion test_script multinode test_ppx trywith ifelse)
   (libraries bistro.utils bistro.nlp bistro.multinode core lwt.unix)
-  (preprocess (pps ppx_bistro ppx_jane)))
+  (preprocess (pps ppx_bistro ppx_jane))
+  (preprocessor_deps template.md))
