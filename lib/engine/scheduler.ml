@@ -918,3 +918,11 @@ let simple_eval_exn
   let thread = eval_exn sched w in
   start sched ;
   Lwt_main.run thread
+
+let build_file_exn ?np ?mem ?allowed_containers ?loggers ?collect ?db_path ~output file =
+  let path =
+    simple_eval_exn
+      ?np ?mem ?loggers ?allowed_containers ?db_path ?collect
+      (Bistro.Workflow.path file)
+  in
+  Lwt_main.run (Misc.cp path output)
