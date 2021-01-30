@@ -1,4 +1,4 @@
 (executables
   (names chipseq rnaseq zhou2011 zhou2018)
-  (libraries bistro.bioinfo bistro.nlp bistro.utils)
+  (libraries bistro-bio.examples)
   (preprocess (pps ppx_bistro ppx_enumerate ppx_deriving.std)))

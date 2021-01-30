@@ -199,21 +199,11 @@ dev.off()
   ]
 
 let report =
-  let title = "Integrated approaches reveal determinants of genome-wide binding and function of the transcription factor Pho4." in
-  Report.make ~title [%script{|
-
-This is an attempt at reproducing a paper by Zhou and O'Shea on why
-transcription factors with similar binding sequences are not bound
-to the same genomic sites.
-
-# Inferred motifs
-{{Report.png (Meme_suite.meme_logo (meme `ChIP_Pho4_noPi) 1)}}
-
-{{Report.svg (occdist_vs_peak_score `ChIP_Pho4_noPi)}}
-|}]
+  [%include_script "lib/bio/examples/zhou2011.md"]
+  |> Report.Md.to_html
 
 let repo = Repo.[
-    item [ "report.html" ] (Report.to_html report) ;
+    item [ "report.html" ] report ;
     (* item [ "macs2" ; "Pho4" ; "noPi" ] (tf_peaks `ChIP_Pho4_noPi) ;
      * item [ "meme" ; "Pho4" ; "noPi" ] (meme `ChIP_Pho4_noPi) ;
      * item [ "meme_chip" ; "Pho4" ; "noPi" ] (meme_chip `ChIP_Pho4_noPi) ;
