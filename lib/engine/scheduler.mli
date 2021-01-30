@@ -95,3 +95,14 @@ val simple_eval_exn :
   ?db_path:string ->
   'a Bistro.workflow ->
   'a
+
+val build_file_exn :
+  ?np:int ->
+  ?mem:[`GB of int] ->
+  ?allowed_containers:[`Docker | `Singularity] list ->
+  ?loggers:Logger.t list ->
+  ?collect:bool ->
+  ?db_path:string ->
+  output:string ->
+  'a Bistro.file ->
+  unit

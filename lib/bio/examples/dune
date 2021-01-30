@@ -3,4 +3,5 @@
   (public_name bistro-bio.examples)
   (libraries bistro_bio bistro.utils)
   (preprocess (pps bistro.ppx ppx_enumerate ppx_deriving.std))
+  (preprocessor_deps zhou2011.md)
   (optional))

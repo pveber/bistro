@@ -138,54 +138,19 @@ let str_item_rewriter ~loc ~path:_ descr version mem np var expr =
   in
   [%stri let [%p B.pvar var] = [%e replace_body workflow_body_with_type expr]]
 
-let translate_position (p : Lexing.position) ~from:(q : Lexing.position) =
-  {
-    q with pos_lnum = p.pos_lnum + q.pos_lnum - 1 ;
-           pos_bol = if p.pos_lnum = 1 then q.pos_bol else q.pos_cnum + p.pos_bol ;
-           pos_cnum = p.pos_cnum + q.pos_cnum
-  }
-
-class ast_translation pos = object
-  inherit Ast.map
-  method bool x = x
-  method char c = c
-  method int x = x
-  method list f x = List.map x ~f
-  method option f x = Option.map x ~f
-  method string x = x
-  method! location loc =
-    {
-      loc with loc_start = translate_position loc.loc_start ~from:pos ;
-               loc_end = translate_position loc.loc_end ~from:pos
-    }
-end
-
-let script_rewriter ~loc:_ ~path:_ { txt = str ; loc } =
-  match Script_parser.lexer str with
-  | Error _ -> failwith "FIXME"
-  | Ok fragments ->
-    List.map fragments ~f:(function
-        | `Text (i, j) ->
-          let i = i.Script_parser.Position.cnum in
-          let j = j.Script_parser.Position.cnum in
-          let e = B.estring (String.sub str ~pos:i ~len:(j - i)) in
-          [%expr Bistro.Shell_dsl.string [%e e]]
-        | `Antiquotation (i, j) ->
-          let cnum_i = i.Script_parser.Position.cnum in
-          let cnum_j = j.Script_parser.Position.cnum in
-          let txt = String.sub str ~pos:cnum_i ~len:(cnum_j - cnum_i) in
-          let e = Parser.parse_expression Lexer.token (Lexing.from_string txt) in
-          let i' = Script_parser.Position.translate_lexing_position ~by:i loc.loc_start in
-          let j' = Script_parser.Position.translate_lexing_position ~by:j loc.loc_start in
-          let loc' = Location.{ loc with loc_start = i' ; loc_end = j' } in
-          (new ast_translation loc'.loc_start)#expression e
-      )
-    |> B.elist
-    |> (fun e -> [%expr Bistro.Shell_dsl.seq ~sep:"" [%e e]])
-
 let script_ext =
   let open Extension in
-  declare "script" Context.expression Ast_pattern.(single_expr_payload (estring __')) script_rewriter
+  declare "script"
+    Context.expression
+    Ast_pattern.(single_expr_payload (estring __'))
+    Bistro_script.rewriter
+
+let include_script_ext =
+  let open Extension in
+  declare "include_script"
+    Context.expression
+    Ast_pattern.(single_expr_payload (estring __'))
+    Bistro_script.include_rewriter
 
 let expression_ext =
   let open Extension in
@@ -194,5 +159,6 @@ let expression_ext =
 let () =
   Driver.register_transformation "bistro" ~extensions:[
     script_ext ;
+    include_script_ext ;
     expression_ext ;
   ]
