@@ -36,6 +36,15 @@ module Position = struct
            pos_bol = if p.lnum = 0 then q.pos_bol - 2 else q.pos_cnum + p.bol ;
            pos_cnum = p.cnum + q.pos_cnum
   }
+
+  let move_lexing_pos (p : t) (lp : Lexing.position) =
+    { lp with pos_cnum = p.cnum ;
+              pos_bol = p.bol ;
+              pos_lnum = p.lnum }
+
+  let move_loc (loc : Location.t) p q =
+    { loc with loc_start = move_lexing_pos p loc.loc_start ;
+               loc_end = move_lexing_pos q loc.loc_end }
 end
 
 type token = [
@@ -82,8 +91,8 @@ let lexer s : lexing_result =
       let newpos = Position.shift pos 2 in
       loop newpos (`Antiquotation (pos, newpos)) (add_text_item acc p pos)
 
-    | `Opening_bracket, `Antiquotation _ ->
-      loop (Position.shift pos 2) state acc
+    | `Opening_bracket, `Antiquotation (bracket_pos, _) ->
+      Error (`Unmatched_opening_bracket bracket_pos)
 
     | `Closing_bracket, `Quotation _ ->
       Error (`Unmatched_closing_bracket pos)
@@ -166,8 +175,18 @@ class ast_translation pos = object
 end
 
 let rewrite str loc =
+  let module Location = Ocaml_common.Location in
   match lexer str with
-  | Error _ -> failwith "FIXME"
+  | Error (`Unmatched_closing_bracket p) ->
+    let msg = "Unmatched closing bracket" in
+    let loc = Position.move_loc loc p (Position.shift p 2) in
+    let err = Location.error ~loc msg in
+    raise (Location.Error err)
+  | Error (`Unmatched_opening_bracket p) ->
+    let msg = "Unmatched opening bracket" in
+    let loc = Position.move_loc loc p (Position.shift p 2) in
+    let err = Location.error ~loc msg in
+    raise (Location.Error err)
   | Ok fragments ->
     List.map fragments ~f:(function
         | `Text (i, j) ->
@@ -192,16 +211,36 @@ let rewrite str loc =
 let rewriter ~loc:_ ~path:_ { txt = str ; loc } =
   rewrite str loc
 
-class ast_constant_loc loc = object
-  inherit ast_loc_transform
-  method! location _ = loc
-end
+let loc_start file_name = {
+  Lexing.pos_fname = file_name ;
+  pos_lnum = 1 ;
+  pos_bol = 0 ;
+  pos_cnum = 0 ;
+}
 
-let include_rewriter ~loc:_ ~path:_ { txt = fn ; loc } =
+let loc_end ~file_name ~file_contents =
+  let pos_fname = file_name in
+  let last_line_number = Base.String.count file_contents ~f:Char.(( = ) '\n') in
+  let last_line_length =
+    match Base.String.rindex file_contents '\n' with
+    | None -> String.length file_contents
+    | Some i -> String.length file_contents - i
+  in
+  let pos_bol = last_line_length - 1 in
+  let pos_cnum = String.length file_contents in
+  let pos_lnum = last_line_number in
+  { Lexing.pos_fname ; pos_lnum ; pos_bol ; pos_cnum }
+
+let includee_loc ~file_name ~file_contents =
+  let loc_start = loc_start file_name in
+  let loc_end = loc_end ~file_name ~file_contents in
+  { Location.loc_start ; loc_end ; loc_ghost = false }
+
+let include_rewriter ~loc:_ ~path:_ { txt = fn ; loc = _ } =
   match Stdio.In_channel.read_all fn with
   | contents ->
+    let loc = includee_loc ~file_name:fn ~file_contents:contents in
     rewrite contents loc
-    |> (new ast_constant_loc loc)#expression
   | exception _ ->
     let msg =
       Printf.sprintf
