@@ -171,11 +171,11 @@ let occdist_vs_peak_score treatment_sample : svg file =
   let occ = dep @@ Meme_suite.fimo (meme_motifs treatment_sample) sequences in
   let peaks = dep peaks in
   let script = [%script {|
-occ <- read.table("{{occ}}/fimo.txt", sep="\t",header=T, comment.char="")
+occ <- read.table("<<<occ>>>/fimo.txt", sep="\t",header=T, comment.char="")
 motifs <- sort(unique(occ$X.pattern.name))
-peaks <- read.table("{{peaks}}", sep="\t", col.names=c("chr","start","end","id","score"))
+peaks <- read.table("<<<peaks>>>", sep="\t", col.names=c("chr","start","end","id","score"))
 peaks <- peaks[order(peaks$score, decreasing=T),]
-svg("{{dest}}", height=10)
+svg("<<<dest>>>", height=10)
 par(mfrow=c(length(motifs), 2))
 for (m in motifs) {
   closest_occ <- sapply(peaks$id, function(p) {

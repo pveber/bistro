@@ -65,9 +65,9 @@ type lexing_result = (token list, lexing_error) Result.t
 let lexer s : lexing_result =
   let n = String.length s in
   let opening i =
-    i < n - 1 && Char.(s.[i] = '{' && s.[i + 1] = '{')
+    i < n - 2 && Char.(s.[i] = '<' && s.[i + 1] = '<' && s.[i + 2] = '<')
   and closing i =
-    i < n - 1 && Char.(s.[i] = '}' && s.[i + 1] = '}')
+    i < n - 2 && Char.(s.[i] = '>' && s.[i + 1] = '>' && s.[i + 2] = '>')
   in
   let classify_current_pos { Position.cnum = i ; _ } =
     if i = n then `EOI
@@ -88,7 +88,7 @@ let lexer s : lexing_result =
       Error (`Unmatched_opening_bracket bracket_pos)
 
     | `Opening_bracket, `Quotation p ->
-      let newpos = Position.shift pos 2 in
+      let newpos = Position.shift pos 3 in
       loop newpos (`Antiquotation (pos, newpos)) (add_text_item acc p pos)
 
     | `Opening_bracket, `Antiquotation (bracket_pos, _) ->
@@ -98,7 +98,7 @@ let lexer s : lexing_result =
       Error (`Unmatched_closing_bracket pos)
 
     | `Closing_bracket, `Antiquotation (_, p) ->
-      let newpos = Position.shift pos 2 in
+      let newpos = Position.shift pos 3 in
       loop newpos (`Quotation newpos) (`Antiquotation (p, pos) :: acc)
 
     | `Newline, _ ->
@@ -119,33 +119,33 @@ let%expect_test "text only" =
   print_lexing_result @@ lexer "rien" ;
   [%expect {| (Ok ((Text (((cnum 0) (bol 0) (lnum 0)) ((cnum 4) (bol 0) (lnum 0)))))) |}]
 
-let%expect_test "text only" =
-  print_lexing_result @@ lexer "ad{{a}} {{e}}b" ;
+let%expect_test "text + antiquot 1" =
+  print_lexing_result @@ lexer "ad<<<a>>> <<<e>>>b" ;
   [%expect {|
     (Ok
      ((Text (((cnum 0) (bol 0) (lnum 0)) ((cnum 2) (bol 0) (lnum 0))))
-      (Antiquotation (((cnum 4) (bol 0) (lnum 0)) ((cnum 5) (bol 0) (lnum 0))))
-      (Text (((cnum 7) (bol 0) (lnum 0)) ((cnum 8) (bol 0) (lnum 0))))
-      (Antiquotation (((cnum 10) (bol 0) (lnum 0)) ((cnum 11) (bol 0) (lnum 0))))
-      (Text (((cnum 13) (bol 0) (lnum 0)) ((cnum 14) (bol 0) (lnum 0)))))) |}]
+      (Antiquotation (((cnum 5) (bol 0) (lnum 0)) ((cnum 6) (bol 0) (lnum 0))))
+      (Text (((cnum 9) (bol 0) (lnum 0)) ((cnum 10) (bol 0) (lnum 0))))
+      (Antiquotation (((cnum 13) (bol 0) (lnum 0)) ((cnum 14) (bol 0) (lnum 0))))
+      (Text (((cnum 17) (bol 0) (lnum 0)) ((cnum 18) (bol 0) (lnum 0)))))) |}]
 
-let%expect_test "text + antiquot" =
-  print_lexing_result @@ lexer "ri{{en}}{{}}";
+let%expect_test "text + antiquot 2" =
+  print_lexing_result @@ lexer "ri<<<en>>><<<>>>";
   [%expect {|
     (Ok
      ((Text (((cnum 0) (bol 0) (lnum 0)) ((cnum 2) (bol 0) (lnum 0))))
-      (Antiquotation (((cnum 4) (bol 0) (lnum 0)) ((cnum 6) (bol 0) (lnum 0))))
-      (Antiquotation (((cnum 10) (bol 0) (lnum 0)) ((cnum 10) (bol 0) (lnum 0)))))) |}]
+      (Antiquotation (((cnum 5) (bol 0) (lnum 0)) ((cnum 7) (bol 0) (lnum 0))))
+      (Antiquotation (((cnum 13) (bol 0) (lnum 0)) ((cnum 13) (bol 0) (lnum 0)))))) |}]
 
 let%expect_test "text + antiquot + eol" =
-  print_lexing_result @@ lexer "ri{{en}}\n{{du \n tout}}";
+  print_lexing_result @@ lexer "ri<<<en>>>\n<<<du \n tout>>>";
   [%expect {|
     (Ok
      ((Text (((cnum 0) (bol 0) (lnum 0)) ((cnum 2) (bol 0) (lnum 0))))
-      (Antiquotation (((cnum 4) (bol 0) (lnum 0)) ((cnum 6) (bol 0) (lnum 0))))
-      (Text (((cnum 8) (bol 0) (lnum 0)) ((cnum 9) (bol 9) (lnum 1))))
+      (Antiquotation (((cnum 5) (bol 0) (lnum 0)) ((cnum 7) (bol 0) (lnum 0))))
+      (Text (((cnum 10) (bol 0) (lnum 0)) ((cnum 11) (bol 11) (lnum 1))))
       (Antiquotation
-       (((cnum 11) (bol 9) (lnum 1)) ((cnum 20) (bol 15) (lnum 2)))))) |}]
+       (((cnum 14) (bol 11) (lnum 1)) ((cnum 23) (bol 18) (lnum 2)))))) |}]
 
 
 let translate_position (p : Lexing.position) ~from:(q : Lexing.position) =

@@ -4,12 +4,12 @@
   (kind ppx_rewriter)
   (libraries core_kernel bistro.script ppxlib)
   (modules ppx_bistro)
-  (preprocess (pps ppxlib.metaquot ppxlib.runner))
-  (inline_tests))
+  (preprocess (pps ppxlib.metaquot ppxlib.runner)))
 
 (library
   (name bistro_script)
   (public_name bistro.script)
   (modules Bistro_script)
   (libraries base ppxlib stdio)
+  (inline_tests)
   (preprocess (pps ppxlib.metaquot ppx_expect ppx_sexp_conv)))
