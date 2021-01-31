@@ -236,14 +236,16 @@ let includee_loc ~file_name ~file_contents =
   let loc_end = loc_end ~file_name ~file_contents in
   { Location.loc_start ; loc_end ; loc_ghost = false }
 
-let include_rewriter ~loc:_ ~path:_ { txt = fn ; loc = _ } =
+let include_rewriter ~loc:_ ~path:_ { txt = fn ; loc } =
   match Stdio.In_channel.read_all fn with
   | contents ->
     let loc = includee_loc ~file_name:fn ~file_contents:contents in
     rewrite contents loc
   | exception _ ->
+    let module Location = Ocaml_common.Location in
     let msg =
       Printf.sprintf
-        "Cannot read %s, for dune users please use preprocessor_deps"
+        "Cannot read %s, have you forgot to add it in a preprocessor_deps field of your dune file?"
         fn in
-    failwith msg
+    let err = Location.error ~loc msg in
+    raise (Location.Error err)
