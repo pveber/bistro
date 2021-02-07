@@ -96,3 +96,21 @@ val closest :
   'a file ->
   #bed3 file list ->
   'a file
+
+val merge :
+  ?s:bool ->
+  ?_S:[ `minus | `plus ] ->
+  ?d:int ->
+  ?c:int list ->
+  ?o:[ `absmin
+     | `collapse
+     | `count
+     | `count_distinct
+     | `distinct
+     | `max
+     | `mean
+     | `median
+     | `min
+     | `sum ] list ->
+  #bed3 file list ->
+  #bed3 file

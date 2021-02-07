@@ -100,3 +100,48 @@ let bamtobed ?bed12 ?split ?splitD ?ed ?tag ?cigar bam =
       opt "-i" dep bam ;
     ]
   ]
+
+
+let strand_arg x =
+  string (
+    match x with
+    | `plus -> "+"
+    | `minus -> "-"
+  )
+
+let operation_arg x =
+  string (
+    match x with
+    | `sum -> "sum"
+    | `min -> "min"
+    | `max -> "max"
+    | `absmin -> "absmin"
+    | `mean -> "mean"
+    | `median -> "median"
+    | `collapse -> "collapse"
+    | `distinct -> "distinct"
+    | `count -> "count"
+    | `count_distinct -> "count_distinct"
+  )
+
+let concat_beds_dep = function
+  | [] -> string ""
+  | xs ->
+    seq ~sep:"" [
+      string "<(cat " ;
+      list ~sep:" " dep xs ;
+      string "| sort -k1,1 -k2,2n)"
+    ]
+
+let merge ?s ?_S ?d ?c ?o beds =
+  Workflow.shell ~descr:"bedtools.merge" ~img [
+    cmd "bedtools" ~stdout:dest [
+      string "merge" ;
+      option (flag string "-s") s ;
+      option (opt "-S" strand_arg) _S ;
+      option (opt "-d" int) d ;
+      option (opt "-c" (list ~sep:"," int)) c ;
+      option (opt "-o" (list ~sep:"," operation_arg)) o ;
+      opt "-i" concat_beds_dep beds ;
+    ]
+  ]
