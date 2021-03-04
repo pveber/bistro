@@ -9,4 +9,4 @@ val map :
   f:('a -> 'b) ->
   'b t
 
-val deps : 'a t -> 'a list
+val deps : 'a t -> compare:('a -> 'a -> int) -> 'a list

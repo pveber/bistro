@@ -11,14 +11,14 @@ type 'a token =
 
 type 'a t = 'a token list
 
-let rec deps tmpl =
+let rec deps tmpl ~compare =
   List.map tmpl ~f:(function
       | D r -> [ r ]
-      | F toks -> deps toks
+      | F toks -> deps ~compare toks
       | S _ | DEST | TMP | NP | MEM -> []
     )
   |> List.concat
-  |> List.dedup_and_sort ~compare:Caml.compare
+  |> List.dedup_and_sort ~compare
 
 let rec map_token x ~f = match x with
   | S s -> S s

@@ -12,6 +12,8 @@ type insert =
     }
   | String of string
 
+let compare_insert = Poly.compare
+
 type t = {
   db : Db.t ;
   allowed_containers : [`Docker | `Singularity] list ;

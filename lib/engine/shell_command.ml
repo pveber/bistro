@@ -91,7 +91,7 @@ let par x = "( " ^ x ^ " )"
    ))' which has a specific meaning for bash *)
 
 let command_path_deps cmd =
-  Command.deps cmd
+  Command.deps cmd ~compare:Execution_env.compare_insert
   |> List.filter_map ~f:(function
       | Execution_env.Path p -> Some [ p ]
       | Path_list l -> Some l.elts

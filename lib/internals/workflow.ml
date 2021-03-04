@@ -143,6 +143,21 @@ let id : type s. s t -> string = function
 
 let any x = Any x
 
+let compare_token x y =
+  match x, y with
+  | Path_token wx, Path_token wy ->
+    String.compare (id wx) (id wy)
+  | Path_token _, _ -> -1
+  | Path_list_token x, Path_list_token y -> (
+      match String.compare (id x.elts) (id y.elts) with
+      | 0 -> compare (x.sep, x.quote) (y.sep, y.quote)
+      | i -> i
+    )
+  | Path_list_token _, _ -> -1
+  | String_token wx, String_token wy ->
+    String.compare (id wx) (id wy)
+  | String_token _, _ -> 1
+
 module Any = struct
   module T = struct
     type t = any
@@ -269,7 +284,7 @@ let shell
   in
   let id = digest ("shell", version, digestible_cmd cmd) in
   let deps = add_mem_dep mem (
-      Command.deps cmd
+      Command.deps cmd ~compare:compare_token
       |> List.map (function
           | Path_token w -> any w
           | Path_list_token { elts ; _ } -> any elts

@@ -9,6 +9,8 @@ type insert =
     }
   | String of string
 
+val compare_insert : insert -> insert -> int
+
 type t = {
   db : Db.t ;
   allowed_containers : [`Docker | `Singularity] list ;
