@@ -52,13 +52,13 @@ let ints_dep w =
 let floats xs = vector Template_dsl.float xs
 
 let floats_dep w =
-  Workflow.(app (pure (string_call_gen "c" Float.to_string) ~id:"r_script.ints") w)
+  Workflow.(app (pure (string_call_gen "c" Float.to_string) ~id:"r_script.floats") w)
   |> Template_dsl.string_dep
 
 let strings xs = vector string xs
 
 let strings_dep w =
-  Workflow.(app (pure (string_call_gen "c" Fn.id) ~id:"r_script.ints") w)
+  Workflow.(app (pure (string_call_gen "c" (Printf.sprintf "%S")) ~id:"r_script.strings") w)
   |> Template_dsl.string_dep
 
 let deps xs = vector dep xs
