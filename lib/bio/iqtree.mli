@@ -136,5 +136,5 @@ val iqtree :
   [`phylip of phylip file | `fasta of #fasta file] ->
   [`iqtree] directory
 
-val treefile : [`iqtree] directory -> newick file
+val treefile : [`iqtree] directory -> #newick file
 val report :  [`iqtree] directory -> text file
