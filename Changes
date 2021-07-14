@@ -1,3 +1,24 @@
+v0.6.0 2021-07-14 Lyon
+----------------------
+
+core library:
+- added ifelse and trywith constructs
+- moved bio-stuff in new package bistro-bio
+
+engine:
+- precious items
+- repo clipping
+
+ppx:
+- include script mechanism
+
+bio:
+- added Bedtools.merge
+- added Samtools.faidx
+- added SE_or_PE
+- new wrapper rnaspades
+- new wrapper busco
+
 v0.5.0 2019-08-20 Lyon
 ----------------------
 
@@ -80,5 +101,3 @@ v0.0.0 2016-01-21 Lyon
 ----------------------
 
 First release on OPAM
-
-
