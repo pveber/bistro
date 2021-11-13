@@ -38,6 +38,7 @@ Features:
     lwt_react
     (ocamlgraph (>= 1.8.7))
     (ocaml (>= 4.08.0))
+    (ppxlib (>= 0.23.0))
     ppx_sexp_conv
     rresult
     (sexplib (>= 113.24.00))
