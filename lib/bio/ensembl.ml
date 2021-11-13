@@ -38,7 +38,7 @@ let ucsc_chr_names_gtf gff =
     ]
   ]
 
-let gff ?(chr_name = `ensembl) ~release ~species =
+let gff ?(chr_name = `ensembl) ~release species =
   let url =
     sprintf "ftp://ftp.ensembl.org/pub/release-%d/gff3/%s/%s.%s.%d.gff3.gz"
       release (string_of_species species)
@@ -51,7 +51,7 @@ let gff ?(chr_name = `ensembl) ~release ~species =
   | `ucsc -> ucsc_chr_names_gtf gff
 
 
-let gtf ?(chr_name = `ensembl) ~release ~species =
+let gtf ?(chr_name = `ensembl) ~release species =
   let url =
     sprintf "ftp://ftp.ensembl.org/pub/release-%d/gtf/%s/%s.%s.%d.gtf.gz"
       release (string_of_species species)

@@ -13,7 +13,7 @@ let bed = Bed
 let gff = Gff
 
 module Cmd = struct
-  let slop_args ?strand ?header ~mode = [
+  let slop_args ?strand ?header mode = [
     option (flag string "-s") strand ;
     option (flag string "-header") header ;
     seq (
@@ -29,7 +29,7 @@ module Cmd = struct
 
   let slop ?strand ?header ~mode input chrom_size =
     bedtools "slop" ~stdout:dest [
-      seq (slop_args ?strand ?header ~mode) ;
+      seq (slop_args ?strand ?header mode) ;
       opt "-i" dep input ;
       opt "-g" dep chrom_size ;
     ]
