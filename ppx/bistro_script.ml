@@ -198,7 +198,7 @@ let rewrite str loc =
           let cnum_i = i.Position.cnum in
           let cnum_j = j.Position.cnum in
           let txt = String.sub str ~pos:cnum_i ~len:(cnum_j - cnum_i) in
-          let e = Parser.parse_expression Lexer.token (Lexing.from_string txt) in
+          let e = Parse.expression (Lexing.from_string txt) in
           let i' = Position.translate_lexing_position ~by:i loc.loc_start in
           let j' = Position.translate_lexing_position ~by:j loc.loc_start in
           let loc' = Location.{ loc with loc_start = i' ; loc_end = j' } in
