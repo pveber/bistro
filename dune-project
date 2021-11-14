@@ -10,6 +10,17 @@
 (maintainers "philippe.veber@gmail.com")
 
 (package
+  (name bistro-bio)
+  (synopsis "Bistro workflows for computational biology")
+  (tags (bioinformatics))
+  (description "
+This library provides wrappers for popular tools for genomics, transcriptomics
+and phylogeny, as well as custom tools to help piping data from one tool to the
+other.
+")
+  (depends biocaml biotk tyxml))
+
+(package
   (name bistro)
   (tags (workflow pipeline))
   (synopsis "A library to build and run distributed scientific workflows")
@@ -43,14 +54,3 @@ Features:
     rresult
     (sexplib (>= 113.24.00))
     (tyxml (>= 4.0))))
-
-(package
-  (name bistro-bio)
-  (synopsis "Bistro workflows for computational biology")
-  (tags (bioinformatics))
-  (description "
-This library provides wrappers for popular tools for genomics, transcriptomics
-and phylogeny, as well as custom tools to help piping data from one tool to the
-other.
-")
-  (depends biocaml biotk tyxml))
