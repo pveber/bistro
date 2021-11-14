@@ -17,6 +17,7 @@ depends: [
   "biocaml"
   "biotk"
   "tyxml"
+  "bistro"
 ]
 build: [
   ["dune" "subst"] {pinned}
