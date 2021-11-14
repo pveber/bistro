@@ -41,7 +41,7 @@ Features:
 - static typing: detect file format errors at compile time
 ")
   (depends
-    base64
+    (base64 (>= 3.0.0))
     bos
     (dune (> 1.6))
     (core (>= 0.12.0))
@@ -53,4 +53,4 @@ Features:
     ppx_sexp_conv
     rresult
     (sexplib (>= 113.24.00))
-    (tyxml (>= 4.0))))
+    (tyxml (>= 4.3.0))))
