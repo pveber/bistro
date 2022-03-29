@@ -1,6 +1,8 @@
 open Core
 open Bistro_internals
 open Bistro_engine
+module Time = Time_unix
+module Unix = Core_unix
 
 type time = float
 

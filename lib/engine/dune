@@ -1,4 +1,4 @@
 (library
   (name bistro_engine)
   (public_name bistro.engine)
-  (libraries bistro bos core lwt.unix re rresult))
+  (libraries bistro bos core core_kernel core_unix core_unix.sys_unix lwt.unix re rresult))

@@ -1,6 +1,8 @@
 open Core
 open Lwt
 open Bistro_engine
+module Time = Time_unix
+module Unix = Core_unix
 
 let zone = Lazy.force Time.Zone.local
 

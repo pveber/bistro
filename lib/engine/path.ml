@@ -1,4 +1,5 @@
 open Core_kernel
+module Sys = Caml.Sys
 
 type t = string list
 [@@deriving sexp]

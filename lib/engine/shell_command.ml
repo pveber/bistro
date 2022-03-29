@@ -1,5 +1,7 @@
 open Core
 open Bistro_internals
+module Sys = Sys_unix
+module Unix = Core_unix
 
 type file_dump = File_dump of {
     text : string ;

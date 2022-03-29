@@ -1,6 +1,8 @@
 open Core
 open Lwt.Infix
 open Bistro_internals
+module Sys = Sys_unix
+module Unix = Core_unix
 module W = Bistro_internals.Workflow
 
 type error = [

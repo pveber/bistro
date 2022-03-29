@@ -2,6 +2,8 @@ open Lwt.Infix
 open Core
 open Bistro
 open Bistro_engine
+module Sys = Sys_unix
+module Unix = Core_unix
 
 module W = Bistro_internals.Workflow
 
