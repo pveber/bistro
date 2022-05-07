@@ -44,7 +44,8 @@ Features:
     (base64 (>= 3.0.0))
     bos
     (dune (> 1.6))
-    (core (>= 0.12.0))
+    (core (>= 0.15.0))
+    (core_unix (>= 0.15.0))
     (lwt (>= 3.2.0))
     lwt_react
     (ocamlgraph (>= 1.8.7))

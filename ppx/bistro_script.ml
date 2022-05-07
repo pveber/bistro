@@ -245,7 +245,8 @@ let include_rewriter ~loc:_ ~path:_ { txt = fn ; loc } =
     let module Location = Ocaml_common.Location in
     let msg =
       Printf.sprintf
-        "Cannot read %s, have you forgot to add it in a preprocessor_deps field of your dune file?"
+        "Cannot read %s from %s, have you forgot to add it in a preprocessor_deps field of your dune file?"
+        (Stdlib.Sys.getcwd ())
         fn in
     let err = Location.error ~loc msg in
     raise (Location.Error err)

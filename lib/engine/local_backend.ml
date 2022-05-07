@@ -2,6 +2,8 @@ open Core
 open Lwt.Infix
 open Bistro_internals
 
+module Unix = Core_unix
+
 type t = {
   logger : Logger.t ;
   db : Db.t ;
@@ -57,7 +59,7 @@ let eval _ () f x =
       (fun () ->
          let ic = Lwt_io.of_unix_fd ~mode:Lwt_io.input read_from_child in
          Lwt_io.read_value ic >>= fun (res : (unit, string) result) ->
-         Caml.Unix.kill (Pid.to_int pid) Caml.Sys.sigkill;
+         Caml_unix.kill (Pid.to_int pid) Caml.Sys.sigkill;
          Misc.waitpid (Pid.to_int pid) >>= fun _ ->
          Unix.close read_from_child ;
          Unix.close write_to_child ;

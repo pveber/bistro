@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Bistro
 open Bistro_bio
 open Biotk

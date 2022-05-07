@@ -1,9 +1,8 @@
-open Core_kernel
 open Bistro
 open Bistro_engine
 
 module Client : sig
-  val command : Command.t
+  val command : Core.Command.t
 end
 
 module Server : sig
@@ -38,5 +37,5 @@ module Server : sig
   val simple_command :
     summary:string ->
     'a workflow ->
-    Command.t
+    Core.Command.t
 end

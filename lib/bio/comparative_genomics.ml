@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Bistro
 
 let select_refseq_genomes ~pattern = [%workflow

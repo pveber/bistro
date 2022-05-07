@@ -2,6 +2,8 @@ open Core
 open Bistro_internals
 open Bistro_engine
 
+module Unix = Core_unix
+
 type time = float
 
 type event =
@@ -21,7 +23,7 @@ type model = {
 
 let ( >>= ) = Lwt.( >>= )
 
-let zone = Lazy.force Time.Zone.local
+let zone = Lazy.force Time_unix.Zone.local
 
 type t = {
   path : string ;
@@ -283,7 +285,7 @@ module Render = struct
   let event time evt =
     let table_line label details =
       [
-        td [ k Time.(to_string_trimmed ~zone (of_tm ~zone (Unix.localtime time))) ] ;
+        td [ k Time_unix.(to_string_trimmed ~zone (of_tm ~zone (Unix.localtime time))) ] ;
         td [ label ] ;
         td details
       ]

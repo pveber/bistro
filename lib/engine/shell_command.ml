@@ -1,6 +1,9 @@
 open Core
 open Bistro_internals
 
+module Sys = Sys_unix
+module Unix = Core_unix
+
 type file_dump = File_dump of {
     text : string ;
     path : string ;
@@ -241,7 +244,7 @@ let run (Command cmd as c) =
   Lwt_process.exec ~stdout ~stderr (Lwt_process.shell invocation)
   >>= fun status ->
   (* Lwt_unix.unlink script_file >>= fun () -> *)
-  let exit_code = Caml.Unix.(
+  let exit_code = Caml_unix.(
       match status with
       | WEXITED code
       | WSIGNALED code

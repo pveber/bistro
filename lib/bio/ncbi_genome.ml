@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 let assembly_summary =
   Bistro_unix.wget Biotk.Ncbi_genome.refseq_assembly_summary_url

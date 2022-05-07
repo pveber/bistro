@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 type 'a t = ('a, Execution_trace.Set.t) Lwt_result.t
 

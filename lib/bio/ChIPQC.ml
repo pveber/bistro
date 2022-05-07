@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Bistro
 open Bistro.Shell_dsl
 open Formats

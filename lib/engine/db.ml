@@ -3,6 +3,9 @@
 open Core
 open Rresult
 
+module Sys = Sys_unix
+module Unix = Core_unix
+
 type id = string
 
 let ok_exn = function

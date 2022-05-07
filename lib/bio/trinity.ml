@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Bistro
 open Bistro.Shell_dsl
 
@@ -43,9 +43,9 @@ let trinity ?(mem = 128) ?(threads = 4) ?no_normalize_reads ?run_as_paired
       option (flag string "--run_as_paired") run_as_paired ;
       option (opt "--min_kmer_cov" int) min_kmer_cov ;
       option ss_lib_type_option ss_lib_type ;
-      opt "--CPU" ident np ;
-      opt "--max_memory" ident (seq [ string "$((" ; Bistro.Shell_dsl.mem ; string " / 1024))G" ]) ;
-      opt "--output" ident tmp_dest ;
+      opt "--CPU" Fun.id np ;
+      opt "--max_memory" Fun.id (seq [ string "$((" ; Bistro.Shell_dsl.mem ; string " / 1024))G" ]) ;
+      opt "--output" Fun.id tmp_dest ;
     ] ;
     cmd "mv" [
       tmp_dest // "Trinity.fasta" ;
@@ -93,12 +93,12 @@ let insilico_read_normalization ?(mem = 128) ?pairs_together ?parallel_stats ~ma
     cmd "$TRINITY_HOME/util/insilico_read_normalization.pl" [
       string "--seqType fq" ;
       fq_option_template se_or_pe_fq ;
-      opt "--CPU" ident np ;
-      opt "--JM" ident (seq [ string "$((" ; Bistro.Shell_dsl.mem ; string " / 1024))G" ]) ;
+      opt "--CPU" Fun.id np ;
+      opt "--JM" Fun.id (seq [ string "$((" ; Bistro.Shell_dsl.mem ; string " / 1024))G" ]) ;
       opt "--max_cov" int max_cov ;
       option (flag string "--pairs_together") pairs_together ;
       option (flag string "--PARALLEL_STATS") parallel_stats ;
-      opt "--output" ident tmp ;
+      opt "--output" Fun.id tmp ;
     ]
   in
   let workflow post =

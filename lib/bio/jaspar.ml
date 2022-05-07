@@ -1,5 +1,7 @@
-open Core_kernel
+open Core
 open Bistro
+
+module Sys = Sys_unix
 
 let core_vertebrates_non_redundant =
   Bistro_unix.wget

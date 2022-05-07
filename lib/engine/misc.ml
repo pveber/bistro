@@ -1,5 +1,8 @@
 open Core
 
+module Sys = Sys_unix
+module Unix = Core_unix
+
 let digest x =
   Md5.to_hex (Md5.digest_string (Marshal.to_string x []))
 

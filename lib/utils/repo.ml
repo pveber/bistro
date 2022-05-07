@@ -4,6 +4,8 @@ open Bistro
 open Bistro_engine
 
 module W = Bistro_internals.Workflow
+module Sys = Sys_unix
+module Unix = Core_unix
 
 type item =
   | Item  : string list * _ path workflow -> item

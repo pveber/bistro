@@ -1,5 +1,5 @@
 open Lwt.Infix
-open Core_kernel
+open Core
 
 type 'a t = {
   queue : 'a Queue.t ;

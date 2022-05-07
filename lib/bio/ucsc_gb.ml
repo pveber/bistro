@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Bistro
 open Bistro.Shell_dsl
 open Formats
@@ -143,7 +143,7 @@ let faToTwoBit fa =
   ]
 
 (* (\* let fetch_sequences (File seq2b) locations = *\) *)
-(* (\*   let open Core_kernel in *\) *)
+(* (\*   let open Core in *\) *)
 (* (\*   Core_extended.Sys_utils.with_tmp ~pre:"gzm" ~suf:".seqList" (fun seqList -> *\) *)
 (* (\*     Core_extended.Sys_utils.with_tmp ~pre:"gzm" ~suf:".fa" (fun fa -> *\) *)
 (* (\*       (\\* Write locations to a file *\\) *\) *)

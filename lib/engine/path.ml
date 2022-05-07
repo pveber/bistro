@@ -1,4 +1,6 @@
-open Core_kernel
+open Core
+
+module Sys = Sys_unix
 
 type t = string list
 [@@deriving sexp]

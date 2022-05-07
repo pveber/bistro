@@ -1,5 +1,7 @@
-open Core_kernel
+open Core
 open Bistro
+
+module Sys = Sys_unix
 
 let fetch_pwm_archive : [`cisbp] directory =
   Bistro_unix.wget Biotk.Cisbp.pwm_archive_url
@@ -55,7 +57,7 @@ let annotated_motifs =
         let threshold = Biotk.Pwm_stats.TFM_pvalue.score_of_pvalue pwm (Biotk.Pwm.flat_background ()) 1e-4 in
         let rc_pwm = Biotk.Pwm.reverse_complement pwm in
         ignore (
-          Sys.command (sprintf "echo %s %s %d/%d >> delme" Time.(now () |> to_string) tf_name i n)
+          Sys.command (sprintf "echo %s %s %d/%d >> delme" Time_unix.(now () |> to_string) tf_name i n)
           : int
         ) ;
         { id ; tf_name ; pwm ; rc_pwm ; threshold ; infos }
