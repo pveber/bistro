@@ -54,6 +54,7 @@ let callpeak_gen
     ?broad ?pvalue ?qvalue ?gsize ?call_summits
     ?fix_bimodal ?mfold ?extsize ?nomodel ?bdg ?control ?keep_dup format treatment =
   Workflow.shell ~descr:"macs2.callpeak" ~img [
+    mkdir_p tmp ;
     macs2 "callpeak" [
       option (flag string "--broad") broad ;
       opt "--outdir" Fn.id dest ;
@@ -71,6 +72,7 @@ let callpeak_gen
       option (opt "--keep-dup" keep_dup_expr) keep_dup ;
       option (opt "--control" (list ~sep:" " dep)) control ;
       opt "--treatment" (list ~sep:" " dep) treatment ;
+      opt "--tempdir" Fun.id tmp ;
     ]
   ]
 
