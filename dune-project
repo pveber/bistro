@@ -54,4 +54,5 @@ Features:
     ppx_sexp_conv
     rresult
     (sexplib (>= 113.24.00))
+    (streaming (>= 0.8.0))
     (tyxml (>= 4.3.0))))

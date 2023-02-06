@@ -883,7 +883,7 @@ module Make(Backend : Backend) = struct
     >>= (fun r -> Maybe_gc.stop sched.gc >|= fun () -> r) (* FIXME: is this the right moment?
                                                              what if eval is called several times? *)
     |> Fn.flip Lwt_result.bind Lwt.(fun () -> shallow_eval_exn ~msg:"eval" sched target >|= Result.return)
-    |> Lwt_result.map_err Execution_trace.Set.elements
+    |> Lwt_result.map_error Execution_trace.Set.elements
 
   let error_report { db ; _ } traces =
     let buf = Buffer.create 1024 in
