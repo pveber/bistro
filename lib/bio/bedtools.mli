@@ -114,3 +114,12 @@ val merge :
      | `sum ] list ->
   #bed3 file list ->
   #bed3 file
+
+val unionbedg :
+  ?header:bool ->
+  ?names:string list ->
+  ?empty:bool ->
+  ?genome_chrom_size:text file ->
+  ?filler:string ->
+  Ucsc_gb.bedGraph file list ->
+  #bed3 file

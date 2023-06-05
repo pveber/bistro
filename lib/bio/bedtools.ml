@@ -145,3 +145,16 @@ let merge ?s ?_S ?d ?c ?o beds =
       opt "-i" concat_beds_dep beds ;
     ]
   ]
+
+let unionbedg ?header ?names ?empty ?genome_chrom_size ?filler beds =
+  Workflow.shell ~descr:"bedtools.unionbedg" ~img [
+    cmd "bedtools" ~stdout:dest [
+      string "unionbedg" ;
+      option (flag string "-header") header ;
+      option (opt "-names" (list ~sep:" " string)) names ;
+      option (flag string "-empty") empty ;
+      option (opt "-g" dep) genome_chrom_size ;
+      option (opt "-filler" string) filler ;
+      opt "-i" (list ~sep:" " dep) beds ;
+    ]
+  ]
