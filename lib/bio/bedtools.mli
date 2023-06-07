@@ -43,6 +43,16 @@ val slop :
   Ucsc_gb.chrom_sizes file ->
   'a file
 
+val shift :
+  ?s:int ->
+  ?m:int ->
+  ?p:int ->
+  ?pct:float ->
+  ?header:bool ->
+  'a input ->
+  'a file ->
+  Ucsc_gb.chrom_sizes file ->
+  'a file
 
 val intersect :
   ?ubam:bool ->

@@ -2,7 +2,7 @@ open Core
 open Bistro
 open Bistro.Shell_dsl
 
-let img = [ docker_image ~account:"pveber" ~name:"bedtools" ~tag:"2.21.0" () ]
+let img = [ docker_image ~registry:"quay.io" ~account:"biocontainers" ~name:"bedtools" ~tag:"2.31.0--hf5e1c6e_2" () ]
 
 let bedtools ?stdout subcmd args =
   cmd "bedtools" ?stdout (string subcmd :: args)
@@ -38,6 +38,19 @@ end
 let slop ?strand ?header ~mode _ input chrom_size =
   Workflow.shell ~descr:"bedtools.slop" ~img [
     Cmd.slop ?strand ?header ~mode input chrom_size
+  ]
+
+let shift ?s ?m ?p ?pct ?header _ input chrom_size =
+  Workflow.shell ~descr:"bedtools.shift" ~img [
+    bedtools "shift" ~stdout:dest [
+      option (flag string "-header") header ;
+      option (opt "-pct" float) pct ;
+      option (opt "-s" int) s ;
+      option (opt "-m" int) m ;
+      option (opt "-p" int) p ;
+      opt "-i" dep input ;
+      opt "-g" dep chrom_size ;
+    ]
   ]
 
 let intersect ?ubam ?wa ?wb ?loj ?wo ?wao ?u ?c ?v ?f ?_F ?r ?e ?s ?_S
