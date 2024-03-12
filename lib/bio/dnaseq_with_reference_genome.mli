@@ -33,7 +33,7 @@ module Make(S : Sample) : sig
     S.t ->
     html file
   val bamstats : S.t -> text file
-  val bamstats_alt : S.t -> Biocaml_ez.Bamstats.t workflow
+  val bamstats_alt : S.t -> Biotk.Bamstats.t workflow
   val chrstats : S.t -> text file
   val alignment_summary : html file
 end

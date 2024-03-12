@@ -89,11 +89,14 @@ module Make(S : Sample) = struct
 
   let bamstats_alt x =
     let f = fun%workflow () ->
-      let open Biocaml_ez in
-      let open CFStream in
+      let open Biotk in
       Bam.with_file [%path mapped_reads_bam x] ~f:(fun _ als ->
-          Stream.fold als ~init:Bamstats.zero ~f:Bamstats.update
+          Seq.fold_left
+            (fun acc r -> Bamstats.update acc (ok_exn r))
+            Bamstats.zero als
+          |> Result.return
         )
+      |> ok_exn
     in
     Workflow.plugin ~descr:"bamstats_alt" f
 

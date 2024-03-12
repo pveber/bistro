@@ -4,11 +4,15 @@ open Formats
 
 let bamstats (bam : bam file) =
   let f = fun%workflow dest ->
-    let open Biocaml_ez in
-    let open CFStream in
+    let open Biotk in
     Bam.with_file [%path bam] ~f:(fun _ als ->
-        Stream.fold als ~init:Bamstats.zero ~f:Bamstats.update
+        Seq.fold_left
+          (fun acc r -> Bamstats.update acc (ok_exn r))
+          Bamstats.zero
+          als
+        |> Result.return
       )
+    |> ok_exn
     |> Bamstats.sexp_of_t
     |> Sexp.to_string_hum
     |> fun data -> Out_channel.write_all dest ~data
@@ -17,39 +21,41 @@ let bamstats (bam : bam file) =
 
 let fragment_length_stats (bam : bam file) =
   let f = fun%workflow dest ->
-    let open Biocaml_ez in
-    let open CFStream in
+    let open Biotk in
     Bam.with_file0 [%path bam] ~f:Bamstats.Fragment_length_histogram.(fun _ als ->
         let h = create ~min_mapq:5 () in
-        Stream.iter als ~f:(fun al -> ok_exn (update0 h al)) ;
-        Biocaml_unix.Accu.Counter.to_alist h.counts
-      ) ;
+        Seq.iter (fun al -> ok_exn (update0 h (ok_exn al))) als ;
+        Binning.seq h.counts
+        |> Stdlib.List.of_seq
+        |> Result.return
+      )
+    |> ok_exn
     |> [%sexp_of: (int * int) list]
     |> Sexp.to_string_hum
     |> fun data -> Out_channel.write_all dest ~data
   in
   Workflow.path_plugin ~descr:"alignment_stats.fragment_length_histogram" f
-  
+
 let chrstats (bam : bam file) =
   let f = fun%workflow dest ->
-    let open Biocaml_ez in
-    let open CFStream in
+    let open Biotk in
     Bam.with_file0 [%path bam] ~f:Bamstats.Chr_histogram.(fun header als ->
         let h = create ~min_mapq:5 header in
-        Stream.iter als ~f:(fun al -> ok_exn (update0 h al)) ;
-        Biocaml_unix.Accu.Counter.to_alist h.counts
-      ) ;
+        Seq.iter (fun al -> ok_exn (update0 h (ok_exn al))) als ;
+        Binning.seq h.counts |> Stdlib.List.of_seq |> Result.return
+      )
+    |> ok_exn
     |> [%sexp_of: (string * int) list]
     |> Sexp.to_string_hum
     |> fun data -> Out_channel.write_all dest ~data
   in
   Workflow.path_plugin ~descr:"alignment_stats.chrstats" f
-  
+
 let summary ~sample_name ~mapped_reads samples =
   let stat_files =
     List.map samples ~f:(fun s -> bamstats (mapped_reads s))
     |> Workflow.path_list
- 
+
   and samples = List.map samples ~f:sample_name
 
   and chrstat_files =
@@ -61,7 +67,7 @@ let summary ~sample_name ~mapped_reads samples =
     let       samples = [%param samples] in
     let chrstat_files = [%eval chrstat_files] in
 
-    let open Biocaml_ez in
+    let open Biotk in
     let open Tyxml_html in
     let k = txt in
     let stats =

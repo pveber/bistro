@@ -39,7 +39,7 @@ let annotated_motifs =
     let selected_motifs =
       List.filter_map motifs ~f:(fun (label, motif) ->
           let id = Filename.chop_extension label in
-          String.Map.find motif_info id
+          Map.find motif_info id
           |> Option.bind ~f:(fun mis ->
               let tf_names =
                 List.map mis ~f:(fun mi -> mi.TF_information.tf_name)
@@ -57,7 +57,7 @@ let annotated_motifs =
         let threshold = Biotk.Pwm_stats.TFM_pvalue.score_of_pvalue pwm (Biotk.Pwm.flat_background ()) 1e-4 in
         let rc_pwm = Biotk.Pwm.reverse_complement pwm in
         ignore (
-          Sys.command (sprintf "echo %s %s %d/%d >> delme" Time_unix.(now () |> to_string) tf_name i n)
+          Sys.command (sprintf "echo %s %s %d/%d >> delme" Time_float_unix.(now () |> to_string) tf_name i n)
           : int
         ) ;
         { id ; tf_name ; pwm ; rc_pwm ; threshold ; infos }
