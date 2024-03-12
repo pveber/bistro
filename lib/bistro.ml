@@ -145,7 +145,7 @@ module Template_dsl = struct
     in
     List.concat (format xs)
 
-  let enum dic x = string (List.Assoc.find_exn ~equal:Caml.( = ) dic x)
+  let enum dic x = string (List.Assoc.find_exn ~equal:Stdlib.( = ) dic x)
 
   let file_dump contents = [ Template.F contents ] (* FIXME: should check that there is no file_dump in contents *)
 end
@@ -173,7 +173,7 @@ module Shell_dsl = struct
     in
     let tokens =
       [ prog_expr ] @ args @ [ stdin_expr ; stdout_expr ; stderr_expr ]
-      |> List.filter ~f:(Caml.( <> ) [])
+      |> List.filter ~f:(Stdlib.( <> ) [])
       |> List.intersperse ~sep:(string " ")
       |> List.concat
     in

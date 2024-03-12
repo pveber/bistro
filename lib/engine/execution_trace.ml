@@ -137,7 +137,7 @@ type t =
 
 module S = struct
   module Elt = struct type nonrec t = t let compare = Poly.compare end
-  include Caml.Set.Make(Elt)
+  include Stdlib.Set.Make(Elt)
 end
 
 let is_errored = function

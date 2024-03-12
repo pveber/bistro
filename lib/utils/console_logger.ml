@@ -4,11 +4,11 @@ open Bistro_engine
 
 module Unix = Core_unix
 
-let zone = Lazy.force Time_unix.Zone.local
+let zone = Lazy.force Time_float_unix.Zone.local
 
 let msg t fmt =
   let k s =
-    let t = Time_unix.(to_string (of_tm ~zone (Unix.localtime t))) in
+    let t = Time_float_unix.(to_string (of_tm ~zone (Unix.localtime t))) in
     printf "[%s] %s\n%!" t s
   in
   ksprintf k fmt

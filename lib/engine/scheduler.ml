@@ -66,13 +66,13 @@ struct
       | Singularity_image i -> Db.singularity_image db i
   end
 
-  module S = Caml.Set.Make(Elt)
+  module S = Stdlib.Set.Make(Elt)
   module T = struct
-    include Caml.Hashtbl.Make(Elt)
+    include Stdlib.Hashtbl.Make(Elt)
     let update t ~key ~default ~f =
       let data = match find t key with
         | d -> d
-        | exception Caml.Not_found -> default
+        | exception Stdlib.Not_found -> default
       in
       replace t key (f data)
 
@@ -81,7 +81,7 @@ struct
 
     let adj_find t u = match find t u with
       | x -> x
-      | exception Caml.Not_found -> S.empty
+      | exception Stdlib.Not_found -> S.empty
 
     let incr_count t u =
       update t ~key:u ~default:0 ~f:succ
@@ -89,7 +89,7 @@ struct
     let decr_count t u =
       let n = match find t u with
         | n -> n - 1
-        | exception Caml.Not_found -> assert false
+        | exception Stdlib.Not_found -> assert false
       in
       replace t u n ;
       n
@@ -259,11 +259,11 @@ struct
               (S.to_seq s)
           | Singularity_image _ -> Seq.empty
         )
-      |> Caml.List.of_seq ;
+      |> Stdlib.List.of_seq ;
     protected =
       S.to_seq gc.protected
       |> Seq.filter_map (function Elt.Workflow w -> Some w | Singularity_image _ -> None)
-      |> Caml.List.of_seq ;
+      |> Stdlib.List.of_seq ;
   }
 
 end
@@ -601,7 +601,7 @@ module Make(Backend : Backend) = struct
               )
         )
       | Trywith tw -> (
-          match Table.find sched.traces (Workflow.id tw.w) with
+          match Hashtbl.find sched.traces (Workflow.id tw.w) with
           | Some eventual_trace -> (
               eventual_trace >>= function
               | Ok (Run r) ->
@@ -667,10 +667,10 @@ module Make(Backend : Backend) = struct
   let register_build sched ~id ~build_trace =
     let open Eval_thread.Infix in
     (
-      match Table.find sched.traces id with
+      match Hashtbl.find sched.traces id with
       | None ->
         let trace = build_trace () in
-        Table.set sched.traces ~key:id ~data:trace ;
+        Hashtbl.set sched.traces ~key:id ~data:trace ;
         trace
       | Some trace -> trace
     ) >>= fun trace ->
@@ -854,7 +854,7 @@ module Make(Backend : Backend) = struct
         Eval_thread.join l.elts ~f:(build ?target sched)
       | Trywith tw -> (
           build sched ?target tw.w >> fun w_result ->
-          match Table.find sched.traces (Workflow.id tw.w) with
+          match Hashtbl.find sched.traces (Workflow.id tw.w) with
           | Some eventual_trace -> (
               eventual_trace >> function
               | Ok (Run r) when run_trywith_recovery r.details ->

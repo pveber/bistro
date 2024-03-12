@@ -48,9 +48,9 @@ let eval _ () f x =
     in
     let oc = Unix.out_channel_of_descr write_to_parent in
     Marshal.to_channel oc res [] ;
-    Caml.flush oc ;
+    Stdlib.flush oc ;
     Unix.close write_to_parent ;
-    ignore (Caml.input_value (Unix.in_channel_of_descr read_from_parent)) ;
+    ignore (Stdlib.input_value (Unix.in_channel_of_descr read_from_parent)) ;
     assert false
   | `In_the_parent pid ->
     Unix.close write_to_parent ;
@@ -59,7 +59,7 @@ let eval _ () f x =
       (fun () ->
          let ic = Lwt_io.of_unix_fd ~mode:Lwt_io.input read_from_child in
          Lwt_io.read_value ic >>= fun (res : (unit, string) result) ->
-         Caml_unix.kill (Pid.to_int pid) Caml.Sys.sigkill;
+         Caml_unix.kill (Pid.to_int pid) Stdlib.Sys.sigkill;
          Misc.waitpid (Pid.to_int pid) >>= fun _ ->
          Unix.close read_from_child ;
          Unix.close write_to_child ;

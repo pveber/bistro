@@ -160,7 +160,7 @@ let protected_set repo =
     | Select s -> fold_path_workflow acc (W.Any s.dir)
     | Input _ -> acc
     | Shell _
-    | Plugin _ -> String.Set.add acc (W.id w)
+    | Plugin _ -> Set.add acc (W.id w)
     | Trywith tw ->
       fold_path_workflow (fold_path_workflow acc (W.Any tw.w)) (W.Any tw.failsafe)
     | Ifelse ie ->
@@ -187,7 +187,7 @@ let cache_clip_fold ~bistro_dir repo ~f ~init =
   let protected = protected_set repo in
   let db = Db.init_exn bistro_dir in
   Db.fold_cache db ~init ~f:(fun acc id ->
-      f db acc (if String.Set.mem protected id then `Protected id else `Unprotected id)
+      f db acc (if Set.mem protected id then `Protected id else `Unprotected id)
     )
 
 let cache_clip_dry_run ~bistro_dir repo =

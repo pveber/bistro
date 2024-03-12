@@ -130,7 +130,7 @@ module Server = struct
       let search (type s) (table : s String.Table.t) ~f =
         let module M = struct exception Found of string * s end in
         try
-          String.Table.fold table ~init:() ~f:(fun ~key ~data () -> if f ~key ~data then raise (M.Found (key, data))) ;
+          Hashtbl.fold table ~init:() ~f:(fun ~key ~data () -> if f ~key ~data then raise (M.Found (key, data))) ;
           None
         with M.Found (k, v) -> Some (k, v)
 
@@ -145,7 +145,7 @@ module Server = struct
               match allocation_attempt with
               | None -> Some elt
               | Some (worker_id, (Resource curr)) ->
-                String.Table.set pool.available ~key:worker_id ~data:(Resource { np = curr.np - np ; mem = curr.mem - mem }) ;
+                Hashtbl.set pool.available ~key:worker_id ~data:(Resource { np = curr.np - np ; mem = curr.mem - mem }) ;
                 Lwt.wakeup u (worker_id, Resource { np ; mem }) ;
                 None
             )
@@ -163,12 +163,12 @@ module Server = struct
         t
 
       let add_worker pool (Worker { id ; np ; mem ; _ }) =
-        match String.Table.add pool.available ~key:id ~data:(Allocator.Resource { np ; mem }) with
+        match Hashtbl.add pool.available ~key:id ~data:(Allocator.Resource { np ; mem }) with
         | `Ok -> allocation_pass pool
         | `Duplicate -> failwith "A worker has been added twice"
 
       let release pool worker_id (Allocator.Resource { np ; mem }) =
-        String.Table.update pool.available worker_id ~f:(function
+        Hashtbl.update pool.available worker_id ~f:(function
             | None -> failwith "Tried to release resources of inexistent worker"
             | Some (Resource r) -> Resource { np = r.np + np ; mem = r.mem + mem }
           )
@@ -235,13 +235,13 @@ module Server = struct
       | Subscript { np ; mem } ->
         let id = new_id () in
         let w = create_worker ~np ~mem id in
-        String.Table.set state.workers ~key:id ~data:w ;
+        Hashtbl.set state.workers ~key:id ~data:w ;
         Worker_allocator.add_worker state.alloc w ;
         log (Logger.Debug (sprintf "new worker %s" id)) ;
         Lwt.return (Client_id id)
 
       | Get_job { client_id } -> (
-          match String.Table.find state.workers client_id with
+          match Hashtbl.find state.workers client_id with
           | None -> Lwt.return None
           | Some (Worker worker) ->
             Lwt.choose [
@@ -250,22 +250,22 @@ module Server = struct
             ] >>= function
             | `Job wp ->
               let workflow_id = workflow_id_of_job_waiter wp in
-              String.Table.set worker.running_jobs ~key:workflow_id ~data:wp ;
+              Hashtbl.set worker.running_jobs ~key:workflow_id ~data:wp ;
               Lwt.return (Some (job_of_job_waiter wp))
             | `Stop -> Lwt.return None
         )
 
       | Plugin_result r ->
-        let Worker worker = String.Table.find_exn state.workers r.client_id in
+        let Worker worker = Hashtbl.find_exn state.workers r.client_id in
         Lwt.return (
-          match String.Table.find_exn worker.running_jobs r.workflow_id with
+          match Hashtbl.find_exn worker.running_jobs r.workflow_id with
           | Waiting_plugin wp -> Lwt.wakeup wp.waiter r.result
           | Waiting_shell_command _ -> assert false (* should never happen *)
         )
       | Shell_command_result r ->
-        let Worker worker = String.Table.find_exn state.workers r.client_id in
+        let Worker worker = Hashtbl.find_exn state.workers r.client_id in
         Lwt.return (
-          match String.Table.find_exn worker.running_jobs r.workflow_id with
+          match Hashtbl.find_exn worker.running_jobs r.workflow_id with
           | Waiting_plugin _ -> assert false (* should never happen *)
           | Waiting_shell_command wp -> Lwt.wakeup wp.waiter r.result
         )
@@ -307,7 +307,7 @@ module Server = struct
 
     let request_resource backend req =
       Worker_allocator.request backend.state.alloc req >|= fun (worker_id, resource) ->
-      String.Table.find_exn backend.state.workers worker_id, resource
+      Hashtbl.find_exn backend.state.workers worker_id, resource
 
     let release_resource backend worker_id res =
       Worker_allocator.release backend.state.alloc worker_id res
@@ -334,7 +334,7 @@ module Server = struct
          *   loop () *)
 
     let eval backend { worker_id ; workflow_id } f x =
-      let Worker worker = String.Table.find_exn backend.state.workers worker_id in
+      let Worker worker = Hashtbl.find_exn backend.state.workers worker_id in
       let f () = f x in
       let t, u = Lwt.wait () in
       let job_waiter = Waiting_plugin { waiter = u ; f ; workflow_id } in
@@ -342,7 +342,7 @@ module Server = struct
       t
 
     let run_shell_command backend { worker_id ; workflow_id } cmd =
-      let Worker worker = String.Table.find_exn backend.state.workers worker_id in
+      let Worker worker = Hashtbl.find_exn backend.state.workers worker_id in
       let t, u = Lwt.wait () in
       let job = Waiting_shell_command { waiter = u ; cmd ; workflow_id } in
       Lwt_queue.push worker.pending_jobs job ;

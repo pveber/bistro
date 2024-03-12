@@ -29,7 +29,7 @@ let container_env (Command { container ; env ; text = _ }) =
 let rec file_dumps_of_tokens toks =
   List.map toks ~f:file_dumps_of_token
   |> List.concat
-  |> List.dedup_and_sort ~compare:Caml.compare
+  |> List.dedup_and_sort ~compare:Stdlib.compare
 
 and file_dumps_of_token =
   let open Template in
@@ -44,7 +44,7 @@ and file_dumps_of_token =
     Symbolic_file_dump {
       contents = contents ;
     } :: file_dumps_of_tokens contents
-    |> List.dedup_and_sort ~compare:Caml.compare
+    |> List.dedup_and_sort ~compare:Stdlib.compare
 
 let rec file_dumps_of_command =
   let open Command in
@@ -55,7 +55,7 @@ let rec file_dumps_of_command =
   | Pipe_list xs ->
     List.map xs ~f:file_dumps_of_command
     |> List.concat
-    |> List.dedup_and_sort ~compare:Caml.compare
+    |> List.dedup_and_sort ~compare:Stdlib.compare
 
 let string_of_token (env : Execution_env.t) =
   let open Template in
@@ -118,7 +118,7 @@ module Mounts = struct
     command_path_deps cmd.text
     |> List.map ~f:(Execution_env.container_mount env.db)
     |> List.map ~f:Execution_env.(fun m -> m.mount_host_location, m.mount_container_location)
-    |> List.dedup_and_sort ~compare:Caml.compare
+    |> List.dedup_and_sort ~compare:Stdlib.compare
     |> List.unzip
     |> of_pair
 

@@ -24,7 +24,7 @@ module G = struct
   (* let successors   g u = fold_succ (fun h t -> h :: t) g u [] *)
 
   let rec of_workflow_aux seen acc u =
-    if S.mem seen u then (seen, acc)
+    if Set.mem seen u then (seen, acc)
     else (
       let deps = W.Any.deps u in
       let seen, acc =
@@ -34,7 +34,7 @@ module G = struct
       in
       let acc = add_vertex acc u in
       let acc = List.fold deps ~init:acc ~f:(fun acc v -> add_edge acc u v) in
-      let seen = S.add seen u in
+      let seen = Set.add seen u in
       seen, acc
     )
 
@@ -109,7 +109,7 @@ let dot_output ?db oc g ~needed =
     ]
   in
   let vertex_attributes u =
-    let needed = (match db with None -> true | Some _ -> false) || S.mem needed u in
+    let needed = (match db with None -> true | Some _ -> false) || Set.mem needed u in
     let color = if needed then black else light_gray in
     let shape = `Shape (shape u) in
     let W.Any w = u in
@@ -141,7 +141,7 @@ let dot_output ?db oc g ~needed =
       | _ -> []
     in
     let color =
-      if (match db with None -> true | Some _ -> false) || (S.mem needed u && not (already_done u))
+      if (match db with None -> true | Some _ -> false) || (Set.mem needed u && not (already_done u))
       then black else light_gray in
     style @ [ `Color color ]
   in
