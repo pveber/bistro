@@ -236,8 +236,15 @@ let includee_loc ~file_name ~file_contents =
   let loc_end = loc_end ~file_name ~file_contents in
   { Location.loc_start ; loc_end ; loc_ghost = false }
 
+(* adapted from ppx_blob *)
+let find_file_path ~loc file_name =
+  let open Stdlib in
+  let dirname = loc.Ocaml_common.Location.loc_start.pos_fname |> Filename.dirname in
+  let relative_path = Filename.concat dirname file_name in
+  List.find Sys.file_exists [relative_path; file_name]
+
 let include_rewriter ~loc:_ ~path:_ { txt = fn ; loc } =
-  match Stdio.In_channel.read_all fn with
+  match Stdio.In_channel.read_all (find_file_path ~loc fn) with
   | contents ->
     let loc = includee_loc ~file_name:fn ~file_contents:contents in
     rewrite contents loc

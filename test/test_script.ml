@@ -5,4 +5,4 @@ I <- {{int 42}}
 O <- {{dest}}
 |}]
 
-let u title = [%include_script "test/template.md"]
+let u title = [%include_script "template.md"]
