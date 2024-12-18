@@ -41,15 +41,15 @@ val unzip : 'a zip file -> 'a path workflow
 val tar_xf :
   ?strip_components:int ->
   'a tar file ->
-  'a file
+  'a path workflow
 val tar_xfz :
   ?strip_components:int ->
   'a tar gz file ->
-  'a file
+  'a path workflow
 val tar_xfj :
   ?strip_components:int ->
   'a tar bz2 file ->
-  'a file
+  'a path workflow
 val crlf2lf : (#text as 'a) file -> 'a file
 
 val head :
