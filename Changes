@@ -1,3 +1,15 @@
+v0.7.0 2024-12-18 Villeurbanne
+------------------------------
+
+Mainly a maintenance release
+
+ppx:
+  - new include_script extension node
+
+bio:
+  - dropped dep on biocaml
+  - Bedtools: added shift and unionbedg
+
 v0.6.0 2021-07-14 Lyon
 ----------------------
 
