@@ -21,12 +21,13 @@ Features:
 maintainer: ["philippe.veber@gmail.com"]
 authors: ["Philippe Veber"]
 license: "CeCILL-B"
+tags: ["workflow" "pipeline"]
 homepage: "https://github.com/pveber/bistro/"
 bug-reports: "https://github.com/pveber/bistro/issues"
 depends: [
   "base64" {>= "3.0.0"}
   "bos"
-  "dune" {> "1.6"}
+  "dune" {>= "3.0" & > "1.6"}
   "core" {>= "0.15.0"}
   "core_unix" {>= "0.15.0"}
   "lwt" {>= "3.2.0"}
@@ -39,9 +40,10 @@ depends: [
   "sexplib" {>= "113.24.00"}
   "streaming" {>= "0.8.0"}
   "tyxml" {>= "4.3.0"}
+  "odoc" {with-doc}
 ]
 build: [
-  ["dune" "subst"] {pinned}
+  ["dune" "subst"] {dev}
   [
     "dune"
     "build"

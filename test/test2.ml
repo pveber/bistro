@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Bistro
 open Bistro_nlp
 open Bistro_utils
@@ -9,8 +9,14 @@ let cut_deps x = [%workflow
   |> List.filter ~f:(Poly.( <> ) [""])
 ]
 
-let%pworkflow dump_lines x =
-  Out_channel.write_lines [%dest] [%eval x]
+let dump_lines x =
+  let f = fun%workflow dest ->
+    Out_channel.write_lines dest [%eval x]
+  in
+  Workflow.path_plugin f
+
+(* FIXME: Repo.items does not exist anymore, this example is defunct *)
+let items _ ~prefix:_ ~ext:_ _ = assert false
 
 let pipeline w =
   wikipedia_summary w
@@ -20,7 +26,7 @@ let pipeline w =
       dump_lines deps
       |> Stanford_parser.dependensee
     )
-  |> Repo.(items [ w ] ~prefix:"sentence" ~ext:"png")
+  |> items [ w ] ~prefix:"sentence" ~ext:"png"
 
 let repo =
   [ "Protein" ; "Cell_(biology)" ]

@@ -4,7 +4,7 @@ open Bistro.Shell_dsl
 open Bistro_engine
 open Bistro_utils
 
-let append (xs : text_file pworkflow list) id =
+let append (xs : text file list) id =
   let echo_cmd = cmd "echo" [ string id ; string ">>" ; dest ] in
   Workflow.shell ~descr:"append" (match xs with
       | [] -> [ echo_cmd ]
@@ -42,4 +42,4 @@ let command =
       main ~n ~debug ~dot_output
     ]
 
-let () = Command.run command
+let () = Command_unix.run command

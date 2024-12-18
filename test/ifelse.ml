@@ -1,6 +1,6 @@
 open Bistro
 
-let%workflow b () = 42 mod 2 = 0
+let b () = [%workflow 42 mod 2 = 0]
 
 let f () = Workflow.(ifelse (b ()) (data "even") (data "odd"))
 
@@ -12,4 +12,3 @@ module Top = Bistro_utils.Toplevel_eval.Make(struct
 let () =
   Top.eval (f ())
   |> print_endline
-

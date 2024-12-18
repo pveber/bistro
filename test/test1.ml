@@ -5,8 +5,11 @@ let add x y = Workflow.plugin ~descr:"add" (fun%workflow () ->
     [%eval x] + [%eval y]
   )
 
-let%workflow mul x y : int workflow =
-  [%eval x] * [%eval y]
+let mul x y : int workflow =
+  Workflow.plugin ~descr:"mul" (fun%workflow () ->
+      [%eval x] * [%eval y]
+    )
+[@@ocaml.warning "-32"]
 
 let pipeline = add (Workflow.int 1) (Workflow.int 41)
 

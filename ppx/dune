@@ -4,7 +4,7 @@
   (kind ppx_rewriter)
   (libraries core_kernel bistro.script ppxlib)
   (modules ppx_bistro)
-  (preprocess (pps ppxlib.metaquot ppxlib.runner)))
+  (preprocess (pps ppxlib.metaquot)))
 
 (library
   (name bistro_script)

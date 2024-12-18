@@ -1,8 +1,8 @@
 open Bistro.Shell_dsl
 
-let s = [%script{|
+let _s = [%script{|
 I <- {{int 42}}
 O <- {{dest}}
 |}]
 
-let u title = [%include_script "template.md"]
+let _u title = [%include_script "template.md"]

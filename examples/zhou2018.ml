@@ -3,14 +3,12 @@
    Data: https://ndownloader.figshare.com/files/9473962
 *)
 
-open Core_kernel
+open Core
 open Bistro
 open Bistro.Shell_dsl
 open Bistro_utils
 
 module Dataset = struct
-  type t = [`SongD1]
-
   let to_string = function
     | `SongD1 -> "SongD1"
 
@@ -32,18 +30,14 @@ module Raxml = struct
   let img = [ docker_image ~account:"pveber" ~name:"raxml" ~tag:"8.2.9" () ]
 
   let hpc alignment =
-    Workflow.shell ~descr:"raxmlhpc" ~np:4 [
-      within_container img (
-        and_list [
-          cd tmp ;
-          cmd "raxmlHPC" [
-            opt "-T" ident np ;
-            string "-p 1 -m GTRGAMMA --no-bfgs" ;
-            opt "-s" dep alignment ;
-            string "-n NAME" ;
-          ] ;
-        ]
-      ) ;
+    Workflow.shell ~descr:"raxmlhpc" ~np:4 ~img [
+      cd tmp ;
+      cmd "raxmlHPC" [
+        opt "-T" Fun.id np ;
+        string "-p 1 -m GTRGAMMA --no-bfgs" ;
+        opt "-s" dep alignment ;
+        string "-n NAME" ;
+      ] ;
       mv (tmp // "RAxML_bestTree.NAME") dest ;
     ]
 end
@@ -52,8 +46,8 @@ module Fasttree = struct
   let img = [ docker_image ~account:"pveber" ~name:"fasttree" ~tag:"2.1.10" () ]
 
   let fasttree fa =
-    Workflow.shell ~descr:"fasttree" [
-      cmd ~img "/usr/local/bin/FastTree" ~stdout:dest [
+    Workflow.shell ~descr:"fasttree" ~img [
+      cmd "/usr/local/bin/FastTree" ~stdout:dest [
         string "-nt -gtr -gamma -spr 4 -mlacc 2 -slownni" ;
         dep fa ;
       ]
@@ -66,19 +60,15 @@ module IQTree = struct
   let iqtree fa =
     let tmp_ali_fn = "data.fa" in
     let tmp_ali = tmp // tmp_ali_fn in
-    Workflow.shell ~descr:"iqtree" [
-      within_container img (
-        and_list [
-          cmd "ln" [ string "-s" ; dep fa ; tmp_ali ] ;
-          cmd "/usr/local/bin/iqtree" [ (* iqtree save its output right next to its input, hence this mess *)
-            string "-m GTR+G4" ;
-            opt "-s" ident tmp_ali ;
-            string "-seed 1" ;
-            opt "-nt" ident np ;
-          ] ;
-          mv (tmp // (tmp_ali_fn ^ ".treefile")) dest ;
-        ]
-      )
+    Workflow.shell ~descr:"iqtree" ~img [
+      cmd "ln" [ string "-s" ; dep fa ; tmp_ali ] ;
+      cmd "/usr/local/bin/iqtree" [ (* iqtree save its output right next to its input, hence this mess *)
+        string "-m GTR+G4" ;
+        opt "-s" Fun.id tmp_ali ;
+        string "-seed 1" ;
+        opt "-nt" Fun.id np ;
+      ] ;
+      mv (tmp // (tmp_ali_fn ^ ".treefile")) dest ;
     ]
 end
 
@@ -88,18 +78,14 @@ module PhyML = struct
   let phyml alignment =
     let tmp_ali_fn = "alignment" in
     let tmp_ali = tmp // tmp_ali_fn in
-    Workflow.shell ~descr:"phyml" [
-      within_container img (
-        and_list [
-          cd tmp ;
-          cmd "ln" [ string "-s" ; dep alignment ; tmp_ali ] ;
-          cmd "/usr/local/bin/phyml" [
-            opt "-i" ident tmp_ali ;
-            string "--r_seed 1 -d nt -b 0 -m GTR -f e -c 4 -a e -s SPR --n_rand_starts 1 -o tlr -p --run_id ID" ;
-          ] ;
-          mv (tmp // (tmp_ali_fn ^ "*_phyml_tree_ID.txt")) dest ;
-        ]
-      )
+    Workflow.shell ~descr:"phyml" ~img [
+      cd tmp ;
+      cmd "ln" [ string "-s" ; dep alignment ; tmp_ali ] ;
+      cmd "/usr/local/bin/phyml" [
+        opt "-i" Fun.id tmp_ali ;
+        string "--r_seed 1 -d nt -b 0 -m GTR -f e -c 4 -a e -s SPR --n_rand_starts 1 -o tlr -p --run_id ID" ;
+      ] ;
+      mv (tmp // (tmp_ali_fn ^ "*_phyml_tree_ID.txt")) dest ;
     ]
 end
 
@@ -107,11 +93,11 @@ module Goalign = struct
   let img = [ docker_image ~account:"pveber" ~name:"goalign" ~tag:"0.2.9" () ]
 
   let phylip_of_fasta fa =
-    Workflow.shell ~descr:"goalign.reformat" [
-      cmd "goalign" ~img [
+    Workflow.shell ~descr:"goalign.reformat" ~img [
+      cmd "goalign" [
         string "reformat phylip" ;
         opt "-i" dep fa ;
-        opt "-o" ident dest ;
+        opt "-o" Fun.id dest ;
       ]
     ]
 end
@@ -120,8 +106,8 @@ module Gotree = struct
   let img = [ docker_image ~account:"pveber" ~name:"gotree" ~tag:"0.2.10" () ]
 
   let compare_trees ~input ~reference =
-    Workflow.shell ~descr:"gotree.compare" [
-      cmd "/usr/local/bin/gotree" ~stdout:dest ~img [
+    Workflow.shell ~descr:"gotree.compare" ~img [
+      cmd "/usr/local/bin/gotree" ~stdout:dest [
         string "compare trees --binary" ;
         opt "-i" dep input ;
         opt "-c" dep reference ;
@@ -145,17 +131,21 @@ let comparisons d meth =
     (Dataset.best_trees d)
     ~f:(fun input reference -> Gotree.compare_trees ~input ~reference)
 
-let%pworkflow concat results =
-  List.map [%eval Workflow.(spawn results ~f:eval_path)] ~f:(fun fn ->
-      In_channel.read_lines fn
-      |> Fn.flip List.nth_exn 1
-    )
-  |> Out_channel.write_lines [%dest]
+let concat results =
+  let f = fun%workflow dest ->
+    List.map [%eval Workflow.(spawn results ~f:path)] ~f:(fun fn ->
+        In_channel.read_lines fn
+        |> Fn.flip List.nth_exn 1
+      )
+    |> Out_channel.write_lines dest
+  in
+  Workflow.path_plugin f
 
 
 let repo = Repo.[
     item ["concatenated_comps_fasttree"] (concat (comparisons `SongD1 `Fasttree)) ;
-    items ["comps_fasttree"] ~prefix:"tree" (comparisons `SongD1 `Fasttree) ;
+    (* items ["comps_fasttree"] ~prefix:"tree" (comparisons `SongD1 `Fasttree) ; *)
+    (* FIXME: this is not possible anymore *)
   ]
 
 let () = Repo.build_main ~loggers:[Console_logger.create ()] ~np:4 ~mem:(`GB 4) ~outdir:"res" repo

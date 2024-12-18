@@ -2,7 +2,7 @@
    Paper: https://www.ncbi.nlm.nih.gov/pubmed/21700227
    Datasets: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE29506
 *)
-open Bistro_bioinfo
+open Bistro_bio
 open Bistro_utils
 
 let treatment_id = "SRR217304"
@@ -12,8 +12,8 @@ let genome = Ucsc_gb.genome_sequence `sacCer2
 let bowtie_index = Bowtie.bowtie_build genome
 
 let mapped_reads srrid =
-  let fastq = Sra_toolkit.fastq_dump (`id srrid) in
-  Bowtie.bowtie ~v:1 bowtie_index (SE_or_PE.Single_end [ fastq ])
+  let fastq = Sra_toolkit.(fastq_dump fastq (`id srrid)) in
+  Bowtie.bowtie ~v:1 bowtie_index (Fastq_sample.Fq (Single_end fastq))
 
 let macs2 =
   Macs2.callpeak ~qvalue:1e-10 ~mfold:(1,100) Macs2.sam

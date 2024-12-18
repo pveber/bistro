@@ -10,16 +10,18 @@ other.
 maintainer: ["philippe.veber@gmail.com"]
 authors: ["Philippe Veber"]
 license: "CeCILL-B"
+tags: ["bioinformatics"]
 homepage: "https://github.com/pveber/bistro/"
 bug-reports: "https://github.com/pveber/bistro/issues"
 depends: [
-  "dune" {>= "1.11"}
+  "dune" {>= "3.0"}
   "biotk"
   "tyxml"
   "bistro"
+  "odoc" {with-doc}
 ]
 build: [
-  ["dune" "subst"] {pinned}
+  ["dune" "subst"] {dev}
   [
     "dune"
     "build"
