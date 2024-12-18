@@ -1,6 +1,6 @@
 open Bistro
 
-module Make(P : sig val np : int val mem : int end)() : sig
+module Make(_ : sig val np : int val mem : int end)() : sig
   val eval : 'a workflow -> 'a
   val path : _ path workflow -> string
   val file : _ file -> unit

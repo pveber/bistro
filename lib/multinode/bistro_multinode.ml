@@ -32,8 +32,6 @@ type _ api_request =
 
 module Client = struct
   type t = {
-    np : int ;
-    mem : int ;
     hostname : string ;
     port : int ;
   }
@@ -50,7 +48,7 @@ module Client = struct
 
   let main ~np ~mem ~hostname ~port () =
     let mem = mem * 1024 in
-    let client = { np ; mem ; hostname ; port } in
+    let client = { hostname ; port } in
     let stop_var = Lwt_mvar.create_empty () in
     send_request client (Subscript { np ; mem }) >>= fun (Client_id client_id) ->
     let job_thread = function
@@ -111,14 +109,14 @@ module Server = struct
         id : string ;
         np : int ;
         mem : int ;
-        mutable available_resource : Allocator.resource ;
+        available_resource : Allocator.resource ;
         pending_jobs : job_waiter Lwt_queue.t ;
         running_jobs : job_waiter String.Table.t ;
       }
 
     module Worker_allocator = struct
       type t = {
-        mutable available : Allocator.resource String.Table.t ;
+        available : Allocator.resource String.Table.t ;
         mutable waiters : ((int * int) * (string * Allocator.resource) Lwt.u) list ;
       }
 
@@ -184,18 +182,9 @@ module Server = struct
       alloc : Worker_allocator.t ;
     }
 
-    type event = [
-      | `Stop
-      | `New_worker
-    ]
-
     type t = {
-      server : Lwt_io.server ;
       state : state ;
-      events : event Lwt_react.event ;
-      send_event : event -> unit ;
       stop_signal : unit Lwt_condition.t ;
-      server_stop : unit Lwt.t ;
       logger : Logger.t ;
       db : Db.t ;
     }
@@ -286,17 +275,9 @@ module Server = struct
       let logger = Logger.tee loggers in
       let log event = logger#event db (Unix.gettimeofday ()) event in
       let stop_signal = Lwt_condition.create () in
-      Lwt_io.establish_server_with_client_address sockaddr (server_handler log ~stop_signal state) >>= fun server ->
-      let events, send_event = Lwt_react.E.create () in
-      let server_stop =
-        Lwt_condition.wait stop_signal >>= fun () -> Lwt_io.shutdown_server server
-      in
+      Lwt_io.establish_server_with_client_address sockaddr (server_handler log ~stop_signal state) >>= fun _server ->
       Lwt.return {
-        events ;
-        send_event ;
         stop_signal ;
-        server_stop ;
-        server ;
         state ;
         logger = Logger.tee loggers ;
         db ;

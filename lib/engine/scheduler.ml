@@ -349,7 +349,7 @@ module Make(Backend : Backend) = struct
   type t = {
     start : unit Synchro.t ;
     _end_ : unit Synchro.t ;
-    mutable closed : bool ;
+    closed : bool ;
     db : Db.t ;
     logger : Logger.t ;
     allowed_containers : [`Docker | `Singularity] list ;

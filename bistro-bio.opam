@@ -14,7 +14,7 @@ tags: ["bioinformatics"]
 homepage: "https://github.com/pveber/bistro/"
 bug-reports: "https://github.com/pveber/bistro/issues"
 depends: [
-  "dune" {>= "3.0"}
+  "dune" {>= "3.16"}
   "biotk"
   "tyxml"
   "bistro"

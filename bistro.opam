@@ -27,7 +27,7 @@ bug-reports: "https://github.com/pveber/bistro/issues"
 depends: [
   "base64" {>= "3.0.0"}
   "bos"
-  "dune" {>= "3.0" & > "1.6"}
+  "dune" {>= "3.16" & > "1.6"}
   "core" {>= "0.15.0"}
   "core_unix" {>= "0.15.0"}
   "lwt" {>= "3.2.0"}
