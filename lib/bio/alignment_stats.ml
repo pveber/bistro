@@ -9,10 +9,9 @@ let bamstats (bam : bam file) =
     let open Biotk in
     Bam.with_file [%path bam] ~f:(fun _ als ->
         Seq.fold_left
-          (fun acc r -> Bamstats.update acc (ok_or_failwith r))
+          (fun acc r -> Bamstats.update acc r)
           Bamstats.zero
           als
-        |> Result.return
       )
     |> Rresult.R.failwith_error_msg
     |> Bamstats.sexp_of_t
@@ -26,10 +25,9 @@ let fragment_length_stats (bam : bam file) =
     let open Biotk in
     Bam.with_file0 [%path bam] ~f:Bamstats.Fragment_length_histogram.(fun _ als ->
         let h = create ~min_mapq:5 () in
-        Seq.iter (fun al -> Stdlib.Result.get_ok (update0 h (Rresult.R.failwith_error_msg al))) als ;
+        Seq.iter (fun al -> Stdlib.Result.get_ok (update0 h al)) als ;
         Binning.seq h.counts
         |> Stdlib.List.of_seq
-        |> Result.return
       )
     |> ok_or_failwith
     |> [%sexp_of: (int * int) list]
@@ -43,8 +41,8 @@ let chrstats (bam : bam file) =
     let open Biotk in
     Bam.with_file0 [%path bam] ~f:Bamstats.Chr_histogram.(fun header als ->
         let h = create ~min_mapq:5 header in
-        Seq.iter (fun al -> Stdlib.Result.get_ok (update0 h (ok_or_failwith al))) als ;
-        Binning.seq h.counts |> Stdlib.List.of_seq |> Result.return
+        Seq.iter (fun al -> Stdlib.Result.get_ok (update0 h al)) als ;
+        Binning.seq h.counts |> Stdlib.List.of_seq
       )
     |> ok_or_failwith
     |> [%sexp_of: (string * int) list]

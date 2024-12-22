@@ -92,9 +92,8 @@ module Make(S : Sample) = struct
       let open Biotk in
       Bam.with_file [%path mapped_reads_bam x] ~f:(fun _ als ->
           Seq.fold_left
-            (fun acc r -> Bamstats.update acc (Rresult.R.failwith_error_msg r))
+            (fun acc r -> Bamstats.update acc r)
             Bamstats.zero als
-          |> Result.return
         )
       |> Rresult.R.failwith_error_msg
     in
