@@ -2,17 +2,19 @@ open Core
 open Bistro
 open Formats
 
+let ok_or_failwith = Rresult.R.failwith_error_msg
+
 let bamstats (bam : bam file) =
   let f = fun%workflow dest ->
     let open Biotk in
     Bam.with_file [%path bam] ~f:(fun _ als ->
         Seq.fold_left
-          (fun acc r -> Bamstats.update acc (ok_exn r))
+          (fun acc r -> Bamstats.update acc (ok_or_failwith r))
           Bamstats.zero
           als
         |> Result.return
       )
-    |> ok_exn
+    |> Rresult.R.failwith_error_msg
     |> Bamstats.sexp_of_t
     |> Sexp.to_string_hum
     |> fun data -> Out_channel.write_all dest ~data
@@ -24,12 +26,12 @@ let fragment_length_stats (bam : bam file) =
     let open Biotk in
     Bam.with_file0 [%path bam] ~f:Bamstats.Fragment_length_histogram.(fun _ als ->
         let h = create ~min_mapq:5 () in
-        Seq.iter (fun al -> ok_exn (update0 h (ok_exn al))) als ;
+        Seq.iter (fun al -> Stdlib.Result.get_ok (update0 h (Rresult.R.failwith_error_msg al))) als ;
         Binning.seq h.counts
         |> Stdlib.List.of_seq
         |> Result.return
       )
-    |> ok_exn
+    |> ok_or_failwith
     |> [%sexp_of: (int * int) list]
     |> Sexp.to_string_hum
     |> fun data -> Out_channel.write_all dest ~data
@@ -41,10 +43,10 @@ let chrstats (bam : bam file) =
     let open Biotk in
     Bam.with_file0 [%path bam] ~f:Bamstats.Chr_histogram.(fun header als ->
         let h = create ~min_mapq:5 header in
-        Seq.iter (fun al -> ok_exn (update0 h (ok_exn al))) als ;
+        Seq.iter (fun al -> Stdlib.Result.get_ok (update0 h (ok_or_failwith al))) als ;
         Binning.seq h.counts |> Stdlib.List.of_seq |> Result.return
       )
-    |> ok_exn
+    |> ok_or_failwith
     |> [%sexp_of: (string * int) list]
     |> Sexp.to_string_hum
     |> fun data -> Out_channel.write_all dest ~data
