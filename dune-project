@@ -18,7 +18,10 @@ This library provides wrappers for popular tools for genomics, transcriptomics
 and phylogeny, as well as custom tools to help piping data from one tool to the
 other.
 ")
-  (depends biotk tyxml bistro))
+  (depends
+    (biotk (>= 0.4))
+    tyxml
+    bistro))
 
 (package
   (name bistro)

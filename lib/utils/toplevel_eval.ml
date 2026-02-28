@@ -29,7 +29,7 @@ struct
     with_pworkflow w ~f:(fun x -> x)
 
   let sh fmt =
-    Printf.kprintf (fun s -> ignore (Sys.command s)) fmt
+    Printf.ksprintf (fun s -> ignore (Sys.command s)) fmt
 
   let rm w = with_pworkflow w ~f:(sh "rm %s")
 

@@ -102,13 +102,13 @@ let expression_rewriter ~loc ~path:_ expr =
   build_applicative ~loc deps code
 
 let rec extract_body = function
-  | { pexp_desc = Pexp_fun (_,_,_,body) ; _ } -> extract_body body
+  | { pexp_desc = Pexp_function (_, _, Pfunction_body body) ; _ } -> extract_body body
   | { pexp_desc = Pexp_constraint (expr, ty) ; _ } -> expr, Some ty
   | expr -> expr, None
 
 let rec replace_body new_body = function
-  | ({ pexp_desc = Pexp_fun (lab, e1, p, e2) ; _ } as expr) ->
-    { expr with pexp_desc = Pexp_fun (lab, e1, p, replace_body new_body e2) }
+  | ({ pexp_desc = Pexp_function (params, tconstr, Pfunction_body body) ; _ } as expr) ->
+    { expr with pexp_desc = Pexp_function (params, tconstr, Pfunction_body (replace_body new_body body)) }
   | _ -> new_body
 
 let default_descr var =
