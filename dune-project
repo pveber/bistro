@@ -46,14 +46,14 @@ Features:
   (depends
     (base64 (>= 3.0.0))
     bos
-    (dune (> 1.6))
-    (core (>= 0.15.0))
-    (core_unix (>= 0.15.0))
-    (lwt (>= 3.2.0))
+    (dune (>= 3.20.0))
+    (core (>= 0.17.0))
+    (core_unix (>= 0.17.0))
+    (lwt (>= 6.1.0))
     lwt_react
     (ocamlgraph (>= 1.8.7))
-    (ocaml (>= 4.08.0))
-    (ppxlib (>= 0.23.0))
+    (ocaml (>= 5.4.0))
+    (ppxlib (>= 0.37.0))
     ppx_sexp_conv
     rresult
     (sexplib (>= 113.24.00))
