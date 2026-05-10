@@ -7,6 +7,9 @@ let update_loc (lexbuf : Lexing.lexbuf) ~lines ~chars =
     pos_lnum = pos.pos_lnum + lines;
     pos_bol = pos.pos_cnum - chars;
   }
+
+let push_lexeme buf (lexbuf : Lexing.lexbuf) =
+  Buffer.add_string buf (Lexing.lexeme lexbuf)
 }
 
 let newline = ('\013'? '\010')
@@ -40,6 +43,11 @@ rule token = parse
     }
 
 and shell_block buf depth = parse
+  | "'"
+    {
+      push_lexeme buf lexbuf ;
+      shell_quotation buf depth lexbuf
+    }
   | "${" | "{"
     {
       shell_block buf (depth + 1) lexbuf
@@ -51,6 +59,18 @@ and shell_block buf depth = parse
     }
   | _
     {
-      Buffer.add_string buf (Lexing.lexeme lexbuf) ;
+      push_lexeme buf lexbuf ;
       shell_block buf depth lexbuf
+    }
+
+and shell_quotation buf depth = parse
+  | "'"
+    {
+      push_lexeme buf lexbuf ;
+      shell_block buf depth lexbuf
+    }
+  | _
+    {
+      push_lexeme buf lexbuf ;
+      shell_quotation buf depth lexbuf
     }

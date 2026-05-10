@@ -43,12 +43,19 @@ let parse_program (lexbuf : Lexing.lexbuf) =
   let init = Lang_parser.Incremental.program lexbuf.lex_curr_p in
   loop lexbuf init
 
-let%expect_test "shell_block_simple" =
-  let lexbuf = Lexing.from_string {|let a = ${ echo bistro }|} in
+let test_shell_block prg =
+  let lexbuf = Lexing.from_string prg in
   for i = 0 to 2 do ignore (Lexer.token lexbuf) done ;
   let output = match Lexer.token lexbuf with
     | SHELL_BLOCK s -> s
     | _ -> "not a shell block"
   in
-  print_endline output ;
+  print_endline output
+
+let%expect_test "shell_block_simple" =
+  test_shell_block {|let a = ${ echo bistro }|} ;
   [%expect {| echo bistro |}]
+
+let%expect_test "shell_block_quote" =
+  test_shell_block {|let a = ${ echo '}' }|} ;
+  [%expect {| echo '}' |}]
