@@ -2,4 +2,45 @@
   (name bistro_lang)
   (public_name bistro.lang)
   (modules_without_implementation parsetree)
-  (libraries cmdliner))
+  (libraries cmdliner menhirLib))
+
+(menhir
+ (modules parser)
+ (flags --table))
+
+(ocamllex lexer)
+
+;; No built-in support for Menhir's parser messages yet
+
+(rule
+ (with-stdout-to
+  parser.messages.new
+  (run menhir %{dep:parser.mly} --list-errors --explain--list-errors)))
+
+(rule
+ (with-stdout-to
+  parser_errors.ml
+  (run
+   menhir
+   %{dep:parser.mly}
+   --compile-errors
+   %{dep:parser.messages})))
+
+(rule
+ (with-stdout-to
+  parser.messages.updated
+  (run
+   menhir
+   %{dep:parser.mly}
+   --update-errors
+   %{dep:parser.messages})))
+
+(rule
+ (alias update-parser-messages)
+ (action
+  (diff parser.messages parser.messages.updated)))
+
+(rule
+ (alias create-parser-messages)
+ (action
+  (diff parser.messages parser.messages.new)))

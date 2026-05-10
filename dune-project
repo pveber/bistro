@@ -1,4 +1,5 @@
-(lang dune 3.16)
+(lang dune 3.21)
+(using menhir 3.0)
 (generate_opam_files true)
 
 (name bistro)
