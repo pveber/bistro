@@ -5,7 +5,7 @@
   (libraries cmdliner menhirLib))
 
 (menhir
- (modules parser)
+ (modules lang_parser)
  (flags --table))
 
 (ocamllex lexer)
@@ -14,33 +14,33 @@
 
 (rule
  (with-stdout-to
-  parser.messages.new
-  (run menhir %{dep:parser.mly} --list-errors --explain--list-errors)))
+  lang_parser.messages.new
+  (run menhir %{dep:lang_parser.mly} --list-errors --explain--list-errors)))
 
 (rule
  (with-stdout-to
-  parser_errors.ml
+  lang_parser_errors.ml
   (run
    menhir
-   %{dep:parser.mly}
+   %{dep:lang_parser.mly}
    --compile-errors
-   %{dep:parser.messages})))
+   %{dep:lang_parser.messages})))
 
 (rule
  (with-stdout-to
-  parser.messages.updated
+  lang_parser.messages.updated
   (run
    menhir
-   %{dep:parser.mly}
+   %{dep:lang_parser.mly}
    --update-errors
-   %{dep:parser.messages})))
+   %{dep:lang_parser.messages})))
 
 (rule
- (alias update-parser-messages)
+ (alias update-lang-parser-messages)
  (action
-  (diff parser.messages parser.messages.updated)))
+  (diff lang_parser.messages lang_parser.messages.updated)))
 
 (rule
- (alias create-parser-messages)
+ (alias create-lang-parser-messages)
  (action
-  (diff parser.messages parser.messages.new)))
+  (diff lang_parser.messages lang_parser.messages.new)))

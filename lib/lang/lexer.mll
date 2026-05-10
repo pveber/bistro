@@ -1,5 +1,5 @@
 {
-open Parser
+open Lang_parser
 
 let update_loc (lexbuf : Lexing.lexbuf) ~lines ~chars =
   let pos = lexbuf.lex_curr_p in

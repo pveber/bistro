@@ -1,4 +1,4 @@
-module I = Parser.MenhirInterpreter
+module I = Lang_parser.MenhirInterpreter
 
 type error_desc = {
   offset : int ;
@@ -19,7 +19,7 @@ let message_of_env env =
     match I.top env with
     | Some (I.Element (s, _, _, _)) ->
       I.number s
-      |> Parser_errors.message
+      |> Lang_parser_errors.message
       |> Option.some
     | None -> None
   with Stdlib.Not_found -> None
@@ -40,7 +40,7 @@ let parse_program (lexbuf : Lexing.lexbuf) =
     let supplier = I.lexer_lexbuf_to_supplier Lexer.token lexbuf in
     I.loop_handle Result.ok (fail lexbuf) supplier result
   in
-  let init = Parser.Incremental.program lexbuf.lex_curr_p in
+  let init = Lang_parser.Incremental.program lexbuf.lex_curr_p in
   loop lexbuf init
 
 let main ~program_path =
