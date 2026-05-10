@@ -1,4 +1,5 @@
 (library
   (name bistro_lang)
   (public_name bistro.lang)
+  (modules_without_implementation parsetree)
   (libraries cmdliner))
