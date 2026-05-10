@@ -2,7 +2,7 @@ let main ~program_path =
   In_channel.with_open_text program_path (fun ic ->
       let lexbuf = Lexing.from_channel ic in
       match Parser.parse_program lexbuf with
-      | Ok () -> ()
+      | Ok _ -> ()
       | Error (`Parser_error e) -> prerr_endline e.msg
     )
 

@@ -24,7 +24,7 @@ let message_of_env env =
     | None -> None
   with Stdlib.Not_found -> None
 
-let fail lexbuf (checkpoint : unit I.checkpoint) =
+let fail lexbuf (checkpoint : Parsetree.structure I.checkpoint) =
   match checkpoint with
   | I.HandlingError env ->
     let msg =

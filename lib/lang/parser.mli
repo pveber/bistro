@@ -7,4 +7,5 @@ type error_desc = {
 
 val parse_program :
   Lexing.lexbuf ->
-  (unit, [> `Parser_error of error_desc]) result
+  (Parsetree.structure,
+   [> `Parser_error of error_desc]) result
