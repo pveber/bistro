@@ -1,6 +1,7 @@
 %token EOF
 %token <string> INT
 %token <string> LIDENT
+%token <string> SHELL_BLOCK
 %token EQUAL
 %token LET
 
@@ -14,5 +15,10 @@ program:
 ;
 
 structure_item:
-  | LET LIDENT EQUAL INT {()}
+  | LET LIDENT EQUAL expression {()}
+;
+
+expression:
+  | INT {()}
+  | SHELL_BLOCK {()}
 ;

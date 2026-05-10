@@ -19,20 +19,38 @@ let ident_char = ident_start | ['0'-'9' '_']
 
 let decimal_literal = ['0'-'9'] ['0'-'9' '_']*
 
+let shell_word = (lower | upper | ['0'-'9' '_'])*
+
 rule token = parse
   | newline
     {
       update_loc lexbuf ~lines:1 ~chars:0 ;
       token lexbuf
     }
-  | blank +
-    { token lexbuf }
-  | eof
-    { EOF }
-  | "=" { EQUAL }
-  | decimal_literal as lit
-    { INT lit }
-  | "let"
-    { LET }
-  | lower ident_char * as s
-    { LIDENT s }
+  | blank +                             { token lexbuf }
+  | eof                                 { EOF }
+  | "="                                 { EQUAL }
+  | decimal_literal as lit              { INT lit }
+  | "let"                               { LET }
+  | lower ident_char * as s             { LIDENT s }
+  | "${"
+    {
+      let buf = Buffer.create 256 in
+      shell_block buf 0 lexbuf
+    }
+
+and shell_block buf depth = parse
+  | "${" | "{"
+    {
+      shell_block buf (depth + 1) lexbuf
+    }
+  | "}"
+    {
+      if depth = 0 then SHELL_BLOCK (Buffer.contents buf)
+      else shell_block buf (depth - 1) lexbuf
+    }
+  | _
+    {
+      Buffer.add_string buf (Lexing.lexeme lexbuf) ;
+      shell_block buf depth lexbuf
+    }
