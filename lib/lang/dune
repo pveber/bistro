@@ -1,0 +1,4 @@
+(library
+  (name bistro_lang)
+  (public_name bistro.lang)
+  (libraries cmdliner))

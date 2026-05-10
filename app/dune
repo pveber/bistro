@@ -1,0 +1,4 @@
+(executable
+  (name bistro_main)
+  (public_name bistro)
+  (libraries bistro_lang cmdliner))
