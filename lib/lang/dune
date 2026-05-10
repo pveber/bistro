@@ -1,8 +1,10 @@
 (library
   (name bistro_lang)
   (public_name bistro.lang)
+  (inline_tests)
   (modules_without_implementation parsetree)
-  (libraries cmdliner menhirLib))
+  (libraries cmdliner menhirLib)
+  (preprocess (pps ppx_expect)))
 
 (menhir
  (modules lang_parser)
