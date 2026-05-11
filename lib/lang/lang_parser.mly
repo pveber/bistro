@@ -14,10 +14,11 @@ let value_binding lident exp =
 %token EOF
 %token <string> INT
 %token <string> LIDENT
-%token <Parsetree.shell_item> SHELL_ITEM
+%token <string> SHELL_WORD
 %token SHELL_LBRACE
 %token RBRACE
 %token EQUAL
+%token COLON
 %token LET
 
 %start program
@@ -39,5 +40,9 @@ expression:
 ;
 
 shell_block:
-  | list(SHELL_ITEM) { $1 }
+  | list(shell_item) { $1 }
 ;
+
+shell_item:
+  | SHELL_WORD { Shell_word $1 }
+  | SHELL_LBRACE e = expression COLON RBRACE { Shell_antiquot e }

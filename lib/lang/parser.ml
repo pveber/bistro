@@ -58,7 +58,7 @@ let string_of_token tok =
   | Lang_parser.EOF -> "EOF"
   | LET -> "LET"
   | EQUAL -> "EQUAL"
-  | SHELL_ITEM (Shell_word s) -> sprintf "SHELL_WORD(%s)" s
+  | SHELL_WORD s -> sprintf "SHELL_WORD(%s)" s
   | LIDENT s -> sprintf "LIDENT(%s)" s
   | SHELL_LBRACE -> "SH_LBRACE"
   | RBRACE -> "RBRACE"
@@ -89,3 +89,8 @@ let%expect_test "shell_word_quote" =
   let prg = {|let a = ${ echo '}' }|} in
   test_lexer prg ;
   [%expect {| LET LIDENT(a) EQUAL SH_LBRACE SHELL_WORD(echo) SHELL_WORD('}') RBRACE EOF |}]
+
+let%expect_test "shell_word_antiquote" =
+  let prg = {|let a = ${ echo ${foo} }|} in
+  test_lexer prg ;
+  [%expect {| LET LIDENT(a) EQUAL SH_LBRACE SHELL_WORD(echo) SH_LBRACE LIDENT(foo) RBRACE RBRACE EOF |}]

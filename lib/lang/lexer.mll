@@ -51,6 +51,11 @@ rule token stack = parse
       push stack `Shell ;
       SHELL_LBRACE
     }
+  | "}"
+    {
+      pop stack ;
+      RBRACE
+    }
 
 and shell_token stack = parse
   | "'"
@@ -66,7 +71,12 @@ and shell_token stack = parse
     }
   | blank +                             { shell_token stack lexbuf }
   | eof                                 { EOF }
-  | shell_word as w                     { SHELL_ITEM (Shell_word w) }
+  | "${"
+    {
+      push stack `ML ;
+      SHELL_LBRACE
+    }
+  | shell_word as w                     { SHELL_WORD w }
   | "}"
     {
       pop stack ;
@@ -77,7 +87,7 @@ and shell_quotation buf = parse
   | "'"
     {
       push_lexeme buf lexbuf ;
-      SHELL_ITEM (Shell_word (Buffer.contents buf))
+      SHELL_WORD (Buffer.contents buf)
     }
   | _
     {

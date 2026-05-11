@@ -22,3 +22,4 @@ and shell_block = shell_item list
 
 and shell_item =
   | Shell_word of string
+  | Shell_antiquot of expression
