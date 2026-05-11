@@ -1,1 +1,3 @@
-let a = ${ echo bistro }
+let a = 42
+
+let b = ${ echo ${a} }

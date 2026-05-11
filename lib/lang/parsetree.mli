@@ -7,6 +7,7 @@ and expression = {
 
 and expression_desc =
   | Pexp_constant of constant
+  | Pexp_ident of string
   | Pexp_shell_block of shell_block
 
 and structure_item = {

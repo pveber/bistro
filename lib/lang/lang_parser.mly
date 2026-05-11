@@ -4,6 +4,9 @@ open Parsetree
 let int s =
   { pexp_desc = Pexp_constant (Pconst_integer s) }
 
+let ident s =
+  { pexp_desc = Pexp_ident s }
+
 let shell_block sb =
   { pexp_desc = Pexp_shell_block sb }
 
@@ -36,6 +39,7 @@ structure_item:
 
 expression:
   | INT { int $1 }
+  | LIDENT { ident $1 }
   | SHELL_LBRACE shell_block RBRACE { shell_block $2 }
 ;
 
@@ -45,4 +49,4 @@ shell_block:
 
 shell_item:
   | SHELL_WORD { Shell_word $1 }
-  | SHELL_LBRACE e = expression COLON RBRACE { Shell_antiquot e }
+  | SHELL_LBRACE e = expression RBRACE { Shell_antiquot e }

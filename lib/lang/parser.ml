@@ -67,16 +67,12 @@ let string_of_token tok =
 let test_lexer prg =
   let lexbuf = Lexing.from_string prg in
   let lexer = make_lexer () in
-  let it = ref 0 in
   let rec loop () =
-    incr it ;
-    if !it > 10 then ()
-    else
-      let tok = lexer lexbuf in
-      let msg = string_of_token tok in
-      print_string msg ;
-      if tok = EOF then print_newline ()
-      else (print_char ' ' ; loop ())
+    let tok = lexer lexbuf in
+    let msg = string_of_token tok in
+    print_string msg ;
+    if tok = EOF then print_newline ()
+    else (print_char ' ' ; loop ())
   in
   loop ()
 
@@ -94,3 +90,11 @@ let%expect_test "shell_word_antiquote" =
   let prg = {|let a = ${ echo ${foo} }|} in
   test_lexer prg ;
   [%expect {| LET LIDENT(a) EQUAL SH_LBRACE SHELL_WORD(echo) SH_LBRACE LIDENT(foo) RBRACE RBRACE EOF |}]
+
+let%expect_test "shell_word_antiquote2" =
+  let prg = {|let a = 42
+
+let b = ${ echo ${a} }
+|} in
+  test_lexer prg ;
+  [%expect {||}]
