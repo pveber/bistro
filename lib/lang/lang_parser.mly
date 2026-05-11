@@ -4,8 +4,8 @@ open Parsetree
 let int s =
   { pexp_desc = Pexp_constant (Pconst_integer s) }
 
-let shell_block s =
-  { pexp_desc = Pexp_shell_block s }
+let shell_block sb =
+  { pexp_desc = Pexp_shell_block sb }
 
 let value_binding lident exp =
   { pstr_desc = Pstr_value (lident, exp) }
@@ -14,7 +14,9 @@ let value_binding lident exp =
 %token EOF
 %token <string> INT
 %token <string> LIDENT
-%token <string> SHELL_BLOCK
+%token <Parsetree.shell_item> SHELL_ITEM
+%token SHELL_LBRACE
+%token RBRACE
 %token EQUAL
 %token LET
 
@@ -33,5 +35,9 @@ structure_item:
 
 expression:
   | INT { int $1 }
-  | SHELL_BLOCK { shell_block $1 }
+  | SHELL_LBRACE shell_block RBRACE { shell_block $2 }
+;
+
+shell_block:
+  | list(SHELL_ITEM) { $1 }
 ;

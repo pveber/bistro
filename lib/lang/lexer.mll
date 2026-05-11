@@ -10,6 +10,16 @@ let update_loc (lexbuf : Lexing.lexbuf) ~lines ~chars =
 
 let push_lexeme buf (lexbuf : Lexing.lexbuf) =
   Buffer.add_string buf (Lexing.lexeme lexbuf)
+
+let push stack x =
+  stack := x :: !stack
+
+let pop stack =
+  stack := (
+    match !stack with
+    | [] -> []
+    | _ :: t -> t
+  )
 }
 
 let newline = ('\013'? '\010')
@@ -22,15 +32,15 @@ let ident_char = ident_start | ['0'-'9' '_']
 
 let decimal_literal = ['0'-'9'] ['0'-'9' '_']*
 
-let shell_word = (lower | upper | ['0'-'9' '_'])*
+let shell_word = (lower | upper | ['0'-'9' '_']) +
 
-rule token = parse
+rule token stack = parse
   | newline
     {
       update_loc lexbuf ~lines:1 ~chars:0 ;
-      token lexbuf
+      token stack lexbuf
     }
-  | blank +                             { token lexbuf }
+  | blank +                             { token stack lexbuf }
   | eof                                 { EOF }
   | "="                                 { EQUAL }
   | decimal_literal as lit              { INT lit }
@@ -38,39 +48,39 @@ rule token = parse
   | lower ident_char * as s             { LIDENT s }
   | "${"
     {
-      let buf = Buffer.create 256 in
-      shell_block buf 0 lexbuf
+      push stack `Shell ;
+      SHELL_LBRACE
     }
 
-and shell_block buf depth = parse
+and shell_token stack = parse
   | "'"
     {
+      let buf = Buffer.create 256 in
       push_lexeme buf lexbuf ;
-      shell_quotation buf depth lexbuf
+      shell_quotation buf lexbuf
     }
-  | "${" | "{"
+  | newline
     {
-      shell_block buf (depth + 1) lexbuf
+      update_loc lexbuf ~lines:1 ~chars:0 ;
+      shell_token stack lexbuf
     }
+  | blank +                             { shell_token stack lexbuf }
+  | eof                                 { EOF }
+  | shell_word as w                     { SHELL_ITEM (Shell_word w) }
   | "}"
     {
-      if depth = 0 then SHELL_BLOCK (Buffer.contents buf)
-      else shell_block buf (depth - 1) lexbuf
-    }
-  | _
-    {
-      push_lexeme buf lexbuf ;
-      shell_block buf depth lexbuf
+      pop stack ;
+      RBRACE
     }
 
-and shell_quotation buf depth = parse
+and shell_quotation buf = parse
   | "'"
     {
       push_lexeme buf lexbuf ;
-      shell_block buf depth lexbuf
+      SHELL_ITEM (Shell_word (Buffer.contents buf))
     }
   | _
     {
       push_lexeme buf lexbuf ;
-      shell_quotation buf depth lexbuf
+      shell_quotation buf lexbuf
     }

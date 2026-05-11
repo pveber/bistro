@@ -35,27 +35,57 @@ let fail lexbuf (checkpoint : Parsetree.structure I.checkpoint) =
     Error (mkerror lexbuf msg)
   | _ -> assert false
 
+let make_lexer () =
+  let stack = ref [`ML] in
+  fun lexbuf ->
+    match !stack with
+    | [] -> assert false
+    | `ML :: _ -> Lexer.token stack lexbuf
+    | `Shell :: _ -> Lexer.shell_token stack lexbuf
+
 let parse_program (lexbuf : Lexing.lexbuf) =
+  let lexer = make_lexer () in
   let loop lexbuf result =
-    let supplier = I.lexer_lexbuf_to_supplier Lexer.token lexbuf in
+    let supplier = I.lexer_lexbuf_to_supplier lexer lexbuf in
     I.loop_handle Result.ok (fail lexbuf) supplier result
   in
   let init = Lang_parser.Incremental.program lexbuf.lex_curr_p in
   loop lexbuf init
 
-let test_shell_block prg =
+let string_of_token tok =
+  let open Printf in
+  match tok with
+  | Lang_parser.EOF -> "EOF"
+  | LET -> "LET"
+  | EQUAL -> "EQUAL"
+  | SHELL_ITEM (Shell_word s) -> sprintf "SHELL_WORD(%s)" s
+  | LIDENT s -> sprintf "LIDENT(%s)" s
+  | SHELL_LBRACE -> "SH_LBRACE"
+  | RBRACE -> "RBRACE"
+  | _ -> "OTHER"
+
+let test_lexer prg =
   let lexbuf = Lexing.from_string prg in
-  for i = 0 to 2 do ignore (Lexer.token lexbuf) done ;
-  let output = match Lexer.token lexbuf with
-    | SHELL_BLOCK s -> s
-    | _ -> "not a shell block"
+  let lexer = make_lexer () in
+  let it = ref 0 in
+  let rec loop () =
+    incr it ;
+    if !it > 10 then ()
+    else
+      let tok = lexer lexbuf in
+      let msg = string_of_token tok in
+      print_string msg ;
+      if tok = EOF then print_newline ()
+      else (print_char ' ' ; loop ())
   in
-  print_endline output
+  loop ()
 
-let%expect_test "shell_block_simple" =
-  test_shell_block {|let a = ${ echo bistro }|} ;
-  [%expect {| echo bistro |}]
+let%expect_test "shell_word_simple" =
+  let prg = {|let a = ${ echo bistro }|} in
+  test_lexer prg ;
+  [%expect {| LET LIDENT(a) EQUAL SH_LBRACE SHELL_WORD(echo) SHELL_WORD(bistro) RBRACE EOF |}]
 
-let%expect_test "shell_block_quote" =
-  test_shell_block {|let a = ${ echo '}' }|} ;
-  [%expect {| echo '}' |}]
+let%expect_test "shell_word_quote" =
+  let prg = {|let a = ${ echo '}' }|} in
+  test_lexer prg ;
+  [%expect {| LET LIDENT(a) EQUAL SH_LBRACE SHELL_WORD(echo) SHELL_WORD('}') RBRACE EOF |}]
