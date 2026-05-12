@@ -45,7 +45,7 @@ is a nice interactive interpreter for OCaml:
 
 .. code:: sh
 
-   $ opam install bistro utop
+   $ opam install bistro bistro-bio utop
 
 If you're new to OCaml, you might want to install ``ocaml-top``, which
 is a simple editor supporting syntax highlighting, automatic
