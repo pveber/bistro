@@ -2,7 +2,15 @@ let main ~program_path =
   In_channel.with_open_text program_path (fun ic ->
       let lexbuf = Lexing.from_channel ic in
       match Parser.parse_program lexbuf with
-      | Ok _ -> ()
+      | Ok ast ->
+        let env = Env.empty () in
+        let typed_ast = Typedtree.type_structure ast env in
+        let itp = Interpreter.create "_bistro" in
+        let values =
+          Interpreter.eval_structure itp typed_ast
+          |> Lwt_main.run
+        in
+        ignore values
       | Error (`Parser_error e) -> prerr_endline e.msg
     )
 

@@ -3,8 +3,8 @@
   (public_name bistro.lang)
   (inline_tests)
   (modules_without_implementation parsetree)
-  (libraries cmdliner menhirLib)
-  (preprocess (pps ppx_expect)))
+  (libraries cmdliner lwt lwt.unix menhirLib)
+  (preprocess (pps ppx_expect lwt_ppx)))
 
 (menhir
  (modules lang_parser)
