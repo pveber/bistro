@@ -25,7 +25,7 @@ and shell_block = shell_cmd list
 
 and shell_cmd = {
   cmd : shell_atom list ;
-  std_redir : shell_atom list option
+  std_redir : shell_atom option
 }
 
 and shell_atom =
@@ -48,7 +48,7 @@ let hash_shell_atom = function
 let hash_shell_cmd { cmd ; std_redir } =
   hash (
     List.map hash_shell_atom cmd,
-    Option.map (List.map hash_shell_atom) std_redir
+    Option.map hash_shell_atom std_redir
   )
 
 let hash_shell_cmds cmds =
@@ -85,7 +85,7 @@ and type_shell_cmd env { Parsetree.cmd ; std_redir } =
     | Shell_dest -> Shell_dest
   in
   let cmd = List.map type_atom cmd in
-  let std_redir = Option.map (List.map type_atom) std_redir in
+  let std_redir = Option.map type_atom std_redir in
   { cmd ; std_redir }
 
 let type_str_item (acc, env) (item : Parsetree.structure_item) =

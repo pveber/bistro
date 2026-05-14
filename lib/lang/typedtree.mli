@@ -25,7 +25,7 @@ and shell_block = shell_cmd list
 
 and shell_cmd = {
   cmd : shell_atom list ;
-  std_redir : shell_atom list option
+  std_redir : shell_atom option
 }
 
 and shell_atom =

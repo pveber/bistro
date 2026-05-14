@@ -60,4 +60,4 @@ shell_atom:
 ;
 
 shell_redir:
-  | GT nonempty_list(shell_atom) { $2 }
+  | GT shell_atom { $2 }
