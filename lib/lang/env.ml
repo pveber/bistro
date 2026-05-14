@@ -8,6 +8,10 @@ type t = {
   value : value_description String_map.t ;
 }
 
+let empty () = {
+  value = String_map.empty ;
+}
+
 let add_value env lident vd =
   {
     value = String_map.add lident vd env.value ;

@@ -4,6 +4,8 @@ type value_description = {
   hash : string ;
 }
 
+val empty : unit -> t
+
 val add_value :
   t ->
   string ->
