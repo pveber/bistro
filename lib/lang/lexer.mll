@@ -71,6 +71,8 @@ and shell_token stack = parse
     }
   | blank +                             { shell_token stack lexbuf }
   | eof                                 { EOF }
+  | ">"                                 { GT }
+  | ";"                                 { SEMICOLON }
   | "${"
     {
       push stack `ML ;
@@ -82,6 +84,14 @@ and shell_token stack = parse
       pop stack ;
       RBRACE
     }
+  | "$@" { SHELL_DEST }
+  | _ {
+    let pos = lexbuf.lex_curr_p in
+    let line = pos.pos_lnum in
+    let column = pos.pos_cnum - pos.pos_bol - 1 in
+    let msg = Printf.sprintf "unexpected character at line %d, position %d" line column in
+    failwith msg
+  }
 
 and shell_quotation buf = parse
   | "'"

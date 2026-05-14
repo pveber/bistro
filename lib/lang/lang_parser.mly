@@ -18,10 +18,12 @@ let value_binding lident exp =
 %token <string> INT
 %token <string> LIDENT
 %token <string> SHELL_WORD
+%token SHELL_DEST
 %token SHELL_LBRACE
 %token RBRACE
 %token EQUAL
-%token COLON
+%token GT
+%token SEMICOLON
 %token LET
 
 %start program
@@ -40,13 +42,22 @@ structure_item:
 expression:
   | INT { int $1 }
   | LIDENT { ident $1 }
-  | SHELL_LBRACE shell_block RBRACE { shell_block $2 }
+  | SHELL_LBRACE sb = shell_block RBRACE { shell_block sb }
 ;
 
 shell_block:
-  | list(shell_item) { $1 }
+  | separated_list(SEMICOLON, shell_cmd) { $1 }
 ;
 
-shell_item:
+shell_cmd:
+  | nonempty_list(shell_atom) option(shell_redir) {
+          { cmd = $1 ; std_redir = $2 }
+        }
+shell_atom:
   | SHELL_WORD { Shell_word $1 }
   | SHELL_LBRACE e = expression RBRACE { Shell_antiquot e }
+  | SHELL_DEST { Shell_dest }
+;
+
+shell_redir:
+  | GT nonempty_list(shell_atom) { $2 }

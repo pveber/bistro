@@ -19,8 +19,14 @@ and structure_item_desc =
 
 and structure = structure_item list
 
-and shell_block = shell_item list
+and shell_block = shell_cmd list
 
-and shell_item =
+and shell_cmd = {
+  cmd : shell_atom list ;
+  std_redir : shell_atom list option
+}
+
+and shell_atom =
   | Shell_word of string
   | Shell_antiquot of expression
+  | Shell_dest
