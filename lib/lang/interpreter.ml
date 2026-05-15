@@ -101,10 +101,10 @@ and exec_shell_cmd itp (cmd, redir) =
     else Ok ()
   )
 
-and eval_shell_cmd itp env { Typedtree.cmd ; std_redir } ~hash =
-  let eval_atom : Typedtree.shell_atom -> string Lwt.t = function
-    | Shell_word s -> Lwt.return s
-    | Shell_antiquot e ->
+and eval_shell_cmd itp env { Shell_ast.cmd ; std_redir } ~hash =
+  let eval_atom : Typedtree.expression Shell_ast.atom -> string Lwt.t = function
+    | Word s -> Lwt.return s
+    | Antiquot e ->
         let%lwt v = eval_expression itp env e in
         let s = match v with
           | VInt i -> string_of_int i
@@ -112,7 +112,7 @@ and eval_shell_cmd itp env { Typedtree.cmd ; std_redir } ~hash =
           | VPath (Cache id) -> Db.cache_path itp.db id
         in
         Lwt.return s
-    | Shell_dest -> Lwt.return (Db.build_dest itp.db hash)
+    | Dest -> Lwt.return (Db.build_dest itp.db hash)
   in
   let%lwt cmd = Lwt_list.map_p eval_atom cmd
   and std_redir = match std_redir with

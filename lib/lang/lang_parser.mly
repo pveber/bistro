@@ -51,12 +51,12 @@ shell_block:
 
 shell_cmd:
   | nonempty_list(shell_atom) option(shell_redir) {
-          { cmd = $1 ; std_redir = $2 }
+          { Shell_ast.cmd = $1 ; std_redir = $2 }
         }
 shell_atom:
-  | SHELL_WORD { Shell_word $1 }
-  | SHELL_LBRACE e = expression RBRACE { Shell_antiquot e }
-  | SHELL_DEST { Shell_dest }
+  | SHELL_WORD { Shell_ast.Word $1 }
+  | SHELL_LBRACE e = expression RBRACE { Shell_ast.Antiquot e }
+  | SHELL_DEST { Shell_ast.Dest }
 ;
 
 shell_redir:

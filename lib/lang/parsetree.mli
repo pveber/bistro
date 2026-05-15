@@ -8,7 +8,7 @@ and expression = {
 and expression_desc =
   | Pexp_constant of constant
   | Pexp_ident of string
-  | Pexp_shell_block of shell_block
+  | Pexp_shell_block of expression Shell_ast.t
 
 and structure_item = {
   pstr_desc: structure_item_desc
@@ -18,15 +18,3 @@ and structure_item_desc =
   | Pstr_value of string * expression
 
 and structure = structure_item list
-
-and shell_block = shell_cmd list
-
-and shell_cmd = {
-  cmd : shell_atom list ;
-  std_redir : shell_atom option
-}
-
-and shell_atom =
-  | Shell_word of string
-  | Shell_antiquot of expression
-  | Shell_dest
