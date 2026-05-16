@@ -15,6 +15,11 @@ and exp_desc =
 
 and t = (string * expression) list
 
+module Exp : sig
+  val int : int -> expression
+  val shell : expression Shell_ast.t -> expression
+end
+
 val compile :
   Typedtree.structure ->
   t

@@ -5,9 +5,10 @@ let main ~program_path =
       | Ok ast ->
         let env = Env.empty () in
         let typed_ast = Typedtree.type_structure ast env in
+        let program = Lambda.compile typed_ast in
         let itp = Interpreter.create "_bistro" in
         let values =
-          Interpreter.eval_structure itp typed_ast
+          Interpreter.eval_program itp program
           |> Lwt_main.run
         in
         ignore values

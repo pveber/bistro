@@ -4,7 +4,7 @@ type t
 
 val create : string -> t
 
-val eval_structure :
+val eval_program :
   t ->
-  Typedtree.structure ->
+  Lambda.t ->
   value list Lwt.t

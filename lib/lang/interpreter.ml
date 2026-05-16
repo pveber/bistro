@@ -11,10 +11,20 @@ type value =
 module String_map = Map.Make(String)
 
 module Env = struct
-  type t = value Lwt.t String_map.t
-  let empty = String_map.empty
-  let add (e : t) k v = String_map.add k v e
-  let get_exn (e : t) k = String_map.find k e
+  type t = {
+    expr : Lambda.expression Lwt.t String_map.t ;
+    value : value Lwt.t String_map.t ;
+  }
+  let empty = {
+    expr = String_map.empty ;
+    value = String_map.empty ;
+  }
+  let add (e : t) k v = { e with value = String_map.add k v e.value }
+  let lookup_exn (e : t) k = String_map.find k e.value
+  let add_expr (e : t) k v = { e with expr = String_map.add k v e.expr }
+  let lookup_hash_exn (e : t) k =
+    let%lwt expr = String_map.find k e.expr in
+    Lwt.return (Option.get expr.hash)
 end
 
 module Db = struct
@@ -32,7 +42,7 @@ module Db = struct
   let build_dest db id = Filename.concat (build_path db id) "dest"
 end
 
-let lwt_option_map o ~f =
+let lwt_option_bind o ~f =
   match o with
   | None -> Lwt.return None
   | Some x ->
@@ -53,7 +63,7 @@ let redirection filename =
   Lwt.return (`FD_move (Lwt_unix.unix_file_descr fd))
 
 let lwt_exec ?stdout cmd =
-  let%lwt stdout = lwt_option_map stdout ~f:redirection in
+  let%lwt stdout = lwt_option_bind stdout ~f:redirection in
   Lwt_process.exec ?stdout ("", cmd)
 
 type t = {
@@ -64,15 +74,47 @@ let create dir =
   Db.create dir ;
   { db = dir }
 
-let eval_const : Typedtree.constant -> value = function
-  | Tconst_int i -> VInt i
+let lwt_shell_ast_bind xs ~f =
+  let open Shell_ast in
+  let bind_atom = function
+    | Word s -> Lwt.return (Word s)
+    | Antiquot x ->
+      let%lwt y = f x in
+      Lwt.return (Antiquot y)
+    | Dest -> Lwt.return Dest
+  in
+  let map_cmd c =
+    let%lwt cmd = Lwt_list.map_p bind_atom c.cmd
+    and std_redir = lwt_option_bind c.std_redir ~f:bind_atom in
+    Lwt.return { cmd ; std_redir }
+  in
+  Lwt_list.map_p map_cmd xs
 
-let rec eval_expression itp env (exp : Typedtree.expression) =
-  match exp.texp_desc with
-  | Texp_constant k -> Lwt.return (eval_const k)
-  | Texp_ident lident -> Env.get_exn env lident
-  | Texp_shell_block sb ->
-    exec_shell_block itp env ~hash:exp.texp_hash sb
+let eval_const : Lambda.constant -> value = function
+  | Constant_int i -> VInt i
+
+let rec eval_expression itp env (exp : Lambda.expression) =
+  let%lwt exp = purify_expression itp env exp in
+  match exp.Lambda.desc with
+  | Lconst k -> Lwt.return (eval_const k)
+  | Lvar lident -> Env.lookup_exn env lident
+  | Lshell sb ->
+    let hash = Option.get exp.hash in
+    exec_shell_block itp env ~hash sb
+
+and purify_expression itp env (exp : Lambda.expression) =
+  match exp.hash with
+    | None -> (
+        match exp.desc with
+        | Lconst _ -> assert false
+        | Lvar lident ->
+          let%lwt hash = Env.lookup_hash_exn env lident in
+          Lwt.return { exp with hash = Some hash }
+        | Lshell sb ->
+          let%lwt cmds = lwt_shell_ast_bind sb ~f:(purify_expression itp env) in
+          Lwt.return (Lambda.Exp.shell cmds)
+      )
+    | Some h -> Lwt.return exp
 
 and exec_shell_block itp env ~hash cmds =
   let%lwt cmds = Lwt_list.map_p (eval_shell_cmd itp env ~hash) cmds in
@@ -102,7 +144,7 @@ and exec_shell_cmd itp (cmd, redir) =
   )
 
 and eval_shell_cmd itp env { Shell_ast.cmd ; std_redir } ~hash =
-  let eval_atom : Typedtree.expression Shell_ast.atom -> string Lwt.t = function
+  let eval_atom : Lambda.expression Shell_ast.atom -> string Lwt.t = function
     | Word s -> Lwt.return s
     | Antiquot e ->
         let%lwt v = eval_expression itp env e in
@@ -123,14 +165,14 @@ and eval_shell_cmd itp env { Shell_ast.cmd ; std_redir } ~hash =
   in
   Lwt.return (Array.of_list cmd, std_redir)
 
-and eval_structure itp str_items =
+and eval_program itp defs =
   let env = Env.empty in
-  let str_items, env = List.fold_left (eval_str_item itp env) ([], env) str_items in
+  let str_items, env = List.fold_left (eval_def itp env) ([], env) defs in
   Lwt_list.map_p Fun.id (List.rev str_items)
 
-and eval_str_item itp env (acc, env) item =
-  match item.Typedtree.tstr_desc with
-  | Typedtree.Tstr_value (lident, exp) ->
-    let value = eval_expression itp env exp in
-    let env = Env.add env lident value in
-    value :: acc, env
+and eval_def itp env (acc, env) (lident, exp) =
+  let pure_expr = purify_expression itp env exp in
+  let value = Lwt.bind pure_expr (eval_expression itp env) in
+  let env = Env.add_expr env lident pure_expr in
+  let env = Env.add env lident value in
+  value :: acc, env
