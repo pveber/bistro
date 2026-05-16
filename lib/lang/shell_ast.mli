@@ -9,3 +9,5 @@ and 'a atom =
   | Word of string
   | Antiquot of 'a
   | Dest
+
+val map : 'a t -> f:('a -> 'b) -> 'b t
