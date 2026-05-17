@@ -1,7 +1,12 @@
 (** Program representation at run time *)
 
+type path =
+  | FS of string
+  | Cache of string
+
 type constant =
   | Constant_int of int
+  | Constant_path of path
 
 type expression = {
   hash : string option ;
@@ -17,6 +22,7 @@ and t = (string * expression) list
 
 module Exp : sig
   val int : int -> expression
+  val path : path -> expression
   val shell : expression Shell_ast.t -> expression
 end
 

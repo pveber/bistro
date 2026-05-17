@@ -1,29 +1,22 @@
-type path =
-  | FS of string
-  | Cache of string
-[@@deriving show]
-
-type value =
-  | VInt of int
-  | VPath of path
-[@@deriving show]
-
 module String_map = Map.Make(String)
 
 module Env = struct
   type t = {
-    expr : Lambda.expression Lwt.t String_map.t ;
-    value : value Lwt.t String_map.t ;
+    resolution : Lambda.expression Lwt.t String_map.t ;
+    evaluation : Lambda.expression Lwt.t String_map.t ;
   }
   let empty = {
-    expr = String_map.empty ;
-    value = String_map.empty ;
+    resolution = String_map.empty ;
+    evaluation = String_map.empty ;
   }
-  let add (e : t) k v = { e with value = String_map.add k v e.value }
-  let lookup_exn (e : t) k = String_map.find k e.value
-  let add_expr (e : t) k v = { e with expr = String_map.add k v e.expr }
+  let register (e : t) k ~resolution ~evaluation = {
+    resolution = String_map.add k resolution e.resolution ;
+    evaluation = String_map.add k evaluation e.evaluation ;
+  }
+
+  let lookup_exn (e : t) k = String_map.find k e.evaluation
   let lookup_hash_exn (e : t) k =
-    let%lwt expr = String_map.find k e.expr in
+    let%lwt expr = String_map.find k e.resolution in
     Lwt.return (Option.get expr.hash)
 end
 
@@ -90,13 +83,10 @@ let lwt_shell_ast_bind xs ~f =
   in
   Lwt_list.map_p map_cmd xs
 
-let eval_const : Lambda.constant -> value = function
-  | Constant_int i -> VInt i
-
 let rec eval_expression itp env (exp : Lambda.expression) =
   let%lwt exp = purify_expression itp env exp in
   match exp.Lambda.desc with
-  | Lconst k -> Lwt.return (eval_const k)
+  | Lconst _ -> Lwt.return exp
   | Lvar lident -> Env.lookup_exn env lident
   | Lshell sb ->
     let hash = Option.get exp.hash in
@@ -119,7 +109,7 @@ and purify_expression itp env (exp : Lambda.expression) =
 and exec_shell_block itp env ~hash cmds =
   let%lwt cmds = Lwt_list.map_p (eval_shell_cmd itp env ~hash) cmds in
   let rec loop = function
-    | [] -> Lwt.return (VPath (Cache hash))
+    | [] -> Lwt.return Lambda.(Exp.path (Cache hash))
     | h :: t ->
       match%lwt exec_shell_cmd itp h with
       | Ok () -> loop t
@@ -148,10 +138,14 @@ and eval_shell_cmd itp env { Shell_ast.cmd ; std_redir } ~hash =
     | Word s -> Lwt.return s
     | Antiquot e ->
         let%lwt v = eval_expression itp env e in
-        let s = match v with
-          | VInt i -> string_of_int i
-          | VPath (FS p) -> p
-          | VPath (Cache id) -> Db.cache_path itp.db id
+        let s = match v.desc with
+          | Lconst c -> (
+              match c with
+              | Constant_int i -> string_of_int i
+              | Constant_path (FS p) -> p
+              | Constant_path (Cache id) -> Db.cache_path itp.db id
+            )
+          | _ -> assert false
         in
         Lwt.return s
     | Dest -> Lwt.return (Db.build_dest itp.db hash)
@@ -171,8 +165,7 @@ and eval_program itp defs =
   Lwt_list.map_p Fun.id (List.rev str_items)
 
 and eval_def itp env (acc, env) (lident, exp) =
-  let pure_expr = purify_expression itp env exp in
-  let value = Lwt.bind pure_expr (eval_expression itp env) in
-  let env = Env.add_expr env lident pure_expr in
-  let env = Env.add env lident value in
-  value :: acc, env
+  let resolution = purify_expression itp env exp in
+  let evaluation = Lwt.bind resolution (eval_expression itp env) in
+  let env = Env.register env lident ~resolution ~evaluation in
+  evaluation :: acc, env

@@ -1,5 +1,10 @@
+type path =
+  | FS of string
+  | Cache of string
+
 type constant =
   | Constant_int of int
+  | Constant_path of path
 
 type expression = {
   hash : string option ;
@@ -21,6 +26,14 @@ module Exp = struct
     hash = Some (hash ("int", i)) ;
     desc = Lconst (Constant_int i)
   }
+
+  let path p =
+    let id = match p with
+      | FS p -> ("FS", p)
+      | Cache id -> ("cache", id)
+    in
+    { hash = Some (hash id) ;
+      desc = Lconst (Constant_path p) }
 
   let hash_shell_atom = function
     | Shell_ast.Word s -> Some (hash ("word", s))
