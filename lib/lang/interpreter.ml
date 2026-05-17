@@ -91,6 +91,7 @@ let rec eval_expression itp env (exp : Lambda.expression) =
   | Lshell sb ->
     let hash = Option.get exp.hash in
     exec_shell_block itp env ~hash sb
+  | Llam _ -> Lwt.return exp
 
 and purify_expression itp env (exp : Lambda.expression) =
   match exp.hash with
@@ -103,6 +104,7 @@ and purify_expression itp env (exp : Lambda.expression) =
         | Lshell sb ->
           let%lwt cmds = lwt_shell_ast_bind sb ~f:(purify_expression itp env) in
           Lwt.return (Lambda.Exp.shell cmds)
+        | Llam _ -> assert false
       )
     | Some h -> Lwt.return exp
 

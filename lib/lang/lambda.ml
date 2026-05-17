@@ -15,6 +15,7 @@ and exp_desc =
   | Lconst of constant
   | Lvar of string
   | Lshell of expression Shell_ast.t
+  | Llam of string * expression
 
 and t = (string * expression) list
 
@@ -67,6 +68,10 @@ module Exp = struct
 
   let shell cmds =
     { hash = hash_shell_cmds cmds ; desc = Lshell cmds }
+
+  let lam var body =
+    let hash = Option.map (fun body_h -> hash ("lam", var, body_h)) body.hash in
+    { hash ; desc = Llam (var, body) }
 end
 
 let compile_constant (c : Typedtree.constant) =

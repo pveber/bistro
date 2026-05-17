@@ -17,6 +17,7 @@ and exp_desc =
   | Lconst of constant
   | Lvar of string
   | Lshell of expression Shell_ast.t
+  | Llam of string * expression
 
 and t = (string * expression) list
 
@@ -24,6 +25,7 @@ module Exp : sig
   val int : int -> expression
   val path : path -> expression
   val shell : expression Shell_ast.t -> expression
+  val lam : string -> expression -> expression
 end
 
 val compile :
