@@ -19,7 +19,10 @@ and structure_item = {
 and structure_item_desc =
   | Tstr_value of string * expression
 
-and structure = structure_item list
+and structure = {
+  tmod_inputs : structure_item list ;
+  tmod_defs : structure_item list ;
+}
 
 let hash x =
   Digest.to_hex (Digest.string (Marshal.(to_string x [No_sharing])))
@@ -85,6 +88,14 @@ let type_str_item (acc, env) (item : Parsetree.structure_item) =
     let env = Env.add_value env lident desc in
     (item :: acc, env)
 
-let type_structure past env =
-  let str_items, env = List.fold_left type_str_item ([], env) past in
-  List.rev str_items
+let type_structure (past : Parsetree.structure) env =
+  let fold_defs env = List.fold_left type_str_item ([], env) in
+  let input_items, env = match past.pmod_inputs with
+    | None -> [], env
+    | Some str_items -> fold_defs env str_items
+  in
+  let def_items, env = fold_defs env past.pmod_defs in
+  {
+    tmod_inputs = List.rev input_items ;
+    tmod_defs = List.rev def_items ;
+  }

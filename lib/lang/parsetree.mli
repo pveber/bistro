@@ -17,4 +17,7 @@ and structure_item = {
 and structure_item_desc =
   | Pstr_value of string * expression
 
-and structure = structure_item list
+and structure = {
+  pmod_inputs : structure_item list option ;
+  pmod_defs : structure_item list ;
+}

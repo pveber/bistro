@@ -19,7 +19,11 @@ and exp_desc =
   | Lshell of expression Shell_ast.t
   | Llam of string * expression
 
-and t = (string * expression) list
+and section = (string * expression) list
+and t = {
+  inputs : section ;
+  defs : section ;
+}
 
 module Exp : sig
   val int : int -> expression

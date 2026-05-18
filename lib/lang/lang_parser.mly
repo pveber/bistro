@@ -12,6 +12,8 @@ let shell_block sb =
 
 let value_binding lident exp =
   { pstr_desc = Pstr_value (lident, exp) }
+
+let structure ?input defs = { pmod_inputs = input ; pmod_defs = defs }
 %}
 
 %token EOF
@@ -20,11 +22,13 @@ let value_binding lident exp =
 %token <string> SHELL_WORD
 %token SHELL_DEST
 %token SHELL_LBRACE
+%token LBRACE
 %token RBRACE
 %token EQUAL
 %token GT
 %token SEMICOLON
 %token LET
+%token INPUT_DIRECTIVE
 
 %start program
 %type <Parsetree.structure> program
@@ -32,7 +36,11 @@ let value_binding lident exp =
 %%
 
 program:
-  | list(structure_item) EOF { $1 }
+  | option(input_section) list(structure_item) EOF { structure ?input:$1 $2 }
+;
+
+input_section:
+  | INPUT_DIRECTIVE LBRACE list(structure_item) RBRACE { $3 }
 ;
 
 structure_item:

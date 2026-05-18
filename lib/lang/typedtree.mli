@@ -19,7 +19,10 @@ and structure_item = {
 and structure_item_desc =
   | Tstr_value of string * expression
 
-and structure = structure_item list
+and structure = {
+  tmod_inputs : structure_item list ;
+  tmod_defs : structure_item list ;
+}
 
 val type_structure :
   Parsetree.structure ->

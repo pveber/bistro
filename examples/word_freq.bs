@@ -1,3 +1,5 @@
-let a = 42
+#inputs {
+  let word = getenv "WORD"
+}
 
-let b = ${ echo ${a} > $@ }
+let b = ${ echo ${word} > $@ }

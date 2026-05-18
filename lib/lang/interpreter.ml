@@ -54,6 +54,8 @@ type t = {
   db : string ;
 }
 
+let eval_inputs 
+
 let create dir =
   Db.create dir ;
   { db = dir }
@@ -135,9 +137,9 @@ and eval_shell_cmd itp env { Shell_ast.cmd ; std_redir } ~hash =
   in
   Lwt.return (Array.of_list cmd, std_redir)
 
-and eval_program itp defs =
-  let env = Env.empty in
-  let str_items, env = List.fold_left (eval_def itp env) ([], env) defs in
+and eval_program itp (prg : Lambda.t) =
+  let env = eval_inputs itp prg.inputs in
+  let str_items, env = List.fold_left (eval_def itp env) ([], env) prg.defs in
   Lwt_list.map_p Fun.id (List.rev str_items)
 
 and eval_def itp env (acc, env) (lident, exp) =

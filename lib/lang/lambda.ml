@@ -17,7 +17,11 @@ and exp_desc =
   | Lshell of expression Shell_ast.t
   | Llam of string * expression
 
-and t = (string * expression) list
+and section = (string * expression) list
+and t = {
+  inputs : section ;
+  defs : section ;
+}
 
 module Exp = struct
   let hash x =
@@ -99,5 +103,7 @@ let compile_str_item (i : Typedtree.structure_item) =
   | Tstr_value (lident, expr) ->
     lident, compile_expression expr
 
-let compile (tree : Typedtree.structure) =
-  List.map compile_str_item tree
+let compile (tree : Typedtree.structure) = {
+  inputs = List.map compile_str_item tree.tmod_inputs ;
+  defs = List.map compile_str_item tree.tmod_defs ;
+}
