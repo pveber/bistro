@@ -9,7 +9,7 @@ type constant =
   | Constant_path of path
 
 type expression = {
-  hash : string option ;
+  hash : string ;
   desc : exp_desc ;
 }
 

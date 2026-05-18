@@ -1,23 +1,14 @@
 module String_map = Map.Make(String)
 
 module Env = struct
-  type t = {
-    resolution : Lambda.expression Lwt.t String_map.t ;
-    evaluation : Lambda.expression Lwt.t String_map.t ;
-  }
-  let empty = {
-    resolution = String_map.empty ;
-    evaluation = String_map.empty ;
-  }
-  let register (e : t) k ~resolution ~evaluation = {
-    resolution = String_map.add k resolution e.resolution ;
-    evaluation = String_map.add k evaluation e.evaluation ;
-  }
+  type t = Lambda.expression Lwt.t String_map.t
 
-  let lookup_exn (e : t) k = String_map.find k e.evaluation
-  let lookup_hash_exn (e : t) k =
-    let%lwt expr = String_map.find k e.resolution in
-    Lwt.return (Option.get expr.hash)
+  let empty = String_map.empty
+
+  let register (e : t) k value =
+    String_map.add k value e
+
+  let lookup_exn (e : t) k = String_map.find k e
 end
 
 module Db = struct
@@ -84,29 +75,12 @@ let lwt_shell_ast_bind xs ~f =
   Lwt_list.map_p map_cmd xs
 
 let rec eval_expression itp env (exp : Lambda.expression) =
-  let%lwt exp = purify_expression itp env exp in
   match exp.Lambda.desc with
   | Lconst _ -> Lwt.return exp
   | Lvar lident -> Env.lookup_exn env lident
   | Lshell sb ->
-    let hash = Option.get exp.hash in
-    exec_shell_block itp env ~hash sb
+    exec_shell_block itp env ~hash:exp.hash sb
   | Llam _ -> Lwt.return exp
-
-and purify_expression itp env (exp : Lambda.expression) =
-  match exp.hash with
-    | None -> (
-        match exp.desc with
-        | Lconst _ -> assert false
-        | Lvar lident ->
-          let%lwt hash = Env.lookup_hash_exn env lident in
-          Lwt.return { exp with hash = Some hash }
-        | Lshell sb ->
-          let%lwt cmds = lwt_shell_ast_bind sb ~f:(purify_expression itp env) in
-          Lwt.return (Lambda.Exp.shell cmds)
-        | Llam _ -> assert false
-      )
-    | Some h -> Lwt.return exp
 
 and exec_shell_block itp env ~hash cmds =
   let%lwt cmds = Lwt_list.map_p (eval_shell_cmd itp env ~hash) cmds in
@@ -167,7 +141,6 @@ and eval_program itp defs =
   Lwt_list.map_p Fun.id (List.rev str_items)
 
 and eval_def itp env (acc, env) (lident, exp) =
-  let resolution = purify_expression itp env exp in
-  let evaluation = Lwt.bind resolution (eval_expression itp env) in
-  let env = Env.register env lident ~resolution ~evaluation in
-  evaluation :: acc, env
+  let value = eval_expression itp env exp in
+  let env = Env.register env lident value in
+  value :: acc, env
